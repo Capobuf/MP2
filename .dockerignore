@@ -1,0 +1,11 @@
+.git
+.github
+.agents
+.specify
+.env
+.env.*
+node_modules
+vendor
+storage/logs/*
+coverage
+*.log

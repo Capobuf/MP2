@@ -1,0 +1,96 @@
+name: Quality
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: testing
+          MYSQL_USER: sail
+          MYSQL_PASSWORD: password
+          MYSQL_ROOT_PASSWORD: password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --host=127.0.0.1 --user=sail --password=password --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=12
+
+    env:
+      APP_ENV: testing
+      APP_DEBUG: false
+      APP_KEY: base64:JXwSFFMnJZQMZGLjjArLbCWZjajLd3C/aRwEpPN0JbM=
+      APP_URL: http://127.0.0.1:9000
+      CACHE_STORE: array
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: testing
+      DB_USERNAME: sail
+      DB_PASSWORD: password
+      DEV_ADMIN_NAME: Administrator
+      DEV_ADMIN_EMAIL: admin@mp2.local
+      DEV_ADMIN_PASSWORD: admin@mp2.local
+      MAIL_MAILER: array
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: array
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath, intl, mbstring, pdo_mysql
+          coverage: none
+          tools: composer:v2
+
+      - name: Validate Composer metadata
+        run: composer validate --strict
+
+      - name: Install locked dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Audit locked dependencies
+        run: composer audit --locked --no-interaction
+
+      - name: Migrate isolated test database
+        run: php artisan migrate --force --no-interaction
+
+      - name: Check formatting
+        run: vendor/bin/pint --test
+
+      - name: Run static analysis
+        run: vendor/bin/phpstan analyse --no-progress
+
+      - name: Run Pest
+        run: vendor/bin/pest
+
+      - name: Smoke test application
+        run: |
+          php artisan serve --host=127.0.0.1 --port=9000 > storage/logs/ci-server.log 2>&1 &
+          for attempt in {1..15}; do
+            if curl --fail --silent --output /dev/null http://127.0.0.1:9000/admin/login; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat storage/logs/ci-server.log
+          exit 1
