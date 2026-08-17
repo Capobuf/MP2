@@ -9,6 +9,9 @@ use App\Domain\Company\Setting;
 use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\CostCenter;
+use App\Models\Exercise;
+use App\Models\Expense;
+use App\Models\ExpenseLine;
 use App\Models\Supplier;
 use App\Models\SupplierContact;
 use App\Models\User;
@@ -37,9 +40,18 @@ class CompanyAudit extends Page implements HasTable
 
     protected static ?int $navigationSort = 40;
 
+    public ?int $expense = null;
+
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
+        $requestedExpense = request()->integer('expense');
+        $this->expense = $requestedExpense > 0 && Expense::query()
+            ->where('company_id', $this->company()->id)
+            ->whereKey($requestedExpense)
+            ->exists()
+                ? $requestedExpense
+                : null;
     }
 
     public static function canAccess(): bool
@@ -55,10 +67,21 @@ class CompanyAudit extends Page implements HasTable
     public function table(Table $table): Table
     {
         return $table
-            ->query(fn (): Builder => AuditEvent::query()
-                ->where('company_id', $this->company()->id)
-                ->orderByDesc('created_at')
-                ->orderByDesc('id'))
+            ->query(function (): Builder {
+                $query = AuditEvent::query()->where('company_id', $this->company()->id);
+
+                if ($this->expense !== null) {
+                    $query->where(fn (Builder $subject): Builder => $subject
+                        ->where(fn (Builder $expense): Builder => $expense
+                            ->where('subject_type', Expense::class)
+                            ->where('subject_id', $this->expense))
+                        ->orWhere(fn (Builder $line): Builder => $line
+                            ->where('reference_type', Expense::class)
+                            ->where('reference_id', $this->expense)));
+                }
+
+                return $query->orderByDesc('created_at')->orderByDesc('id');
+            })
             ->columns([
                 TextColumn::make('created_at')
                     ->label('Data e ora')
@@ -75,6 +98,10 @@ class CompanyAudit extends Page implements HasTable
                 TextColumn::make('effective_from')
                     ->label('Decorrenza')
                     ->date('d/m/Y'),
+                TextColumn::make('affected_exercise_ids')
+                    ->label('Esercizi interessati')
+                    ->state(fn (AuditEvent $record): string => self::formatExercises($record))
+                    ->placeholder('—'),
                 TextColumn::make('beneficiary.email')->label('Beneficiario')->placeholder('—'),
                 TextColumn::make('capability')
                     ->label('Capacità')
@@ -99,6 +126,15 @@ class CompanyAudit extends Page implements HasTable
                     ->state(fn (AuditEvent $record): string => self::formatValue($record, $record->new_value))
                     ->wrap(),
                 TextColumn::make('reason')->label('Motivo')->placeholder('—')->wrap(),
+                TextColumn::make('allocated_impact_by_exercise')
+                    ->label('Impatto Allocato')
+                    ->state(fn (AuditEvent $record): string => self::formatImpact($record->allocated_impact_by_exercise, $record))
+                    ->placeholder('—')->wrap(),
+                TextColumn::make('actual_impact_by_exercise')
+                    ->label('Impatto Effettivo')
+                    ->state(fn (AuditEvent $record): string => self::formatImpact($record->actual_impact_by_exercise, $record))
+                    ->placeholder('—')->wrap(),
+                TextColumn::make('operation_id')->label('Operazione')->placeholder('—')->copyable(),
             ])
             ->paginated([10, 25, 50]);
     }
@@ -140,6 +176,9 @@ class CompanyAudit extends Page implements HasTable
             Supplier::class => 'Fornitore',
             SupplierContact::class => 'Referente',
             CostCenter::class => 'Centro di Costo',
+            Exercise::class => 'Esercizio',
+            Expense::class => 'Spesa',
+            ExpenseLine::class => 'Riga',
             Company::class => 'Azienda',
             User::class => 'Utente',
             default => class_basename($event->subject_type),
@@ -169,6 +208,35 @@ class CompanyAudit extends Page implements HasTable
             CostCenter::class => [
                 'name' => 'Denominazione',
                 'archived' => 'Stato',
+            ],
+            Exercise::class => [
+                'year' => 'Anno',
+                'status' => 'Stato',
+                'revision' => 'Revisione',
+            ],
+            Expense::class => [
+                'origin_key' => 'OriginKey',
+                'exercise_id' => 'Esercizio',
+                'supplier_id' => 'Fornitore',
+                'direct_cost_center_id' => 'Centro di Costo',
+                'description' => 'Descrizione',
+                'notes' => 'Note',
+                'reversed' => 'Stornata',
+                'allocation' => 'Allocato',
+                'actual' => 'Effettivo',
+                'operational_variance' => 'Scostamento',
+                'has_actuals' => 'Ha Effettivi',
+                'revision' => 'Revisione',
+            ],
+            ExpenseLine::class => [
+                'expense_id' => 'Spesa',
+                'type' => 'Tipo',
+                'amount' => 'Importo',
+                'quantity' => 'Quantità',
+                'unit_amount' => 'Importo unitario',
+                'unit_of_measure' => 'Unità di misura',
+                'note' => 'Nota',
+                'annulled' => 'Annullata',
             ],
             default => null,
         };
@@ -208,5 +276,32 @@ class CompanyAudit extends Page implements HasTable
         abort_unless($company instanceof Company, 404);
 
         return $company;
+    }
+
+    private static function formatExercises(AuditEvent $event): string
+    {
+        $ids = array_map('intval', $event->affected_exercise_ids ?? []);
+        if ($ids === []) {
+            return '—';
+        }
+        $years = Exercise::query()->where('company_id', $event->company_id)->whereIn('id', $ids)->pluck('year', 'id');
+
+        return collect($ids)->map(fn (int $id): string => isset($years[$id]) ? (string) $years[$id] : '#'.$id)->implode(', ');
+    }
+
+    private static function formatImpact(mixed $impact, AuditEvent $event): string
+    {
+        if (! is_array($impact) || $impact === []) {
+            return '—';
+        }
+        $ids = array_map('intval', array_keys($impact));
+        $years = Exercise::query()->where('company_id', $event->company_id)->whereIn('id', $ids)->pluck('year', 'id');
+
+        return collect($impact)->map(function (mixed $amount, int|string $id) use ($years): string {
+            $numericId = (int) $id;
+            $label = isset($years[$numericId]) ? (string) $years[$numericId] : '#'.$numericId;
+
+            return $label.': € '.(string) $amount;
+        })->implode(' · ');
     }
 }

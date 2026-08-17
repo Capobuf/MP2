@@ -7,16 +7,16 @@ below. Later slices may add integration or regression coverage.
 
 | Invariant | Canonical title | Primary test slice | Status |
 |---|---|---|---|
-| 28.1 | Tipi economici | S3 — Esercizi, Spese e Righe | planned |
-| 28.2 | Presenza di Effettivi | S3 — Esercizi, Spese e Righe | planned |
-| 28.3 | Importo autoritativo | S3 — Esercizi, Spese e Righe | planned |
+| 28.1 | Tipi economici | S3 — Esercizi, Spese e Righe | implemented |
+| 28.2 | Presenza di Effettivi | S3 — Esercizi, Spese e Righe | implemented |
+| 28.3 | Importo autoritativo | S3 — Esercizi, Spese e Righe | implemented |
 | 28.4 | Appartenenza esclusiva | S3 — Esercizi, Spese e Righe | planned |
-| 28.5 | Sorgenti di primo livello | S3 — Esercizi, Spese e Righe | planned |
-| 28.6 | Nessun matching | S3 — Esercizi, Spese e Righe | planned |
-| 28.7 | Allocato della Spesa autonoma | S3 — Esercizi, Spese e Righe | planned |
+| 28.5 | Sorgenti di primo livello | S3 — Esercizi, Spese e Righe | implemented |
+| 28.6 | Nessun matching | S3 — Esercizi, Spese e Righe | implemented |
+| 28.7 | Allocato della Spesa autonoma | S3 — Esercizi, Spese e Righe | implemented |
 | 28.8 | Allocato del Progetto | S4 — Progetti | planned |
 | 28.9 | Allocato del Contratto | S5 — Contratti | planned |
-| 28.10 | Scostamento Operativo | S3 — Esercizi, Spese e Righe | planned |
+| 28.10 | Scostamento Operativo | S3 — Esercizi, Spese e Righe | implemented |
 | 28.11 | Residuo e disponibilità riportabile | S8 — Riporto e Riprogrammazione | planned |
 | 28.12 | Riporto entro il limite | S8 — Riporto e Riprogrammazione | planned |
 | 28.13 | Effettivo negativo | S8 — Riporto e Riprogrammazione | planned |
@@ -50,24 +50,24 @@ below. Later slices may add integration or regression coverage.
 | 28.41 | Spese manuali di Contratto | S5 — Contratti | planned |
 | 28.42 | Classificazione annuale | S4 — Progetti | planned |
 | 28.43 | Ereditarietà del Centro di Costo | S4 — Progetti | planned |
-| 28.44 | Archivio non economico | S2 — Anagrafiche | planned |
-| 28.45 | Nessuna cancellazione fisica ordinaria | S2 — Anagrafiche | planned |
-| 28.46 | Identità non riutilizzabile | S2 — Anagrafiche | planned |
+| 28.44 | Archivio non economico | S2 — Anagrafiche | implemented |
+| 28.45 | Nessuna cancellazione fisica ordinaria | S2 — Anagrafiche | implemented |
+| 28.46 | Identità non riutilizzabile | S2 — Anagrafiche | implemented |
 | 28.47 | Snapshot autonome | S6 — Proposta e Budget iniziale | planned |
 | 28.48 | Schema Budget | S6 — Proposta e Budget iniziale | planned |
 | 28.49 | Schema Chiusura | S9 — Chiusura | planned |
 | 28.50 | Previsto e Non previsto | S11 — Reportistica ed esportazione | planned |
 | 28.51 | Categorie del confronto | S11 — Reportistica ed esportazione | planned |
-| 28.52 | Nessun doppio conteggio | S3 — Esercizi, Spese e Righe | planned |
-| 28.53 | Valuta e IVA | S3 — Esercizi, Spese e Righe | planned |
-| 28.54 | Annualità dell'Effettivo | S3 — Esercizi, Spese e Righe | planned |
+| 28.52 | Nessun doppio conteggio | S3 — Esercizi, Spese e Righe | implemented |
+| 28.53 | Valuta e IVA | S3 — Esercizi, Spese e Righe | implemented |
+| 28.54 | Annualità dell'Effettivo | S3 — Esercizi, Spese e Righe | implemented |
 | 28.55 | Copia fra Esercizi | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
 | 28.56 | Scadenze contrattuali | S5 — Contratti | planned |
 | 28.57 | Permessi per Azienda | S1 — Azienda, accesso e impostazioni | implemented |
 | 28.58 | Esercizio successivo | S9 — Chiusura | planned |
 | 28.59 | Nessun Forecast | S0 — Foundation e ambiente di sviluppo live | planned |
 | 28.60 | Relazioni informative | S5 — Contratti | planned |
-| 28.61 | Plafond | S3 — Esercizi, Spese e Righe | planned |
+| 28.61 | Plafond | S3 — Esercizi, Spese e Righe | implemented |
 
 ## Test rule
 

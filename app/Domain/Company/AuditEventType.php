@@ -18,6 +18,16 @@ enum AuditEventType: string
     case CostCenterRenamed = 'cost_center_renamed';
     case CostCenterArchived = 'cost_center_archived';
     case CostCenterRestored = 'cost_center_restored';
+    case ExerciseCreated = 'exercise_created';
+    case ExpenseCreated = 'expense_created';
+    case ExpenseUpdated = 'expense_updated';
+    case ExpenseMovedOrReclassified = 'expense_moved_or_reclassified';
+    case ExpenseReversed = 'expense_reversed';
+    case ExpenseRestored = 'expense_restored';
+    case ExpenseLineCreated = 'expense_line_created';
+    case ExpenseLineUpdated = 'expense_line_updated';
+    case ExpenseLineAnnulled = 'expense_line_annulled';
+    case ExpenseLineRestored = 'expense_line_restored';
 
     public function label(): string
     {
@@ -36,6 +46,16 @@ enum AuditEventType: string
             self::CostCenterRenamed => 'Centro di Costo rinominato',
             self::CostCenterArchived => 'Centro di Costo archiviato',
             self::CostCenterRestored => 'Centro di Costo ripristinato',
+            self::ExerciseCreated => 'Esercizio creato',
+            self::ExpenseCreated => 'Spesa creata',
+            self::ExpenseUpdated => 'Spesa modificata',
+            self::ExpenseMovedOrReclassified => 'Spesa spostata o riclassificata',
+            self::ExpenseReversed => 'Spesa stornata',
+            self::ExpenseRestored => 'Spesa ripristinata',
+            self::ExpenseLineCreated => 'Riga creata',
+            self::ExpenseLineUpdated => 'Riga modificata',
+            self::ExpenseLineAnnulled => 'Riga annullata',
+            self::ExpenseLineRestored => 'Riga ripristinata',
         };
     }
 }

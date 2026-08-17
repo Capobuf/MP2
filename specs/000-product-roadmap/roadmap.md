@@ -35,8 +35,8 @@ cycle only when dependencies are ready.
 |---|---|---|---|---|---|
 | S0 | `001-foundation-dev-environment` | Foundation e ambiente di sviluppo live | none | Runnable Laravel/Filament dev environment, persistent DB, credentials, CI | implemented |
 | S1 | `002-company-access-settings` | Azienda, accesso e impostazioni | S0 | Create company, assign per-company capabilities, change company settings | implemented |
-| S2 | `003-master-data` | Anagrafiche | S1 | Manage suppliers, contacts and cost centers with archive/restore | planned |
-| S3 | `004-exercises-expenses` | Esercizi, Spese e Righe | S1,S2 | Create open year and autonomous expenses; estimates/actuals calculate correctly | planned |
+| S2 | `003-master-data` | Anagrafiche | S1 | Manage suppliers, contacts and cost centers with archive/restore | implemented |
+| S3 | `004-exercises-expenses` | Esercizi, Spese e Righe | S1,S2 | Create open year and autonomous expenses; estimates/actuals calculate correctly | implemented |
 | S4 | `005-projects` | Progetti | S3 | Create project, transition state, attach expenses, see allocation/actual/variance | planned |
 | S5 | `006-contracts` | Contratti | S2,S3 | Create contract, generate annual estimate, handle lifecycle and deadlines | planned |
 | S6 | `007-proposal-budget-v1` | Proposta e Budget iniziale | S3,S4,S5 | Prepare isolated proposal and approve immutable Budget v1 | planned |
@@ -82,6 +82,15 @@ A slice is `verified` only when:
 
 FR-084 has primary ownership in S3 because that is where the first economic domain
 mutations appear. Every later slice extends the event taxonomy required by §22.
+
+### S3 autonomous container boundary
+
+S3 implements only the autonomous side of FR-005, FR-051, FR-052 and invariant 28.4.
+The canonical rule is complete and has no category-E gap, but its Project and Contract
+cases are intentionally unrepresentable until S4 and S5 add those real containers and
+foreign keys. Those shared traceability rows remain `planned` until every container
+case can be exercised; S3 must not add placeholder ownership columns to claim them
+early.
 
 ### Snapshot materialization
 
