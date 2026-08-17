@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Expenses\Schemas;
 
+use App\Filament\Resources\Projects\ProjectResource;
 use App\Models\Expense;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
@@ -17,14 +18,17 @@ class ExpenseInfolist
                 TextEntry::make('description')->label('Descrizione'),
                 TextEntry::make('notes')->label('Note')->placeholder('—'),
                 TextEntry::make('exercise.year')->label('Esercizio'),
+                TextEntry::make('container')->label('Contenitore')
+                    ->state(fn (Expense $record): string => $record->containerLabel())
+                    ->url(fn (Expense $record): ?string => $record->project === null
+                        ? null
+                        : ProjectResource::getUrl('view', ['record' => $record->project])),
                 TextEntry::make('supplier_display')->label('Fornitore')->placeholder('—')
                     ->state(fn (Expense $record): ?string => $record->supplier === null
                         ? null
                         : $record->supplier->legal_name.($record->supplier->isArchived() ? ' · Archiviato' : '')),
-                TextEntry::make('cost_center_display')->label('Centro di Costo')->placeholder('Non classificata')
-                    ->state(fn (Expense $record): ?string => $record->directCostCenter === null
-                        ? null
-                        : $record->directCostCenter->name.($record->directCostCenter->isArchived() ? ' · Archiviato' : '')),
+                TextEntry::make('cost_center_display')->label('Centro di Costo')
+                    ->state(fn (Expense $record): string => $record->costCenterLabel()),
                 TextEntry::make('state')->label('Stato')->state(fn (Expense $record): string => $record->isReversed() ? 'Stornata' : 'Attiva')->badge(),
             ])->columns(3),
             Section::make('Totali correnti')->schema([

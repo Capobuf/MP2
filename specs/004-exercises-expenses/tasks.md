@@ -180,6 +180,15 @@ phase contains no more than eight tasks and ends with a non-destructive checkpoi
   remote CI was intentionally not monitored. FR-005, FR-051, FR-052 and invariant
   28.4 remain `planned` until S4/S5 make the Project and Contract cases real.
 
+### Remote verification evidence — 2026-08-17
+
+- Draft PR #1 passed the GitHub `Quality` workflow and was squash-merged into
+  `main` as `bccb082`; the independent browser demonstration and local quality gate
+  above remain the verification evidence for S3.
+- S3 and its fully representable FR/invariant rows are now `verified`. FR-005,
+  FR-051, FR-052 and invariant 28.4 remain `planned` until S4/S5 make every
+  container case representable.
+
 ---
 
 ## Dependencies and execution order

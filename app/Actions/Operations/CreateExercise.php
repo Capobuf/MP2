@@ -8,6 +8,8 @@ use App\Domain\Expenses\ExpenseAuditSnapshot;
 use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\Exercise;
+use App\Models\Project;
+use App\Models\ProjectExerciseClassification;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -51,11 +53,36 @@ class CreateExercise
                 ]);
             }
 
+            $projects = Project::query()->where('company_id', $lockedCompany->id)->orderBy('id')->lockForUpdate()->get();
+
             $exercise = Exercise::query()->create([
                 'company_id' => $lockedCompany->id,
                 'year' => $validated['year'],
                 'status' => ExerciseStatus::Open,
             ]);
+            $classificationIds = [];
+            foreach ($projects as $project) {
+                $latest = ProjectExerciseClassification::query()
+                    ->select('project_exercise_classifications.*')
+                    ->join('exercises', 'exercises.id', '=', 'project_exercise_classifications.exercise_id')
+                    ->where('project_exercise_classifications.project_id', $project->id)
+                    ->orderByDesc('exercises.year')
+                    ->orderByDesc('project_exercise_classifications.id')
+                    ->lockForUpdate()
+                    ->first();
+                $classification = ProjectExerciseClassification::query()->create([
+                    'company_id' => $lockedCompany->id,
+                    'project_id' => $project->id,
+                    'exercise_id' => $exercise->id,
+                    'cost_center_id' => $latest?->cost_center_id,
+                ]);
+                $classificationIds[] = $classification->id;
+                $project->increment('revision');
+            }
+            if ($projects->isNotEmpty()) {
+                $exercise->increment('revision');
+                $exercise->refresh();
+            }
             $zeroImpact = ExpenseAuditSnapshot::impact($exercise->id, '0');
 
             AuditEvent::query()->create([
@@ -68,7 +95,10 @@ class CreateExercise
                 'affected_exercise_ids' => [$exercise->id],
                 'effective_from' => now($lockedCompany->timezone)->toDateString(),
                 'previous_value' => null,
-                'new_value' => ExpenseAuditSnapshot::exercise($exercise),
+                'new_value' => [
+                    ...ExpenseAuditSnapshot::exercise($exercise),
+                    'project_classification_ids' => $classificationIds,
+                ],
                 'allocated_impact_by_exercise' => $zeroImpact,
                 'actual_impact_by_exercise' => $zeroImpact,
             ]);

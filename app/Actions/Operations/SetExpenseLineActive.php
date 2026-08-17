@@ -6,11 +6,14 @@ use App\Domain\Company\AuditEventType;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseAuditSnapshot;
 use App\Domain\Expenses\ManualExpenseLine;
+use App\Domain\Projects\ProjectAuditSnapshot;
+use App\Domain\Projects\ProjectExpenseActivity;
 use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
+use App\Models\Project;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -19,14 +22,23 @@ use Illuminate\Validation\ValidationException;
 
 class SetExpenseLineActive
 {
-    public function execute(User $actor, ExpenseLine $line, bool $active, string $operationId): ExpenseLine
+    /** @param array<string, mixed> $context */
+    public function execute(User $actor, ExpenseLine $line, bool $active, string $operationId, array $context = []): ExpenseLine
     {
         Validator::make(['operation_id' => $operationId], ['operation_id' => ['required', 'uuid']])->validate();
 
-        return DB::transaction(function () use ($actor, $line, $active, $operationId): ExpenseLine {
+        return DB::transaction(function () use ($actor, $line, $active, $operationId, $context): ExpenseLine {
             $unlockedExpense = Expense::query()->findOrFail($line->expense_id);
             $company = Company::query()->lockForUpdate()->findOrFail($unlockedExpense->company_id);
             $exercise = Exercise::query()->lockForUpdate()->findOrFail($unlockedExpense->exercise_id);
+            $project = $unlockedExpense->project_id === null
+                ? null
+                : Project::query()->lockForUpdate()->findOrFail($unlockedExpense->project_id);
+            $transitions = collect();
+            if ($project !== null) {
+                $transitions = $project->transitions()->orderBy('effective_date')->orderBy('id')->lockForUpdate()->get();
+                $project->classifications()->where('exercise_id', $exercise->id)->lockForUpdate()->get();
+            }
             $expense = Expense::query()->lockForUpdate()->findOrFail($unlockedExpense->id);
             $lockedLine = ExpenseLine::query()->lockForUpdate()->findOrFail($line->id);
             Gate::forUser($actor)->authorize('update', $lockedLine);
@@ -50,7 +62,7 @@ class SetExpenseLineActive
                 return $lockedLine;
             }
             if ($active) {
-                ManualExpenseLine::validate([
+                $validatedLine = ManualExpenseLine::validate([
                     'type' => $lockedLine->lineType()->value,
                     'amount' => $lockedLine->amount,
                     'quantity' => $lockedLine->quantity,
@@ -63,12 +75,40 @@ class SetExpenseLineActive
 
             $allocationBefore = $expense->allocation();
             $actualBefore = $expense->actual();
+            $projectContext = null;
+            $varianceBefore = null;
+            $openingTransition = null;
+            if ($project !== null) {
+                $varianceBefore = ProjectExpenseActivity::annualVariance($project, $exercise);
+                if ($active) {
+                    $projectContext = ProjectExpenseActivity::validate($project, $exercise, $company, [$validatedLine], $context);
+                    $openingTransition = app(ProjectExpenseOpening::class)->create($project, $company, $actor, $projectContext, $transitions);
+                }
+            }
             $before = ExpenseAuditSnapshot::line($lockedLine);
             $lockedLine->annulled_at = $active ? null : now();
             $lockedLine->save();
+            if ($project !== null) {
+                $varianceAfter = ProjectExpenseActivity::annualVariance($project, $exercise);
+                if ($projectContext !== null) {
+                    ProjectExpenseActivity::assertOverspendNote($company, $projectContext, $varianceBefore, $varianceAfter);
+                }
+                $project->increment('revision', $openingTransition === null ? 1 : 2);
+            }
             $expense->increment('revision');
             $exercise->increment('revision');
             $expense->refresh();
+
+            $newValue = ExpenseAuditSnapshot::line($lockedLine);
+            if ($project !== null) {
+                $newValue['project_activity'] = [
+                    'actual_kind' => ($projectContext['actual_kind'] ?? null)?->value,
+                    'activity_note' => $projectContext['activity_note'] ?? null,
+                    'opening_transition' => $openingTransition === null ? null : ProjectAuditSnapshot::transition($openingTransition),
+                    'overspend' => ProjectAuditSnapshot::overspend($varianceBefore, ProjectExpenseActivity::annualVariance($project, $exercise)),
+                    'overspend_note' => $projectContext['overspend_note'] ?? null,
+                ];
+            }
 
             AuditEvent::query()->create([
                 'operation_id' => $operationId,
@@ -80,11 +120,12 @@ class SetExpenseLineActive
                 'affected_exercise_ids' => [$exercise->id],
                 'effective_from' => now($company->timezone)->toDateString(),
                 'previous_value' => $before,
-                'new_value' => ExpenseAuditSnapshot::line($lockedLine),
+                'new_value' => $newValue,
                 'allocated_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($expense->allocation(), $allocationBefore)),
                 'actual_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($expense->actual(), $actualBefore)),
-                'reference_type' => Expense::class,
-                'reference_id' => $expense->id,
+                'reason' => $projectContext === null ? null : ($projectContext['activity_note'] ?? $projectContext['overspend_note']),
+                'reference_type' => $project === null ? Expense::class : Project::class,
+                'reference_id' => $project === null ? $expense->id : $project->id,
             ]);
 
             return $lockedLine;

@@ -28,7 +28,7 @@ function grantExpenseResource(User $user, Company $company, bool $manage = true)
     }
 }
 
-it('creates an expense with an initial line and no future fields', function () {
+it('creates an expense with an initial line and only supported ownership fields', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
     grantExpenseResource($manager, $company);
@@ -37,7 +37,7 @@ it('creates an expense with an initial line and no future fields', function () {
     Filament::setTenant($company);
 
     Livewire::test(CreateExpense::class)
-        ->assertFormFieldDoesNotExist('project_id')
+        ->assertFormFieldExists('project_id')
         ->assertFormFieldDoesNotExist('contract_id')
         ->assertFormFieldDoesNotExist('budget_id')
         ->assertFormFieldDoesNotExist('proposal_id')

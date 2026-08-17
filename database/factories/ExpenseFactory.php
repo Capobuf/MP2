@@ -17,6 +17,7 @@ class ExpenseFactory extends Factory
             'exercise_id' => fn (array $attributes): int => Exercise::factory()->create([
                 'company_id' => $attributes['company_id'],
             ])->id,
+            'project_id' => null,
             'supplier_id' => null,
             'direct_cost_center_id' => null,
             'description' => fake()->sentence(3),

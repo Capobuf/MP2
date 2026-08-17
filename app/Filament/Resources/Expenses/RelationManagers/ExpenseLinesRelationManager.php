@@ -7,6 +7,7 @@ use App\Actions\Operations\SetExpenseLineActive;
 use App\Actions\Operations\UpdateExpenseLine;
 use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExpenseLineType;
+use App\Domain\Projects\ProjectActualKind;
 use App\Filament\Resources\Expenses\Schemas\ExpenseForm;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -14,7 +15,10 @@ use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
@@ -43,6 +47,7 @@ class ExpenseLinesRelationManager extends RelationManager
     {
         return $schema->components([
             ...ExpenseForm::lineFields(),
+            ...$this->projectActivityFields(),
             Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
         ]);
     }
@@ -109,7 +114,11 @@ class ExpenseLinesRelationManager extends RelationManager
                     ->modalSubmitActionLabel('Ripristina riga')
                     ->modalCancelActionLabel('Torna alla riga')
                     ->visible(fn (ExpenseLine $record): bool => $record->isAnnulled() && $this->canMutateOwner())
-                    ->action(fn (ExpenseLine $record) => $this->setActive($record, true)),
+                    ->form([
+                        ...$this->projectActivityFields(),
+                        Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
+                    ])
+                    ->action(fn (ExpenseLine $record, array $data) => $this->setActive($record, true, $data)),
             ]);
     }
 
@@ -127,12 +136,36 @@ class ExpenseLinesRelationManager extends RelationManager
             && $actor->hasCapability($expense->company, Capability::ManageOperations);
     }
 
-    private function setActive(ExpenseLine $line, bool $active): void
+    /** @param array<string, mixed> $data */
+    private function setActive(ExpenseLine $line, bool $active, array $data = []): void
     {
         $actor = auth()->user();
         abort_unless($actor instanceof User, 403);
-        app(SetExpenseLineActive::class)->execute($actor, $line, $active, (string) Str::uuid());
+        $operationId = isset($data['operation_id']) ? (string) $data['operation_id'] : (string) Str::uuid();
+        unset($data['operation_id']);
+        app(SetExpenseLineActive::class)->execute($actor, $line, $active, $operationId, $data);
         $line->refresh();
         $this->getOwnerRecord()->refresh();
+    }
+
+    /** @return array<int, mixed> */
+    private function projectActivityFields(): array
+    {
+        return [
+            Select::make('actual_kind')
+                ->label('Dichiarazione Effettivo')
+                ->options(ProjectActualKind::options())
+                ->placeholder('Ordinario')
+                ->visible(fn (): bool => $this->getOwnerRecord() instanceof Expense && $this->getOwnerRecord()->project_id !== null),
+            Checkbox::make('open_project')
+                ->label('Conferma apertura atomica se il Progetto è Pianificato')
+                ->visible(fn (): bool => $this->getOwnerRecord() instanceof Expense && $this->getOwnerRecord()->project_id !== null),
+            Textarea::make('activity_note')
+                ->label('Nota attività tardiva, rimborso o correzione')
+                ->visible(fn (): bool => $this->getOwnerRecord() instanceof Expense && $this->getOwnerRecord()->project_id !== null),
+            Textarea::make('overspend_note')
+                ->label('Nota di sovraspesa')
+                ->visible(fn (): bool => $this->getOwnerRecord() instanceof Expense && $this->getOwnerRecord()->project_id !== null),
+        ];
     }
 }

@@ -6,6 +6,7 @@ use App\Domain\Company\AuditEventType;
 use App\Domain\Company\Capability;
 use App\Domain\Company\Setting;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -73,6 +74,20 @@ class AuditEvent extends Model
         }
 
         return $eventType;
+    }
+
+    /** @param Builder<self> $query */
+    public function scopeForProject(Builder $query, Project $project): void
+    {
+        $query->where(function (Builder $query) use ($project): void {
+            $query->where(function (Builder $subject) use ($project): void {
+                $subject->where('subject_type', Project::class)
+                    ->where('subject_id', $project->id);
+            })->orWhere(function (Builder $reference) use ($project): void {
+                $reference->where('reference_type', Project::class)
+                    ->where('reference_id', $project->id);
+            });
+        });
     }
 
     /** @return array<string, string> */

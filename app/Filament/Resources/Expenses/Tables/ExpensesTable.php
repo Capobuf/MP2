@@ -19,8 +19,9 @@ class ExpensesTable
             ->columns([
                 TextColumn::make('description')->label('Descrizione')->searchable()->sortable(),
                 TextColumn::make('exercise.year')->label('Esercizio')->sortable(),
+                TextColumn::make('container')->label('Contenitore')->state(fn (Expense $record): string => $record->containerLabel()),
                 TextColumn::make('supplier.legal_name')->label('Fornitore')->placeholder('—'),
-                TextColumn::make('directCostCenter.name')->label('Centro di Costo')->placeholder('Non classificata'),
+                TextColumn::make('cost_center')->label('Centro di Costo')->state(fn (Expense $record): string => $record->costCenterLabel()),
                 TextColumn::make('state')->label('Stato')->state(fn (Expense $record): string => $record->isReversed() ? 'Stornata' : 'Attiva')->badge(),
                 TextColumn::make('allocation')->label('Allocato corrente')->state(fn (Expense $record): string => $record->allocation())->money('EUR', locale: 'it'),
                 TextColumn::make('actual')->label('Effettivo')->state(fn (Expense $record): string => $record->actual())->money('EUR', locale: 'it'),

@@ -16,7 +16,7 @@ class CreateExpense extends CreateRecord
 {
     protected static string $resource = ExpenseResource::class;
 
-    protected static ?string $title = 'Nuova spesa autonoma';
+    protected static ?string $title = 'Nuova spesa';
 
     public string $operationId;
 

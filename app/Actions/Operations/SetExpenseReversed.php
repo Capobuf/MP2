@@ -5,10 +5,13 @@ namespace App\Actions\Operations;
 use App\Domain\Company\AuditEventType;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseAuditSnapshot;
+use App\Domain\Projects\ProjectAuditSnapshot;
+use App\Domain\Projects\ProjectExpenseActivity;
 use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\Exercise;
 use App\Models\Expense;
+use App\Models\Project;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -17,7 +20,8 @@ use Illuminate\Validation\ValidationException;
 
 class SetExpenseReversed
 {
-    public function execute(User $actor, Expense $expense, bool $reversed, string $reason, string $operationId): Expense
+    /** @param array<string, mixed> $context */
+    public function execute(User $actor, Expense $expense, bool $reversed, string $reason, string $operationId, array $context = []): Expense
     {
         /** @var array{reason: string, operation_id: string} $validated */
         $validated = Validator::make([
@@ -28,11 +32,19 @@ class SetExpenseReversed
             'operation_id' => ['required', 'uuid'],
         ])->validate();
 
-        return DB::transaction(function () use ($actor, $expense, $reversed, $validated): Expense {
+        return DB::transaction(function () use ($actor, $expense, $reversed, $validated, $context): Expense {
             $company = Company::query()->lockForUpdate()->findOrFail($expense->company_id);
             $exercise = Exercise::query()->lockForUpdate()->findOrFail($expense->exercise_id);
+            $project = $expense->project_id === null
+                ? null
+                : Project::query()->lockForUpdate()->findOrFail($expense->project_id);
+            $transitions = collect();
+            if ($project !== null) {
+                $transitions = $project->transitions()->orderBy('effective_date')->orderBy('id')->lockForUpdate()->get();
+                $project->classifications()->where('exercise_id', $exercise->id)->lockForUpdate()->get();
+            }
             $lockedExpense = Expense::query()->lockForUpdate()->findOrFail($expense->id);
-            $lockedExpense->lines()->orderBy('id')->lockForUpdate()->get();
+            $lines = $lockedExpense->lines()->orderBy('id')->lockForUpdate()->get();
             Gate::forUser($actor)->authorize('update', $lockedExpense);
             $eventType = $reversed ? AuditEventType::ExpenseReversed : AuditEventType::ExpenseRestored;
 
@@ -57,14 +69,48 @@ class SetExpenseReversed
 
             $allocationBefore = $lockedExpense->allocation();
             $actualBefore = $lockedExpense->actual();
+            $projectContext = null;
+            $varianceBefore = null;
+            $openingTransition = null;
+            if ($project !== null) {
+                $varianceBefore = ProjectExpenseActivity::annualVariance($project, $exercise);
+                if (! $reversed) {
+                    $activeLines = $lines->reject->isAnnulled()->map(fn ($line): array => [
+                        'type' => $line->lineType(),
+                    ]);
+                    $hasActualLines = $activeLines->contains(fn (array $line): bool => $line['type']->value === 'actual');
+                    $projectContext = ProjectExpenseActivity::validate($project, $exercise, $company, $activeLines, [
+                        ...$context,
+                        'activity_note' => $hasActualLines ? ($context['activity_note'] ?? $validated['reason']) : null,
+                    ]);
+                    $openingTransition = app(ProjectExpenseOpening::class)->create($project, $company, $actor, $projectContext, $transitions);
+                }
+            }
             $before = ExpenseAuditSnapshot::expense($lockedExpense, true);
             $lockedExpense->reversed_at = $reversed ? now() : null;
             $lockedExpense->revision++;
             $lockedExpense->save();
+            if ($project !== null) {
+                $varianceAfter = ProjectExpenseActivity::annualVariance($project, $exercise);
+                if ($projectContext !== null) {
+                    ProjectExpenseActivity::assertOverspendNote($company, $projectContext, $varianceBefore, $varianceAfter);
+                }
+                $project->increment('revision', $openingTransition === null ? 1 : 2);
+            }
             $exercise->increment('revision');
 
             $allocationAfter = $lockedExpense->allocation();
             $actualAfter = $lockedExpense->actual();
+            $newValue = ExpenseAuditSnapshot::expense($lockedExpense, true);
+            if ($project !== null) {
+                $newValue['project_activity'] = [
+                    'actual_kind' => ($projectContext['actual_kind'] ?? null)?->value,
+                    'activity_note' => $projectContext['activity_note'] ?? null,
+                    'opening_transition' => $openingTransition === null ? null : ProjectAuditSnapshot::transition($openingTransition),
+                    'overspend' => ProjectAuditSnapshot::overspend($varianceBefore, ProjectExpenseActivity::annualVariance($project, $exercise)),
+                    'overspend_note' => $projectContext['overspend_note'] ?? null,
+                ];
+            }
             AuditEvent::query()->create([
                 'operation_id' => $validated['operation_id'],
                 'company_id' => $company->id,
@@ -75,10 +121,12 @@ class SetExpenseReversed
                 'affected_exercise_ids' => [$exercise->id],
                 'effective_from' => now($company->timezone)->toDateString(),
                 'previous_value' => $before,
-                'new_value' => ExpenseAuditSnapshot::expense($lockedExpense, true),
+                'new_value' => $newValue,
                 'allocated_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($allocationAfter, $allocationBefore)),
                 'actual_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($actualAfter, $actualBefore)),
                 'reason' => $validated['reason'],
+                'reference_type' => $project === null ? null : Project::class,
+                'reference_id' => $project?->id,
             ]);
 
             return $lockedExpense;

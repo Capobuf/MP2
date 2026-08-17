@@ -28,6 +28,17 @@ enum AuditEventType: string
     case ExpenseLineUpdated = 'expense_line_updated';
     case ExpenseLineAnnulled = 'expense_line_annulled';
     case ExpenseLineRestored = 'expense_line_restored';
+    case ProjectCreated = 'project_created';
+    case ProjectUpdated = 'project_updated';
+    case ProjectTransitionPlanned = 'project_transition_planned';
+    case ProjectTransitionEffective = 'project_transition_effective';
+    case ProjectTransitionAnnulled = 'project_transition_annulled';
+    case ProjectTransitionReplaced = 'project_transition_replaced';
+    case ProjectClassificationChanged = 'project_classification_changed';
+    case ProjectOverspendCreated = 'project_overspend_created';
+    case ProjectOverspendIncreased = 'project_overspend_increased';
+    case ProjectArchived = 'project_archived';
+    case ProjectRestored = 'project_restored';
 
     public function label(): string
     {
@@ -56,6 +67,17 @@ enum AuditEventType: string
             self::ExpenseLineUpdated => 'Riga modificata',
             self::ExpenseLineAnnulled => 'Riga annullata',
             self::ExpenseLineRestored => 'Riga ripristinata',
+            self::ProjectCreated => 'Progetto creato',
+            self::ProjectUpdated => 'Progetto modificato',
+            self::ProjectTransitionPlanned => 'Transizione progetto pianificata',
+            self::ProjectTransitionEffective => 'Transizione progetto efficace',
+            self::ProjectTransitionAnnulled => 'Transizione progetto annullata',
+            self::ProjectTransitionReplaced => 'Transizione progetto sostituita',
+            self::ProjectClassificationChanged => 'Classificazione progetto modificata',
+            self::ProjectOverspendCreated => 'Sovraspesa progetto creata',
+            self::ProjectOverspendIncreased => 'Sovraspesa progetto aumentata',
+            self::ProjectArchived => 'Progetto archiviato',
+            self::ProjectRestored => 'Progetto ripristinato',
         };
     }
 }
