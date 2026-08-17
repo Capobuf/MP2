@@ -155,11 +155,11 @@ cross-company disclosure.
 
 **Purpose:** Verify the complete S2 slice while preserving the live S1 environment.
 
-- [ ] T036 [P] Review Italian labels, empty states, confirmations, accessibility text, and absence of delete/S3+ controls across `app/Filament/Resources/Suppliers/` and `app/Filament/Resources/CostCenters/`
-- [ ] T037 Run focused S2 tests, current S1 regression tests, and Laravel boot checks using only the isolated `testing` database
-- [ ] T038 Run Composer validation/audit, Pint, Larastan, and the complete Pest suite defined in `composer.json` through Sail
-- [ ] T039 Apply only forward S2 migrations to persistent development and execute the browser/persistence journey in `specs/003-master-data/quickstart.md` without destructive reset or CI monitoring
-- [ ] T040 Mark completed S2 tasks and update implementation evidence/statuses in `specs/003-master-data/tasks.md`, `specs/000-product-roadmap/roadmap.md`, `specs/000-product-roadmap/traceability.md`, and `specs/000-product-roadmap/invariant-test-map.md`
+- [X] T036 [P] Review Italian labels, empty states, confirmations, accessibility text, and absence of delete/S3+ controls across `app/Filament/Resources/Suppliers/` and `app/Filament/Resources/CostCenters/`
+- [X] T037 Run focused S2 tests, current S1 regression tests, and Laravel boot checks using only the isolated `testing` database
+- [X] T038 Run Composer validation/audit, Pint, Larastan, and the complete Pest suite defined in `composer.json` through Sail
+- [X] T039 Apply only forward S2 migrations to persistent development and execute the browser/persistence journey in `specs/003-master-data/quickstart.md` without destructive reset or CI monitoring
+- [X] T040 Mark completed S2 tasks and update implementation evidence/statuses in `specs/003-master-data/tasks.md`, `specs/000-product-roadmap/roadmap.md`, `specs/000-product-roadmap/traceability.md`, and `specs/000-product-roadmap/invariant-test-map.md`
 
 ---
 
@@ -219,3 +219,15 @@ US1 + US2 + US3 + US4 ----> US5 Timeline
 - Tests precede their corresponding implementation work.
 - S2 adds no dependency and intentionally does not implement annual Cost Center
   classification or any economic entity.
+
+## Implementation evidence
+
+- All 40 S2 tasks are complete and all eight phase checkpoints passed locally.
+- Focused S1/S2 verification passed with 66 tests and 625 assertions against the
+  dedicated `testing` database.
+- The complete local gate passed with 77 tests and 657 assertions, valid/audited
+  Composer metadata, Pint, Larastan, Laravel boot, and HTTP reachability.
+- Only the four forward S2 migrations were applied to the persistent development
+  database; the complete browser journey and a normal container stop/start preserved
+  all data.
+- Remote CI was intentionally not monitored, so S2 is `implemented`, not `verified`.

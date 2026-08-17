@@ -40,6 +40,18 @@ class Company extends Model implements HasName
         return $this->hasMany(CostCenter::class);
     }
 
+    /** @return HasMany<Exercise, $this> */
+    public function exercises(): HasMany
+    {
+        return $this->hasMany(Exercise::class);
+    }
+
+    /** @return HasMany<Expense, $this> */
+    public function expenses(): HasMany
+    {
+        return $this->hasMany(Expense::class);
+    }
+
     public function getFilamentName(): string
     {
         return $this->name;
