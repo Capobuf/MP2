@@ -28,6 +28,18 @@ class Company extends Model implements HasName
         return $this->hasMany(AuditEvent::class);
     }
 
+    /** @return HasMany<Supplier, $this> */
+    public function suppliers(): HasMany
+    {
+        return $this->hasMany(Supplier::class);
+    }
+
+    /** @return HasMany<CostCenter, $this> */
+    public function costCenters(): HasMany
+    {
+        return $this->hasMany(CostCenter::class);
+    }
+
     public function getFilamentName(): string
     {
         return $this->name;

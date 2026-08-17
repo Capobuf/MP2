@@ -50,9 +50,9 @@ below. Later slices may add integration or regression coverage.
 | 28.41 | Spese manuali di Contratto | S5 — Contratti | planned |
 | 28.42 | Classificazione annuale | S4 — Progetti | planned |
 | 28.43 | Ereditarietà del Centro di Costo | S4 — Progetti | planned |
-| 28.44 | Archivio non economico | S3 — Esercizi, Spese e Righe | planned |
-| 28.45 | Nessuna cancellazione fisica ordinaria | S3 — Esercizi, Spese e Righe | planned |
-| 28.46 | Identità non riutilizzabile | S3 — Esercizi, Spese e Righe | planned |
+| 28.44 | Archivio non economico | S2 — Anagrafiche | planned |
+| 28.45 | Nessuna cancellazione fisica ordinaria | S2 — Anagrafiche | planned |
+| 28.46 | Identità non riutilizzabile | S2 — Anagrafiche | planned |
 | 28.47 | Snapshot autonome | S6 — Proposta e Budget iniziale | planned |
 | 28.48 | Schema Budget | S6 — Proposta e Budget iniziale | planned |
 | 28.49 | Schema Chiusura | S9 — Chiusura | planned |

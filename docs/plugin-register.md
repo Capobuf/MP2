@@ -13,6 +13,7 @@ slice that plans to install one.
 | Advanced tables/saved views | Advanced Tables class of plugins | S11 | Deferred until native Filament tables prove insufficient |
 | Advanced export | Filament export plugins | S11 | Evaluate against semantic export requirements before adoption |
 | Generic activity log | Activity-log plugins | cross-cutting | MUST NOT replace the canonical Timeline; may only assist if canonical event schema remains authoritative |
+| Master-data CRUD | Native Filament Resources | S2 | No plugin: two tenant-scoped Resources and one Contact relation manager cover the bounded workflow directly |
 | Right-click/context menus | UI plugins | none | Not a domain need; do not install by default |
 
 ## Shield acceptance gate

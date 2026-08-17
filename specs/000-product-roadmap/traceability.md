@@ -16,8 +16,8 @@ changing its traceability anchor.
 | FR-006 | Sorgenti economiche di primo livello | §5.6 | S3 — Esercizi, Spese e Righe | planned |
 | FR-007 | Nessun doppio conteggio | §§5.6, 8.6 | S3 — Esercizi, Spese e Righe | planned |
 | FR-008 | Identità stabile e OriginKey | §5.4 | S3 — Esercizi, Spese e Righe | planned |
-| FR-009 | Nessuna cancellazione fisica ordinaria | §§5.7, 24.1 | S3 — Esercizi, Spese e Righe | planned |
-| FR-010 | Archivio non economico | §§5.8, 24.3 | S3 — Esercizi, Spese e Righe | planned |
+| FR-009 | Nessuna cancellazione fisica ordinaria | §§5.7, 24.1 | S2 — Anagrafiche | planned |
+| FR-010 | Archivio non economico | §§5.8, 24.3 | S2 — Anagrafiche | planned |
 | FR-011 | Budget Approvato immutabile | §§1.2, 13 | S6 — Proposta e Budget iniziale | planned |
 | FR-012 | Versione iniziale v1 preservata | §13.4 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
 | FR-013 | Revisioni sempre disponibili in Esercizio Aperto | §§12.3, 13.4, 26.3 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |

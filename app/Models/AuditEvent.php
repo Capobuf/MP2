@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'company_id',
+    'operation_id',
     'actor_id',
     'event_type',
     'subject_type',
@@ -29,6 +30,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'reference_type',
     'reference_id',
 ])]
+/** @property AuditEventType $event_type */
 class AuditEvent extends Model
 {
     public const UPDATED_AT = null;
@@ -60,6 +62,17 @@ class AuditEvent extends Model
     public function beneficiary(): BelongsTo
     {
         return $this->belongsTo(User::class, 'beneficiary_id');
+    }
+
+    public function eventType(): AuditEventType
+    {
+        $eventType = $this->getAttribute('event_type');
+
+        if (! $eventType instanceof AuditEventType) {
+            throw new \UnexpectedValueException('Invalid persisted audit event type.');
+        }
+
+        return $eventType;
     }
 
     /** @return array<string, string> */

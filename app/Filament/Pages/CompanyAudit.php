@@ -8,6 +8,9 @@ use App\Domain\Company\ClosingUnclassifiedPolicy;
 use App\Domain\Company\Setting;
 use App\Models\AuditEvent;
 use App\Models\Company;
+use App\Models\CostCenter;
+use App\Models\Supplier;
+use App\Models\SupplierContact;
 use App\Models\User;
 use BackedEnum;
 use Filament\Facades\Filament;
@@ -65,7 +68,13 @@ class CompanyAudit extends Page implements HasTable
                     ->formatStateUsing(fn (mixed $state): string => $state instanceof AuditEventType
                         ? $state->label()
                         : AuditEventType::from($state)->label()),
+                TextColumn::make('subject')
+                    ->label('Oggetto')
+                    ->state(fn (AuditEvent $record): string => self::formatSubject($record)),
                 TextColumn::make('actor.name')->label('Autore'),
+                TextColumn::make('effective_from')
+                    ->label('Decorrenza')
+                    ->date('d/m/Y'),
                 TextColumn::make('beneficiary.email')->label('Beneficiario')->placeholder('—'),
                 TextColumn::make('capability')
                     ->label('Capacità')
@@ -83,10 +92,12 @@ class CompanyAudit extends Page implements HasTable
                     }),
                 TextColumn::make('previous_value')
                     ->label('Valore precedente')
-                    ->state(fn (AuditEvent $record): string => self::formatValue($record, $record->previous_value)),
+                    ->state(fn (AuditEvent $record): string => self::formatValue($record, $record->previous_value))
+                    ->wrap(),
                 TextColumn::make('new_value')
                     ->label('Valore nuovo')
-                    ->state(fn (AuditEvent $record): string => self::formatValue($record, $record->new_value)),
+                    ->state(fn (AuditEvent $record): string => self::formatValue($record, $record->new_value))
+                    ->wrap(),
                 TextColumn::make('reason')->label('Motivo')->placeholder('—')->wrap(),
             ])
             ->paginated([10, 25, 50]);
@@ -106,6 +117,14 @@ class CompanyAudit extends Page implements HasTable
             return ClosingUnclassifiedPolicy::from($value)->label();
         }
 
+        if (is_array($value)) {
+            $formatted = self::formatMasterDataValue($event, $value);
+
+            if ($formatted !== null) {
+                return $formatted;
+            }
+        }
+
         return match (true) {
             $value === null => '—',
             $value === true => 'Sì',
@@ -113,6 +132,74 @@ class CompanyAudit extends Page implements HasTable
             is_scalar($value) => (string) $value,
             default => json_encode($value, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
         };
+    }
+
+    private static function formatSubject(AuditEvent $event): string
+    {
+        $label = match ($event->subject_type) {
+            Supplier::class => 'Fornitore',
+            SupplierContact::class => 'Referente',
+            CostCenter::class => 'Centro di Costo',
+            Company::class => 'Azienda',
+            User::class => 'Utente',
+            default => class_basename($event->subject_type),
+        };
+
+        return $label.' #'.$event->subject_id;
+    }
+
+    /** @param array<string, mixed> $value */
+    private static function formatMasterDataValue(AuditEvent $event, array $value): ?string
+    {
+        $fields = match ($event->subject_type) {
+            Supplier::class => [
+                'legal_name' => 'Ragione Sociale',
+                'vat_number' => 'Partita IVA',
+                'notes' => 'Note',
+                'archived' => 'Stato',
+            ],
+            SupplierContact::class => [
+                'first_name' => 'Nome',
+                'last_name' => 'Cognome',
+                'phone' => 'Telefono',
+                'email' => 'Email',
+                'notes' => 'Note',
+                'role_tags' => 'Tag di ruolo',
+            ],
+            CostCenter::class => [
+                'name' => 'Denominazione',
+                'archived' => 'Stato',
+            ],
+            default => null,
+        };
+
+        if ($fields === null) {
+            return null;
+        }
+
+        $parts = [];
+
+        foreach ($fields as $key => $label) {
+            if (! array_key_exists($key, $value)) {
+                continue;
+            }
+
+            $fieldValue = $value[$key];
+
+            if ($key === 'archived' && is_bool($fieldValue)) {
+                $fieldValue = $fieldValue ? 'Archiviato' : 'Attivo';
+            } elseif (is_array($fieldValue)) {
+                $fieldValue = $fieldValue === [] ? '—' : implode(', ', $fieldValue);
+            } elseif ($fieldValue === null || $fieldValue === '') {
+                $fieldValue = '—';
+            } elseif (is_bool($fieldValue)) {
+                $fieldValue = $fieldValue ? 'Sì' : 'No';
+            }
+
+            $parts[] = $label.': '.$fieldValue;
+        }
+
+        return implode(' · ', $parts);
     }
 
     private function company(): Company
