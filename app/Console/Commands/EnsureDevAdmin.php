@@ -43,6 +43,7 @@ class EnsureDevAdmin extends Command
             [
                 'name' => $validated['name'],
                 'password' => $validated['password'],
+                'is_platform_admin' => true,
             ],
         );
 

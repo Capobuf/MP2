@@ -34,7 +34,7 @@ cycle only when dependencies are ready.
 | ID | Planned feature directory | Slice | Depends on | Independent demonstration | Status |
 |---|---|---|---|---|---|
 | S0 | `001-foundation-dev-environment` | Foundation e ambiente di sviluppo live | none | Runnable Laravel/Filament dev environment, persistent DB, credentials, CI | implemented |
-| S1 | `002-company-access-settings` | Azienda, accesso e impostazioni | S0 | Create company, assign per-company capabilities, change company settings | planned |
+| S1 | `002-company-access-settings` | Azienda, accesso e impostazioni | S0 | Create company, assign per-company capabilities, change company settings | implemented |
 | S2 | `003-master-data` | Anagrafiche | S1 | Manage suppliers, contacts and cost centers with archive/restore | planned |
 | S3 | `004-exercises-expenses` | Esercizi, Spese e Righe | S1,S2 | Create open year and autonomous expenses; estimates/actuals calculate correctly | planned |
 | S4 | `005-projects` | Progetti | S3 | Create project, transition state, attach expenses, see allocation/actual/variance | planned |

@@ -21,7 +21,7 @@
 | Static analysis | Larastan |
 | Formatter | Laravel Pint |
 | CI | GitHub Actions |
-| Dev HTTP port | 8000 |
+| Dev HTTP port | 9000 |
 | Dev exposure | host + LAN |
 | MFA in S0 | no |
 | Demo domain data in S0 | no |

@@ -7,9 +7,9 @@ slice that plans to install one.
 
 | Capability | Candidate | Planned slice | Current decision |
 |---|---|---:|---|
-| Per-Azienda capabilities | Filament Shield + Spatie Permission | S1 | Evaluate with a tenancy/capability POC; not installed in S0 |
+| Per-Azienda capabilities | Filament Shield + Spatie Permission | S1 | Rejected for S1: native tenancy plus direct capability rows and policies map the canonical model with less code and no role vocabulary |
 | Attachments/media | Filament Spatie Media Library integration | first slice that needs managed attachments | Candidate; verify immutable/versioned evidence requirements separately |
-| Settings UI/storage | Spatie Settings / Filament integration | S1 | Deferred; three company settings may be simpler as normal application data |
+| Settings UI/storage | Spatie Settings / Filament integration | S1 | Rejected for S1: the three closed settings are normal typed Company data |
 | Advanced tables/saved views | Advanced Tables class of plugins | S11 | Deferred until native Filament tables prove insufficient |
 | Advanced export | Filament export plugins | S11 | Evaluate against semantic export requirements before adoption |
 | Generic activity log | Activity-log plugins | cross-cutting | MUST NOT replace the canonical Timeline; may only assist if canonical event schema remains authoritative |

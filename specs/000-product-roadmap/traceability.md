@@ -98,9 +98,9 @@ changing its traceability anchor.
 | FR-088 | Categoria primaria e etichette sovrapponibili | §§25.5–25.7 | S11 — Reportistica ed esportazione | planned |
 | FR-089 | Report con riferimenti espliciti | §§25.1–25.2 | S11 — Reportistica ed esportazione | planned |
 | FR-090 | Scadenze informative dei Contratti | §19 | S5 — Contratti | planned |
-| FR-091 | Impostazioni minime per Azienda | §26 | S1 — Azienda, accesso e impostazioni | planned |
-| FR-092 | Permessi assegnati per Azienda | §§26.5–26.6 | S1 — Azienda, accesso e impostazioni | planned |
-| FR-093 | Audit di permessi e Impostazioni | §§26.8–26.10 | S1 — Azienda, accesso e impostazioni | planned |
+| FR-091 | Impostazioni minime per Azienda | §26 | S1 — Azienda, accesso e impostazioni | implemented |
+| FR-092 | Permessi assegnati per Azienda | §§26.5–26.6 | S1 — Azienda, accesso e impostazioni | implemented |
+| FR-093 | Audit di permessi e Impostazioni | §§26.8–26.10 | S1 — Azienda, accesso e impostazioni | implemented |
 | FR-094 | Operazioni inter-Esercizio atomiche | §10 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
 | FR-095 | Relazioni informative senza effetto economico | §7.3 | S5 — Contratti | planned |
 | FR-096 | Report separato delle correzioni e annotazioni | §§24.11, 25.13 | S11 — Reportistica ed esportazione | planned |

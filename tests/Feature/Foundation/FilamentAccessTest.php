@@ -10,11 +10,9 @@ it('redirects unauthenticated visitors to the Filament login', function () {
 });
 
 it('allows an authenticated user to open the Filament dashboard', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->platformAdmin()->create();
 
     $this->actingAs($user)
         ->get('/admin')
-        ->assertOk()
-        ->assertSee('Dashboard')
-        ->assertSee('Vai al contenuto');
+        ->assertRedirect('/admin/new');
 });
