@@ -47,6 +47,16 @@ it('creates a stable Project and initial classification atomically and idempoten
         'initial_effective_date' => '2027-01-01',
         'exercise_id' => $exercise->id,
         'cost_center_id' => $costCenter->id,
+        'supplier_id' => 999,
+        'carryover' => '100.00',
+        'reprogramming' => '100.00',
+        'contract_id' => 999,
+        'proposal_id' => 999,
+        'budget_id' => 999,
+        'closing' => true,
+        'forecast' => '100.00',
+        'attachments' => ['future-file'],
+        'cost_center_percentage' => 50,
     ];
 
     $project = app(CreateProject::class)->execute($actor, $company, $input, $operationId);
@@ -59,6 +69,18 @@ it('creates a stable Project and initial classification atomically and idempoten
         ->and($project->title)->toBe('Rinnovo laboratorio')
         ->and($project->description)->toBe('Nuovi strumenti')
         ->and($project->notes)->toBe('Priorità alta')
+        ->and(array_intersect_key($project->getAttributes(), array_flip([
+            'supplier_id',
+            'carryover',
+            'reprogramming',
+            'contract_id',
+            'proposal_id',
+            'budget_id',
+            'closing',
+            'forecast',
+            'attachments',
+            'cost_center_percentage',
+        ])))->toBe([])
         ->and($project->initialState())->toBe(ProjectState::Planned)
         ->and($classification->project_id)->toBe($project->id)
         ->and($classification->exercise_id)->toBe($exercise->id)

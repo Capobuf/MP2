@@ -38,7 +38,16 @@ it('shows archive only for terminal active Projects and restore only for archive
     Livewire::test(ViewProject::class, ['record' => $open->getRouteKey()])
         ->assertActionHidden('archive')
         ->assertActionHidden('restore')
-        ->assertActionDoesNotExist('delete');
+        ->assertActionDoesNotExist('delete')
+        ->assertActionDoesNotExist('carryover')
+        ->assertActionDoesNotExist('reprogram')
+        ->assertActionDoesNotExist('linkContract')
+        ->assertActionDoesNotExist('createProposal')
+        ->assertActionDoesNotExist('approveBudget')
+        ->assertActionDoesNotExist('closeExercise')
+        ->assertActionDoesNotExist('uploadAttachment')
+        ->assertActionDoesNotExist('forecast')
+        ->assertActionDoesNotExist('exportReport');
     Livewire::test(ViewProject::class, ['record' => $closed->getRouteKey()])
         ->assertActionVisible('archive')
         ->callAction('archive')

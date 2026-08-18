@@ -61,13 +61,21 @@ it('creates a Project from the tenant UI without future-slice or destructive fie
         ->assertFormFieldExists('cost_center_id')
         ->assertFormFieldDoesNotExist('supplier_id')
         ->assertFormFieldDoesNotExist('carryover')
+        ->assertFormFieldDoesNotExist('carryover_mode')
         ->assertFormFieldDoesNotExist('reprogramming')
+        ->assertFormFieldDoesNotExist('reprogrammed_amount')
         ->assertFormFieldDoesNotExist('contract_id')
+        ->assertFormFieldDoesNotExist('contract_ids')
         ->assertFormFieldDoesNotExist('proposal_id')
         ->assertFormFieldDoesNotExist('budget_id')
         ->assertFormFieldDoesNotExist('closing')
+        ->assertFormFieldDoesNotExist('closing_snapshot_id')
         ->assertFormFieldDoesNotExist('forecast')
         ->assertFormFieldDoesNotExist('attachment')
+        ->assertFormFieldDoesNotExist('attachments')
+        ->assertFormFieldDoesNotExist('cost_center_percentage')
+        ->assertFormFieldDoesNotExist('report')
+        ->assertDontSee('Sospeso')
         ->fillForm([
             'title' => 'Nuovo laboratorio',
             'description' => 'Allestimento',
@@ -125,7 +133,19 @@ it('lists views and resolves Projects only inside the current tenant', function 
         ->assertSee('1° gennaio dell’Esercizio futuro')
         ->assertSee('01/06/2027: Pianificato → Aperto')
         ->assertDontSee('Riporto')
-        ->assertDontSee('Contratto');
+        ->assertDontSee('Riprogrammazione')
+        ->assertDontSee('Contratto')
+        ->assertDontSee('Proposta')
+        ->assertDontSee('Budget')
+        ->assertDontSee('Chiusura')
+        ->assertDontSee('Forecast')
+        ->assertDontSee('Allegati')
+        ->assertDontSee('Fornitore del Progetto')
+        ->assertDontSee('Ripartizione percentuale')
+        ->assertActionDoesNotExist('delete')
+        ->assertActionDoesNotExist('closeExercise')
+        ->assertActionDoesNotExist('approveBudget')
+        ->assertActionDoesNotExist('exportReport');
 
     $this->get(ProjectResource::getUrl('view', ['record' => $projectB], tenant: $companyA))->assertNotFound();
     $this->get(ProjectResource::getUrl('edit', ['record' => $projectA], tenant: $companyA))->assertForbidden();
@@ -147,6 +167,16 @@ it('allows descriptive edit to an operator without exposing lifecycle fields', f
         ->assertFormFieldDoesNotExist('initial_effective_date')
         ->assertFormFieldDoesNotExist('archived_at')
         ->assertFormFieldDoesNotExist('cost_center_id')
+        ->assertFormFieldDoesNotExist('supplier_id')
+        ->assertFormFieldDoesNotExist('carryover')
+        ->assertFormFieldDoesNotExist('reprogramming')
+        ->assertFormFieldDoesNotExist('contract_id')
+        ->assertFormFieldDoesNotExist('proposal_id')
+        ->assertFormFieldDoesNotExist('budget_id')
+        ->assertFormFieldDoesNotExist('closing')
+        ->assertFormFieldDoesNotExist('forecast')
+        ->assertFormFieldDoesNotExist('attachments')
+        ->assertFormFieldDoesNotExist('cost_center_percentage')
         ->fillForm(['title' => 'Dopo', 'description' => 'Aggiornata'])
         ->call('save')
         ->assertHasNoFormErrors();

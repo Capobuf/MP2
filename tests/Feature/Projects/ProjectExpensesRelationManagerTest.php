@@ -47,7 +47,14 @@ it('shows only child Expenses and links to prefilled creation without future own
         ->assertFormFieldExists('supplier_id')
         ->assertFormFieldExists('actual_kind')
         ->assertFormFieldDoesNotExist('contract_id')
-        ->assertFormFieldDoesNotExist('budget_id');
+        ->assertFormFieldDoesNotExist('proposal_id')
+        ->assertFormFieldDoesNotExist('budget_id')
+        ->assertFormFieldDoesNotExist('carryover')
+        ->assertFormFieldDoesNotExist('reprogramming')
+        ->assertFormFieldDoesNotExist('closing')
+        ->assertFormFieldDoesNotExist('forecast')
+        ->assertFormFieldDoesNotExist('attachment')
+        ->assertFormFieldDoesNotExist('cost_center_percentage');
 });
 
 it('hides Project Expense creation from read-only viewers', function () {

@@ -192,14 +192,40 @@ visible through one append-only Company Timeline.
 **Purpose**: Close S4 with exclusion guards, full local quality gates, browser
 validation, persistence checks, and accurate evidence without premature publication.
 
-- [ ] T056 [P] Add or tighten negative UI and request assertions for absent carryover, reprogramming, Contract, Proposal, Budget, Closing, attachment, Forecast, full-reporting, suspended-state, percentage classification, Project Supplier, and physical-delete controls across `tests/Feature/Projects/` and `tests/Feature/Expenses/`.
-- [ ] T057 [P] Add aggregate-query regression coverage for Project/Exercise lists and annual situations, preventing per-row Line loading and first-level double counting in `tests/Feature/Projects/ProjectAggregateQueryTest.php`.
-- [ ] T058 Run `composer validate`, `composer audit`, Pint, Larastan, and the complete Pest suite through Sail, confirming all automated tests use the `testing` database; fix only S4 regressions in S4-owned or directly extended S3 files.
-- [ ] T059 Execute `specs/005-projects/quickstart.md`: forward migration, application boot, local/LAN HTTP checks, complete browser journeys, tenant isolation, browser console check, and normal stop/start persistence without destructive reset.
-- [ ] T060 Reconcile completed checkboxes and local evidence in `specs/005-projects/tasks.md`, `specs/000-product-roadmap/roadmap.md`, `specs/000-product-roadmap/traceability.md`, and `specs/000-product-roadmap/invariant-test-map.md`; mark only locally demonstrated S4 rows implemented and keep shared Contract cases planned until S5.
+- [X] T056 [P] Add or tighten negative UI and request assertions for absent carryover, reprogramming, Contract, Proposal, Budget, Closing, attachment, Forecast, full-reporting, suspended-state, percentage classification, Project Supplier, and physical-delete controls across `tests/Feature/Projects/` and `tests/Feature/Expenses/`.
+- [X] T057 [P] Add aggregate-query regression coverage for Project/Exercise lists and annual situations, preventing per-row Line loading and first-level double counting in `tests/Feature/Projects/ProjectAggregateQueryTest.php`.
+- [X] T058 Run `composer validate`, `composer audit`, Pint, Larastan, and the complete Pest suite through Sail, confirming all automated tests use the `testing` database; fix only S4 regressions in S4-owned or directly extended S3 files.
+- [X] T059 Execute `specs/005-projects/quickstart.md`: forward migration, application boot, local/LAN HTTP checks, complete browser journeys, tenant isolation, browser console check, and normal stop/start persistence without destructive reset.
+- [X] T060 Reconcile completed checkboxes and local evidence in `specs/005-projects/tasks.md`, `specs/000-product-roadmap/roadmap.md`, `specs/000-product-roadmap/traceability.md`, and `specs/000-product-roadmap/invariant-test-map.md`; mark only locally demonstrated S4 rows implemented and keep shared Contract cases planned until S5.
 
 **Checkpoint**: S4 is locally implemented, quality-gated, inspectable, and documented;
 commit, push, PR, and remote CI remain a separate explicit publication step.
+
+### Local implementation evidence — 2026-08-18
+
+- The forward-only S4 migrations were already applied and `artisan migrate --force`
+  reported no pending migration; no shared migration was edited and no destructive
+  reset, truncate, volume removal, commit, push, or remote-CI action ran.
+- `composer validate --strict`, `composer audit`, Pint, and Larastan passed through
+  Sail. The complete Pest suite passed with 190 tests and 1,672 assertions against
+  the dedicated `testing` database; the focused Project/Expense suite passed with
+  107 tests and 985 assertions.
+- Browser validation covered absent/future state, transition scheduling,
+  annulment/replacement, Project Expenses with distinct Suppliers, exact first-level
+  totals, Planned atomic opening, declared corrective Actual on Closed, annual
+  reclassification, new-Exercise seeding, stable whole-Expense moves with and without
+  Actuals, overspend creation/increase/non-increase and mandatory-note rollback,
+  terminal archive/restore, and immutable filtered Timeline details. Read-only
+  behavior and rejection matrices remained covered by the focused UI/action tests;
+  a cross-tenant Project URL returned 404 and browser console/page errors were empty.
+- A normal `sail stop` / `sail up -d` retained 5 Projects, 4 transitions, 7 annual
+  classifications, 6 Expenses, 18 Lines, and 84 append-only events with the same
+  IDs, ownership, revisions, and archive state. The restarted Project UI rendered
+  without an error overlay; local and LAN `/admin` endpoints both returned the
+  expected 302 to login.
+- S4 and its primary FR/invariant rows are `implemented`, not `verified`, because no
+  publication or remote CI was requested. FR-005, FR-051, FR-052, and invariant 28.4
+  remain `planned` until S5 makes the Contract ownership cases representable.
 
 ---
 

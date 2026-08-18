@@ -35,7 +35,14 @@ it('shows the S4 owner preview and moves the whole Expense without Contract cont
         ->mountAction('moveOrReclassify')
         ->assertSchemaComponentExists('project_id')
         ->assertSchemaComponentExists('impact_confirmed')
-        ->assertSchemaComponentDoesNotExist('contract_id');
+        ->assertSchemaComponentDoesNotExist('contract_id')
+        ->assertSchemaComponentDoesNotExist('contract_owner_id')
+        ->assertSchemaComponentDoesNotExist('proposal_id')
+        ->assertSchemaComponentDoesNotExist('budget_id')
+        ->assertSchemaComponentDoesNotExist('carryover')
+        ->assertSchemaComponentDoesNotExist('reprogramming')
+        ->assertSchemaComponentDoesNotExist('cost_center_percentage')
+        ->assertSchemaComponentDoesNotExist('attachment');
 
     Livewire::test(ViewExpense::class, ['record' => $expense->getRouteKey()])
         ->callAction('moveOrReclassify', data: [
