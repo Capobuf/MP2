@@ -6,17 +6,24 @@ use App\Domain\Company\AuditEventType;
 use App\Domain\Company\Capability;
 use App\Domain\Company\ClosingUnclassifiedPolicy;
 use App\Domain\Company\Setting;
+use App\Domain\Projects\ProjectState;
 use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
+use App\Models\Project;
+use App\Models\ProjectExerciseClassification;
+use App\Models\ProjectTransition;
 use App\Models\Supplier;
 use App\Models\SupplierContact;
 use App\Models\User;
 use BackedEnum;
+use Carbon\CarbonImmutable;
+use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Placeholder;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Schema;
@@ -42,6 +49,8 @@ class CompanyAudit extends Page implements HasTable
 
     public ?int $expense = null;
 
+    public ?int $project = null;
+
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
@@ -51,6 +60,13 @@ class CompanyAudit extends Page implements HasTable
             ->whereKey($requestedExpense)
             ->exists()
                 ? $requestedExpense
+                : null;
+        $requestedProject = request()->integer('project');
+        $this->project = $requestedProject > 0 && Project::query()
+            ->where('company_id', $this->company()->id)
+            ->whereKey($requestedProject)
+            ->exists()
+                ? $requestedProject
                 : null;
     }
 
@@ -79,6 +95,12 @@ class CompanyAudit extends Page implements HasTable
                             ->where('reference_type', Expense::class)
                             ->where('reference_id', $this->expense)));
                 }
+                if ($this->project !== null) {
+                    $project = Project::query()
+                        ->where('company_id', $this->company()->id)
+                        ->findOrFail($this->project);
+                    $query->forProject($project);
+                }
 
                 return $query->orderByDesc('created_at')->orderByDesc('id');
             })
@@ -94,7 +116,8 @@ class CompanyAudit extends Page implements HasTable
                 TextColumn::make('subject')
                     ->label('Oggetto')
                     ->state(fn (AuditEvent $record): string => self::formatSubject($record)),
-                TextColumn::make('actor.name')->label('Autore'),
+                TextColumn::make('actor.name')->label('Autore')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('effective_from')
                     ->label('Decorrenza')
                     ->date('d/m/Y'),
@@ -102,39 +125,86 @@ class CompanyAudit extends Page implements HasTable
                     ->label('Esercizi interessati')
                     ->state(fn (AuditEvent $record): string => self::formatExercises($record))
                     ->placeholder('—'),
-                TextColumn::make('beneficiary.email')->label('Beneficiario')->placeholder('—'),
+                TextColumn::make('beneficiary.email')->label('Beneficiario')->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('capability')
                     ->label('Capacità')
                     ->formatStateUsing(fn (mixed $state): string => match (true) {
                         $state instanceof Capability => $state->label(),
                         is_string($state) => Capability::from($state)->label(),
                         default => '—',
-                    }),
+                    })->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('setting')
                     ->label('Impostazione')
                     ->formatStateUsing(fn (mixed $state): string => match (true) {
                         $state instanceof Setting => $state->label(),
                         is_string($state) => Setting::from($state)->label(),
                         default => '—',
-                    }),
+                    })->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('previous_value')
                     ->label('Valore precedente')
                     ->state(fn (AuditEvent $record): string => self::formatValue($record, $record->previous_value))
-                    ->wrap(),
+                    ->wrap()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('new_value')
                     ->label('Valore nuovo')
                     ->state(fn (AuditEvent $record): string => self::formatValue($record, $record->new_value))
-                    ->wrap(),
-                TextColumn::make('reason')->label('Motivo')->placeholder('—')->wrap(),
+                    ->wrap()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('reason')->label('Motivo')->placeholder('—')->limit(40)
+                    ->tooltip(fn (AuditEvent $record): ?string => $record->reason),
+                TextColumn::make('reference')
+                    ->label('Riferimento')
+                    ->state(fn (AuditEvent $record): string => self::formatReference($record))
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('overspend')
+                    ->label('Sovraspesa')
+                    ->state(fn (AuditEvent $record): string => self::formatOverspend($record))
+                    ->placeholder('—')->wrap(),
                 TextColumn::make('allocated_impact_by_exercise')
                     ->label('Impatto Allocato')
                     ->state(fn (AuditEvent $record): string => self::formatImpact($record->allocated_impact_by_exercise, $record))
-                    ->placeholder('—')->wrap(),
+                    ->placeholder('—')->wrap()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('actual_impact_by_exercise')
                     ->label('Impatto Effettivo')
                     ->state(fn (AuditEvent $record): string => self::formatImpact($record->actual_impact_by_exercise, $record))
-                    ->placeholder('—')->wrap(),
-                TextColumn::make('operation_id')->label('Operazione')->placeholder('—')->copyable(),
+                    ->placeholder('—')->wrap()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('operation_id')->label('Operazione')->placeholder('—')->copyable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+            ])
+            ->recordActions([
+                Action::make('details')
+                    ->label('Dettagli')
+                    ->modalHeading(fn (AuditEvent $record): string => $record->eventType()->label())
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Chiudi')
+                    ->form([
+                        Placeholder::make('detail_effective_from')->label('Decorrenza')
+                            ->content(fn (AuditEvent $record): string => self::formatEffectiveDate($record)),
+                        Placeholder::make('detail_exercises')->label('Esercizi interessati')
+                            ->content(fn (AuditEvent $record): string => self::formatExercises($record)),
+                        Placeholder::make('detail_actor')->label('Autore')
+                            ->content(fn (AuditEvent $record): string => $record->actor->name),
+                        Placeholder::make('detail_previous')->label('Valore precedente')
+                            ->content(fn (AuditEvent $record): string => self::formatValue($record, $record->previous_value)),
+                        Placeholder::make('detail_new')->label('Valore nuovo')
+                            ->content(fn (AuditEvent $record): string => self::formatValue($record, $record->new_value)),
+                        Placeholder::make('detail_allocated')->label('Impatto Allocato')
+                            ->content(fn (AuditEvent $record): string => self::formatImpact($record->allocated_impact_by_exercise, $record)),
+                        Placeholder::make('detail_actual')->label('Impatto Effettivo')
+                            ->content(fn (AuditEvent $record): string => self::formatImpact($record->actual_impact_by_exercise, $record)),
+                        Placeholder::make('detail_reason')->label('Motivo')
+                            ->content(fn (AuditEvent $record): string => $record->reason ?? '—'),
+                        Placeholder::make('detail_reference')->label('Riferimento')
+                            ->content(fn (AuditEvent $record): string => self::formatReference($record)),
+                        Placeholder::make('detail_overspend')->label('Sovraspesa')
+                            ->content(fn (AuditEvent $record): string => self::formatOverspend($record)),
+                        Placeholder::make('detail_operation')->label('Identità operazione')
+                            ->content(fn (AuditEvent $record): string => $record->operation_id),
+                    ]),
             ])
             ->paginated([10, 25, 50]);
     }
@@ -179,6 +249,9 @@ class CompanyAudit extends Page implements HasTable
             Exercise::class => 'Esercizio',
             Expense::class => 'Spesa',
             ExpenseLine::class => 'Riga',
+            Project::class => 'Progetto',
+            ProjectTransition::class => 'Transizione Progetto',
+            ProjectExerciseClassification::class => 'Classificazione Progetto',
             Company::class => 'Azienda',
             User::class => 'Utente',
             default => class_basename($event->subject_type),
@@ -217,6 +290,7 @@ class CompanyAudit extends Page implements HasTable
             Expense::class => [
                 'origin_key' => 'OriginKey',
                 'exercise_id' => 'Esercizio',
+                'project_id' => 'Progetto',
                 'supplier_id' => 'Fornitore',
                 'direct_cost_center_id' => 'Centro di Costo',
                 'description' => 'Descrizione',
@@ -238,6 +312,31 @@ class CompanyAudit extends Page implements HasTable
                 'note' => 'Nota',
                 'annulled' => 'Annullata',
             ],
+            Project::class => [
+                'origin_key' => 'OriginKey',
+                'title' => 'Titolo',
+                'description' => 'Descrizione',
+                'notes' => 'Note',
+                'initial_state' => 'Stato iniziale',
+                'initial_effective_date' => 'Efficacia iniziale',
+                'archived_at' => 'Archivio',
+                'revision' => 'Revisione',
+            ],
+            ProjectTransition::class => [
+                'project_id' => 'Progetto',
+                'state' => 'Stato',
+                'from_state' => 'Da',
+                'to_state' => 'A',
+                'effective_date' => 'Data efficacia',
+                'reason' => 'Motivo',
+                'annulled_at' => 'Annullata il',
+                'annulment_reason' => 'Motivo annullamento',
+            ],
+            ProjectExerciseClassification::class => [
+                'project_id' => 'Progetto',
+                'exercise_id' => 'Esercizio',
+                'cost_center_id' => 'Centro di Costo',
+            ],
             default => null,
         };
 
@@ -254,7 +353,11 @@ class CompanyAudit extends Page implements HasTable
 
             $fieldValue = $value[$key];
 
-            if ($key === 'archived' && is_bool($fieldValue)) {
+            if (in_array($key, ['initial_state', 'state', 'from_state', 'to_state'], true) && is_string($fieldValue)) {
+                $fieldValue = ProjectState::tryFrom($fieldValue)?->label() ?? $fieldValue;
+            } elseif ($key === 'archived_at') {
+                $fieldValue = $fieldValue === null ? 'Attivo' : 'Archiviato';
+            } elseif ($key === 'archived' && is_bool($fieldValue)) {
                 $fieldValue = $fieldValue ? 'Archiviato' : 'Attivo';
             } elseif (is_array($fieldValue)) {
                 $fieldValue = $fieldValue === [] ? '—' : implode(', ', $fieldValue);
@@ -303,5 +406,48 @@ class CompanyAudit extends Page implements HasTable
 
             return $label.': € '.(string) $amount;
         })->implode(' · ');
+    }
+
+    private static function formatReference(AuditEvent $event): string
+    {
+        if ($event->reference_type === null || $event->reference_id === null) {
+            return '—';
+        }
+
+        $label = match ($event->reference_type) {
+            Project::class => 'Progetto',
+            Expense::class => 'Spesa',
+            CostCenter::class => 'Centro di Costo',
+            Supplier::class => 'Fornitore',
+            default => class_basename($event->reference_type),
+        };
+
+        return $label.' #'.$event->reference_id;
+    }
+
+    private static function formatOverspend(AuditEvent $event): string
+    {
+        $occurrences = $event->overspendOccurrences();
+        if ($occurrences === []) {
+            return '—';
+        }
+
+        return collect($occurrences)->map(function (array $occurrence) use ($occurrences): string {
+            $label = $occurrence['result'] === 'increased' ? 'Sovraspesa aumentata' : 'Sovraspesa creata';
+            $project = count($occurrences) > 1 && $occurrence['project_id'] !== null
+                ? ' · Progetto #'.$occurrence['project_id']
+                : '';
+
+            return $label.$project.': € '.$occurrence['variance_before'].' → € '.$occurrence['variance_after'];
+        })->implode(' · ');
+    }
+
+    private static function formatEffectiveDate(AuditEvent $event): string
+    {
+        $date = $event->getRawOriginal('effective_from');
+
+        return is_string($date) && $date !== ''
+            ? CarbonImmutable::parse($date)->format('d/m/Y')
+            : '—';
     }
 }

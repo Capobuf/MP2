@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Expenses\Tables;
 
 use App\Filament\Resources\Expenses\ExpenseResource;
+use App\Filament\Resources\Projects\ProjectResource;
 use App\Models\Expense;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
@@ -19,7 +20,11 @@ class ExpensesTable
             ->columns([
                 TextColumn::make('description')->label('Descrizione')->searchable()->sortable(),
                 TextColumn::make('exercise.year')->label('Esercizio')->sortable(),
-                TextColumn::make('container')->label('Contenitore')->state(fn (Expense $record): string => $record->containerLabel()),
+                TextColumn::make('container')->label('Contenitore')
+                    ->state(fn (Expense $record): string => $record->containerLabel())
+                    ->url(fn (Expense $record): ?string => $record->project === null
+                        ? null
+                        : ProjectResource::getUrl('view', ['record' => $record->project])),
                 TextColumn::make('supplier.legal_name')->label('Fornitore')->placeholder('—'),
                 TextColumn::make('cost_center')->label('Centro di Costo')->state(fn (Expense $record): string => $record->costCenterLabel()),
                 TextColumn::make('state')->label('Stato')->state(fn (Expense $record): string => $record->isReversed() ? 'Stornata' : 'Attiva')->badge(),

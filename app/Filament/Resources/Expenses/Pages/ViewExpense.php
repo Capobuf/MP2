@@ -5,8 +5,11 @@ namespace App\Filament\Resources\Expenses\Pages;
 use App\Actions\Operations\UpdateExpense;
 use App\Domain\Expenses\ExpenseImpactPlan;
 use App\Domain\Projects\ProjectActualKind;
+use App\Domain\Projects\ProjectOverspend;
+use App\Domain\Projects\ProjectOverspendResult;
 use App\Filament\Pages\CompanyAudit;
 use App\Filament\Resources\Expenses\ExpenseResource;
+use App\Filament\Support\ProjectOverspendNotifier;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -51,6 +54,7 @@ class ViewExpense extends ViewRecord
                     abort_unless($actor instanceof User, 403);
                     $preview = app(UpdateExpense::class)->preview($actor, $record, $data);
                     app(UpdateExpense::class)->confirm($actor, $record, $preview, (string) $data['operation_id']);
+                    ProjectOverspendNotifier::sendForOperation((string) $data['operation_id']);
                     $record->refresh();
                 }),
             ExpenseResource::reverseAction(),
@@ -141,13 +145,44 @@ class ViewExpense extends ViewRecord
     {
         $rows = ["Identità preservate: {$plan->originKey}; Righe ".implode(', ', $plan->lineIds).'.'];
         $rows[] = 'Contenitore: '.($plan->sourceProjectId === null ? 'Autonoma' : 'Progetto '.$plan->sourceProjectId).' → '.($plan->targetProjectId === null ? 'Autonoma' : 'Progetto '.$plan->targetProjectId).'.';
+        $rows[] = 'Centro di Costo: '.$this->costCenterLabel($plan->sourceCostCenterId).' → '.$this->costCenterLabel($plan->targetCostCenterId).'.';
+        if ($plan->targetProjectId !== null) {
+            $project = Project::query()->find($plan->targetProjectId);
+            if ($project !== null) {
+                $state = $project->stateAtDate(now($project->company->timezone)->toDateString());
+                $rows[] = 'Ammissibilità destinazione: '.($state?->label() ?? 'Assente alla data')
+                    .($plan->openProject ? ', con apertura atomica confermata.' : '.');
+            }
+        }
         foreach ($plan->exerciseImpacts as $impact) {
             $rows[] = "Esercizio {$impact['year']}: Allocato {$impact['allocation_before']} → {$impact['allocation_after']} ({$impact['allocation_delta']}); Effettivo {$impact['actual_before']} → {$impact['actual_after']} ({$impact['actual_delta']})";
         }
+        if ($plan->sourceExerciseId === $plan->targetExerciseId) {
+            $rows[] = 'Totale dell’Esercizio invariato: lo spostamento cambia solo il contenitore di primo livello.';
+        }
         foreach ($plan->projectImpacts as $projectId => $impact) {
-            $rows[] = "Progetto {$projectId}: Allocato {$impact['allocation_before']} → {$impact['allocation_after']}; Effettivo {$impact['actual_before']} → {$impact['actual_after']}";
+            $overspend = ProjectOverspend::detect((string) $impact['variance_before'], (string) $impact['variance_after']);
+            $warning = match ($overspend) {
+                ProjectOverspendResult::Created => '; Sovraspesa creata',
+                ProjectOverspendResult::Increased => '; Sovraspesa aumentata',
+                ProjectOverspendResult::None => '',
+            };
+            $rows[] = "Progetto {$projectId}: Allocato {$impact['allocation_before']} → {$impact['allocation_after']}; Effettivo {$impact['actual_before']} → {$impact['actual_after']}; Scostamento {$impact['variance_before']} → {$impact['variance_after']}{$warning}";
         }
 
         return implode(' · ', $rows);
+    }
+
+    private function costCenterLabel(?int $costCenterId): string
+    {
+        if ($costCenterId === null) {
+            return 'Non classificato';
+        }
+
+        $costCenter = CostCenter::query()->find($costCenterId);
+
+        return $costCenter === null
+            ? 'Centro di Costo #'.$costCenterId
+            : $costCenter->name.($costCenter->isArchived() ? ' · Archiviato' : '');
     }
 }

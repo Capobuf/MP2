@@ -9,6 +9,7 @@ use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Projects\ProjectActualKind;
 use App\Filament\Resources\Expenses\Schemas\ExpenseForm;
+use App\Filament\Support\ProjectOverspendNotifier;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\User;
@@ -79,7 +80,10 @@ class ExpenseLinesRelationManager extends RelationManager
                         $operationId = (string) $data['operation_id'];
                         unset($data['operation_id']);
 
-                        return app(CreateExpenseLine::class)->execute($actor, $expense, $data, $operationId);
+                        $line = app(CreateExpenseLine::class)->execute($actor, $expense, $data, $operationId);
+                        ProjectOverspendNotifier::sendForOperation($operationId);
+
+                        return $line;
                     }),
             ])
             ->recordActions([
@@ -93,7 +97,10 @@ class ExpenseLinesRelationManager extends RelationManager
                         $operationId = (string) $data['operation_id'];
                         unset($data['operation_id']);
 
-                        return app(UpdateExpenseLine::class)->execute($actor, $record, $data, $operationId);
+                        $line = app(UpdateExpenseLine::class)->execute($actor, $record, $data, $operationId);
+                        ProjectOverspendNotifier::sendForOperation($operationId);
+
+                        return $line;
                     }),
                 Action::make('annul')
                     ->label('Annulla')
@@ -104,7 +111,13 @@ class ExpenseLinesRelationManager extends RelationManager
                     ->modalSubmitActionLabel('Annulla riga')
                     ->modalCancelActionLabel('Torna alla riga')
                     ->visible(fn (ExpenseLine $record): bool => ! $record->isAnnulled() && $this->canMutateOwner())
-                    ->action(fn (ExpenseLine $record) => $this->setActive($record, false)),
+                    ->form([
+                        Textarea::make('overspend_note')
+                            ->label('Nota di sovraspesa')
+                            ->visible(fn (): bool => $this->getOwnerRecord() instanceof Expense && $this->getOwnerRecord()->project_id !== null),
+                        Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
+                    ])
+                    ->action(fn (ExpenseLine $record, array $data) => $this->setActive($record, false, $data)),
                 Action::make('restore')
                     ->label('Ripristina')
                     ->color('success')
@@ -144,6 +157,7 @@ class ExpenseLinesRelationManager extends RelationManager
         $operationId = isset($data['operation_id']) ? (string) $data['operation_id'] : (string) Str::uuid();
         unset($data['operation_id']);
         app(SetExpenseLineActive::class)->execute($actor, $line, $active, $operationId, $data);
+        ProjectOverspendNotifier::sendForOperation($operationId);
         $line->refresh();
         $this->getOwnerRecord()->refresh();
     }

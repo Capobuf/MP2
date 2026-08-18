@@ -173,14 +173,14 @@ and a complete immutable Project-filtered Timeline.
 archive/restore every eligible/ineligible state, then inspect all Project-related
 events even after Expense movement.
 
-- [ ] T048 [P] [US6] Add failing cross-command overspend tests for exact crossing/increase/no-event predicates, required note, one causal event, retry, rollback, and notification payload in `tests/Feature/Projects/ProjectOverspendTest.php`.
-- [ ] T049 [P] [US6] Add failing Project archive/restore tests for state-at-current-date eligibility, unchanged values/classifications/history, archived activity rejection, idempotency, and audit in `tests/Feature/Projects/SetProjectArchivedTest.php`.
-- [ ] T050 [P] [US6] Add failing Project Resource and Timeline tests for action visibility, read-only viewer, immutable historical Project references, filtering after Expense moves, newest-first detail, and no delete in `tests/Feature/Projects/ProjectLifecycleUiTest.php` and `tests/Feature/Projects/ProjectTimelineTest.php`.
-- [ ] T051 [US6] Implement locked idempotent terminal-only archive/restore with current company-local state and one complete event in `app/Actions/Operations/SetProjectArchived.php`.
-- [ ] T052 [US6] Integrate overspend result/required-note handling and notifications across Project-capable Actions and forms in `app/Actions/Operations/`, `app/Domain/Projects/`, and `app/Filament/Resources/{Projects,Expenses}/`.
-- [ ] T053 [US6] Extend `app/Filament/Pages/CompanyAudit.php`, `app/Models/AuditEvent.php`, and Project/Expense view links for immutable Project filtering, exact impacts, state, reason, references, and overspend detail after ownership changes.
-- [ ] T054 [US6] Wire archive/restore and filtered Timeline actions into `app/Filament/Resources/Projects/`, with no action for ineligible current states and no economic side effects.
-- [ ] T055 [US6] Run US6 and complete focused S4 suites against `testing`, boot the application, and inspect archive/Timeline/notification behavior without persistent-data mutation.
+- [X] T048 [P] [US6] Add failing cross-command overspend tests for exact crossing/increase/no-event predicates, required note, one causal event, retry, rollback, and notification payload in `tests/Feature/Projects/ProjectOverspendTest.php`.
+- [X] T049 [P] [US6] Add failing Project archive/restore tests for state-at-current-date eligibility, unchanged values/classifications/history, archived activity rejection, idempotency, and audit in `tests/Feature/Projects/SetProjectArchivedTest.php`.
+- [X] T050 [P] [US6] Add failing Project Resource and Timeline tests for action visibility, read-only viewer, immutable historical Project references, filtering after Expense moves, newest-first detail, and no delete in `tests/Feature/Projects/ProjectLifecycleUiTest.php` and `tests/Feature/Projects/ProjectTimelineTest.php`.
+- [X] T051 [US6] Implement locked idempotent terminal-only archive/restore with current company-local state and one complete event in `app/Actions/Operations/SetProjectArchived.php`.
+- [X] T052 [US6] Integrate overspend result/required-note handling and notifications across Project-capable Actions and forms in `app/Actions/Operations/`, `app/Domain/Projects/`, and `app/Filament/Resources/{Projects,Expenses}/`.
+- [X] T053 [US6] Extend `app/Filament/Pages/CompanyAudit.php`, `app/Models/AuditEvent.php`, and Project/Expense view links for immutable Project filtering, exact impacts, state, reason, references, and overspend detail after ownership changes.
+- [X] T054 [US6] Wire archive/restore and filtered Timeline actions into `app/Filament/Resources/Projects/`, with no action for ineligible current states and no economic side effects.
+- [X] T055 [US6] Run US6 and complete focused S4 suites against `testing`, boot the application, and inspect archive/Timeline/notification behavior without persistent-data mutation.
 
 **Checkpoint**: All six S4 stories are explainable, reversible where canonical, and
 visible through one append-only Company Timeline.

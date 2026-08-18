@@ -72,6 +72,7 @@ class SetExpenseReversed
             $projectContext = null;
             $varianceBefore = null;
             $openingTransition = null;
+            $overspendNote = $this->nullableTrim($context['overspend_note'] ?? null);
             if ($project !== null) {
                 $varianceBefore = ProjectExpenseActivity::annualVariance($project, $exercise);
                 if (! $reversed) {
@@ -92,9 +93,14 @@ class SetExpenseReversed
             $lockedExpense->save();
             if ($project !== null) {
                 $varianceAfter = ProjectExpenseActivity::annualVariance($project, $exercise);
-                if ($projectContext !== null) {
-                    ProjectExpenseActivity::assertOverspendNote($company, $projectContext, $varianceBefore, $varianceAfter);
-                }
+                $overspendContext = $projectContext ?? [
+                    'actual_kind' => null,
+                    'activity_note' => null,
+                    'open_project' => false,
+                    'overspend_note' => $overspendNote,
+                    'today' => now($company->timezone)->toDateString(),
+                ];
+                ProjectExpenseActivity::assertOverspendNote($company, $overspendContext, $varianceBefore, $varianceAfter);
                 $project->increment('revision', $openingTransition === null ? 1 : 2);
             }
             $exercise->increment('revision');
@@ -108,7 +114,7 @@ class SetExpenseReversed
                     'activity_note' => $projectContext['activity_note'] ?? null,
                     'opening_transition' => $openingTransition === null ? null : ProjectAuditSnapshot::transition($openingTransition),
                     'overspend' => ProjectAuditSnapshot::overspend($varianceBefore, ProjectExpenseActivity::annualVariance($project, $exercise)),
-                    'overspend_note' => $projectContext['overspend_note'] ?? null,
+                    'overspend_note' => $projectContext['overspend_note'] ?? $overspendNote,
                 ];
             }
             AuditEvent::query()->create([
@@ -131,5 +137,16 @@ class SetExpenseReversed
 
             return $lockedExpense;
         });
+    }
+
+    private function nullableTrim(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value === '' ? null : $value;
     }
 }

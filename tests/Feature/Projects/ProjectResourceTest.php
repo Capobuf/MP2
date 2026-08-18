@@ -14,6 +14,7 @@ use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\Project;
 use App\Models\ProjectExerciseClassification;
+use App\Models\ProjectTransition;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
@@ -90,6 +91,7 @@ it('lists views and resolves Projects only inside the current tenant', function 
     grantProjectResource($viewer, $companyA, false);
     $past = Exercise::factory()->for($companyA)->create(['year' => 2025]);
     $current = Exercise::factory()->for($companyA)->create(['year' => 2026]);
+    $future = Exercise::factory()->for($companyA)->create(['year' => 2027]);
     $projectA = Project::factory()->for($companyA)->create([
         'title' => 'Visibile',
         'initial_state' => ProjectState::Planned,
@@ -97,6 +99,13 @@ it('lists views and resolves Projects only inside the current tenant', function 
     ]);
     ProjectExerciseClassification::factory()->forProjectAndExercise($projectA, $past)->create();
     ProjectExerciseClassification::factory()->forProjectAndExercise($projectA, $current)->create();
+    ProjectExerciseClassification::factory()->forProjectAndExercise($projectA, $future)->create();
+    ProjectTransition::factory()->forProject($projectA)->create([
+        'from_state' => ProjectState::Planned,
+        'to_state' => ProjectState::Open,
+        'effective_date' => '2027-06-01',
+        'created_by_id' => $viewer->id,
+    ]);
     $projectB = Project::factory()->for($companyB)->create(['title' => 'Segreto']);
     $this->actingAs($viewer);
     Filament::setTenant($companyA);
@@ -113,6 +122,8 @@ it('lists views and resolves Projects only inside the current tenant', function 
         ->assertSee('Assente alla data')
         ->assertSee('31/12/2025')
         ->assertSee('17/08/2026')
+        ->assertSee('1° gennaio dell’Esercizio futuro')
+        ->assertSee('01/06/2027: Pianificato → Aperto')
         ->assertDontSee('Riporto')
         ->assertDontSee('Contratto');
 

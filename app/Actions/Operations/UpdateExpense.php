@@ -161,7 +161,14 @@ class UpdateExpense
                 'source_cost_center_id' => $preview->sourceCostCenterId,
                 'target_cost_center_id' => $preview->targetCostCenterId,
                 'preserved_line_ids' => $preview->lineIds,
-                'project_impacts' => $preview->projectImpacts,
+                'project_impacts' => collect($preview->projectImpacts)
+                    ->map(fn (array $impact): array => [
+                        ...$impact,
+                        'overspend' => ProjectAuditSnapshot::overspend(
+                            (string) $impact['variance_before'],
+                            (string) $impact['variance_after'],
+                        ),
+                    ])->all(),
                 'actual_kind' => $preview->actualKind,
                 'activity_note' => $preview->activityNote,
                 'opening_transition' => $openingTransition === null ? null : ProjectAuditSnapshot::transition($openingTransition),

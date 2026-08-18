@@ -13,6 +13,7 @@ use App\Filament\Resources\Expenses\RelationManagers\ExpenseLinesRelationManager
 use App\Filament\Resources\Expenses\Schemas\ExpenseForm;
 use App\Filament\Resources\Expenses\Schemas\ExpenseInfolist;
 use App\Filament\Resources\Expenses\Tables\ExpensesTable;
+use App\Filament\Support\ProjectOverspendNotifier;
 use App\Models\Company;
 use App\Models\Expense;
 use App\Models\User;
@@ -132,6 +133,8 @@ class ExpenseResource extends Resource
             ->tooltip(fn (Expense $record): ?string => $record->hasActuals() ? 'La Spesa contiene Effettivi attivi non nulli.' : null)
             ->form([
                 Textarea::make('reason')->label('Motivo')->required(),
+                Textarea::make('overspend_note')->label('Nota di sovraspesa')
+                    ->visible(fn (Expense $record): bool => $record->project_id !== null),
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
             ])
             ->action(fn (Expense $record, array $data) => self::setReversed($record, true, $data));
@@ -174,6 +177,7 @@ class ExpenseResource extends Resource
             (string) $data['operation_id'],
             $data,
         );
+        ProjectOverspendNotifier::sendForOperation((string) $data['operation_id']);
         $expense->refresh();
     }
 }

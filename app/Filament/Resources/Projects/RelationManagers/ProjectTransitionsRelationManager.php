@@ -14,9 +14,11 @@ use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
@@ -116,12 +118,53 @@ class ProjectTransitionsRelationManager extends RelationManager
     private function transitionFields(): array
     {
         return [
-            Select::make('from_state')->label('Stato di origine')->options(ProjectState::options())->required(),
-            Select::make('to_state')->label('Nuovo stato')->options(ProjectState::options())->required(),
-            DatePicker::make('effective_date')->label('Data di efficacia')->required(),
-            Textarea::make('reason')->label('Motivo'),
+            DatePicker::make('effective_date')->label('Data di efficacia')->required()->live(),
+            Placeholder::make('state_before')
+                ->label('Stato immediatamente precedente')
+                ->content(function (Get $get, ?ProjectTransition $record): string {
+                    $state = $this->stateImmediatelyBefore($get('effective_date'), $record);
+
+                    return $state?->label() ?? 'Assente alla data o data non selezionata';
+                }),
+            Hidden::make('from_state')
+                ->dehydrateStateUsing(fn (mixed $state, Get $get, ?ProjectTransition $record): ?string => $this
+                    ->stateImmediatelyBefore($get('effective_date'), $record)?->value),
+            Select::make('to_state')->label('Nuovo stato')
+                ->options(function (Get $get, ?ProjectTransition $record): array {
+                    $from = $this->stateImmediatelyBefore($get('effective_date'), $record);
+
+                    return $from === null
+                        ? []
+                        : collect(ProjectState::cases())
+                            ->filter(fn (ProjectState $state): bool => $from->canTransitionTo($state))
+                            ->mapWithKeys(fn (ProjectState $state): array => [$state->value => $state->label()])
+                            ->all();
+                })->required(),
+            Textarea::make('reason')->label('Motivo')
+                ->required(function (Get $get, ?ProjectTransition $record): bool {
+                    $from = $this->stateImmediatelyBefore($get('effective_date'), $record);
+                    $to = is_string($get('to_state')) ? ProjectState::tryFrom($get('to_state')) : null;
+
+                    return $from !== null && $to !== null && $from->transitionRequiresReason($to);
+                }),
             Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
         ];
+    }
+
+    private function stateImmediatelyBefore(mixed $effectiveDate, ?ProjectTransition $replaced = null): ?ProjectState
+    {
+        if (! is_string($effectiveDate) || $effectiveDate === '') {
+            return null;
+        }
+
+        $project = $this->getOwnerRecord();
+        abort_unless($project instanceof Project, 404);
+        $transitions = $project->transitions()
+            ->when($replaced !== null, fn ($query) => $query->where('id', '!=', $replaced->id))
+            ->get();
+        $project->setRelation('transitions', $transitions);
+
+        return $project->stateAtDate(CarbonImmutable::parse($effectiveDate)->subDay()->toDateString());
     }
 
     private function canMutateOwner(): bool

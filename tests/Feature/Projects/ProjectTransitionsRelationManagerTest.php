@@ -50,7 +50,6 @@ it('manages transitions explicitly without edit or delete and only changes futur
         'ownerRecord' => $project,
         'pageClass' => ViewProject::class,
     ])->callTableAction('createTransition', data: [
-        'from_state' => 'planned',
         'to_state' => 'open',
         'effective_date' => '2026-10-01',
         'reason' => null,
