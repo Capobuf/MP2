@@ -231,8 +231,9 @@ commit, push, PR, and remote CI remain a separate explicit publication step.
 ### Remote verification evidence — 2026-08-20
 
 - Draft PR #2 ran the GitHub `Quality` workflow successfully for the complete S4
-  application change and the status-reconciliation commit; CodeRabbit also reported
-  success and no blocking review decision was present.
+  application change and the status-reconciliation commit. CodeRabbit left no
+  blocking review decision but skipped automated diff analysis because the 110-file
+  slice exceeded its 100-file review limit.
 - The independent browser demonstration, persistence check, focused suites, and
   complete local quality gate above remain the functional verification evidence.
 - S4 and its primary FR/invariant rows are now `verified`. Shared FR-005, FR-051,
