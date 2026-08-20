@@ -146,7 +146,7 @@ administrator exists, Dashboard loads.
   Larastan, migrations, Pest, and application smoke verification.
 - [X] **T027 [US3]** Ensure the S0 workflow does not set up Node, npm, Vite, Selenium,
   or Dusk.
-- [ ] **T028 [US3]** Run the complete local S0 suite, verify development credentials
+- [X] **T028 [US3]** Run the complete local S0 suite, verify development credentials
   still work afterward, then run/review the GitHub Actions workflow.
 
 **Checkpoint D:** test safety guard works and CI is green.
@@ -170,8 +170,22 @@ administrator exists, Dashboard loads.
 - [X] **T034** Update `specs/000-product-roadmap/traceability.md` status for FR-099 and
   FR-100 only if S0 produced concrete enforcement/evidence; do not mark unrelated
   domain FRs implemented.
-- [ ] **T035** Mark roadmap S0 `verified` only after Checkpoints A–D and all S0 success
+- [X] **T035** Mark roadmap S0 `verified` only after Checkpoints A–D and all S0 success
   criteria pass.
+
+### Verification evidence — 2026-08-20
+
+- The complete current quality gate passed against the dedicated `testing` database
+  with 190 tests and 1,672 assertions; Composer validation/audit, Pint and Larastan
+  also passed.
+- The configured development administrator credentials still match the persisted
+  administrator, the local `/admin` endpoint returns the expected redirect, and all
+  forward migrations are applied without a destructive reset.
+- The original S0 push run failed in Pest, but the subsequent S1, S2 and S3 `main`
+  runs passed the same repository Quality workflow, including the inherited S0
+  bootstrap, database isolation, test and smoke gates. S0 is therefore verified by
+  the repaired cumulative baseline rather than by rewriting the failed historical
+  run.
 
 ## Dependencies and execution order
 

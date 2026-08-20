@@ -6,11 +6,14 @@ use App\Domain\Company\AuditEventType;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseAuditSnapshot;
 use App\Domain\Expenses\ManualExpenseLine;
+use App\Domain\Projects\ProjectAuditSnapshot;
+use App\Domain\Projects\ProjectExpenseActivity;
 use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
+use App\Models\Project;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -27,6 +30,14 @@ class CreateExpenseLine
         return DB::transaction(function () use ($actor, $expense, $input, $operationId): ExpenseLine {
             $company = Company::query()->lockForUpdate()->findOrFail($expense->company_id);
             $exercise = Exercise::query()->lockForUpdate()->findOrFail($expense->exercise_id);
+            $project = $expense->project_id === null
+                ? null
+                : Project::query()->lockForUpdate()->findOrFail($expense->project_id);
+            $transitions = collect();
+            if ($project !== null) {
+                $transitions = $project->transitions()->orderBy('effective_date')->orderBy('id')->lockForUpdate()->get();
+                $project->classifications()->where('exercise_id', $exercise->id)->lockForUpdate()->get();
+            }
             $lockedExpense = Expense::query()->lockForUpdate()->findOrFail($expense->id);
             Gate::forUser($actor)->authorize('create', [ExpenseLine::class, $lockedExpense]);
 
@@ -45,10 +56,34 @@ class CreateExpenseLine
             $allocationBefore = $lockedExpense->allocation();
             $actualBefore = $lockedExpense->actual();
             $validated = ManualExpenseLine::validate($input, $company, $exercise);
+            $projectContext = null;
+            $varianceBefore = null;
+            $openingTransition = null;
+            if ($project !== null) {
+                $projectContext = ProjectExpenseActivity::validate($project, $exercise, $company, [$validated], $input);
+                $varianceBefore = ProjectExpenseActivity::annualVariance($project, $exercise);
+                $openingTransition = app(ProjectExpenseOpening::class)->create($project, $company, $actor, $projectContext, $transitions);
+            }
             $line = $lockedExpense->lines()->create($validated);
+            if ($project !== null) {
+                $varianceAfter = ProjectExpenseActivity::annualVariance($project, $exercise);
+                ProjectExpenseActivity::assertOverspendNote($company, $projectContext, $varianceBefore, $varianceAfter);
+                $project->increment('revision', $openingTransition === null ? 1 : 2);
+            }
             $lockedExpense->increment('revision');
             $exercise->increment('revision');
             $lockedExpense->refresh();
+
+            $newValue = ExpenseAuditSnapshot::line($line);
+            if ($project !== null) {
+                $newValue['project_activity'] = [
+                    'actual_kind' => $projectContext['actual_kind']?->value,
+                    'activity_note' => $projectContext['activity_note'],
+                    'opening_transition' => $openingTransition === null ? null : ProjectAuditSnapshot::transition($openingTransition),
+                    'overspend' => ProjectAuditSnapshot::overspend($varianceBefore, ProjectExpenseActivity::annualVariance($project, $exercise)),
+                    'overspend_note' => $projectContext['overspend_note'],
+                ];
+            }
 
             AuditEvent::query()->create([
                 'operation_id' => $operationId,
@@ -60,11 +95,12 @@ class CreateExpenseLine
                 'affected_exercise_ids' => [$exercise->id],
                 'effective_from' => now($company->timezone)->toDateString(),
                 'previous_value' => null,
-                'new_value' => ExpenseAuditSnapshot::line($line),
+                'new_value' => $newValue,
                 'allocated_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($lockedExpense->allocation(), $allocationBefore)),
                 'actual_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($lockedExpense->actual(), $actualBefore)),
-                'reference_type' => Expense::class,
-                'reference_id' => $lockedExpense->id,
+                'reason' => $projectContext === null ? null : ($projectContext['activity_note'] ?? $projectContext['overspend_note']),
+                'reference_type' => $project === null ? Expense::class : Project::class,
+                'reference_id' => $project === null ? $lockedExpense->id : $project->id,
             ]);
 
             return $line;

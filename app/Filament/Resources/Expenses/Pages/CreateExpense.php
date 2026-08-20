@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Expenses\Pages;
 
 use App\Actions\Operations\CreateExpense as CreateExpenseAction;
 use App\Filament\Resources\Expenses\ExpenseResource;
+use App\Filament\Support\ProjectOverspendNotifier;
 use App\Models\Company;
 use App\Models\Expense;
 use App\Models\User;
@@ -16,7 +17,7 @@ class CreateExpense extends CreateRecord
 {
     protected static string $resource = ExpenseResource::class;
 
-    protected static ?string $title = 'Nuova spesa autonoma';
+    protected static ?string $title = 'Nuova spesa';
 
     public string $operationId;
 
@@ -33,7 +34,10 @@ class CreateExpense extends CreateRecord
         $company = Filament::getTenant();
         abort_unless($actor instanceof User && $company instanceof Company, 403);
 
-        return app(CreateExpenseAction::class)->execute($actor, $company, $data, $this->operationId);
+        $expense = app(CreateExpenseAction::class)->execute($actor, $company, $data, $this->operationId);
+        ProjectOverspendNotifier::sendForOperation($this->operationId);
+
+        return $expense;
     }
 
     protected function getRedirectUrl(): string

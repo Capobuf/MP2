@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Expenses;
 
 use App\Actions\Operations\SetExpenseReversed;
 use App\Domain\Company\Capability;
+use App\Domain\Projects\ProjectActualKind;
 use App\Filament\Resources\Expenses\Pages\CreateExpense;
 use App\Filament\Resources\Expenses\Pages\EditExpense;
 use App\Filament\Resources\Expenses\Pages\ListExpenses;
@@ -12,13 +13,16 @@ use App\Filament\Resources\Expenses\RelationManagers\ExpenseLinesRelationManager
 use App\Filament\Resources\Expenses\Schemas\ExpenseForm;
 use App\Filament\Resources\Expenses\Schemas\ExpenseInfolist;
 use App\Filament\Resources\Expenses\Tables\ExpensesTable;
+use App\Filament\Support\ProjectOverspendNotifier;
 use App\Models\Company;
 use App\Models\Expense;
 use App\Models\User;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -76,7 +80,7 @@ class ExpenseResource extends Resource
         $company = Filament::getTenant();
 
         return $company instanceof Company
-            ? $query->whereBelongsTo($company, 'company')->with(['exercise', 'supplier', 'directCostCenter', 'lines'])
+            ? $query->whereBelongsTo($company, 'company')->with(['exercise', 'supplier', 'directCostCenter', 'project.classifications.costCenter', 'lines'])
             : $query->whereRaw('1 = 0');
     }
 
@@ -129,6 +133,8 @@ class ExpenseResource extends Resource
             ->tooltip(fn (Expense $record): ?string => $record->hasActuals() ? 'La Spesa contiene Effettivi attivi non nulli.' : null)
             ->form([
                 Textarea::make('reason')->label('Motivo')->required(),
+                Textarea::make('overspend_note')->label('Nota di sovraspesa')
+                    ->visible(fn (Expense $record): bool => $record->project_id !== null),
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
             ])
             ->action(fn (Expense $record, array $data) => self::setReversed($record, true, $data));
@@ -145,6 +151,14 @@ class ExpenseResource extends Resource
             ->visible(fn (Expense $record): bool => $record->isReversed() && static::canEdit($record))
             ->form([
                 Textarea::make('reason')->label('Motivo')->required(),
+                Select::make('actual_kind')->label('Dichiarazione Effettivo')->options(ProjectActualKind::options())->placeholder('Ordinario')
+                    ->visible(fn (Expense $record): bool => $record->project_id !== null),
+                Checkbox::make('open_project')->label('Conferma apertura atomica se il Progetto è Pianificato')
+                    ->visible(fn (Expense $record): bool => $record->project_id !== null),
+                Textarea::make('activity_note')->label('Nota attività tardiva, rimborso o correzione')
+                    ->visible(fn (Expense $record): bool => $record->project_id !== null),
+                Textarea::make('overspend_note')->label('Nota di sovraspesa')
+                    ->visible(fn (Expense $record): bool => $record->project_id !== null),
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
             ])
             ->action(fn (Expense $record, array $data) => self::setReversed($record, false, $data));
@@ -161,7 +175,9 @@ class ExpenseResource extends Resource
             $reversed,
             (string) $data['reason'],
             (string) $data['operation_id'],
+            $data,
         );
+        ProjectOverspendNotifier::sendForOperation((string) $data['operation_id']);
         $expense->refresh();
     }
 }

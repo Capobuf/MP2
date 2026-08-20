@@ -4,9 +4,11 @@ namespace App\Filament\Resources\Expenses\Schemas;
 
 use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Expenses\ManualExpenseLine;
+use App\Domain\Projects\ProjectActualKind;
 use App\Models\Company;
 use App\Models\CostCenter;
 use App\Models\Exercise;
+use App\Models\Project;
 use App\Models\Supplier;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Checkbox;
@@ -33,6 +35,15 @@ class ExpenseForm
                         : [])
                     ->default(fn (): ?int => request()->integer('exercise') ?: null)
                     ->required(),
+                Select::make('project_id')
+                    ->label('Contenitore Progetto')
+                    ->options(fn (): array => self::company() instanceof Company
+                        ? Project::query()->whereBelongsTo(self::company(), 'company')->active()->orderBy('title')->pluck('title', 'id')->all()
+                        : [])
+                    ->default(fn (): ?int => request()->integer('project') ?: null)
+                    ->searchable()
+                    ->live()
+                    ->placeholder('Autonoma'),
                 Select::make('supplier_id')
                     ->label('Fornitore')
                     ->options(fn (): array => self::company() instanceof Company
@@ -46,8 +57,16 @@ class ExpenseForm
                         ? CostCenter::query()->whereBelongsTo(self::company(), 'company')->active()->orderBy('name')->pluck('name', 'id')->all()
                         : [])
                     ->searchable()
-                    ->placeholder('Non classificata'),
+                    ->placeholder('Non classificata')
+                    ->visible(fn (Get $get): bool => blank($get('project_id')))
+                    ->dehydrated(fn (Get $get): bool => blank($get('project_id'))),
             ])->columns(2),
+            Section::make('Attività Effettiva del Progetto')->schema([
+                Select::make('actual_kind')->label('Dichiarazione Effettivo')->options(ProjectActualKind::options())->placeholder('Ordinario'),
+                Checkbox::make('open_project')->label('Conferma apertura atomica se il Progetto è Pianificato'),
+                Textarea::make('activity_note')->label('Nota attività tardiva, rimborso o correzione')->columnSpanFull(),
+                Textarea::make('overspend_note')->label('Nota di sovraspesa')->columnSpanFull(),
+            ])->columns(2)->visible(fn (Get $get): bool => filled($get('project_id'))),
             Section::make('Righe iniziali')->schema([
                 Repeater::make('lines')
                     ->label('Righe')

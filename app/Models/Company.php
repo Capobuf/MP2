@@ -52,6 +52,12 @@ class Company extends Model implements HasName
         return $this->hasMany(Expense::class);
     }
 
+    /** @return HasMany<Project, $this> */
+    public function projects(): HasMany
+    {
+        return $this->hasMany(Project::class);
+    }
+
     public function getFilamentName(): string
     {
         return $this->name;

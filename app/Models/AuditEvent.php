@@ -6,6 +6,7 @@ use App\Domain\Company\AuditEventType;
 use App\Domain\Company\Capability;
 use App\Domain\Company\Setting;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -73,6 +74,61 @@ class AuditEvent extends Model
         }
 
         return $eventType;
+    }
+
+    /** @param Builder<self> $query */
+    public function scopeForProject(Builder $query, Project $project): void
+    {
+        $query->where(function (Builder $query) use ($project): void {
+            $query->where(function (Builder $subject) use ($project): void {
+                $subject->where('subject_type', Project::class)
+                    ->where('subject_id', $project->id);
+            })->orWhere(function (Builder $reference) use ($project): void {
+                $reference->where('reference_type', Project::class)
+                    ->where('reference_id', $project->id);
+            })->orWhere('new_value->ownership_impact->source_project_id', $project->id)
+                ->orWhere('new_value->ownership_impact->target_project_id', $project->id);
+        });
+    }
+
+    /** @return array<int, array{result: string, variance_before: string, variance_after: string, project_id: int|null}> */
+    public function overspendOccurrences(): array
+    {
+        $newValue = $this->getAttribute('new_value');
+        if (! is_array($newValue)) {
+            return [];
+        }
+
+        $occurrences = [];
+        $activity = $newValue['project_activity'] ?? null;
+        if (is_array($activity) && is_array($activity['overspend'] ?? null)) {
+            $occurrences[] = $this->normalizeOverspend($activity['overspend'], $this->reference_type === Project::class ? $this->reference_id : null);
+        }
+
+        $ownership = $newValue['ownership_impact'] ?? null;
+        $projectImpacts = is_array($ownership) ? ($ownership['project_impacts'] ?? null) : null;
+        if (is_array($projectImpacts)) {
+            foreach ($projectImpacts as $projectId => $impact) {
+                if (is_array($impact) && is_array($impact['overspend'] ?? null)) {
+                    $occurrences[] = $this->normalizeOverspend($impact['overspend'], (int) $projectId);
+                }
+            }
+        }
+
+        return $occurrences;
+    }
+
+    /** @param array<string, mixed> $overspend
+     * @return array{result: string, variance_before: string, variance_after: string, project_id: int|null}
+     */
+    private function normalizeOverspend(array $overspend, ?int $projectId): array
+    {
+        return [
+            'result' => (string) $overspend['result'],
+            'variance_before' => (string) $overspend['variance_before'],
+            'variance_after' => (string) $overspend['variance_after'],
+            'project_id' => $projectId,
+        ];
     }
 
     /** @return array<string, string> */

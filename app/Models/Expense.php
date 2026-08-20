@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'company_id',
     'exercise_id',
+    'project_id',
     'supplier_id',
     'direct_cost_center_id',
     'description',
@@ -44,6 +45,12 @@ class Expense extends Model
     public function exercise(): BelongsTo
     {
         return $this->belongsTo(Exercise::class);
+    }
+
+    /** @return BelongsTo<Project, $this> */
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
     }
 
     /** @return BelongsTo<Supplier, $this> */
@@ -93,6 +100,30 @@ class Expense extends Model
     public function operationalVariance(): string
     {
         return Decimal::subtract($this->actual(), $this->allocation());
+    }
+
+    public function containerLabel(): string
+    {
+        return $this->project === null ? 'Autonoma' : $this->project->title;
+    }
+
+    public function costCenterLabel(): string
+    {
+        if ($this->project_id === null) {
+            return $this->directCostCenter === null
+                ? 'Non classificata'
+                : $this->directCostCenter->name.($this->directCostCenter->isArchived() ? ' · Archiviato' : '');
+        }
+
+        $classification = $this->project?->classifications()
+            ->where('exercise_id', $this->exercise_id)
+            ->with('costCenter')
+            ->first();
+        $costCenter = $classification?->costCenter;
+
+        return $costCenter === null
+            ? 'Non classificata · ereditata dal Progetto'
+            : $costCenter->name.($costCenter->isArchived() ? ' · Archiviato' : '').' · ereditata dal Progetto';
     }
 
     public function hasActuals(): bool
