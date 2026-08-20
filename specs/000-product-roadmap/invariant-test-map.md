@@ -50,9 +50,9 @@ below. Later slices may add integration or regression coverage.
 | 28.41 | Spese manuali di Contratto | S5 — Contratti | planned |
 | 28.42 | Classificazione annuale | S4 — Progetti | implemented |
 | 28.43 | Ereditarietà del Centro di Costo | S4 — Progetti | implemented |
-| 28.44 | Archivio non economico | S2 — Anagrafiche | implemented |
-| 28.45 | Nessuna cancellazione fisica ordinaria | S2 — Anagrafiche | implemented |
-| 28.46 | Identità non riutilizzabile | S2 — Anagrafiche | implemented |
+| 28.44 | Archivio non economico | S2 — Anagrafiche | verified |
+| 28.45 | Nessuna cancellazione fisica ordinaria | S2 — Anagrafiche | verified |
+| 28.46 | Identità non riutilizzabile | S2 — Anagrafiche | verified |
 | 28.47 | Snapshot autonome | S6 — Proposta e Budget iniziale | planned |
 | 28.48 | Schema Budget | S6 — Proposta e Budget iniziale | planned |
 | 28.49 | Schema Chiusura | S9 — Chiusura | planned |
@@ -63,9 +63,9 @@ below. Later slices may add integration or regression coverage.
 | 28.54 | Annualità dell'Effettivo | S3 — Esercizi, Spese e Righe | verified |
 | 28.55 | Copia fra Esercizi | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
 | 28.56 | Scadenze contrattuali | S5 — Contratti | planned |
-| 28.57 | Permessi per Azienda | S1 — Azienda, accesso e impostazioni | implemented |
+| 28.57 | Permessi per Azienda | S1 — Azienda, accesso e impostazioni | verified |
 | 28.58 | Esercizio successivo | S9 — Chiusura | planned |
-| 28.59 | Nessun Forecast | S0 — Foundation e ambiente di sviluppo live | planned |
+| 28.59 | Nessun Forecast | S0 — Foundation e ambiente di sviluppo live | verified |
 | 28.60 | Relazioni informative | S5 — Contratti | planned |
 | 28.61 | Plafond | S3 — Esercizi, Spese e Righe | verified |
 

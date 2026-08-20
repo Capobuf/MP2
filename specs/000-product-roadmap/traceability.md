@@ -16,8 +16,8 @@ changing its traceability anchor.
 | FR-006 | Sorgenti economiche di primo livello | §5.6 | S3 — Esercizi, Spese e Righe | verified |
 | FR-007 | Nessun doppio conteggio | §§5.6, 8.6 | S3 — Esercizi, Spese e Righe | verified |
 | FR-008 | Identità stabile e OriginKey | §5.4 | S3 — Esercizi, Spese e Righe | verified |
-| FR-009 | Nessuna cancellazione fisica ordinaria | §§5.7, 24.1 | S2 — Anagrafiche | implemented |
-| FR-010 | Archivio non economico | §§5.8, 24.3 | S2 — Anagrafiche | implemented |
+| FR-009 | Nessuna cancellazione fisica ordinaria | §§5.7, 24.1 | S2 — Anagrafiche | verified |
+| FR-010 | Archivio non economico | §§5.8, 24.3 | S2 — Anagrafiche | verified |
 | FR-011 | Budget Approvato immutabile | §§1.2, 13 | S6 — Proposta e Budget iniziale | planned |
 | FR-012 | Versione iniziale v1 preservata | §13.4 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
 | FR-013 | Revisioni sempre disponibili in Esercizio Aperto | §§12.3, 13.4, 26.3 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
@@ -89,8 +89,8 @@ changing its traceability anchor.
 | FR-079 | Centro di Costo annuale | §20 | S4 — Progetti | implemented |
 | FR-080 | Cambio Centro di Costo sull'intero Esercizio | §20.3 | S4 — Progetti | implemented |
 | FR-081 | Ereditarietà del Centro di Costo | §20.5 | S4 — Progetti | implemented |
-| FR-082 | Fornitore e Referenti | §21 | S2 — Anagrafiche | implemented |
-| FR-083 | Fornitore Archiviato utilizzabile nello storico | §§21.4, 24.6 | S2 — Anagrafiche | implemented |
+| FR-082 | Fornitore e Referenti | §21 | S2 — Anagrafiche | verified |
+| FR-083 | Fornitore Archiviato utilizzabile nello storico | §§21.4, 24.6 | S2 — Anagrafiche | verified |
 | FR-084 | Timeline esplicativa append-only | §22 | S3 — Esercizi, Spese e Righe | verified |
 | FR-085 | Schemi separati delle Snapshot | §23 | S6 — Proposta e Budget iniziale | planned |
 | FR-086 | Snapshot autonome | §§23.2, 23.13 | S6 — Proposta e Budget iniziale | planned |
@@ -98,16 +98,16 @@ changing its traceability anchor.
 | FR-088 | Categoria primaria e etichette sovrapponibili | §§25.5–25.7 | S11 — Reportistica ed esportazione | planned |
 | FR-089 | Report con riferimenti espliciti | §§25.1–25.2 | S11 — Reportistica ed esportazione | planned |
 | FR-090 | Scadenze informative dei Contratti | §19 | S5 — Contratti | planned |
-| FR-091 | Impostazioni minime per Azienda | §26 | S1 — Azienda, accesso e impostazioni | implemented |
-| FR-092 | Permessi assegnati per Azienda | §§26.5–26.6 | S1 — Azienda, accesso e impostazioni | implemented |
-| FR-093 | Audit di permessi e Impostazioni | §§26.8–26.10 | S1 — Azienda, accesso e impostazioni | implemented |
+| FR-091 | Impostazioni minime per Azienda | §26 | S1 — Azienda, accesso e impostazioni | verified |
+| FR-092 | Permessi assegnati per Azienda | §§26.5–26.6 | S1 — Azienda, accesso e impostazioni | verified |
+| FR-093 | Audit di permessi e Impostazioni | §§26.8–26.10 | S1 — Azienda, accesso e impostazioni | verified |
 | FR-094 | Operazioni inter-Esercizio atomiche | §10 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
 | FR-095 | Relazioni informative senza effetto economico | §7.3 | S5 — Contratti | planned |
 | FR-096 | Report separato delle correzioni e annotazioni | §§24.11, 25.13 | S11 — Reportistica ed esportazione | planned |
 | FR-097 | Approvazione economica esterna ammessa | §26.11 | S6 — Proposta e Budget iniziale | planned |
 | FR-098 | EUR, netto IVA e anno solare | §4.3 | S3 — Esercizi, Spese e Righe | verified |
-| FR-099 | Evoluzione del dominio tramite categorie A–E | §3 | S0 — Foundation e ambiente di sviluppo live | planned |
-| FR-100 | Nessun Forecast | §§1.4, 28.59 | S0 — Foundation e ambiente di sviluppo live | planned |
+| FR-099 | Evoluzione del dominio tramite categorie A–E | §3 | S0 — Foundation e ambiente di sviluppo live | verified |
+| FR-100 | Nessun Forecast | §§1.4, 28.59 | S0 — Foundation e ambiente di sviluppo live | verified |
 | FR-101 | Presenza di Effettivi distinta dal totale netto | §§6.4, 28.2 | S3 — Esercizi, Spese e Righe | verified |
 
 ## Status rules
