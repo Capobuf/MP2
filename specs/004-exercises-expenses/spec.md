@@ -204,8 +204,8 @@ per-Exercise allocation and actual impacts.
 - A past, current, or future calendar-year Exercise is created; all start open.
 - An Actual is entered into an Exercise after the company's local year has advanced,
   or into a future Exercise and must be rejected.
-- An Estimate is negative, an Actual is negative without a note, or a new manual
-  zero-valued Line has no explicit reason.
+- An Estimate is negative, an Actual is negative without a note, or a zero-valued
+  Line does not preserve an already materialized identity or an explicit decision.
 - Quantity or unit amount is absent, has up to six decimal places, or suggests an
   amount different from the authoritative amount.
 - Active Actual Lines offset to net zero; Actual presence remains true.
@@ -258,7 +258,9 @@ per-Exercise allocation and actual impacts.
   authoritative amount.
 - **S3-FR-013**: An Estimate amount MUST be non-negative. An Actual amount MAY be
   negative only for a reimbursement, credit, or correction and MUST require a note.
-  A new manual zero Line MUST require an explicit reason.
+  A zero-valued Line MUST be accepted only when it preserves an already materialized
+  identity or an explicit decision; a new manual zero Line SHOULD NOT be created
+  without a documented reason.
 - **S3-FR-014**: An Actual MUST NOT belong to an Exercise later than the year of its
   technical registration as evaluated in the company's time zone; within the same
   year the user's annual declaration is authoritative.
@@ -367,13 +369,12 @@ per-Exercise allocation and actual impacts.
   timing of closing, not the timing of initial creation; S3 does not close it.
 - Exercise, Expense, and initial Line creation are presented as one coherent journey,
   but an Exercise never automatically creates economic sources.
-- A reason on a new zero-valued Line satisfies the canonical instruction that such a
-  manual Line should not be created without a purpose; zero remains economically
-  neutral.
-- Optional Expense/Line attachments do not yet require uploaded evidence for the S3
-  independent demonstration. Their storage lifecycle is introduced only when a
-  bounded slice requires actual evidence, without inventing removal or historical
-  versioning behavior here.
+- A zero-valued Line remains economically neutral but is admissible only to preserve
+  an already materialized identity or an explicit decision. A new manual zero Line
+  should normally carry a documented reason.
+- S3 does not expose optional Expense/Line attachments. S5 introduces the shared
+  canonical attachment baseline for Contracts, Expenses and Lines; the attachment
+  portion of FR-046 remains planned until that slice is implemented and verified.
 
 ## Clarifications
 
@@ -385,19 +386,20 @@ guessed.
 
 ## Domain Traceability
 
-- Canonical FR-001–FR-008 — live reality, two Line types, authoritative amount, no
-  matching, exclusive Expense membership, first-level sources, no double counting,
-  and OriginKey (§§5.1–5.6, 7.2, 8.1, 8.6).
+- Canonical FR-001–FR-004 and FR-008 — live reality, two Line types, authoritative
+  amount, no matching, and OriginKey (§§5.1–5.4, 8.1).
+- The autonomous portions of FR-005–FR-007 and invariants 28.4, 28.5 and 28.52;
+  complete first-level source coverage remains planned until S5 adds Contracts.
 - Canonical FR-031–FR-033 — multiple open Exercises and authoritative annual Actuals
   with no future-year Actual (§§6.4, 11.1, 11.3).
-- Canonical FR-046–FR-047 and FR-050–FR-054 — Expense structure, autonomous source
-  identity, year/container rules, integral reclassification, Storno, and prohibited
-  special types (§15).
+- Canonical FR-047, FR-050, FR-053 and FR-054, plus the non-attachment portion of
+  FR-046 and the autonomous portions of FR-051–FR-052 (§15). Complete FR-046,
+  FR-051 and FR-052 coverage remains planned until S5.
 - Canonical FR-084 — complete explanatory append-only Timeline (§22), extending the
   S1/S2 shared event envelope rather than creating a parallel audit mechanism.
 - Canonical FR-098 and FR-101 — calendar year, EUR net of VAT, decimal precision, and
   Actual presence independent from net total (§§4.3, 6.4).
-- Canonical invariants 28.1–28.7, 28.10, 28.52–28.54, and 28.61.
+- Canonical invariants 28.1–28.3, 28.6–28.7, 28.10, 28.53–28.54, and 28.61.
 - Canonical implementation constraints for impact plans, consistency, atomicity,
   idempotency, company time zones, and domain messages (§§30.4, 30.10–30.14).
 
@@ -412,6 +414,6 @@ guessed.
 - Project and Contract containers are canonical but belong to S4/S5. S3 preserves
   their exclusive-membership boundary without exposing incomplete container
   workflows.
-- Optional attachment lifecycle is not needed for the bounded S3 demonstration and
-  is not invented; notes and Timeline provide the required explanations in S3.
+- Attachment upload is not exposed in S3. Its canonical Expense/Line coverage is
+  explicitly assigned to S5 and is not claimed as verified by this slice.
 - No category-E structural gap was found for the S3 operations exposed here.

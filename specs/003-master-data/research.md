@@ -124,7 +124,7 @@ one event, the event also records the already-applied result that a retry return
 ## Roadmap invariant reconciliation
 
 **Decision:** Move first primary ownership of FR-009/010 and invariants 28.44–28.46
-from S3 to S2 while leaving annual Cost Center invariants in S4.
+from S3 to S2 while leaving annual Cost Center behavior to the S4/S5 source slices.
 
 **Rationale:** S2 is the first slice that persists ordinary domain master data and
 demonstrates Archive, rejection of physical deletion, and stable identities. Keeping
@@ -136,4 +136,5 @@ unmapped. Later slices extend rather than replace these rules.
 - Leave every cross-cutting Archive/no-delete row in S3: rejected because it obscures
   the first actual implementation and test.
 - Move FR-079–081 to S2: rejected because annual classification and inherited Cost
-  Center behavior are explicitly outside S2 and remain S4 work.
+  Center behavior are explicitly outside S2; S4 supplies Project coverage and S5
+  completes the primary verification with Contracts.

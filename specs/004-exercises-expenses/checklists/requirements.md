@@ -31,7 +31,8 @@
 
 ## Notes
 
-- Validation passed after reconciling canonical FR-001–FR-008, FR-031–FR-033,
-  FR-046–FR-047, FR-050–FR-054, FR-084, FR-098, FR-101 and their primary invariants.
+- Validation passed for the S3-complete canonical rows and the explicitly partial
+  autonomous/non-attachment coverage of FR-005–FR-007, FR-046, FR-051–FR-052 and
+  invariants 28.4, 28.5 and 28.52; their primary verification remains assigned to S5.
 - No category-E gap blocks the bounded S3 scope; later-slice containers and
   operations are excluded explicitly instead of being partially implemented.

@@ -12,14 +12,14 @@ changing its traceability anchor.
 | FR-002 | Soli tipi Stima ed Effettivo | §5.2 | S3 — Esercizi, Spese e Righe | verified |
 | FR-003 | Importo autoritativo della Riga | §8.1 | S3 — Esercizi, Spese e Righe | verified |
 | FR-004 | Nessun matching | §5.3 | S3 — Esercizi, Spese e Righe | verified |
-| FR-005 | Appartenenza esclusiva della Spesa | §7.2 | S3 — Esercizi, Spese e Righe | planned |
-| FR-006 | Sorgenti economiche di primo livello | §5.6 | S3 — Esercizi, Spese e Righe | verified |
-| FR-007 | Nessun doppio conteggio | §§5.6, 8.6 | S3 — Esercizi, Spese e Righe | verified |
+| FR-005 | Appartenenza esclusiva della Spesa | §7.2 | S5 — Contratti | planned |
+| FR-006 | Sorgenti economiche di primo livello | §5.6 | S5 — Contratti | planned |
+| FR-007 | Nessun doppio conteggio | §§5.6, 8.6 | S5 — Contratti | planned |
 | FR-008 | Identità stabile e OriginKey | §5.4 | S3 — Esercizi, Spese e Righe | verified |
 | FR-009 | Nessuna cancellazione fisica ordinaria | §§5.7, 24.1 | S2 — Anagrafiche | verified |
 | FR-010 | Archivio non economico | §§5.8, 24.3 | S2 — Anagrafiche | verified |
 | FR-011 | Budget Approvato immutabile | §§1.2, 13 | S6 — Proposta e Budget iniziale | planned |
-| FR-012 | Versione iniziale v1 preservata | §13.4 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
+| FR-012 | Versione iniziale v1 preservata | §13.4 | S6 — Proposta e Budget iniziale | planned |
 | FR-013 | Revisioni sempre disponibili in Esercizio Aperto | §§12.3, 13.4, 26.3 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
 | FR-014 | Versione Budget esplicita nei report | §§13.7, 25 | S11 — Reportistica ed esportazione | planned |
 | FR-015 | Proposta isolata | §§1.3, 12.1 | S6 — Proposta e Budget iniziale | planned |
@@ -53,13 +53,13 @@ changing its traceability anchor.
 | FR-043 | Distinzione Chiusura e Conoscenza Corrente | §§6.10–6.12, 24.11 | S11 — Reportistica ed esportazione | planned |
 | FR-044 | Nessuna riclassificazione economica storica | §§14.9, 24.10 | S10 — Correzioni post-Chiusura | planned |
 | FR-045 | Errori post-Chiusura annotati e corretti solo negli anni Aperti | §14.9 | S10 — Correzioni post-Chiusura | planned |
-| FR-046 | Struttura della Spesa | §15.1 | S3 — Esercizi, Spese e Righe | verified |
+| FR-046 | Struttura della Spesa | §15.1 | S5 — Contratti | planned |
 | FR-047 | Correlazione manuale della Spesa autonoma | §§15.2, 25.3 | S3 — Esercizi, Spese e Righe | verified |
 | FR-048 | Spese manuali di Contratto con soli Effettivi | §15.4 | S5 — Contratti | planned |
 | FR-049 | Unica Stima annuale di sistema del Contratto | §§15.4, 18.18 | S5 — Contratti | planned |
 | FR-050 | Cambio Esercizio della Spesa | §15.7 | S3 — Esercizi, Spese e Righe | verified |
-| FR-051 | Cambio contenitore | §15.8 | S3 — Esercizi, Spese e Righe | planned |
-| FR-052 | Riclassificazione integrale di una Spesa con Effettivi | §15.9 | S3 — Esercizi, Spese e Righe | planned |
+| FR-051 | Cambio contenitore | §15.8 | S5 — Contratti | planned |
+| FR-052 | Riclassificazione integrale di una Spesa con Effettivi | §15.9 | S5 — Contratti | planned |
 | FR-053 | Storno soltanto senza Effettivi | §15.11 | S3 — Esercizi, Spese e Righe | verified |
 | FR-054 | Nessun tipo Imprevista, Preventivo o Plafond | §§15.12–15.14 | S3 — Esercizi, Spese e Righe | verified |
 | FR-055 | Stati del Progetto | §16.2 | S4 — Progetti | verified |
@@ -86,11 +86,11 @@ changing its traceability anchor.
 | FR-076 | Data di attribuzione della Stima | §18.16 | S5 — Contratti | planned |
 | FR-077 | Nessun prorata | §18.17 | S5 — Contratti | planned |
 | FR-078 | Effettivi contrattuali manuali senza matching | §18.19 | S5 — Contratti | planned |
-| FR-079 | Centro di Costo annuale | §20 | S4 — Progetti | verified |
-| FR-080 | Cambio Centro di Costo sull'intero Esercizio | §20.3 | S4 — Progetti | verified |
-| FR-081 | Ereditarietà del Centro di Costo | §20.5 | S4 — Progetti | verified |
+| FR-079 | Centro di Costo annuale | §20 | S5 — Contratti | planned |
+| FR-080 | Cambio Centro di Costo sull'intero Esercizio | §20.3 | S5 — Contratti | planned |
+| FR-081 | Ereditarietà del Centro di Costo | §20.5 | S5 — Contratti | planned |
 | FR-082 | Fornitore e Referenti | §21 | S2 — Anagrafiche | verified |
-| FR-083 | Fornitore Archiviato utilizzabile nello storico | §§21.4, 24.6 | S2 — Anagrafiche | verified |
+| FR-083 | Fornitore Archiviato utilizzabile nello storico | §§21.4, 24.6 | S10 — Correzioni post-Chiusura | planned |
 | FR-084 | Timeline esplicativa append-only | §22 | S3 — Esercizi, Spese e Righe | verified |
 | FR-085 | Schemi separati delle Snapshot | §23 | S6 — Proposta e Budget iniziale | planned |
 | FR-086 | Snapshot autonome | §§23.2, 23.13 | S6 — Proposta e Budget iniziale | planned |
@@ -101,7 +101,7 @@ changing its traceability anchor.
 | FR-091 | Impostazioni minime per Azienda | §26 | S1 — Azienda, accesso e impostazioni | verified |
 | FR-092 | Permessi assegnati per Azienda | §§26.5–26.6 | S1 — Azienda, accesso e impostazioni | verified |
 | FR-093 | Audit di permessi e Impostazioni | §§26.8–26.10 | S1 — Azienda, accesso e impostazioni | verified |
-| FR-094 | Operazioni inter-Esercizio atomiche | §10 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
+| FR-094 | Operazioni inter-Esercizio atomiche | §10 | S5 — Contratti | planned |
 | FR-095 | Relazioni informative senza effetto economico | §7.3 | S5 — Contratti | planned |
 | FR-096 | Report separato delle correzioni e annotazioni | §§24.11, 25.13 | S11 — Reportistica ed esportazione | planned |
 | FR-097 | Approvazione economica esterna ammessa | §26.11 | S6 — Proposta e Budget iniziale | planned |

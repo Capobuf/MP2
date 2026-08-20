@@ -46,7 +46,7 @@ user journeys, and the existing Timeline; no production throughput claim
 
 | Principle | Gate result |
 |---|---|
-| Canonical domain is sole functional authority | PASS — scope maps to S3-owned FR-001–008, FR-031–033, FR-046–047, FR-050–054, FR-084, FR-098 and FR-101 without adding economic semantics. |
+| Canonical domain is sole functional authority | PASS — scope fully maps FR-001–FR-004, FR-008, FR-031–FR-033, FR-047, FR-050, FR-053–FR-054, FR-084, FR-098 and FR-101, while providing only the autonomous/non-attachment portions of shared FR-005–FR-007, FR-046 and FR-051–FR-052. |
 | Category A–E discipline | PASS — narrative causes use Notes; excluded accounting/matching cases are D; no E gap blocks the exposed operations. |
 | Smallest proportional design | PASS — native Resources, direct models/policies, focused decimal code, and explicit Actions only. |
 | Slice boundary | PASS — only open Exercise creation and autonomous Expenses exist; Projects, Contracts and every planning/closing/reporting workflow remain absent. |
@@ -106,7 +106,8 @@ exact calculations and the impact plan; mutation orchestration stays in Actions.
 ### Phase 0 — Research
 
 Decimal arithmetic, schema constraints, revisions, idempotency, Filament interaction,
-audit reuse and attachment deferral are resolved in [research.md](research.md).
+audit reuse and the explicit S5 attachment handoff are resolved in
+[research.md](research.md).
 
 ### Phase 1 — Design and contracts
 

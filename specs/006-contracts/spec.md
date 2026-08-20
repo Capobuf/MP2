@@ -11,6 +11,19 @@
 **Input**: Continue development with roadmap slice S5, Contracts, after the verified
 master-data, Exercise/Expense, and Project foundations.
 
+## Clarifications
+
+### Session 2026-08-20
+
+- Q: Quando un comando sul Contratto produce più conseguenze di dominio, quanti
+  eventi Timeline registra? → A: Tutti gli eventi tipizzati richiesti, una volta.
+- Q: Come incide sugli anni chiusi il censimento tardivo di un Contratto già
+  esistente? → A: Conserva le date reali e aggiorna soltanto gli Esercizi Aperti.
+- Q: L'elaborazione dei rinnovi automatici può dipendere dall'apertura della pagina
+  Scadenze? → A: No, deve essere indipendente dalla pagina.
+- Q: Una Riga Effettivo Attiva a importo zero costituisce primo utilizzo economico
+  per il cambio Fornitore del Contratto? → A: Sì, blocca il cambio Fornitore.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Create and inspect Contracts (Priority: P1)
@@ -31,7 +44,8 @@ Estimates and company isolation without creating any Actual.
 1. **Given** an authorized user, an active Supplier, and an open Exercise, **When**
    the user creates a Contract with all required dates and one valid condition,
    **Then** one stable Contract, its initial lifecycle facts, annual classification,
-   generated Estimate composition, and one complete Timeline event are available.
+   generated Estimate composition, and the complete set of required typed Timeline
+   events are available exactly once.
 2. **Given** a Contract whose start is in the future, **When** a date before or on
    its start is inspected, **Then** it is Planned before the start and Active from
    the start without depending on the date the screen is opened.
@@ -41,6 +55,11 @@ Estimates and company isolation without creating any Actual.
 4. **Given** a Contract with no defined next expiry, **When** it is inspected,
    **Then** it explicitly shows `Scadenza non definita` and no renewal or notice date
    is inferred.
+5. **Given** an existing Contract whose real start predates its registration and may
+   fall in a closed Exercise, **When** it is registered, **Then** its real dates,
+   current state, deadlines, and renewals are retained, only open Exercises are
+   recalculated, existing approved Budgets and Closing Snapshots remain unchanged,
+   and the census is recorded in the Timeline.
 
 ---
 
@@ -145,8 +164,8 @@ dates, explicit confirmation, atomicity, and unchanged historical references.
    complete impact and audit, without changing approved historical references.
 5. **Given** one operation affects several open Exercises, **When** any reference,
    revision, condition, or Exercise has changed since preview, **Then** every effect
-   is rejected; otherwise all annual Estimates and one explanatory event are
-   applied together.
+   is rejected; otherwise all annual Estimates and all required explanatory
+   Timeline events are applied together.
 6. **Given** a Contract has already been economically used, **When** a Supplier
    change is attempted, **Then** it is rejected and a new Contract is required for a
    different counterparty.
@@ -190,19 +209,19 @@ identity preservation, ownership exclusivity, exact totals, and rollback.
 
 ---
 
-### User Story 6 - Classify, relate, archive, and explain Contracts (Priority: P2)
+### User Story 6 - Classify, relate, attach, archive, and explain Contracts (Priority: P2)
 
 As an authorized user, I can classify Contracts annually, inspect actionable expiry
-information, add non-economic source relations, archive terminal Contracts, and
-follow their complete Timeline.
+information, add non-economic source relations and optional evidence, archive
+terminal Contracts, and follow their complete Timeline.
 
 **Why this priority**: Operational governance requires findable deadlines and
 explainable history without changing economics or introducing reporting and
 notification systems early.
 
 **Independent Test**: Reclassify a Contract with Actuals, filter expiry and notice
-dates, create/archive valid relations, archive/restore terminal Contracts, and
-inspect the immutable company-scoped history.
+dates, create/archive valid relations, add and inspect optional attachments,
+archive/restore terminal Contracts, and inspect the immutable company-scoped history.
 
 **Acceptance Scenarios**:
 
@@ -216,18 +235,20 @@ inspect the immutable company-scoped history.
 3. **Given** no expiry is defined, **When** deadline filters are used, **Then** the
    Contract appears only under `Scadenza non definita`; no payment deadline or
    reminder is invented.
-4. **Given** a Project-Contract link or a directed source replacement, **When** a
-   valid same-company relation is confirmed, **Then** it supports navigation and
-   history without transferring amount, state, classification, ownership, or
-   carryover; duplicate active links and same-Exercise replacement cycles are
-   rejected.
+4. **Given** a Project and Contract, **When** a valid same-company `Collegato a`
+   relation is confirmed, **Then** it supports navigation and history without
+   transferring amount, state, classification, ownership, or carryover, and a
+   duplicate active link is rejected.
 5. **Given** a Cessated or Cancelled Contract, **When** it is archived or restored,
    **Then** identity, conditions, deadlines, classifications, values, relations, and
    history remain unchanged; Planned and Active Contracts cannot be archived.
 6. **Given** any Contract mutation, **When** an authorized viewer inspects the
    Timeline, **Then** effective dates, before/after facts, affected Exercises, exact
-   allocation/Actual impacts, reason, references, and operation identity are
+   allocation/Actual impacts, reason when required, references, and operation identity are
    readable and cannot be edited or deleted.
+7. **Given** an authorized user adds an optional attachment to a Contract, Expense,
+   or Line, **When** that attachment is inspected, **Then** it is readable only in
+   the owning company and remains associated with the stable domain object.
 
 ### Edge Cases
 
@@ -247,9 +268,9 @@ inspect the immutable company-scoped history.
 - The Contract Supplier or Cost Center becomes archived after historical use.
 - An Expense changes ownership while another request changes a Line, condition,
   lifecycle event, classification, or Exercise revision.
-- A directed replacement would form an indirect cycle through mixed source types.
 - A physical deletion is attempted for a Contract, condition, lifecycle fact,
-  system Estimate, classification, relation, or Timeline event.
+  system Estimate, classification, relation, or Timeline event, or for attachment
+  evidence already retained by a historical decision.
 
 ## Requirements *(mandatory)*
 
@@ -269,10 +290,11 @@ inspect the immutable company-scoped history.
   and append-only history.
 - **S5-FR-004**: A new Contract MUST include at least one valid economic condition,
   and its first valid-from date MUST NOT precede contractual start.
-- **S5-FR-005**: Automatic renewal MUST default to enabled. When next expiry is
-  defined it MUST NOT precede contractual start; automatic renewal with a defined
-  expiry MUST require a positive whole-month renewal duration, while notice days,
-  when present, MUST be a non-negative integer.
+- **S5-FR-005**: Automatic renewal MUST default to enabled. The initial complete
+  renewal configuration MUST have an explicit company-local effective date. When
+  next expiry is defined it MUST NOT precede contractual start; automatic renewal
+  with a defined expiry MUST require a positive whole-month renewal duration, while
+  notice days, when present, MUST be a non-negative integer.
 - **S5-FR-006**: Contract lifecycle states MUST be exactly Planned, Active, Cessated,
   and Cancelled; Archived MUST remain a separate visibility property and Suspended
   MUST NOT exist.
@@ -285,8 +307,8 @@ inspect the immutable company-scoped history.
   day; cessation and non-renewed expiry MUST be the last Active day, with Cessated
   state beginning the following day.
 - **S5-FR-009**: Lifecycle facts MUST retain declared contractual date, state-change
-  date when different, author, technical timestamp, status, and mandatory reason;
-  effective history MUST NOT be erased.
+  date when different, author, technical timestamp, status, and reason when the
+  canonical operation requires one; effective history MUST NOT be erased.
 - **S5-FR-010**: Duplicate non-annulled state changes on one effective date or a
   lifecycle sequence incompatible with the state immediately before the event MUST
   be rejected atomically.
@@ -347,7 +369,8 @@ inspect the immutable company-scoped history.
 - **S5-FR-028**: Missing elapsed renewals MUST be processed chronologically and
   idempotently until the next expiry is future; calculation for a future open
   Exercise MUST consider projected renewals without prematurely turning them into
-  historical events.
+  historical events. Renewal processing MUST NOT depend on a user opening the
+  deadlines section.
 - **S5-FR-029**: Automatic renewal MUST continue open-ended conditions but MUST NOT
   extend an explicit valid-to date; renewal without a condition covering the later
   period MUST keep the Contract Active with a warning and zero invented Estimate.
@@ -370,7 +393,7 @@ inspect the immutable company-scoped history.
   allocation to zero only in affected open Exercises without rewriting historical
   references.
 - **S5-FR-035**: Supplier MAY change only before the Contract's first economic use;
-  after a non-zero live Estimate, active non-zero Actual, approved Budget presence,
+  after a non-zero live Estimate, any active Actual Line, approved Budget presence,
   or Closing Snapshot presence, a different counterparty MUST require a new
   Contract. An existing Contract MAY continue using its historically assigned
   archived Supplier and receiving valid Actuals, but an archived Supplier MUST NOT
@@ -390,9 +413,12 @@ inspect the immutable company-scoped history.
 - **S5-FR-040**: Entering a Contract MUST reject manual Estimate Lines, replace a
   different direct Supplier after warning, and derive Supplier and annual Cost
   Center from the Contract. Leaving a Contract MAY retain the former Contract
-  Supplier as the Expense's optional direct Supplier, MUST require valid direct or
-  destination-container classification, and MUST NOT copy the generated system
-  Estimate.
+  Supplier as the Expense's optional direct Supplier and MUST NOT copy the generated
+  system Estimate. When it becomes autonomous, the Expense MUST NOT implicitly keep
+  the inherited Cost Center: the user MAY select an active same-company direct Cost
+  Center in the same operation, otherwise the Expense becomes Unclassified. When it
+  enters another container, it MUST inherit that container's annual classification,
+  including an absent classification.
 - **S5-FR-041**: Every Contract MUST have at most one Cost Center classification per
   Exercise; changing it in an open Exercise MUST preview and atomically reclassify
   the full annual generated allocation and Actual. Manual selection MUST accept only
@@ -411,9 +437,7 @@ inspect the immutable company-scoped history.
   invoice/payment deadlines, automatically send cancellation, infer that notice was
   sent, or promise reminders or notifications in S5.
 - **S5-FR-045**: Active `Collegato a` relations MUST be unique symmetric
-  Project-Contract links; active `Sostituisce` relations MUST be directed among
-  first-level sources, require an effective Exercise, and MUST reject direct or
-  indirect cycles in that Exercise.
+  Project-Contract links belonging to one company.
 - **S5-FR-046**: Informative relations MUST NOT transfer or aggregate amounts,
   ownership, state, classification, carryover, or lifecycle and MUST be archived or
   restored rather than physically deleted.
@@ -423,16 +447,29 @@ inspect the immutable company-scoped history.
 - **S5-FR-048**: Contract, condition, lifecycle, renewal, classification, generated
   Estimate, manual Actual ownership, relation, archive, and restore mutations MUST
   be idempotent, revision-safe, and atomically persist the complete domain change
-  with one typed Timeline event per real operation.
+  with every required typed Timeline event recorded exactly once. One command MAY
+  record multiple distinct domain events; in particular, each elapsed renewal MUST
+  have its own event.
 - **S5-FR-049**: Contract Timeline events MUST remain company-scoped, append-only,
   newest-first, and include effective dates, before/after facts, affected Exercises,
-  exact allocation and Actual impacts, reason, references, and operation identity.
+  exact allocation and Actual impacts, reason when required, references, and
+  operation identity.
 - **S5-FR-050**: Contract, condition, lifecycle fact, renewal configuration, annual
   classification, Expense, Line, relation, and Timeline records MUST NOT be
   physically deleted through ordinary operations.
 - **S5-FR-051**: S5 MUST NOT implement Proposals, Budgets, Revisions, carryover,
-  reprogramming, Closing, late closed-year correction, attachments, Forecast,
-  invoicing, payment schedules, reminders, or full reporting.
+  reprogramming, Closing, late closed-year correction, Forecast, invoicing, payment
+  schedules, reminders, full reporting, or directed `Sostituisce` relations.
+- **S5-FR-052**: Contracts, Expenses, and Lines MUST support optional attachments
+  owned by the same company as the attached object. Attachments used as evidence for
+  a later approval, Revision, Closing, late correction, or historical-error
+  annotation MUST be retained immutably or by version, and removing an attachment
+  from the live object MUST NOT remove that retained historical evidence.
+- **S5-FR-053**: Registering an existing Contract after its real start MUST preserve
+  its real contractual dates, derive current state, deadlines, and renewals, and
+  recalculate only affected open Exercises. It MUST NOT retroactively insert or
+  recalculate the Contract in closed Budgets or Closing Snapshots, and MUST record
+  the census date in the Timeline.
 
 ### Key Entities
 
@@ -456,8 +493,11 @@ inspect the immutable company-scoped history.
   Contract and Exercise.
 - **Contract Deadline**: The informational next expiry and optional derived notice
   limit, explicitly distinct from invoice or payment dates.
-- **Informative Source Relation**: An archived/restored non-economic link or directed
-  replacement among canonical first-level sources.
+- **Informative Source Relation**: An archived/restored non-economic `Collegato a`
+  link between one Project and one Contract.
+- **Attachment**: Optional company-owned evidence associated with a Contract,
+  Expense, or Line; historical decision evidence is retained immutably or by
+  version.
 
 ## Success Criteria *(mandatory)*
 
@@ -487,8 +527,11 @@ inspect the immutable company-scoped history.
   invalid lifecycle sequence, cross-company reference, archived target, physical
   deletion, and stale confirmation is rejected with zero partial economic effect.
 - **SC-009**: The complete S5 demonstration exposes no Proposal, Budget, carryover,
-  reprogramming, Closing, closed-year correction, attachment, Forecast, invoice,
-  payment schedule, reminder, or full-reporting control.
+  reprogramming, Closing, closed-year correction, Forecast, invoice, payment
+  schedule, reminder, full-reporting control, or directed `Sostituisce` relation.
+- **SC-010**: Every tested Contract, Expense, and Line attachment is readable only
+  within its company; any attachment retained as historical decision evidence is
+  immutable or versioned and survives removal from the live object.
 
 ## Assumptions
 
@@ -501,8 +544,8 @@ inspect the immutable company-scoped history.
   Closing or historical-annotation controls.
 - Budget-dependent reasons, immutable Budget references, and Proposal realignment
   are not triggered because Budget and Proposal do not exist before S6/S7. Reasons
-  already required by Contract lifecycle, late Actual, archive, correction, and
-  economic-change rules remain mandatory.
+  already required for Contract cessation, reactivation, cancellation, late Actual,
+  and material input correction remain mandatory.
 - Approval or confirmation date is interpreted in the company's local timezone;
   effective contractual dates remain local economic dates.
 - Automatic renewal must be correct independently of a user opening the deadlines
@@ -510,21 +553,28 @@ inspect the immutable company-scoped history.
 - Components not representable by the canonical recurring-condition engine remain
   separate autonomous or Project Expenses. An informative relation does not include
   them economically in the Contract.
-- Uploaded evidence remains deferred until a bounded slice specifies its immutable
-  or versioned attachment lifecycle.
+- S5 introduces the shared optional attachment baseline for Contracts, Expenses,
+  and Lines. Later approval, Revision, Closing, late-correction, and historical-error
+  workflows reuse it and retain their decision evidence immutably or by version.
 
 ## Domain Traceability
 
 - Canonical FR-048–FR-049 for Contract Expense types and the unique generated annual
   Estimate.
+- Canonical attachment fields in §§8.1, 15.1, and 18.2, plus the historical
+  evidence rules in §§23.12 and 30.9.
 - Canonical FR-062–FR-078 for Contract data, lifecycle, renewals, conditions,
   recurrence, attribution, no prorata, and manual Actuals.
-- Canonical FR-090 and FR-095 for informative deadlines and source relations.
-- Contract completion of canonical FR-005, FR-051, FR-052, and invariant 28.4 for
-  exclusive ownership and whole-Expense movement across every real container.
-- Canonical invariants 28.9, 28.32–28.41, 28.56, and 28.60.
-- Cross-cutting reuse of canonical FR-007, FR-079–FR-081, FR-084, FR-094 and
-  invariants 28.24, 28.42–28.46, 28.52, and 28.57.
+- Canonical FR-090 and the Project-Contract `Collegato a` portion of FR-095 for
+  informative deadlines and non-economic navigation. Full FR-095 remains planned.
+- Contract completion of canonical FR-005–FR-007, FR-051–FR-052, FR-079–FR-081 and
+  invariants 28.4, 28.5, 28.42, 28.43 and 28.52 across every first-level source.
+- Canonical invariants 28.9, 28.32–28.41 and 28.56; S5 exercises the non-economic
+  `Collegato a` portion of 28.60 without claiming the full invariant.
+- First complete verification of canonical FR-094 for atomic operations across
+  multiple open Exercises.
+- Cross-cutting reuse of canonical FR-084 and invariants 28.24, 28.44–28.46, and
+  28.57.
 - Canonical implementation constraints for revisions, impact plans, anchored dates,
   idempotent renewal and generated Estimates, atomicity, exact totals, company time
   zones, and domain messages.
@@ -537,10 +587,16 @@ inspect the immutable company-scoped history.
 - Invoices, payments, instalments, tax, procurement, prorata, variable consumption,
   tiering, indexation, reminders, and Forecast remain category D or explicitly
   excluded canonical behavior.
-- Proposals, Budgets, carryover, Closing, late closed-year corrections, attachments,
-  and full reporting are canonical but assigned to later roadmap slices; S5 does not
-  approximate them.
+- Proposals, Budgets, carryover, Closing, late closed-year corrections, and full
+  reporting are canonical but assigned to later roadmap slices; S5 does not
+  approximate them. S5 supplies only their shared attachment prerequisite, without
+  introducing those later workflows.
+- Directed `Sostituisce` relations are excluded from the bounded plan because the
+  canon does not define what happens when an autonomous Expense used as an active
+  endpoint is moved into a Project or Contract. This category-E gap blocks only
+  `Sostituisce`; no automatic archive, movement block, or historical endpoint rule
+  is inferred.
 - Contract state at date, renewal, recurrence, annual attribution, economic-change
-  boundary, ownership, classification, deadlines, and informative relations are
-  deterministic in the canonical domain. No category-E structural gap was found for
-  the bounded S5 scope.
+  boundary, ownership, classification, deadlines, and Project-Contract links are
+  deterministic in the canonical domain. No other category-E structural gap was
+  found for the bounded S5 scope.

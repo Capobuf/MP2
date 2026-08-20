@@ -44,6 +44,12 @@ class Exercise extends Model
         return $this->hasMany(ProjectExerciseClassification::class);
     }
 
+    /** @return HasMany<ContractExerciseClassification, $this> */
+    public function contractClassifications(): HasMany
+    {
+        return $this->hasMany(ContractExerciseClassification::class);
+    }
+
     /** @param Builder<self> $query */
     public function scopeOpen(Builder $query): void
     {

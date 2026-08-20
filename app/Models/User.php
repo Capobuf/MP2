@@ -37,6 +37,30 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         return $this->hasMany(CompanyCapability::class);
     }
 
+    /** @return HasMany<Attachment, $this> */
+    public function uploadedAttachments(): HasMany
+    {
+        return $this->hasMany(Attachment::class, 'uploaded_by_id');
+    }
+
+    /** @return HasMany<ContractRenewalConfiguration, $this> */
+    public function contractRenewalConfigurations(): HasMany
+    {
+        return $this->hasMany(ContractRenewalConfiguration::class, 'created_by_id');
+    }
+
+    /** @return HasMany<ContractLifecycleFact, $this> */
+    public function contractLifecycleFacts(): HasMany
+    {
+        return $this->hasMany(ContractLifecycleFact::class, 'created_by_id');
+    }
+
+    /** @return HasMany<ContractCondition, $this> */
+    public function contractConditions(): HasMany
+    {
+        return $this->hasMany(ContractCondition::class, 'created_by_id');
+    }
+
     /** @return Collection<int, Company> */
     public function getTenants(Panel $panel): Collection
     {

@@ -101,7 +101,7 @@ class ExpenseResource extends Resource
 
     public static function canEdit(Model $record): bool
     {
-        return $record instanceof Expense && auth()->user() instanceof User
+        return $record instanceof Expense && $record->origin !== 'system' && auth()->user() instanceof User
             && auth()->user()->can('update', $record);
     }
 

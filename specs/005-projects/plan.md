@@ -46,7 +46,7 @@ existing Resources and six Project journeys; no production-throughput claim
 
 | Principle | Gate result |
 |---|---|
-| Canonical domain is sole functional authority | PASS — scope maps to S4-owned FR-055–058 and FR-079–081 while extending the real Project cases of FR-005, FR-051 and FR-052. |
+| Canonical domain is sole functional authority | PASS — scope maps to S4-owned FR-055–058 while implementing the Project portions of shared FR-005–FR-007, FR-051–FR-052 and FR-079–FR-081; full shared coverage remains planned until S5. |
 | Category A–E discipline | PASS — canonical state, classification, ownership and overspend rules are complete for S4; later canonical concepts remain explicitly deferred and no E gap is present. |
 | Smallest proportional design | PASS — direct models, domain value code, Actions, policies and native Filament Resources only. |
 | Slice boundary | PASS — carryover, reprogramming, Contracts, Proposals, Budgets, Closing and full reporting are neither stored nor exposed. |

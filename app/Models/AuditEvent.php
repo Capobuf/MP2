@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'company_id',
     'operation_id',
+    'event_sequence',
     'actor_id',
     'event_type',
     'subject_type',
@@ -38,6 +39,10 @@ class AuditEvent extends Model
 
     protected static function booted(): void
     {
+        static::creating(function (AuditEvent $event): void {
+            $event->event_sequence ??= 0;
+        });
+
         static::updating(function (): never {
             throw new \LogicException('Audit events are append-only.');
         });
@@ -91,6 +96,21 @@ class AuditEvent extends Model
         });
     }
 
+    /** @param Builder<self> $query */
+    public function scopeForContract(Builder $query, Contract $contract): void
+    {
+        $query->where(function (Builder $query) use ($contract): void {
+            $query->where(function (Builder $subject) use ($contract): void {
+                $subject->where('subject_type', Contract::class)
+                    ->where('subject_id', $contract->id);
+            })->orWhere(function (Builder $reference) use ($contract): void {
+                $reference->where('reference_type', Contract::class)
+                    ->where('reference_id', $contract->id);
+            })->orWhere('new_value->ownership_impact->source_contract_id', $contract->id)
+                ->orWhere('new_value->ownership_impact->target_contract_id', $contract->id);
+        });
+    }
+
     /** @return array<int, array{result: string, variance_before: string, variance_after: string, project_id: int|null}> */
     public function overspendOccurrences(): array
     {
@@ -136,6 +156,7 @@ class AuditEvent extends Model
     {
         return [
             'event_type' => AuditEventType::class,
+            'event_sequence' => 'integer',
             'capability' => Capability::class,
             'setting' => Setting::class,
             'affected_exercise_ids' => 'array',

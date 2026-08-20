@@ -324,7 +324,8 @@ company-scoped Timeline containing exact before/after impacts.
   transition.
 - **S4-FR-033**: Project Timeline events MUST remain company-scoped, append-only, and
   readable newest first with effective date, before/after state, affected Exercises,
-  exact allocation and Actual impacts, reason, references, and operation identity.
+  exact allocation and Actual impacts, reason when required, references, and
+  operation identity.
 - **S4-FR-034**: Project, transition, annual classification, Expense, and Line records
   MUST NOT be physically deleted through ordinary operations.
 - **S4-FR-035**: S4 MUST NOT implement carryover, reprogramming, Proposal, Budget,
@@ -393,22 +394,26 @@ company-scoped Timeline containing exact before/after impacts.
   persistence; Project allocation is extended there without changing child Expense
   semantics.
 - Budget-dependent mandatory reasons are not triggered because Budget does not exist
-  before S6. Reasons already required by state, Actual, move, archive, and overspend
-  rules remain mandatory.
+  before S6. Reasons already required for Project closing, cancellation, reopening,
+  late or corrective Actuals, Expense movement, and configured overspend remain
+  mandatory.
 - Project-to-Contract links and Contract destinations are deferred until the real
   Contract identity and workflows exist in S5.
-- Notes and Timeline provide S4 explanations; uploaded evidence remains deferred to
-  the first bounded slice that requires an attachment lifecycle.
+- Notes and Timeline provide S4 explanations; S5 introduces the shared canonical
+  attachment baseline for Contracts, Expenses and Lines.
 
 ## Domain Traceability
 
-- Canonical FR-005–FR-007 and FR-051–FR-052 for the real Project container,
-  first-level aggregation, no double counting, and whole-Expense reclassification.
+- The Project portions of canonical FR-005–FR-007 and FR-051–FR-052 for ownership,
+  first-level aggregation, no double counting, and whole-Expense reclassification;
+  complete coverage remains planned until S5 adds Contracts.
 - Canonical FR-055–FR-058 for Project states, Actual eligibility, dated transitions,
   and overspend warnings.
-- Canonical FR-079–FR-081 for annual Cost Center classification and inheritance.
+- The Project portions of canonical FR-079–FR-081 for annual Cost Center
+  classification and inheritance; complete coverage remains planned until S5.
 - Canonical FR-084 for typed explanatory Timeline events produced by S4 operations.
-- Canonical invariants 28.4, 28.5, 28.8, 28.24, 28.42–28.46, 28.52, 28.57.
+- Canonical invariant 28.8 and 28.24, plus the Project portions of invariants 28.4,
+  28.5, 28.42, 28.43 and 28.52. Invariants 28.44–28.46 and 28.57 are reused.
 - Canonical implementation constraints for revision-safe state-at-date calculation,
   impact plans, exact totals, atomicity, idempotency, time zones, and domain messages.
 

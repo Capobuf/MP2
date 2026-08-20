@@ -46,6 +46,9 @@ class SetExpenseReversed
             $lockedExpense = Expense::query()->lockForUpdate()->findOrFail($expense->id);
             $lines = $lockedExpense->lines()->orderBy('id')->lockForUpdate()->get();
             Gate::forUser($actor)->authorize('update', $lockedExpense);
+            if ($lockedExpense->origin === 'system') {
+                throw ValidationException::withMessages(['expense' => 'La Stima di sistema non è stornabile o ripristinabile manualmente.']);
+            }
             $eventType = $reversed ? AuditEventType::ExpenseReversed : AuditEventType::ExpenseRestored;
 
             $existing = AuditEvent::query()->where('operation_id', $validated['operation_id'])->first();

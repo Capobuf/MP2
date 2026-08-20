@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'company_id',
     'exercise_id',
     'project_id',
+    'contract_id',
+    'origin',
     'supplier_id',
     'direct_cost_center_id',
     'description',
@@ -53,6 +55,12 @@ class Expense extends Model
         return $this->belongsTo(Project::class);
     }
 
+    /** @return BelongsTo<Contract, $this> */
+    public function contract(): BelongsTo
+    {
+        return $this->belongsTo(Contract::class);
+    }
+
     /** @return BelongsTo<Supplier, $this> */
     public function supplier(): BelongsTo
     {
@@ -69,6 +77,12 @@ class Expense extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(ExpenseLine::class);
+    }
+
+    /** @return HasMany<Attachment, $this> */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(Attachment::class);
     }
 
     /** @param Builder<self> $query */
@@ -104,26 +118,31 @@ class Expense extends Model
 
     public function containerLabel(): string
     {
-        return $this->project === null ? 'Autonoma' : $this->project->title;
+        if ($this->project !== null) {
+            return $this->project->title;
+        }
+
+        return $this->contract === null ? 'Autonoma' : $this->contract->title;
     }
 
     public function costCenterLabel(): string
     {
-        if ($this->project_id === null) {
+        if ($this->project_id === null && $this->contract_id === null) {
             return $this->directCostCenter === null
                 ? 'Non classificata'
                 : $this->directCostCenter->name.($this->directCostCenter->isArchived() ? ' · Archiviato' : '');
         }
 
-        $classification = $this->project?->classifications()
-            ->where('exercise_id', $this->exercise_id)
-            ->with('costCenter')
-            ->first();
+        $classification = $this->project_id !== null
+            ? $this->project?->classifications()->where('exercise_id', $this->exercise_id)->with('costCenter')->first()
+            : $this->contract?->classifications()->where('exercise_id', $this->exercise_id)->with('costCenter')->first();
         $costCenter = $classification?->costCenter;
 
+        $owner = $this->project_id !== null ? 'Progetto' : 'Contratto';
+
         return $costCenter === null
-            ? 'Non classificata · ereditata dal Progetto'
-            : $costCenter->name.($costCenter->isArchived() ? ' · Archiviato' : '').' · ereditata dal Progetto';
+            ? 'Non classificata · ereditata dal '.$owner
+            : $costCenter->name.($costCenter->isArchived() ? ' · Archiviato' : '').' · ereditata dal '.$owner;
     }
 
     public function hasActuals(): bool

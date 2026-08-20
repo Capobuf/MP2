@@ -22,7 +22,7 @@ phase contains no more than eight tasks and ends with a non-destructive checkpoi
 
 **Purpose**: Preserve the verified S2 baseline and make S3's technical boundary explicit.
 
-- [X] T001 Reconcile S3 ownership, category A–E conclusions and the incremental autonomous-only coverage of FR-005/FR-051/FR-052/invariant 28.4 in `specs/000-product-roadmap/roadmap.md`, `specs/000-product-roadmap/traceability.md`, and `specs/000-product-roadmap/invariant-test-map.md` without marking unbuilt behavior implemented or verified.
+- [X] T001 Reconcile S3 ownership, category A–E conclusions and the incremental autonomous/non-attachment coverage of FR-005–FR-007, FR-046, FR-051–FR-052 and invariants 28.4, 28.5 and 28.52 in `specs/000-product-roadmap/roadmap.md`, `specs/000-product-roadmap/traceability.md`, and `specs/000-product-roadmap/invariant-test-map.md` without marking unbuilt behavior implemented or verified.
 - [X] T002 Declare the already-installed PHP BCMath extension as the exact-decimal runtime requirement through `composer.json` and `composer.lock`, retaining the dependency rationale and removal consequence in `specs/004-exercises-expenses/research.md`.
 - [X] T003 Run the unchanged S2 focused gate, application boot, and `/admin` HTTP smoke check; record only reproducible S3 commands or corrections in `specs/004-exercises-expenses/quickstart.md`.
 
@@ -177,17 +177,19 @@ phase contains no more than eight tasks and ends with a non-destructive checkpoi
   audit events. Local and LAN `/admin` endpoints both returned the expected 302 to
   login after restart.
 - S3 and its fully representable FR/invariant rows are `implemented`, not `verified`:
-  remote CI was intentionally not monitored. FR-005, FR-051, FR-052 and invariant
-  28.4 remain `planned` until S4/S5 make the Project and Contract cases real.
+  remote CI was intentionally not monitored. FR-005–FR-007, FR-046, FR-051,
+  FR-052 and invariants 28.4, 28.5 and 28.52 remain `planned` until S5 completes
+  the Contract, first-level aggregation and attachment cases.
 
 ### Remote verification evidence — 2026-08-17
 
 - Draft PR #1 passed the GitHub `Quality` workflow and was squash-merged into
   `main` as `bccb082`; the independent browser demonstration and local quality gate
   above remain the verification evidence for S3.
-- S3 and its fully representable FR/invariant rows are now `verified`. FR-005,
-  FR-051, FR-052 and invariant 28.4 remain `planned` until S4/S5 make every
-  container case representable.
+- S3 and its fully representable FR/invariant rows are now `verified`. FR-005–FR-007,
+  FR-046, FR-051, FR-052 and invariants 28.4, 28.5 and 28.52 remain
+  `planned` until S5 makes every first-level source and attachment case
+  representable.
 
 ---
 

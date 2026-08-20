@@ -58,7 +58,9 @@ or bulk destructive action.
 
 The form permits only Stima/Effettivo; amount is authoritative with two decimals;
 quantity/unit amount accept six decimals. Negative Estimate is rejected. Negative
-Actual and new zero require Note. Future-year Actual is rejected in Company time.
+Negative Actual requires Note. A zero-valued Line is accepted only to preserve an
+already materialized identity or an explicit decision; a new manual zero Line should
+normally include a documented reason. Future-year Actual is rejected in Company time.
 
 When both descriptive factors exist, show the exact half-up `Importo suggerito`. If
 different, the first submit does not persist and requires explicit `Salva comunque`;

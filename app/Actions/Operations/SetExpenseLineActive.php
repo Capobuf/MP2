@@ -42,6 +42,9 @@ class SetExpenseLineActive
             $expense = Expense::query()->lockForUpdate()->findOrFail($unlockedExpense->id);
             $lockedLine = ExpenseLine::query()->lockForUpdate()->findOrFail($line->id);
             Gate::forUser($actor)->authorize('update', $lockedLine);
+            if ($expense->origin === 'system') {
+                throw ValidationException::withMessages(['expense' => 'Le Righe della Stima di sistema non sono annullabili o ripristinabili manualmente.']);
+            }
             $eventType = $active ? AuditEventType::ExpenseLineRestored : AuditEventType::ExpenseLineAnnulled;
 
             $existing = AuditEvent::query()->where('operation_id', $operationId)->first();

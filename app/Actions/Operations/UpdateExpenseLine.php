@@ -43,6 +43,9 @@ class UpdateExpenseLine
             $expense = Expense::query()->lockForUpdate()->findOrFail($expenseId);
             $lockedLine = ExpenseLine::query()->lockForUpdate()->findOrFail($line->id);
             Gate::forUser($actor)->authorize('update', $lockedLine);
+            if ($expense->origin === 'system') {
+                throw ValidationException::withMessages(['expense' => 'Le Righe della Stima di sistema non sono modificabili manualmente.']);
+            }
 
             $existing = AuditEvent::query()->where('operation_id', $operationId)->first();
             if ($existing !== null) {

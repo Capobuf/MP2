@@ -10,8 +10,8 @@ below. Later slices may add integration or regression coverage.
 | 28.1 | Tipi economici | S3 — Esercizi, Spese e Righe | verified |
 | 28.2 | Presenza di Effettivi | S3 — Esercizi, Spese e Righe | verified |
 | 28.3 | Importo autoritativo | S3 — Esercizi, Spese e Righe | verified |
-| 28.4 | Appartenenza esclusiva | S3 — Esercizi, Spese e Righe | planned |
-| 28.5 | Sorgenti di primo livello | S3 — Esercizi, Spese e Righe | verified |
+| 28.4 | Appartenenza esclusiva | S5 — Contratti | planned |
+| 28.5 | Sorgenti di primo livello | S5 — Contratti | planned |
 | 28.6 | Nessun matching | S3 — Esercizi, Spese e Righe | verified |
 | 28.7 | Allocato della Spesa autonoma | S3 — Esercizi, Spese e Righe | verified |
 | 28.8 | Allocato del Progetto | S4 — Progetti | verified |
@@ -48,8 +48,8 @@ below. Later slices may add integration or regression coverage.
 | 28.39 | Nessun prorata | S5 — Contratti | planned |
 | 28.40 | Stima di Contratto | S5 — Contratti | planned |
 | 28.41 | Spese manuali di Contratto | S5 — Contratti | planned |
-| 28.42 | Classificazione annuale | S4 — Progetti | verified |
-| 28.43 | Ereditarietà del Centro di Costo | S4 — Progetti | verified |
+| 28.42 | Classificazione annuale | S5 — Contratti | planned |
+| 28.43 | Ereditarietà del Centro di Costo | S5 — Contratti | planned |
 | 28.44 | Archivio non economico | S2 — Anagrafiche | verified |
 | 28.45 | Nessuna cancellazione fisica ordinaria | S2 — Anagrafiche | verified |
 | 28.46 | Identità non riutilizzabile | S2 — Anagrafiche | verified |
@@ -58,7 +58,7 @@ below. Later slices may add integration or regression coverage.
 | 28.49 | Schema Chiusura | S9 — Chiusura | planned |
 | 28.50 | Previsto e Non previsto | S11 — Reportistica ed esportazione | planned |
 | 28.51 | Categorie del confronto | S11 — Reportistica ed esportazione | planned |
-| 28.52 | Nessun doppio conteggio | S3 — Esercizi, Spese e Righe | verified |
+| 28.52 | Nessun doppio conteggio | S5 — Contratti | planned |
 | 28.53 | Valuta e IVA | S3 — Esercizi, Spese e Righe | verified |
 | 28.54 | Annualità dell'Effettivo | S3 — Esercizi, Spese e Righe | verified |
 | 28.55 | Copia fra Esercizi | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |

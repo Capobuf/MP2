@@ -83,14 +83,31 @@ A slice is `verified` only when:
 FR-084 has primary ownership in S3 because that is where the first economic domain
 mutations appear. Every later slice extends the event taxonomy required by §22.
 
-### S3 autonomous container boundary
+### Incremental first-level source boundary
 
-S3 implements only the autonomous side of FR-005, FR-051, FR-052 and invariant 28.4.
-The canonical rule is complete and has no category-E gap, but its Project and Contract
-cases are intentionally unrepresentable until S4 and S5 add those real containers and
-foreign keys. Those shared traceability rows remain `planned` until every container
-case can be exercised; S3 must not add placeholder ownership columns to claim them
-early.
+S3 implements the autonomous Expense cases and S4 adds the real Project container.
+FR-005–FR-007, FR-051–FR-052, FR-079–FR-081 and invariants 28.4, 28.5, 28.42,
+28.43 and 28.52 become fully representable only when S5 adds the real Contract
+container, its annual classification and its aggregation. Their primary verification
+anchor is therefore S5 and the rows remain `planned` until every first-level source
+case is exercised. Earlier slices must not add placeholder ownership or classification
+columns to claim complete coverage.
+
+### Inter-Exercise atomicity
+
+S5 is the first slice whose ordinary conditions, renewals and lifecycle operations can
+change several open Exercises. It therefore owns the first complete verification of
+FR-094. Later Proposal, reprogramming and Closing slices reuse and extend the same
+canonical impact-plan, locking, revalidation and all-or-nothing behavior.
+
+### Directed source replacement gap
+
+S5 implements the deterministic Project-Contract `Collegato a` relation. The
+directed `Sostituisce` portion of FR-095 and invariant 28.60 remains `planned`: the
+canonical domain does not define what happens when an autonomous Expense that is an
+active replacement endpoint is later moved into a Project or Contract. Until the
+domain is explicitly reopened, no automatic relation archive, movement rejection or
+historical-endpoint behavior is selected.
 
 ### Snapshot materialization
 
@@ -103,9 +120,11 @@ S11 owns the complete canonical comparison/report/export semantics.
 
 ### Attachments
 
-Attachment storage is introduced in the earliest slice that requires actual uploaded
-evidence. It must already respect the later immutable/versioned-evidence requirement;
-a future snapshot slice must not require rewriting stored evidence architecture.
+S5 introduces the shared optional attachment baseline required by canonical Contract,
+Expense and Line structure. Evidence retained for a later approval, Revision,
+Closing, late correction or historical-error annotation is immutable or versioned;
+removing an attachment from a live object must not remove that retained evidence.
+Later snapshot slices reuse this baseline rather than rewriting its storage semantics.
 
 ## No premature branch/spec creation
 

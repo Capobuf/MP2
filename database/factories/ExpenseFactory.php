@@ -18,6 +18,8 @@ class ExpenseFactory extends Factory
                 'company_id' => $attributes['company_id'],
             ])->id,
             'project_id' => null,
+            'contract_id' => null,
+            'origin' => 'manual',
             'supplier_id' => null,
             'direct_cost_center_id' => null,
             'description' => fake()->sentence(3),

@@ -284,8 +284,9 @@ one, rather than inventing behavior.
 ## Domain Traceability
 
 - Canonical FR-082 — Supplier and Contacts (§21).
-- Canonical FR-083 — archived Supplier remains usable in historical contexts
-  (§§21.4, 24.6).
+- The master-data foundation of canonical FR-083: an archived Supplier remains
+  readable and referenceable by existing objects. Full historical and late-
+  correction verification remains assigned to S10 (§§21.4, 24.6).
 - Canonical company ownership boundary — §7.4.
 - Canonical cost-center identity, rename, Archive, and restore behavior —
   §§20.1, 20.7–20.8, 24.3.

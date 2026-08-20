@@ -39,6 +39,31 @@ enum AuditEventType: string
     case ProjectOverspendIncreased = 'project_overspend_increased';
     case ProjectArchived = 'project_archived';
     case ProjectRestored = 'project_restored';
+    case ContractCreated = 'contract_created';
+    case ContractCensused = 'contract_censused';
+    case ContractUpdated = 'contract_updated';
+    case ContractActivation = 'contract_activation';
+    case ContractRenewed = 'contract_renewed';
+    case ContractRenewalChanged = 'contract_renewal_changed';
+    case ContractCessated = 'contract_cessated';
+    case ContractReactivated = 'contract_reactivated';
+    case ContractCancelled = 'contract_cancelled';
+    case ContractLifecycleFactAnnulled = 'contract_lifecycle_fact_annulled';
+    case ContractLifecycleFactReplaced = 'contract_lifecycle_fact_replaced';
+    case ContractConditionCreated = 'contract_condition_created';
+    case ContractConditionChanged = 'contract_condition_changed';
+    case ContractConditionCorrected = 'contract_condition_corrected';
+    case ContractConditionAnnulled = 'contract_condition_annulled';
+    case ContractConditionRestored = 'contract_condition_restored';
+    case ContractEstimateRecalculated = 'contract_estimate_recalculated';
+    case ContractClassificationChanged = 'contract_classification_changed';
+    case ProjectContractLinked = 'project_contract_linked';
+    case ProjectContractLinkArchived = 'project_contract_link_archived';
+    case ProjectContractLinkRestored = 'project_contract_link_restored';
+    case ContractArchived = 'contract_archived';
+    case ContractRestored = 'contract_restored';
+    case AttachmentUploaded = 'attachment_uploaded';
+    case AttachmentDetached = 'attachment_detached';
 
     public function label(): string
     {
@@ -78,6 +103,31 @@ enum AuditEventType: string
             self::ProjectOverspendIncreased => 'Sovraspesa progetto aumentata',
             self::ProjectArchived => 'Progetto archiviato',
             self::ProjectRestored => 'Progetto ripristinato',
+            self::ContractCreated => 'Contratto creato',
+            self::ContractCensused => 'Contratto censito tardivamente',
+            self::ContractUpdated => 'Contratto modificato',
+            self::ContractActivation => 'Contratto attivato',
+            self::ContractRenewed => 'Contratto rinnovato',
+            self::ContractRenewalChanged => 'Configurazione rinnovo modificata',
+            self::ContractCessated => 'Contratto cessato',
+            self::ContractReactivated => 'Contratto riattivato',
+            self::ContractCancelled => 'Contratto annullato',
+            self::ContractLifecycleFactAnnulled => 'Evento contrattuale annullato',
+            self::ContractLifecycleFactReplaced => 'Evento contrattuale sostituito',
+            self::ContractConditionCreated => 'Condizione contrattuale creata',
+            self::ContractConditionChanged => 'Condizione contrattuale modificata',
+            self::ContractConditionCorrected => 'Condizione contrattuale corretta',
+            self::ContractConditionAnnulled => 'Condizione contrattuale annullata',
+            self::ContractConditionRestored => 'Condizione contrattuale ripristinata',
+            self::ContractEstimateRecalculated => 'Stima contrattuale ricalcolata',
+            self::ContractClassificationChanged => 'Classificazione contratto modificata',
+            self::ProjectContractLinked => 'Progetto e Contratto collegati',
+            self::ProjectContractLinkArchived => 'Collegamento Progetto-Contratto archiviato',
+            self::ProjectContractLinkRestored => 'Collegamento Progetto-Contratto ripristinato',
+            self::ContractArchived => 'Contratto archiviato',
+            self::ContractRestored => 'Contratto ripristinato',
+            self::AttachmentUploaded => 'Allegato caricato',
+            self::AttachmentDetached => 'Allegato rimosso dall’oggetto',
         };
     }
 }

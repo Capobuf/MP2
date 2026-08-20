@@ -110,20 +110,22 @@ observable and testable.
 **Alternatives considered:** Auto-replacement violates authority; rejecting every
 difference turns a warning into an invented invariant.
 
-## Decision 9 — Attachments deferred
+## Decision 9 — Attachments assigned to S5
 
 **Decision:** S3 exposes no upload/removal controls. Notes and Timeline cover S3
-explanations; attachment storage begins with the first bounded slice that requires
-uploaded evidence.
+explanations; S5 introduces the shared optional attachment baseline for Contracts,
+Expenses and Lines and completes the attachment portion of canonical FR-046.
 
 **Rationale:** Empty attachment collections are valid. A partial UI would invent
-removal/versioning behavior and a media plugin has no demonstrated S3 need.
+removal/versioning behavior and a media plugin has no demonstrated S3 need. FR-046
+therefore remains planned rather than being claimed as fully verified by S3.
 
 ## Decision 10 — Traceability is incremental, not a domain gap
 
-**Decision:** S3 establishes the autonomous side of FR-005/FR-051/FR-052 and invariant
-28.4. S4 and S5 extend the same primary anchor with Project/Contract cases. These rows
-must not be declared fully verified before those container cases exist.
+**Decision:** S3 establishes the autonomous side of FR-005–FR-007, FR-051–FR-052 and
+invariants 28.4, 28.5 and 28.52. S4 adds Project cases and S5 owns first complete
+verification after adding Contract cases. These rows must not be declared fully
+verified before those container cases exist.
 
 **Rationale:** The canonical domain is complete, but S3 is intentionally forbidden
 from introducing the future containers. This is a roadmap verification boundary, not

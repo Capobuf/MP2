@@ -191,13 +191,15 @@ Archive scope is introduced.
 
 ### Roadmap reconciliation
 
-- FR-082 and FR-083 remain S2's primary canonical requirements.
+- FR-082 remains S2's primary canonical requirement. S2 supplies the archived-
+  Supplier foundation of FR-083; S10 owns its first complete historical and
+  late-correction verification.
 - The first authoritative Archive/no-delete/stable-identity tests occur in S2 for
   Suppliers and Cost Centers. Roadmap rows FR-009/010 and invariants 28.44–28.46 are
   reassigned to S2 as the first implementing slice; later economic slices extend the
   same rules to their own entities.
-- FR-079–081 and invariant 28.42–28.43 remain owned by S4 because S2 does not create
-  annual classification or inheritance.
+- FR-079–081 and invariants 28.42–28.43 remain planned until S5 completes annual
+  classification and inheritance for both Project and Contract sources.
 - FR-084 remains owned by S3 for the first economic Timeline, while S2 incrementally
   adds the master-data events mandated by §22.6.
 

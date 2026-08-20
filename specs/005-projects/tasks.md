@@ -223,10 +223,11 @@ commit, push, PR, and remote CI remain a separate explicit publication step.
   IDs, ownership, revisions, and archive state. The restarted Project UI rendered
   without an error overlay; local and LAN `/admin` endpoints both returned the
   expected 302 to login.
-- S4 and its primary FR/invariant rows were initially `implemented`, not `verified`,
-  because publication and remote CI had not yet occurred. FR-005, FR-051, FR-052,
-  and invariant 28.4 remain `planned` until S5 makes the Contract ownership cases
-  representable.
+- S4 and its fully representable FR/invariant rows were initially `implemented`, not
+  `verified`, because publication and remote CI had not yet occurred. FR-005–FR-007,
+  FR-046, FR-051, FR-052, FR-079–FR-081 and invariants 28.4, 28.5,
+  28.42, 28.43 and 28.52 remain `planned` until S5 completes the Contract,
+  aggregation, classification and attachment cases.
 
 ### Remote verification evidence — 2026-08-20
 
@@ -236,9 +237,10 @@ commit, push, PR, and remote CI remain a separate explicit publication step.
   slice exceeded its 100-file review limit.
 - The independent browser demonstration, persistence check, focused suites, and
   complete local quality gate above remain the functional verification evidence.
-- S4 and its primary FR/invariant rows are now `verified`. Shared FR-005, FR-051,
-  FR-052, and invariant 28.4 remain `planned` until S5 makes every Contract ownership
-  case representable and tested.
+- S4 and its fully representable FR/invariant rows are now `verified`. Shared
+  FR-005–FR-007, FR-046, FR-051, FR-052, FR-079–FR-081 and invariants 28.4, 28.5,
+  28.42, 28.43 and 28.52 remain `planned` until S5 makes every Contract,
+  aggregation, classification and attachment case representable and tested.
 
 ---
 

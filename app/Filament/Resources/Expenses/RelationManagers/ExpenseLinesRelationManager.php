@@ -145,7 +145,7 @@ class ExpenseLinesRelationManager extends RelationManager
         $actor = auth()->user();
         $expense = $this->getOwnerRecord();
 
-        return $actor instanceof User && $expense instanceof Expense && ! $expense->isReversed()
+        return $actor instanceof User && $expense instanceof Expense && $expense->origin !== 'system' && ! $expense->isReversed()
             && $actor->hasCapability($expense->company, Capability::ManageOperations);
     }
 

@@ -20,11 +20,11 @@ starts with focused behavior/rejection tests and is validated before the next ph
 ownership before code is introduced.
 
 - [X] T001 Confirm S2 quality, category A–E conclusions, and no unresolved clarification in `specs/003-master-data/spec.md` and `specs/003-master-data/checklists/requirements.md`
-- [X] T002 Reconcile FR-009, FR-010, FR-082, FR-083 and invariants 28.44–28.46 primary ownership in `specs/000-product-roadmap/traceability.md` and `specs/000-product-roadmap/invariant-test-map.md`
+- [X] T002 Reconcile FR-009, FR-010, FR-082, the S2 foundation of FR-083, and invariants 28.44–28.46 in `specs/000-product-roadmap/traceability.md` and `specs/000-product-roadmap/invariant-test-map.md`
 - [X] T003 Confirm the no-new-package/native-Resource design and S3+ exclusions in `specs/003-master-data/research.md`, `specs/003-master-data/plan.md`, and `docs/plugin-register.md`
 
 **Checkpoint:** S2 has complete artifacts, no category-E blocker, and explicit roadmap
-ownership without moving annual Cost Center behavior out of S4.
+ownership without moving Project/Contract annual Cost Center behavior into S2.
 
 ---
 

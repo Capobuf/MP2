@@ -66,6 +66,12 @@ class Project extends Model
         return $this->hasMany(Expense::class);
     }
 
+    /** @return HasMany<ProjectContractLink, $this> */
+    public function contractLinks(): HasMany
+    {
+        return $this->hasMany(ProjectContractLink::class);
+    }
+
     /** @param Builder<self> $query */
     public function scopeActive(Builder $query): void
     {

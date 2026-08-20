@@ -28,6 +28,9 @@ class UpdateExpense
     public function preview(User $actor, Expense $expense, array $input): ExpenseImpactPlan
     {
         Gate::forUser($actor)->authorize('update', $expense);
+        if ($expense->origin === 'system') {
+            throw ValidationException::withMessages(['expense' => 'La Stima di sistema non può essere spostata o riclassificata manualmente.']);
+        }
         $normalized = $this->normalizeClassification($expense, $input);
         $source = $expense->exercise;
         $target = Exercise::query()->find($normalized['exercise_id']);
@@ -73,6 +76,9 @@ class UpdateExpense
             $lockedExpense = Expense::query()->lockForUpdate()->findOrFail($expense->id);
             $lines = $lockedExpense->lines()->orderBy('id')->lockForUpdate()->get();
             Gate::forUser($actor)->authorize('update', $lockedExpense);
+            if ($lockedExpense->origin === 'system') {
+                throw ValidationException::withMessages(['expense' => 'La Stima di sistema non può essere spostata o riclassificata manualmente.']);
+            }
 
             $existing = AuditEvent::query()->where('operation_id', $operationId)->first();
             if ($existing !== null) {
@@ -219,6 +225,9 @@ class UpdateExpense
                 : Project::query()->lockForUpdate()->findOrFail($expense->project_id);
             $lockedExpense = Expense::query()->lockForUpdate()->findOrFail($expense->id);
             Gate::forUser($actor)->authorize('update', $lockedExpense);
+            if ($lockedExpense->origin === 'system') {
+                throw ValidationException::withMessages(['expense' => 'La Stima di sistema non è modificabile manualmente.']);
+            }
             $existing = AuditEvent::query()->where('operation_id', $validated['operation_id'])->first();
             if ($existing !== null) {
                 if ($existing->eventType() !== AuditEventType::ExpenseUpdated || $existing->subject_id !== $lockedExpense->id) {

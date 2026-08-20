@@ -61,13 +61,15 @@ Center, and has one or more persisted Lines.
 | `quantity` | nullable decimal with 6 places | Descriptive only |
 | `unit_amount` | nullable decimal with 6 places | Descriptive only |
 | `unit_of_measure` | nullable string | Descriptive; technical max 64 |
-| `note` | nullable text | Required for negative Actual/new manual zero |
+| `note` | nullable text | Required for negative Actual; normally documents a new manual zero decision |
 | `annulled_at` | nullable technical timestamp | Null = Attiva; value = Annullata |
 | timestamps | technical UTC | No structured economic Actual date |
 
 Database checks close Line type and reject negative Estimates and negative Actuals
-without non-blank Note. Action validation covers new zero reason, future Actual year,
-warning acknowledgement, open Exercise and active Expense.
+without non-blank Note. Action validation admits a zero Line only to preserve an
+already materialized identity or an explicit decision, discourages a new manual zero
+without a documented reason, and also covers future Actual year, warning
+acknowledgement, open Exercise and active Expense.
 
 ## Exact derived values
 

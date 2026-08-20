@@ -102,7 +102,7 @@ revision-safe, and audited without changing values or classifications.
 creation, details, transitions, annual classification, Expense ownership, child
 Expense/Line economic changes, overspend, archive, and restore, even after an Expense
 moves elsewhere. Details show effective date, before/after, affected Exercises,
-exact impacts, reason, references, and operation identity.
+exact impacts, reason when required, references, and operation identity.
 
 ## Explicit absences
 

@@ -25,6 +25,10 @@ class CreateExpense
     /** @param array<string, mixed> $input */
     public function execute(User $actor, Company $company, array $input, string $operationId): Expense
     {
+        if (($input['origin'] ?? 'manual') !== 'manual') {
+            throw ValidationException::withMessages(['origin' => 'Le Stime di sistema possono essere create soltanto dal motore Contratti.']);
+        }
+
         $normalized = [
             ...$input,
             'supplier_id' => $input['supplier_id'] ?? null,
