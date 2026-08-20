@@ -14,7 +14,7 @@ below. Later slices may add integration or regression coverage.
 | 28.5 | Sorgenti di primo livello | S3 — Esercizi, Spese e Righe | verified |
 | 28.6 | Nessun matching | S3 — Esercizi, Spese e Righe | verified |
 | 28.7 | Allocato della Spesa autonoma | S3 — Esercizi, Spese e Righe | verified |
-| 28.8 | Allocato del Progetto | S4 — Progetti | implemented |
+| 28.8 | Allocato del Progetto | S4 — Progetti | verified |
 | 28.9 | Allocato del Contratto | S5 — Contratti | planned |
 | 28.10 | Scostamento Operativo | S3 — Esercizi, Spese e Righe | verified |
 | 28.11 | Residuo e disponibilità riportabile | S8 — Riporto e Riprogrammazione | planned |
@@ -30,7 +30,7 @@ below. Later slices may add integration or regression coverage.
 | 28.21 | Nuovi oggetti proposti | S6 — Proposta e Budget iniziale | planned |
 | 28.22 | Riallineamento per sorgente | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
 | 28.23 | Approvazione atomica | S6 — Proposta e Budget iniziale | planned |
-| 28.24 | Stato alla data | S4 — Progetti | implemented |
+| 28.24 | Stato alla data | S4 — Progetti | verified |
 | 28.25 | Stato alla Chiusura | S9 — Chiusura | planned |
 | 28.26 | Nessuna riapertura | S9 — Chiusura | planned |
 | 28.27 | Chiusura atomica | S9 — Chiusura | planned |
@@ -48,8 +48,8 @@ below. Later slices may add integration or regression coverage.
 | 28.39 | Nessun prorata | S5 — Contratti | planned |
 | 28.40 | Stima di Contratto | S5 — Contratti | planned |
 | 28.41 | Spese manuali di Contratto | S5 — Contratti | planned |
-| 28.42 | Classificazione annuale | S4 — Progetti | implemented |
-| 28.43 | Ereditarietà del Centro di Costo | S4 — Progetti | implemented |
+| 28.42 | Classificazione annuale | S4 — Progetti | verified |
+| 28.43 | Ereditarietà del Centro di Costo | S4 — Progetti | verified |
 | 28.44 | Archivio non economico | S2 — Anagrafiche | verified |
 | 28.45 | Nessuna cancellazione fisica ordinaria | S2 — Anagrafiche | verified |
 | 28.46 | Identità non riutilizzabile | S2 — Anagrafiche | verified |

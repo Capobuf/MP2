@@ -62,10 +62,10 @@ changing its traceability anchor.
 | FR-052 | Riclassificazione integrale di una Spesa con Effettivi | §15.9 | S3 — Esercizi, Spese e Righe | planned |
 | FR-053 | Storno soltanto senza Effettivi | §15.11 | S3 — Esercizi, Spese e Righe | verified |
 | FR-054 | Nessun tipo Imprevista, Preventivo o Plafond | §§15.12–15.14 | S3 — Esercizi, Spese e Righe | verified |
-| FR-055 | Stati del Progetto | §16.2 | S4 — Progetti | implemented |
-| FR-056 | Effettivi compatibili con lo stato del Progetto | §16.5 | S4 — Progetti | implemented |
-| FR-057 | Transizioni del Progetto valutate alla data | §§9.3, 16.4 | S4 — Progetti | implemented |
-| FR-058 | Avvisi di Sovraspesa | §16.8 | S4 — Progetti | implemented |
+| FR-055 | Stati del Progetto | §16.2 | S4 — Progetti | verified |
+| FR-056 | Effettivi compatibili con lo stato del Progetto | §16.5 | S4 — Progetti | verified |
+| FR-057 | Transizioni del Progetto valutate alla data | §§9.3, 16.4 | S4 — Progetti | verified |
+| FR-058 | Avvisi di Sovraspesa | §16.8 | S4 — Progetti | verified |
 | FR-059 | Modalità Nessuna, Riporto o Riprogrammazione mutuamente esclusive | §16.10 | S8 — Riporto e Riprogrammazione | planned |
 | FR-060 | Formule del Riporto | §§8.4, 17 | S8 — Riporto e Riprogrammazione | planned |
 | FR-061 | Effettivo negativo non genera Riporto oltre l'Allocato | §§17.5, 28.13 | S8 — Riporto e Riprogrammazione | planned |
@@ -86,9 +86,9 @@ changing its traceability anchor.
 | FR-076 | Data di attribuzione della Stima | §18.16 | S5 — Contratti | planned |
 | FR-077 | Nessun prorata | §18.17 | S5 — Contratti | planned |
 | FR-078 | Effettivi contrattuali manuali senza matching | §18.19 | S5 — Contratti | planned |
-| FR-079 | Centro di Costo annuale | §20 | S4 — Progetti | implemented |
-| FR-080 | Cambio Centro di Costo sull'intero Esercizio | §20.3 | S4 — Progetti | implemented |
-| FR-081 | Ereditarietà del Centro di Costo | §20.5 | S4 — Progetti | implemented |
+| FR-079 | Centro di Costo annuale | §20 | S4 — Progetti | verified |
+| FR-080 | Cambio Centro di Costo sull'intero Esercizio | §20.3 | S4 — Progetti | verified |
+| FR-081 | Ereditarietà del Centro di Costo | §20.5 | S4 — Progetti | verified |
 | FR-082 | Fornitore e Referenti | §21 | S2 — Anagrafiche | verified |
 | FR-083 | Fornitore Archiviato utilizzabile nello storico | §§21.4, 24.6 | S2 — Anagrafiche | verified |
 | FR-084 | Timeline esplicativa append-only | §22 | S3 — Esercizi, Spese e Righe | verified |

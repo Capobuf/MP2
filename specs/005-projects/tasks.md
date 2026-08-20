@@ -223,9 +223,21 @@ commit, push, PR, and remote CI remain a separate explicit publication step.
   IDs, ownership, revisions, and archive state. The restarted Project UI rendered
   without an error overlay; local and LAN `/admin` endpoints both returned the
   expected 302 to login.
-- S4 and its primary FR/invariant rows are `implemented`, not `verified`, because no
-  publication or remote CI was requested. FR-005, FR-051, FR-052, and invariant 28.4
-  remain `planned` until S5 makes the Contract ownership cases representable.
+- S4 and its primary FR/invariant rows were initially `implemented`, not `verified`,
+  because publication and remote CI had not yet occurred. FR-005, FR-051, FR-052,
+  and invariant 28.4 remain `planned` until S5 makes the Contract ownership cases
+  representable.
+
+### Remote verification evidence — 2026-08-20
+
+- Draft PR #2 ran the GitHub `Quality` workflow successfully for the complete S4
+  application change and the status-reconciliation commit; CodeRabbit also reported
+  success and no blocking review decision was present.
+- The independent browser demonstration, persistence check, focused suites, and
+  complete local quality gate above remain the functional verification evidence.
+- S4 and its primary FR/invariant rows are now `verified`. Shared FR-005, FR-051,
+  FR-052, and invariant 28.4 remain `planned` until S5 makes every Contract ownership
+  case representable and tested.
 
 ---
 
