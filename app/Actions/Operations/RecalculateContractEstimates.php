@@ -68,7 +68,7 @@ class RecalculateContractEstimates
                 conditions: $contract->conditions,
                 year: $exercise->year,
                 stateAt: fn (string $date) => ContractStateTimeline::stateAtDate(
-                    $contract->contractual_start_date->toDateString(),
+                    $contract->contractualStartDate()->toDateString(),
                     $contract->lifecycleFacts,
                     $date,
                 ),

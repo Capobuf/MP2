@@ -43,9 +43,11 @@ class CompanyAudit extends Page implements HasTable
 
     protected static ?string $navigationLabel = 'Timeline';
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Controllo';
+
     protected static ?string $title = 'Timeline Azienda';
 
-    protected static ?int $navigationSort = 40;
+    protected static ?int $navigationSort = 10;
 
     public ?int $expense = null;
 

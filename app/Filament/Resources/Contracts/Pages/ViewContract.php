@@ -10,6 +10,16 @@ class ViewContract extends ViewRecord
 {
     protected static string $resource = ContractResource::class;
 
+    public function hasCombinedRelationManagerTabsWithContent(): bool
+    {
+        return true;
+    }
+
+    public function getContentTabLabel(): ?string
+    {
+        return 'Panoramica';
+    }
+
     protected function getHeaderActions(): array
     {
         return [EditAction::make()];

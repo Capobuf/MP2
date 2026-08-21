@@ -10,8 +10,13 @@ class ListSuppliers extends ListRecords
 {
     protected static string $resource = SupplierResource::class;
 
+    public function getSubheading(): ?string
+    {
+        return 'Anagrafica dei Fornitori utilizzati nelle attività operative.';
+    }
+
     protected function getHeaderActions(): array
     {
-        return [CreateAction::make()];
+        return [CreateAction::make()->label('Nuovo Fornitore')];
     }
 }

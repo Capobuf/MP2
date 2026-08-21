@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable(['company_id', 'contract_id', 'exercise_id', 'cost_center_id'])]
+/** @property CostCenter|null $costCenter */
 class ContractExerciseClassification extends Model
 {
     /** @use HasFactory<ContractExerciseClassificationFactory> */

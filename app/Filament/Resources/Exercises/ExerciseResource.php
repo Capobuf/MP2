@@ -31,13 +31,15 @@ class ExerciseResource extends Resource
 
     protected static ?string $navigationLabel = 'Esercizi';
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Operatività';
+
     protected static ?string $modelLabel = 'esercizio';
 
     protected static ?string $pluralModelLabel = 'esercizi';
 
     protected static ?string $recordTitleAttribute = 'year';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 10;
 
     public static function form(Schema $schema): Schema
     {

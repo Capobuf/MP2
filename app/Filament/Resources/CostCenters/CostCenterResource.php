@@ -33,6 +33,8 @@ class CostCenterResource extends Resource
 
     protected static ?string $navigationLabel = 'Centri di Costo';
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Anagrafiche';
+
     protected static ?string $modelLabel = 'centro di costo';
 
     protected static ?string $pluralModelLabel = 'centri di costo';

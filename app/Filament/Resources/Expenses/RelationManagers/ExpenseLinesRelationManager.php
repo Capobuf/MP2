@@ -7,7 +7,6 @@ use App\Actions\Operations\SetExpenseLineActive;
 use App\Actions\Operations\UpdateExpenseLine;
 use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExpenseLineType;
-use App\Domain\Projects\ProjectActualKind;
 use App\Filament\Resources\Expenses\Schemas\ExpenseForm;
 use App\Filament\Support\ProjectOverspendNotifier;
 use App\Models\Expense;
@@ -16,12 +15,12 @@ use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Hidden;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Alignment;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Auth\Access\Response;
@@ -47,8 +46,8 @@ class ExpenseLinesRelationManager extends RelationManager
     public function form(Schema $schema): Schema
     {
         return $schema->components([
-            ...ExpenseForm::lineFields(),
-            ...$this->projectActivityFields(),
+            ...ExpenseForm::lineFormSections(),
+            ExpenseForm::projectActivitySection($this->ownerIsProjectExpense()),
             Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
         ]);
     }
@@ -57,20 +56,27 @@ class ExpenseLinesRelationManager extends RelationManager
     {
         return $table
             ->columns([
-                TextColumn::make('type')->label('Tipo')->formatStateUsing(fn ($state): string => $state instanceof ExpenseLineType ? $state->label() : ExpenseLineType::from($state)->label()),
-                TextColumn::make('amount')->label('Importo EUR netto IVA')->money('EUR', locale: 'it'),
+                TextColumn::make('type')->label('Tipo')->formatStateUsing(fn ($state): string => $state instanceof ExpenseLineType ? $state->label() : ExpenseLineType::from($state)->label())
+                    ->badge()->color(fn ($state): string => ($state instanceof ExpenseLineType ? $state : ExpenseLineType::from($state)) === ExpenseLineType::Estimate ? 'primary' : 'success'),
+                TextColumn::make('note')->label('Nota')->placeholder('—')->wrap(),
                 TextColumn::make('quantity')->label('Quantità')->placeholder('—'),
                 TextColumn::make('unit_amount')->label('Importo unitario')->placeholder('—'),
                 TextColumn::make('unit_of_measure')->label('Unità di misura')->placeholder('—'),
-                TextColumn::make('note')->label('Nota')->placeholder('—')->wrap(),
-                TextColumn::make('state')->label('Stato')->state(fn (ExpenseLine $record): string => $record->isAnnulled() ? 'Annullata' : 'Attiva')->badge(),
-                TextColumn::make('updated_at')->label('Ultima modifica')->dateTime('d/m/Y H:i'),
+                TextColumn::make('amount')->label('Importo')->money('EUR', locale: 'it')->alignment(Alignment::End),
+                TextColumn::make('state')->label('Stato')->state(fn (ExpenseLine $record): string => $record->isAnnulled() ? 'Annullata' : 'Attiva')
+                    ->badge()->color(fn (string $state): string => $state === 'Attiva' ? 'success' : 'gray'),
+                TextColumn::make('updated_at')->label('Ultima modifica')->dateTime('d/m/Y H:i')
+                    ->timezone(fn (ExpenseLine $record): string => $record->expense->company->timezone),
             ])
             ->headerActions([
                 CreateAction::make()
                     ->label('Aggiungi riga')
                     ->modalHeading('Aggiungi riga')
-                    ->modalSubmitActionLabel('Aggiungi')
+                    ->modalDescription('Aggiungi una Stima o un Effettivo alla Spesa. L’Importo resta autoritativo.')
+                    ->modalSubmitActionLabel('Aggiungi riga')
+                    ->modalCancelActionLabel('Annulla')
+                    ->slideOver()
+                    ->modalWidth(Width::TwoExtraLarge)
                     ->createAnother(false)
                     ->visible(fn (): bool => $this->canMutateOwner())
                     ->using(function (array $data): ExpenseLine {
@@ -89,7 +95,11 @@ class ExpenseLinesRelationManager extends RelationManager
             ->recordActions([
                 EditAction::make()
                     ->modalHeading('Modifica riga')
-                    ->modalSubmitActionLabel('Salva')
+                    ->modalDescription('La modifica conserva l’identità della Riga e viene registrata nella Timeline.')
+                    ->modalSubmitActionLabel('Salva modifica')
+                    ->modalCancelActionLabel('Annulla')
+                    ->slideOver()
+                    ->modalWidth(Width::TwoExtraLarge)
                     ->visible(fn (): bool => $this->canMutateOwner())
                     ->using(function (array $data, Model $record): ExpenseLine {
                         $actor = auth()->user();
@@ -128,7 +138,7 @@ class ExpenseLinesRelationManager extends RelationManager
                     ->modalCancelActionLabel('Torna alla riga')
                     ->visible(fn (ExpenseLine $record): bool => $record->isAnnulled() && $this->canMutateOwner())
                     ->form([
-                        ...$this->projectActivityFields(),
+                        ...ExpenseForm::projectActivityFields($this->ownerIsProjectExpense()),
                         Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
                     ])
                     ->action(fn (ExpenseLine $record, array $data) => $this->setActive($record, true, $data)),
@@ -162,24 +172,10 @@ class ExpenseLinesRelationManager extends RelationManager
         $this->getOwnerRecord()->refresh();
     }
 
-    /** @return array<int, mixed> */
-    private function projectActivityFields(): array
+    private function ownerIsProjectExpense(): bool
     {
-        return [
-            Select::make('actual_kind')
-                ->label('Dichiarazione Effettivo')
-                ->options(ProjectActualKind::options())
-                ->placeholder('Ordinario')
-                ->visible(fn (): bool => $this->getOwnerRecord() instanceof Expense && $this->getOwnerRecord()->project_id !== null),
-            Checkbox::make('open_project')
-                ->label('Conferma apertura atomica se il Progetto è Pianificato')
-                ->visible(fn (): bool => $this->getOwnerRecord() instanceof Expense && $this->getOwnerRecord()->project_id !== null),
-            Textarea::make('activity_note')
-                ->label('Nota attività tardiva, rimborso o correzione')
-                ->visible(fn (): bool => $this->getOwnerRecord() instanceof Expense && $this->getOwnerRecord()->project_id !== null),
-            Textarea::make('overspend_note')
-                ->label('Nota di sovraspesa')
-                ->visible(fn (): bool => $this->getOwnerRecord() instanceof Expense && $this->getOwnerRecord()->project_id !== null),
-        ];
+        $expense = $this->getOwnerRecord();
+
+        return $expense instanceof Expense && $expense->project_id !== null;
     }
 }

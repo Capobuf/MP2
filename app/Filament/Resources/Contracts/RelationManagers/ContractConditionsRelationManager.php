@@ -84,7 +84,9 @@ class ContractConditionsRelationManager extends RelationManager
                     app(SetContractConditionAnnulled::class)->execute($actor, $record, false, (string) $data['reason'], (string) $data['operation_id']);
                     $this->getOwnerRecord()->refresh();
                 }),
-        ])->defaultSort('valid_from')->emptyStateHeading('Nessuna condizione');
+        ])->defaultSort('valid_from')
+            ->emptyStateHeading('Nessuna condizione')
+            ->emptyStateDescription('Ogni Contratto nasce con una prima condizione valida; verifica i filtri se non è visibile.');
     }
 
     /** @return array<int, mixed> */

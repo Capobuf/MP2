@@ -3,8 +3,8 @@
 **Project:** MP2 — IT Spend Governance  
 **Stack di riferimento:** Laravel + Filament  
 **Stato:** riferimento visuale e comportamentale vincolante per l'implementazione UI  
-**Versione:** 1.0  
-**Data:** 17 agosto 2026
+**Versione:** 1.1  
+**Data:** 20 agosto 2026
 
 ---
 
@@ -129,6 +129,26 @@ I colori seguenti derivano dal linguaggio visuale del mockup approvato e costitu
 | `info` | `#2563EB` | Informazioni e stato neutro informativo |
 | `info-soft` | `#EFF6FF` | Badge info |
 
+I componenti applicativi devono usare token semantici condivisi, ridefiniti dai due
+temi, almeno:
+
+```text
+--app-bg
+--surface
+--surface-muted
+--surface-elevated
+--border
+--border-strong
+--text-primary
+--text-secondary
+--text-muted
+--primary
+--primary-soft
+```
+
+In dark mode gli stessi token assumono valori scuri coerenti. Non è ammesso
+correggere il dark mode pagina per pagina con colori hardcoded.
+
 ### Regola
 
 L'agent **MUST NOT** aggiungere nuovi colori principali per singole pagine.
@@ -233,7 +253,7 @@ Il bordo deve restare il principale elemento di separazione.
 
 Ogni card standard usa:
 
-- background bianco;
+- background `surface`;
 - border 1 px;
 - radius 10–12 px;
 - padding 20 px;
@@ -255,16 +275,21 @@ Layout:
 
 ```text
 ┌───────────────┬──────────────────────────────────────────────┐
-│ Sidebar       │ Page header                                  │
-│ 216–224 px    │ ──────────────────────────────────────────── │
-│               │ Contenuto fluido                             │
+│ Sidebar       │ Topbar globale                               │
+│ 216–224 px    ├──────────────────────────────────────────────┤
+│               │ Page header e contenuto fluido               │
 │               │                                              │
 └───────────────┴──────────────────────────────────────────────┘
 ```
 
 Regole:
 
-- sidebar fissa a sinistra;
+- sidebar fissa a sinistra dal bordo superiore a quello inferiore dello schermo;
+- la topbar inizia a destra della sidebar e non la attraversa;
+- la topbar usa `app-bg`, un bordo inferiore leggero e altezza 56–60 px;
+- non deve esistere una fascia bianca indipendente sopra la sidebar;
+- il controllo collapse appartiene alla sidebar o al suo bordo con il contenuto;
+- larghezza sidebar collassata indicativa 68–72 px;
 - contenuto principale fluido;
 - niente contenitore centrale eccessivamente stretto;
 - padding pagina desktop: 24 px;
@@ -323,7 +348,21 @@ Utenti e Permessi
 - `Riduci menu` può stare in fondo;
 - non creare voci `Analisi`, `Esportazioni` o altre sezioni solo per riempire il menu: devono esistere soltanto se la funzione è realmente implementata e distinta.
 
-## 4.3 Page header
+## 4.3 Topbar globale
+
+La topbar contiene, in ordine stabile e allineati a destra:
+
+```text
+[Azienda] [Esercizio] [Ricerca globale] [Account]
+```
+
+I controlli hanno altezza 36–40 px, stesso bordo, stesso radius e stesso
+allineamento. Azienda ed Esercizio non vengono duplicati nei page header.
+
+Il controllo account resta discreto. La topbar e tutti i suoi controlli seguono il
+tema globale: in dark mode non resta alcuna superficie bianca.
+
+## 4.4 Page header
 
 Ogni pagina usa lo stesso schema.
 
@@ -335,36 +374,30 @@ A sinistra:
 
 A destra:
 
-- contesto Azienda quando necessario;
-- **selettore globale dell'Esercizio**;
 - azioni secondarie;
-- azione primaria.
+- una sola azione primaria.
 
 Esempio:
 
 ```text
 Spese
-Elenco e dettaglio delle spese
+Elenco e dettaglio delle Spese dell'Esercizio selezionato.
 
-                              [Azienda Demo] [2025 ▾] [Esporta] [+ Nuova spesa]
+                                                     [+ Nuova spesa]
 ```
 
 Non inserire toolbars differenti per ogni Resource senza necessità.
 
 ---
 
-# 5. Selettore globale dell'Esercizio
+# 5. Contesti globali Azienda ed Esercizio
 
 Il selettore globale dell'anno è un elemento strutturale dell'applicazione.
 
 ## 5.1 Posizione
 
-Deve stare:
-
-- nella parte alta del contenuto;
-- allineato a destra;
-- nella stessa posizione su tutte le pagine;
-- prima delle azioni di pagina.
+Devono stare nella topbar, prima della ricerca globale e del menu account, nella
+stessa posizione su tutte le pagine.
 
 Non deve essere duplicato dentro widget o filtri locali, salvo una funzione che confronti esplicitamente più Esercizi.
 
@@ -380,7 +413,18 @@ La selezione dell'Esercizio:
 
 Quando l'utente apre una pagina non strettamente annuale, l'Esercizio selezionato resta comunque il contesto per i riepiloghi economici annuali eventualmente presenti.
 
-## 5.3 Azienda
+## 5.3 Dropdown custom
+
+Azienda ed Esercizio non devono usare il popup nativo del browser o del sistema
+operativo. Usare il dropdown supportato dalla versione Filament installata oppure un
+componente dropdown Filament equivalente.
+
+Il menu aperto usa `surface`, `border`, radius 8–10 px, ombra leggera e righe alte
+36–40 px. Hover e selezione usano `primary-soft`; la selezione può avere un check
+discreto. È vietata la grande selezione blu satura tipica dei select nativi. In dark
+mode menu, bordo, hover e selezione usano gli stessi token ridefiniti dal tema.
+
+## 5.4 Azienda
 
 L'Azienda e l'Esercizio sono contesti distinti.
 
@@ -518,7 +562,9 @@ Le tabelle sono un elemento primario del prodotto e devono essere progettate per
 - testo 13–14 px;
 - importi allineati a destra;
 - azioni allineate a destra;
-- checkbox solo quando esistono azioni bulk reali.
+- checkbox come colonna di selezione nella tabella Spese; se non esistono azioni
+  bulk di dominio valide, la selezione resta non distruttiva e non autorizza a
+  inventare operazioni massive.
 
 ## 8.2 Filtri
 
@@ -569,11 +615,11 @@ Mantenere questo schema costante.
 
 # 9. Pattern master/detail
 
-Per entità con dettaglio ricco, il pattern preferito su desktop è:
+Per entità con dettaglio ricco, il pattern obbligatorio su desktop è:
 
 ```text
 ┌───────────────────────────────┬───────────────────────┐
-│ Tabella / elenco              │ Drawer dettaglio      │
+│ Tabella / elenco              │ Pannello dettaglio    │
 │                               │                       │
 │                               │                       │
 └───────────────────────────────┴───────────────────────┘
@@ -581,28 +627,40 @@ Per entità con dettaglio ricco, il pattern preferito su desktop è:
 
 È il pattern di riferimento della pagina **Spese**.
 
-## 9.1 Drawer
+## 9.1 Pannello affiancato
 
 Larghezza desktop indicativa:
 
 - 380–480 px per dettagli semplici;
 - fino a 520 px quando contiene una tabella di righe.
 
-Il drawer:
+Il pannello:
 
-- non deve sovrapporsi in modo opaco a tutta la pagina se c'è spazio;
+- è un `<aside>` sibling della tabella, non un modal o uno slide-over;
+- non usa backdrop e non oscura la lista;
+- misura circa 420–480 px, o 30–35% dello spazio, con min-width 400 px e
+  max-width 500 px quando il viewport lo consente;
 - deve poter essere chiuso chiaramente;
 - deve avere header sticky quando il contenuto scorre;
 - mantiene le azioni oggetto in alto;
 - usa sezioni ben separate.
 
-Su schermi piccoli diventa full-screen.
+Quando nessun record è selezionato il pannello non viene renderizzato e la tabella
+usa tutta la larghezza. La riga selezionata usa `primary-soft` e un indicatore
+discreto. Click sulla stessa riga esegue toggle; click su un'altra riga aggiorna il
+pannello senza chiuderlo. La X ed Escape chiudono il pannello. Filtri, ricerca,
+ordinamento, paginazione e scroll restano preservati.
+
+Le azioni della riga non devono propagare il click al record. Se un filtro esclude
+il record selezionato, il pannello viene chiuso automaticamente.
+
+Sotto 1024 px il pannello può degradare a slide-over o full-screen accessibile.
 
 ## 9.2 Navigazione
 
 Click sulla riga:
 
-- apre il drawer di dettaglio;
+- apre il pannello di dettaglio;
 - non deve richiedere di cliccare un minuscolo link.
 
 Per una pagina di dettaglio completa, prevedere un'azione `Apri dettaglio completo`.
@@ -619,7 +677,7 @@ Questa pagina è il riferimento visuale più importante per le Resource tabellar
 Spese
 Elenco e dettaglio delle spese
 
-                    [Esercizio globale 2025 ▾] [Esporta] [+ Nuova Spesa] [Azioni ▾]
+                                                     [+ Nuova Spesa]
 ```
 
 ## 10.2 KPI superiori
@@ -628,7 +686,7 @@ Massimo 4 card.
 
 Valori consigliati, se disponibili per il contesto selezionato:
 
-- Totale Allocato delle Spese rappresentate;
+- Spese rappresentate;
 - Totale Stime;
 - Totale Effettivi;
 - Spese senza Fornitore oppure altra metrica realmente definita e utile.
@@ -643,7 +701,7 @@ La Spesa può contenere sia Stime sia Effettivi. Perciò **MUST NOT** esistere u
 
 Colonne di default:
 
-1. selezione, solo se servono azioni bulk;
+1. selezione;
 2. Codice / ID leggibile;
 3. Descrizione;
 4. Contenitore;
@@ -653,7 +711,7 @@ Colonne di default:
 8. Effettivo;
 9. Scostamento;
 10. Stato Spesa;
-11. azioni.
+11. azioni operative, senza link `Dettaglio` ridondante.
 
 Su viewport ridotto, le colonne meno importanti possono essere nascoste progressivamente, ma Stima ed Effettivo non devono essere fusi in un singolo `Importo`.
 
@@ -667,34 +725,13 @@ Mostrare una label esplicita:
 
 La natura del contenitore può essere indicata da una piccola icona o metadata, senza aggiungere una colonna ridondante se il nome è sufficiente.
 
-## 10.4 Espansione delle Righe
+## 10.4 Accesso rapido al dettaglio
 
-L'utente deve poter vedere le Righe **senza abbandonare l'elenco**.
+L'utente vede le Righe senza abbandonare l'elenco tramite il pannello master/detail.
+La riga intera della Spesa è cliccabile, mostra `cursor: pointer` e un hover chiaro.
+Non usare un pulsante testuale `Dettaglio` in ogni riga.
 
-Ogni Spesa deve avere un controllo expand/collapse.
-
-Riga espansa:
-
-```text
-Spesa
-└── Righe
-    ├── [Stima]      Descrizione | Quantità | Unitario | Importo | Stato
-    ├── [Effettivo]  Descrizione | Quantità | Unitario | Importo | Stato
-    └── ...
-```
-
-Regole:
-
-- le Righe sono visualmente subordinate;
-- fondo leggermente differente dalla riga padre;
-- indentazione chiara;
-- `Tipo` compare qui perché appartiene alla Riga;
-- `Importo` è il valore autoritativo;
-- Quantità e Importo unitario sono mostrati solo quando presenti;
-- una Riga Annullata resta leggibile ma non deve sembrare attiva;
-- le Righe non devono essere conteggiate una seconda volta nei totali della tabella.
-
-## 10.5 Drawer Dettaglio Spesa
+## 10.5 Pannello Dettaglio Spesa
 
 Ordine delle sezioni:
 
@@ -705,26 +742,24 @@ Ordine delle sezioni:
 - badge Attiva/Stornata;
 - menu Azioni.
 
-### B. Riepilogo
+### B. Riepilogo economico
 
-Sinistra:
+- Totale Stima;
+- Totale Effettivo;
+- Scostamento.
+
+### C. Dati principali
 
 - Esercizio;
 - Contenitore;
 - Centro di Costo;
 - Fornitore.
 
-Destra:
-
-- Totale Stima;
-- Totale Effettivo;
-- Scostamento.
-
-### C. Note
+### D. Note
 
 Mostrare Note solo se presenti; in assenza non lasciare grande spazio vuoto.
 
-### D. Righe della Spesa
+### E. Righe della Spesa
 
 Tabella compatta:
 
@@ -738,7 +773,7 @@ Tabella compatta:
 
 CTA: `+ Aggiungi riga`, solo quando consentita dal dominio e dai permessi.
 
-### E. Timeline
+### F. Timeline
 
 Mostrare gli eventi più recenti.
 
@@ -752,7 +787,36 @@ Ogni evento:
 
 Link: `Vedi Timeline completa`.
 
-## 10.6 Creazione/modifica
+### G. Dettaglio completo
+
+Link finale: `Apri dettaglio completo`.
+
+Il pannello deve permettere `+ Aggiungi riga`. Dopo il salvataggio rimane aperto e
+aggiorna localmente Righe, riepilogo economico e valori della lista.
+
+## 10.6 Dettaglio completo della Spesa
+
+Il dettaglio completo è una singola pagina continua. Non deve esistere lo switcher
+`Panoramica | Righe`.
+
+Ordine obbligatorio:
+
+1. Header Spesa;
+2. Riepilogo economico;
+3. Dati principali;
+4. Righe della Spesa con `+ Aggiungi riga`;
+5. Timeline recente;
+6. Note e altri dati realmente presenti.
+
+Le azioni di pagina usano una CTA principale `Modifica` e un menu `Azioni` per
+Sposta o riclassifica, Storna/Ripristina e azioni secondarie. Timeline non è una CTA
+primaria: il collegamento è `Vedi Timeline completa` nella sezione relativa.
+
+Pannello e dettaglio completo devono condividere componenti, query e form per
+riepilogo, dati principali, Righe, Timeline, badge e gestione delle Righe. Sono
+ammesse varianti compatta/estesa, non implementazioni indipendenti.
+
+## 10.7 Creazione/modifica
 
 Una Spesa semplice può essere creata in slide-over o pagina compatta.
 
@@ -1297,6 +1361,12 @@ Ogni item:
 - descrizione;
 - motivo quando presente.
 
+La Timeline recente non deve essere una tabella. Usa una linea verticale tratteggiata
+o puntinata da 1 px che attraversa marker circolari da 8–10 px. Timestamp e nome
+evento stanno sulla prima riga, autore e motivo seguono solo quando presenti. Le
+colonne vuote non vengono renderizzate. In fondo è sempre disponibile `Vedi Timeline
+completa` quando esiste la relativa destinazione.
+
 ## 20.2 Colore marker
 
 Il colore è secondario.
@@ -1425,7 +1495,7 @@ Il prodotto è desktop-first, ma non deve rompersi su viewport inferiori.
 
 - sidebar completa o collassabile;
 - KPI 2–4 colonne secondo spazio;
-- drawer più stretto;
+- master/detail affiancato finché la tabella resta utilizzabile;
 - alcune colonne secondarie nascoste.
 
 ### Tablet — 768–1023 px
@@ -1567,6 +1637,16 @@ Tutti i valori visuali riutilizzabili devono essere centralizzati nel tema/app s
 
 L'agent deve poter cambiare un token globale senza cercare valori sparsi nel progetto.
 
+## 26.5 Dark mode globale
+
+Light e dark mode sono temi dell'intera applicazione, non varianti di singole card.
+In dark mode cambiano coerentemente topbar, page background, card, filtri, tabelle,
+header tabella, pannelli laterali, modal, dropdown, input, tab, Timeline, empty state,
+menu contestuali e paginazione. La sidebar può mantenere il proprio colore identitario.
+
+È vietato ottenere pagina bianca con card nere, topbar bianca con body nero o
+controlli chiari isolati dentro superfici scure.
+
 ---
 
 # 27. Pattern di interazione
@@ -1680,7 +1760,7 @@ Prima di considerare una pagina UI completata, l'agent deve verificare:
 
 - [ ] usa la sidebar globale senza logo e senza profilo persistente;
 - [ ] usa il page header standard;
-- [ ] il selettore globale Esercizio è presente quando il contesto lo richiede;
+- [ ] Azienda, Esercizio e Ricerca sono allineati nella topbar globale;
 - [ ] l'Azienda è inequivocabile;
 - [ ] non esistono duplicazioni del selettore annuale.
 
@@ -1733,14 +1813,21 @@ Prima di considerare una pagina UI completata, l'agent deve verificare:
 # 31. Checklist specifica Spese
 
 - [ ] nessun `Tipo` a livello Spesa;
+- [ ] nessun pulsante `Dettaglio` ridondante nelle righe;
+- [ ] click riga apre/cambia/chiude il pannello affiancato senza backdrop;
+- [ ] la riga selezionata è riconoscibile;
+- [ ] nessun pannello vuoto è renderizzato senza selezione;
 - [ ] Stima ed Effettivo sono colonne separate;
-- [ ] ogni Spesa può espandere le proprie Righe;
+- [ ] le Righe sono visibili nel pannello affiancato;
 - [ ] sulle Righe è visibile il Tipo `Stima/Effettivo`;
 - [ ] Importo Riga è il valore autoritativo;
 - [ ] Quantità e unitario sono secondari e opzionali;
 - [ ] una Riga Annullata resta visibile nello storico;
-- [ ] il drawer mostra riepilogo + Righe + Timeline;
-- [ ] il drawer non duplica i totali della pagina in modo ambiguo;
+- [ ] pannello e dettaglio completo mostrano riepilogo + Righe + Timeline;
+- [ ] `+ Aggiungi riga` è presente in entrambi;
+- [ ] il dettaglio completo non usa una tab `Righe` separata;
+- [ ] la Timeline recente è verticale, con linea e marker, non tabellare;
+- [ ] pannello e pagina completa riutilizzano gli stessi componenti;
 - [ ] Contenitore distingue Autonoma, Progetto e Contratto;
 - [ ] il Centro di Costo ereditato non è presentato come campo indipendente modificabile quando non lo è.
 

@@ -7,6 +7,9 @@ use App\Models\ContractExerciseClassification;
 use App\Models\ContractLifecycleFact;
 use App\Models\ContractRenewalConfiguration;
 use App\Policies\ContractPolicy;
+use App\Support\ExerciseContext;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -17,7 +20,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->scoped(ExerciseContext::class);
     }
 
     /**
@@ -25,6 +28,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        DatePicker::configureUsing(fn (DatePicker $picker): DatePicker => $picker
+            ->native()
+            ->extraInputAttributes(['lang' => 'it']));
+
+        Select::configureUsing(fn (Select $select): Select => $select->native(false));
+
         Gate::policy(ContractCondition::class, ContractPolicy::class);
         Gate::policy(ContractExerciseClassification::class, ContractPolicy::class);
         Gate::policy(ContractLifecycleFact::class, ContractPolicy::class);

@@ -10,8 +10,13 @@ class ListExercises extends ListRecords
 {
     protected static string $resource = ExerciseResource::class;
 
+    public function getSubheading(): ?string
+    {
+        return 'Gestione degli Esercizi aziendali e del loro stato.';
+    }
+
     protected function getHeaderActions(): array
     {
-        return [CreateAction::make()->label('Crea Esercizio')];
+        return [CreateAction::make()->label('Nuovo Esercizio')];
     }
 }

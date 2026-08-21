@@ -33,13 +33,15 @@ class ContractResource extends Resource
 
     protected static ?string $navigationLabel = 'Contratti';
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Operatività';
+
     protected static ?string $modelLabel = 'contratto';
 
     protected static ?string $pluralModelLabel = 'contratti';
 
     protected static ?string $recordTitleAttribute = 'title';
 
-    protected static ?int $navigationSort = 23;
+    protected static ?int $navigationSort = 40;
 
     public static function form(Schema $schema): Schema
     {

@@ -111,7 +111,8 @@ class ProjectTransitionsRelationManager extends RelationManager
                     }),
             ])
             ->defaultSort('effective_date')
-            ->emptyStateHeading('Nessuna transizione');
+            ->emptyStateHeading('Nessuna transizione')
+            ->emptyStateDescription('Le transizioni pianificate ed efficaci compariranno qui.');
     }
 
     /** @return array<int, mixed> */

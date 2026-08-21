@@ -30,9 +30,11 @@ class CompanySettings extends Page
 
     protected static ?string $navigationLabel = 'Impostazioni';
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Amministrazione';
+
     protected static ?string $title = 'Impostazioni Azienda';
 
-    protected static ?int $navigationSort = 30;
+    protected static ?int $navigationSort = 20;
 
     /** @var array<string, mixed>|null */
     public ?array $data = [];

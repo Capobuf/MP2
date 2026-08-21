@@ -9,10 +9,10 @@ use App\Filament\Resources\Expenses\Pages\CreateExpense;
 use App\Filament\Resources\Expenses\Pages\EditExpense;
 use App\Filament\Resources\Expenses\Pages\ListExpenses;
 use App\Filament\Resources\Expenses\Pages\ViewExpense;
-use App\Filament\Resources\Expenses\RelationManagers\ExpenseLinesRelationManager;
 use App\Filament\Resources\Expenses\Schemas\ExpenseForm;
 use App\Filament\Resources\Expenses\Schemas\ExpenseInfolist;
 use App\Filament\Resources\Expenses\Tables\ExpensesTable;
+use App\Filament\Resources\Expenses\Widgets\ExpenseOverview;
 use App\Filament\Support\ProjectOverspendNotifier;
 use App\Models\Company;
 use App\Models\Expense;
@@ -41,13 +41,15 @@ class ExpenseResource extends Resource
 
     protected static ?string $navigationLabel = 'Spese';
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Operatività';
+
     protected static ?string $modelLabel = 'spesa autonoma';
 
     protected static ?string $pluralModelLabel = 'spese';
 
     protected static ?string $recordTitleAttribute = 'description';
 
-    protected static ?int $navigationSort = 21;
+    protected static ?int $navigationSort = 20;
 
     public static function form(Schema $schema): Schema
     {
@@ -80,7 +82,10 @@ class ExpenseResource extends Resource
         $company = Filament::getTenant();
 
         return $company instanceof Company
-            ? $query->whereBelongsTo($company, 'company')->with(['exercise', 'supplier', 'directCostCenter', 'project.classifications.costCenter', 'lines'])
+            ? $query->whereBelongsTo($company, 'company')->with([
+                'exercise', 'supplier', 'directCostCenter', 'project.classifications.costCenter',
+                'contract.classifications.costCenter', 'lines',
+            ])
             : $query->whereRaw('1 = 0');
     }
 
@@ -117,7 +122,12 @@ class ExpenseResource extends Resource
 
     public static function getRelations(): array
     {
-        return [ExpenseLinesRelationManager::class];
+        return [];
+    }
+
+    public static function getWidgets(): array
+    {
+        return [ExpenseOverview::class];
     }
 
     public static function reverseAction(): Action

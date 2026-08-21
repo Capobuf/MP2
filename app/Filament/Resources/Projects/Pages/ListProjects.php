@@ -10,8 +10,13 @@ class ListProjects extends ListRecords
 {
     protected static string $resource = ProjectResource::class;
 
+    public function getSubheading(): ?string
+    {
+        return 'Elenco e situazione annuale dei Progetti.';
+    }
+
     protected function getHeaderActions(): array
     {
-        return [CreateAction::make()->label('Crea Progetto')];
+        return [CreateAction::make()->label('Nuovo Progetto')];
     }
 }

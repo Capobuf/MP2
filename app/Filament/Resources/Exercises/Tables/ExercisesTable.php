@@ -22,6 +22,7 @@ class ExercisesTable
                 TextColumn::make('expenses_count')->label('Spese')->counts('expenses'),
             ])
             ->recordActions([ViewAction::make()])
-            ->emptyStateHeading('Nessun esercizio');
+            ->emptyStateHeading('Nessun esercizio')
+            ->emptyStateDescription('Crea un Esercizio Aperto per registrare Stime ed Effettivi.');
     }
 }

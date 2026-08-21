@@ -83,27 +83,105 @@ class ExpenseForm
     public static function lineFields(): array
     {
         return [
-            Select::make('type')->label('Tipo')->options(ExpenseLineType::options())->required(),
-            TextInput::make('amount')->label('Importo EUR netto IVA')->required()->regex('/^-?\d{1,17}(\.\d{1,2})?$/')->live(),
-            TextInput::make('quantity')->label('Quantità')->regex('/^-?\d{1,14}(\.\d{1,6})?$/')->live(),
-            TextInput::make('unit_amount')->label('Importo unitario')->regex('/^-?\d{1,14}(\.\d{1,6})?$/')->live(),
-            TextInput::make('unit_of_measure')->label('Unità di misura')->maxLength(64),
-            Textarea::make('note')->label('Nota'),
-            Checkbox::make('amount_warning_acknowledged')
-                ->label('Salva comunque')
-                ->helperText(function (Get $get): string {
-                    $quantity = is_string($get('quantity')) ? $get('quantity') : null;
-                    $unitAmount = is_string($get('unit_amount')) ? $get('unit_amount') : null;
-                    $amount = is_string($get('amount')) ? $get('amount') : null;
-                    $suggested = ManualExpenseLine::suggestedAmount($quantity, $unitAmount);
-
-                    if ($suggested !== null && $amount !== null && ManualExpenseLine::hasAmountMismatch($quantity, $unitAmount, $amount)) {
-                        return "Quantità × importo unitario produce € {$suggested}, mentre l’importo indicato è € {$amount}. Verrà salvato l’importo indicato.";
-                    }
-
-                    return 'L’importo indicato resta autoritativo; la conferma è richiesta solo in caso di differenza.';
-                }),
+            ...self::economicLineFields(),
+            ...self::descriptiveLineFields(),
+            ...self::lineNoteFields(),
         ];
+    }
+
+    /** @return array<int, mixed> */
+    public static function lineFormSections(): array
+    {
+        return [
+            Section::make('Valore economico')->description('Il Tipo appartiene alla Riga. L’Importo resta il valore autoritativo.')
+                ->schema(self::economicLineFields())->columns(2),
+            Section::make('Dettagli descrittivi')->description('Quantità e unitario aiutano la lettura ma non sostituiscono l’Importo.')
+                ->schema(self::descriptiveLineFields())->columns(3),
+            Section::make('Nota e verifica')->schema(self::lineNoteFields()),
+        ];
+    }
+
+    public static function projectActivitySection(bool $visible): Section
+    {
+        return Section::make('Impatto sul Progetto')
+            ->description('Richiesto solo quando la Riga Effettivo modifica lo stato o l’equilibrio economico del Progetto.')
+            ->schema(self::projectActivityFields($visible))
+            ->columns(2)
+            ->visible($visible);
+    }
+
+    /** @return array<int, mixed> */
+    public static function projectActivityFields(bool $visible): array
+    {
+        return [
+            Select::make('actual_kind')
+                ->label('Dichiarazione Effettivo')
+                ->options(ProjectActualKind::options())
+                ->placeholder('Ordinario (predefinito)')
+                ->visible($visible),
+            Checkbox::make('open_project')
+                ->label('Conferma apertura atomica se il Progetto è Pianificato')
+                ->visible($visible),
+            Textarea::make('activity_note')
+                ->label('Nota attività tardiva, rimborso o correzione')
+                ->visible($visible),
+            Textarea::make('overspend_note')
+                ->label('Nota di sovraspesa')
+                ->visible($visible),
+        ];
+    }
+
+    /** @return array<int, mixed> */
+    private static function economicLineFields(): array
+    {
+        return [
+            Select::make('type')->label('Tipo Riga')->options(ExpenseLineType::options())->required()->native(false)->live(),
+            TextInput::make('amount')->label('Importo')->helperText('Valore autoritativo in EUR, netto IVA.')
+                ->suffix('EUR')->inputMode('decimal')->required()->regex('/^-?\d{1,17}(\.\d{1,2})?$/')->live(),
+        ];
+    }
+
+    /** @return array<int, mixed> */
+    private static function descriptiveLineFields(): array
+    {
+        return [
+            TextInput::make('quantity')->label('Quantità')->inputMode('decimal')->regex('/^-?\d{1,14}(\.\d{1,6})?$/')->live(),
+            TextInput::make('unit_amount')->label('Importo unitario')->suffix('EUR')->inputMode('decimal')
+                ->regex('/^-?\d{1,14}(\.\d{1,6})?$/')->live(),
+            TextInput::make('unit_of_measure')->label('Unità di misura')->maxLength(64),
+        ];
+    }
+
+    /** @return array<int, mixed> */
+    private static function lineNoteFields(): array
+    {
+        return [
+            Textarea::make('note')->label('Nota')
+                ->helperText('Obbligatoria per un Effettivo negativo e normalmente richiesta per una nuova Riga a zero.'),
+            Checkbox::make('amount_warning_acknowledged')
+                ->label('Salva comunque l’Importo indicato')
+                ->helperText(fn (Get $get): string => self::amountMismatchMessage($get))
+                ->visible(fn (Get $get): bool => self::hasAmountMismatch($get)),
+        ];
+    }
+
+    private static function hasAmountMismatch(Get $get): bool
+    {
+        $quantity = is_string($get('quantity')) ? $get('quantity') : null;
+        $unitAmount = is_string($get('unit_amount')) ? $get('unit_amount') : null;
+        $amount = is_string($get('amount')) ? $get('amount') : null;
+
+        return $amount !== null && ManualExpenseLine::hasAmountMismatch($quantity, $unitAmount, $amount);
+    }
+
+    private static function amountMismatchMessage(Get $get): string
+    {
+        $quantity = is_string($get('quantity')) ? $get('quantity') : null;
+        $unitAmount = is_string($get('unit_amount')) ? $get('unit_amount') : null;
+        $amount = is_string($get('amount')) ? $get('amount') : null;
+        $suggested = ManualExpenseLine::suggestedAmount($quantity, $unitAmount);
+
+        return "Quantità × importo unitario suggerisce € {$suggested}; l’Importo autoritativo indicato è € {$amount}.";
     }
 
     private static function company(): ?Company

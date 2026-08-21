@@ -28,9 +28,11 @@ class CompanyAccess extends Page
 
     protected static ?string $navigationLabel = 'Accessi';
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Amministrazione';
+
     protected static ?string $title = 'Accessi e capacità';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 10;
 
     /** @var array<string, mixed>|null */
     public ?array $data = [];

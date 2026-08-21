@@ -55,7 +55,8 @@ class ProjectExpensesRelationManager extends RelationManager
                 ExpenseResource::reverseAction(),
                 ExpenseResource::restoreAction(),
             ])
-            ->emptyStateHeading('Nessuna spesa di Progetto');
+            ->emptyStateHeading('Nessuna spesa di Progetto')
+            ->emptyStateDescription('Aggiungi una Spesa per alimentare Allocato ed Effettivo del Progetto.');
     }
 
     private function canMutateOwner(): bool

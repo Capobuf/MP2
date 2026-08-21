@@ -12,12 +12,19 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 #[Fillable([
     'company_id', 'supplier_id', 'title', 'notes', 'contractual_start_date',
     'next_expiry_date', 'renewal_anchor_date', 'automatic_renewal',
     'renewal_duration_months', 'notice_days', 'archived_at', 'revision',
 ])]
+/**
+ * @property Carbon $contractual_start_date
+ * @property Carbon|null $next_expiry_date
+ * @property Carbon|null $renewal_anchor_date
+ * @property Carbon|null $archived_at
+ */
 class Contract extends Model
 {
     /** @use HasFactory<ContractFactory> */
@@ -113,6 +120,17 @@ class Contract extends Model
         return $this->archived_at !== null;
     }
 
+    public function contractualStartDate(): Carbon
+    {
+        $date = $this->getAttribute('contractual_start_date');
+
+        if (! $date instanceof Carbon) {
+            throw new \UnexpectedValueException('Invalid persisted Contract start date.');
+        }
+
+        return $date;
+    }
+
     public function stateAtDate(string $date): ContractState
     {
         $facts = $this->relationLoaded('lifecycleFacts')
@@ -120,7 +138,7 @@ class Contract extends Model
             : $this->lifecycleFacts()->get();
 
         return ContractStateTimeline::stateAtDate(
-            $this->contractual_start_date->toDateString(),
+            $this->contractualStartDate()->toDateString(),
             $facts,
             $date,
         );

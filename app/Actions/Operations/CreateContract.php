@@ -137,13 +137,13 @@ class CreateContract
             $this->event($actor, $contract, $validated['operation_id'], $sequence++, AuditEventType::ContractCreated, $affectedIds, [
                 'title' => $contract->title,
                 'supplier_id' => $contract->supplier_id,
-                'contractual_start_date' => $contract->contractual_start_date->toDateString(),
-                'renewal_configuration_effective_from' => $configuration->effective_from->toDateString(),
+                'contractual_start_date' => $contract->contractualStartDate()->toDateString(),
+                'renewal_configuration_effective_from' => $configuration->effectiveFrom()->toDateString(),
             ], $validated['contractual_start_date']);
             if ($lateCensus) {
                 $this->event($actor, $contract, $validated['operation_id'], $sequence++, AuditEventType::ContractCensused, $affectedIds, [
                     'censused_at' => now()->toIso8601String(),
-                    'real_contractual_start_date' => $contract->contractual_start_date->toDateString(),
+                    'real_contractual_start_date' => $contract->contractualStartDate()->toDateString(),
                 ], $validated['contractual_start_date']);
             }
             $this->event($actor, $contract, $validated['operation_id'], $sequence++, AuditEventType::ContractActivation, $affectedIds, [

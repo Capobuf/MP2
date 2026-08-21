@@ -33,13 +33,15 @@ class ProjectResource extends Resource
 
     protected static ?string $navigationLabel = 'Progetti';
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Operatività';
+
     protected static ?string $modelLabel = 'progetto';
 
     protected static ?string $pluralModelLabel = 'progetti';
 
     protected static ?string $recordTitleAttribute = 'title';
 
-    protected static ?int $navigationSort = 22;
+    protected static ?int $navigationSort = 30;
 
     public static function form(Schema $schema): Schema
     {

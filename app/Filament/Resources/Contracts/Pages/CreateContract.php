@@ -16,6 +16,8 @@ class CreateContract extends CreateRecord
 {
     protected static string $resource = ContractResource::class;
 
+    protected static bool $canCreateAnother = false;
+
     protected static ?string $title = 'Nuovo contratto';
 
     public string $operationId;

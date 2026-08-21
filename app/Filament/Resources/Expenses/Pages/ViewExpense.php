@@ -7,9 +7,9 @@ use App\Domain\Expenses\ExpenseImpactPlan;
 use App\Domain\Projects\ProjectActualKind;
 use App\Domain\Projects\ProjectOverspend;
 use App\Domain\Projects\ProjectOverspendResult;
-use App\Filament\Pages\CompanyAudit;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Support\ProjectOverspendNotifier;
+use App\Livewire\ExpenseDetail;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -17,6 +17,7 @@ use App\Models\Project;
 use App\Models\Supplier;
 use App\Models\User;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Hidden;
@@ -24,8 +25,10 @@ use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -33,33 +36,44 @@ class ViewExpense extends ViewRecord
 {
     protected static string $resource = ExpenseResource::class;
 
+    public function content(Schema $schema): Schema
+    {
+        return $schema->components([
+            Livewire::make(ExpenseDetail::class, fn (): array => [
+                'expenseId' => $this->getRecord()->getKey(),
+                'compact' => false,
+            ])->key(fn (): string => 'expense-full-'.$this->getRecord()->getKey()),
+        ]);
+    }
+
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('timeline')
-                ->label('Timeline della Spesa')
-                ->url(fn (Expense $record): string => CompanyAudit::getUrl([
-                    'tenant' => $record->company,
-                    'expense' => $record->id,
-                ])),
-            EditAction::make()->label('Modifica descrizione e note'),
-            Action::make('moveOrReclassify')
-                ->label('Sposta o riclassifica')
-                ->visible(fn (Expense $record): bool => ExpenseResource::canEdit($record))
-                ->modalHeading('Sposta o riclassifica la Spesa')
-                ->modalSubmitActionLabel('Conferma modifica')
-                ->form($this->impactForm())
-                ->action(function (array $data, Expense $record): void {
-                    $actor = auth()->user();
-                    abort_unless($actor instanceof User, 403);
-                    $preview = app(UpdateExpense::class)->preview($actor, $record, $data);
-                    app(UpdateExpense::class)->confirm($actor, $record, $preview, (string) $data['operation_id']);
-                    ProjectOverspendNotifier::sendForOperation((string) $data['operation_id']);
-                    $record->refresh();
-                }),
-            ExpenseResource::reverseAction(),
-            ExpenseResource::restoreAction(),
+            EditAction::make()->label('Modifica')->color('primary'),
+            ActionGroup::make([
+                $this->moveOrReclassifyAction(),
+                ExpenseResource::reverseAction(),
+                ExpenseResource::restoreAction(),
+            ])->label('Azioni')->icon('heroicon-m-chevron-down')->color('gray')->button()->outlined(),
         ];
+    }
+
+    private function moveOrReclassifyAction(): Action
+    {
+        return Action::make('moveOrReclassify')
+            ->label('Sposta o riclassifica')
+            ->visible(fn (Expense $record): bool => ExpenseResource::canEdit($record))
+            ->modalHeading('Sposta o riclassifica la Spesa')
+            ->modalSubmitActionLabel('Conferma modifica')
+            ->form($this->impactForm())
+            ->action(function (array $data, Expense $record): void {
+                $actor = auth()->user();
+                abort_unless($actor instanceof User, 403);
+                $preview = app(UpdateExpense::class)->preview($actor, $record, $data);
+                app(UpdateExpense::class)->confirm($actor, $record, $preview, (string) $data['operation_id']);
+                ProjectOverspendNotifier::sendForOperation((string) $data['operation_id']);
+                $record->refresh();
+            });
     }
 
     /** @return array<int, mixed> */

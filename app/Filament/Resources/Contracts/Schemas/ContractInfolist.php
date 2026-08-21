@@ -75,7 +75,9 @@ class ContractInfolist
                 'year' => $exercise->year,
                 'reference_date' => $reference->toDateString(),
                 'state' => $contract->stateAtDate($reference->toDateString())->label(),
-                'cost_center' => $classification?->costCenter?->name ?? 'Non classificato',
+                'cost_center' => $classification === null || $classification->cost_center_id === null
+                    ? 'Non classificato'
+                    : $classification->costCenter->name,
                 'allocation' => $allocation->amount,
                 'actual' => $actual,
                 'variance' => Decimal::subtract($actual, $allocation->amount),

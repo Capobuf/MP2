@@ -50,6 +50,9 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
     Filament::setTenant($company);
 
     Livewire::test(CreateContract::class)
+        ->assertSee('Le date di fattura e pagamento appartengono alle Spese.')
+        ->assertSee('Nessun prorata')
+        ->assertDontSee('Salva & nuovo')
         ->assertFormFieldExists('title')
         ->assertFormFieldExists('supplier_id')
         ->assertFormFieldExists('contractual_start_date')
@@ -62,6 +65,14 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
         ->assertFormFieldDoesNotExist('replacement_contract_id')
         ->assertFormFieldDoesNotExist('proposal_id')
         ->assertFormFieldDoesNotExist('budget_id')
+        ->assertFormSet(function (array $state) use ($exercise): array {
+            expect(array_values($state['classifications']))->toBe([[
+                'exercise_id' => $exercise->id,
+                'cost_center_id' => null,
+            ]]);
+
+            return [];
+        })
         ->fillForm([
             'title' => 'Contratto energia',
             'supplier_id' => $supplier->id,

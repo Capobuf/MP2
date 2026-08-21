@@ -10,8 +10,13 @@ class ListCostCenters extends ListRecords
 {
     protected static string $resource = CostCenterResource::class;
 
+    public function getSubheading(): ?string
+    {
+        return 'Anagrafica dei Centri di Costo usati per la classificazione annuale.';
+    }
+
     protected function getHeaderActions(): array
     {
-        return [CreateAction::make()];
+        return [CreateAction::make()->label('Nuovo Centro di Costo')];
     }
 }

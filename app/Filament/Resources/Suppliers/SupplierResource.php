@@ -34,6 +34,8 @@ class SupplierResource extends Resource
 
     protected static ?string $navigationLabel = 'Fornitori';
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Anagrafiche';
+
     protected static ?string $modelLabel = 'fornitore';
 
     protected static ?string $pluralModelLabel = 'fornitori';

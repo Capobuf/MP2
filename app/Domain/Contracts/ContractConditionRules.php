@@ -19,7 +19,7 @@ final class ContractConditionRules
         $from = CarbonImmutable::parse($validFrom)->startOfDay();
         $to = $validTo === null ? null : CarbonImmutable::parse($validTo)->startOfDay();
 
-        if ($from->lessThan($contract->contractual_start_date->startOfDay())) {
+        if ($from->lessThan($contract->contractualStartDate()->startOfDay())) {
             throw ValidationException::withMessages(['valid_from' => 'La condizione non può precedere l’inizio contrattuale.']);
         }
         if ($to !== null && $to->lessThan($from)) {

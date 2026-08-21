@@ -1,8 +1,10 @@
 <?php
 
 use App\Domain\Company\Capability;
+use App\Filament\Pages\CompanyAudit;
 use App\Filament\Resources\Expenses\Pages\EditExpense;
 use App\Filament\Resources\Expenses\Pages\ViewExpense;
+use App\Livewire\ExpenseDetail;
 use App\Models\Company;
 use App\Models\CompanyCapability;
 use App\Models\Exercise;
@@ -29,8 +31,15 @@ it('exposes separate descriptive edit and impact-confirmed classification action
 
     Livewire::test(ViewExpense::class, ['record' => $expense->getRouteKey()])
         ->assertSuccessful()
-        ->assertActionExists('timeline')
         ->assertActionExists('moveOrReclassify');
+
+    $detail = Livewire::test(ExpenseDetail::class, ['expenseId' => $expense->id, 'compact' => false])
+        ->assertSee('Vedi Timeline completa');
+
+    expect($detail->instance()->timelineUrl())->toBe(CompanyAudit::getUrl([
+        'tenant' => $company,
+        'expense' => $expense->id,
+    ]));
 
     Livewire::test(EditExpense::class, ['record' => $expense->getRouteKey()])
         ->assertFormFieldExists('description')
@@ -56,9 +65,11 @@ it('hides every expense mutation from a read-only viewer', function () {
 
     Livewire::test(ViewExpense::class, ['record' => $expense->getRouteKey()])
         ->assertSuccessful()
-        ->assertActionVisible('timeline')
         ->assertActionHidden('edit')
         ->assertActionHidden('moveOrReclassify')
         ->assertActionHidden('reverse')
         ->assertActionHidden('restore');
+
+    Livewire::test(ExpenseDetail::class, ['expenseId' => $expense->id, 'compact' => false])
+        ->assertSee('Vedi Timeline completa');
 });

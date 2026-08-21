@@ -47,14 +47,14 @@ class SetContractConditionAnnulled
             if (! $annulled) {
                 ContractConditionRules::assertMayPersist(
                     $contract,
-                    $locked->valid_from->toDateString(),
-                    $locked->valid_to?->toDateString(),
+                    $locked->validFrom()->toDateString(),
+                    $locked->validTo()?->toDateString(),
                     $conditions,
                     $locked->id,
                 );
             }
             $exercises = Exercise::query()->whereBelongsTo($company, 'company')->open()->orderBy('year')->lockForUpdate()->get();
-            $before = ['annulled_at' => $locked->annulled_at?->toIso8601String(), 'reason' => $locked->reason];
+            $before = ['annulled_at' => $locked->annulledAt()?->toIso8601String(), 'reason' => $locked->reason];
             $locked->forceFill([
                 'annulled_at' => $annulled ? now() : null,
                 'annulled_by_id' => $annulled ? $actor->id : null,
@@ -70,7 +70,7 @@ class SetContractConditionAnnulled
                 'effective_from' => $locked->valid_from,
                 'effective_to' => $locked->valid_to,
                 'previous_value' => $before,
-                'new_value' => ['annulled_at' => $locked->annulled_at?->toIso8601String(), 'reason' => $locked->reason],
+                'new_value' => ['annulled_at' => $locked->annulledAt()?->toIso8601String(), 'reason' => $locked->reason],
                 'allocated_impact_by_exercise' => array_fill_keys(array_map('strval', $exerciseIds), '0.00'),
                 'actual_impact_by_exercise' => array_fill_keys(array_map('strval', $exerciseIds), '0.00'),
                 'reason' => $validated['reason'],

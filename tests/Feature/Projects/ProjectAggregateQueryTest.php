@@ -50,7 +50,7 @@ function capturedQueries(): array
     );
 }
 
-it('loads the Project list relationships in sets without loading child Lines', function () {
+it('loads the Project list relationships in sets and annual totals in the list query', function () {
     $viewer = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
     grantAggregateViewer($viewer, $company);
@@ -78,7 +78,8 @@ it('loads the Project list relationships in sets without loading child Lines', f
 
     expect(collect($queries)->filter(fn (string $sql): bool => str_contains($sql, 'from `project_transitions`'))->count())->toBe(1)
         ->and(collect($queries)->filter(fn (string $sql): bool => str_contains($sql, 'from `project_exercise_classifications`'))->count())->toBe(1)
-        ->and(collect($queries)->filter(fn (string $sql): bool => str_contains($sql, 'from `expense_lines`'))->count())->toBe(0);
+        ->and(collect($queries)->filter(fn (string $sql): bool => str_contains($sql, 'from `expense_lines`'))->count())->toBe(1)
+        ->and(collect($queries)->first(fn (string $sql): bool => str_contains($sql, 'from `expense_lines`')))->toContain('sum(expense_lines.amount)');
 });
 
 it('builds every annual Project situation with one aggregate Line query', function () {
