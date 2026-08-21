@@ -43,3 +43,19 @@ it('enforces estimate, actual, zero and company-year rules', function () {
         ->and(ManualExpenseLine::validate(['type' => 'actual', 'amount' => '-1', 'note' => 'Rimborso'], $company, $current)['amount'])
         ->toBe('-1.00');
 });
+
+it('accepts the Italian decimal separator for monetary and descriptive values', function () {
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now('Europe/Rome')->year]);
+
+    $validated = ManualExpenseLine::validate([
+        'type' => 'estimate',
+        'amount' => '5,25',
+        'quantity' => '2,500000',
+        'unit_amount' => '2,100000',
+    ], $company, $exercise);
+
+    expect($validated['amount'])->toBe('5.25')
+        ->and($validated['quantity'])->toBe('2.500000')
+        ->and($validated['unit_amount'])->toBe('2.100000');
+});

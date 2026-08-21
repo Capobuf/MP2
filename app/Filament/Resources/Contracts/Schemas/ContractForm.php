@@ -7,6 +7,7 @@ use App\Actions\MasterData\CreateSupplier;
 use App\Domain\Company\Capability;
 use App\Domain\Contracts\ContractAttributionMode;
 use App\Domain\Contracts\ContractCycleType;
+use App\Filament\Forms\DecimalInput;
 use App\Models\Company;
 use App\Models\CostCenter;
 use App\Models\Exercise;
@@ -79,7 +80,7 @@ class ContractForm
             Section::make('Prima condizione economica')
                 ->description('Genera le Stime per ciclo negli Esercizi interessati. Nessun prorata: ogni ciclo è attribuito per intero secondo la modalità scelta.')
                 ->statePath('condition')->schema([
-                    TextInput::make('amount')->label('Importo netto IVA')->numeric()->minValue(0)->prefix('€')->step('0.01')->required()
+                    DecimalInput::make('amount')->label('Importo netto IVA')->minValue(0)->prefix('€')->required()
                         ->columnSpan(['default' => 6, 'xl' => 2]),
                     Select::make('cycle')->label('Ciclo')->options(ContractCycleType::options())->native(false)->required()
                         ->columnSpan(['default' => 6, 'xl' => 2]),

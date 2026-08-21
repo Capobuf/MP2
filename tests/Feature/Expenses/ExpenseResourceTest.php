@@ -76,6 +76,34 @@ it('creates an expense in the selected global Exercise without exposing a second
         ->and(ExpenseLine::query()->count())->toBe(1);
 });
 
+it('accepts an amount entered with the Italian decimal separator', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+    app(ExerciseContext::class)->select($company, $exercise->id);
+
+    Livewire::test(CreateExpense::class)
+        ->fillForm([
+            'description' => 'Importo con virgola',
+            'lines' => [[
+                'type' => 'estimate',
+                'amount' => '100,50',
+                'quantity' => '2,5',
+                'unit_amount' => '40,2',
+            ]],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $line = ExpenseLine::query()->sole();
+    expect($line->amount)->toBe('100.50')
+        ->and($line->quantity)->toBe('2.500000')
+        ->and($line->unit_amount)->toBe('40.200000');
+});
+
 it('overrides any browser Exercise state with the selected global Exercise', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();

@@ -10,6 +10,8 @@ use App\Domain\Company\Capability;
 use App\Domain\Contracts\ContractAttributionMode;
 use App\Domain\Contracts\ContractCycleType;
 use App\Domain\Contracts\ContractEconomicChangePlan;
+use App\Domain\Expenses\Decimal;
+use App\Filament\Forms\DecimalInput;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\User;
@@ -20,7 +22,6 @@ use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -144,7 +145,7 @@ class ContractConditionsRelationManager extends RelationManager
     private function fields(): array
     {
         return [
-            TextInput::make('amount')->label('Importo netto IVA')->numeric()->minValue(0)->required(),
+            DecimalInput::make('amount')->label('Importo netto IVA')->minValue(0)->required(),
             Select::make('cycle')->label('Ciclo')->options(ContractCycleType::options())->required(),
             Select::make('attribution_mode')->label('Attribuzione Stima')->options(ContractAttributionMode::options())->required(),
             DatePicker::make('valid_from')->label('Valida dal')->required(),
@@ -170,7 +171,7 @@ class ContractConditionsRelationManager extends RelationManager
 
         return [
             DatePicker::make('requested_date')->label('Data richiesta')->required()->live()->afterStateUpdated($invalidate),
-            TextInput::make('amount')->label('Nuovo importo netto IVA')->numeric()->minValue(0)->required()->live()->afterStateUpdated($invalidate),
+            DecimalInput::make('amount')->label('Nuovo importo netto IVA')->minValue(0)->required()->live()->afterStateUpdated($invalidate),
             Select::make('cycle')->label('Nuovo ciclo')->options(ContractCycleType::options())->required()->live()->afterStateUpdated($invalidate),
             Select::make('attribution_mode')->label('Nuova attribuzione')->options(ContractAttributionMode::options())->required()->live()->afterStateUpdated($invalidate),
             Textarea::make('reason')->label('Nota accordo')->live()->afterStateUpdated($invalidate),
@@ -183,7 +184,7 @@ class ContractConditionsRelationManager extends RelationManager
                     try {
                         $plan = app(ChangeContractCondition::class)->preview($contract, $record, [
                             'requested_date' => $get('requested_date'),
-                            'amount' => $get('amount'),
+                            'amount' => Decimal::normalizeInput($get('amount')),
                             'cycle' => $get('cycle'),
                             'attribution_mode' => $get('attribution_mode'),
                             'reason' => $get('reason'),
@@ -207,7 +208,7 @@ class ContractConditionsRelationManager extends RelationManager
         $invalidate = fn (Set $set): mixed => $set('impact_confirmed', false);
 
         return [
-            TextInput::make('amount')->label('Importo corretto')->numeric()->minValue(0)->required()->live()->afterStateUpdated($invalidate),
+            DecimalInput::make('amount')->label('Importo corretto')->minValue(0)->required()->live()->afterStateUpdated($invalidate),
             Select::make('cycle')->label('Ciclo corretto')->options(ContractCycleType::options())->required()->live()->afterStateUpdated($invalidate),
             Select::make('attribution_mode')->label('Attribuzione corretta')->options(ContractAttributionMode::options())->required()->live()->afterStateUpdated($invalidate),
             Textarea::make('reason')->label('Motivo della correzione')->required()->live()->afterStateUpdated($invalidate),
@@ -221,7 +222,7 @@ class ContractConditionsRelationManager extends RelationManager
                     }
                     try {
                         $plan = app(CorrectContractCondition::class)->preview($contract, $record, [
-                            'amount' => $get('amount'),
+                            'amount' => Decimal::normalizeInput($get('amount')),
                             'cycle' => $get('cycle'),
                             'attribution_mode' => $get('attribution_mode'),
                             'reason' => $get('reason'),

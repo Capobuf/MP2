@@ -6,9 +6,14 @@ final class Decimal
 {
     private const INTERNAL_SCALE = 12;
 
+    public static function normalizeInput(mixed $value): mixed
+    {
+        return is_string($value) ? str_replace(',', '.', trim($value)) : $value;
+    }
+
     public static function money(string|int $value): string
     {
-        return self::round((string) $value, 2);
+        return self::round((string) self::normalizeInput($value), 2);
     }
 
     /** @param iterable<int, string|int> $values */
@@ -17,7 +22,7 @@ final class Decimal
         $sum = '0';
 
         foreach ($values as $value) {
-            $sum = bcadd($sum, (string) $value, self::INTERNAL_SCALE);
+            $sum = bcadd($sum, (string) self::normalizeInput($value), self::INTERNAL_SCALE);
         }
 
         return self::round($sum, $scale);
@@ -25,31 +30,37 @@ final class Decimal
 
     public static function add(string $left, string $right, int $scale = 2): string
     {
-        return self::round(bcadd($left, $right, self::INTERNAL_SCALE), $scale);
+        return self::round(bcadd(self::normalize($left), self::normalize($right), self::INTERNAL_SCALE), $scale);
     }
 
     public static function subtract(string $left, string $right, int $scale = 2): string
     {
-        return self::round(bcsub($left, $right, self::INTERNAL_SCALE), $scale);
+        return self::round(bcsub(self::normalize($left), self::normalize($right), self::INTERNAL_SCALE), $scale);
     }
 
     public static function multiply(string $left, string $right, int $scale = 2): string
     {
-        return self::round(bcmul($left, $right, self::INTERNAL_SCALE), $scale);
+        return self::round(bcmul(self::normalize($left), self::normalize($right), self::INTERNAL_SCALE), $scale);
     }
 
     public static function compare(string $left, string $right, int $scale = 12): int
     {
-        return bccomp($left, $right, $scale);
+        return bccomp(self::normalize($left), self::normalize($right), $scale);
     }
 
     public static function round(string $value, int $scale): string
     {
+        $value = self::normalize($value);
         $increment = '0.'.str_repeat('0', $scale).'5';
         $adjusted = self::compare($value, '0', self::INTERNAL_SCALE) < 0
             ? bcsub($value, $increment, $scale + 1)
             : bcadd($value, $increment, $scale + 1);
 
         return bcadd($adjusted, '0', $scale);
+    }
+
+    private static function normalize(string $value): string
+    {
+        return (string) self::normalizeInput($value);
     }
 }

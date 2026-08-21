@@ -93,7 +93,7 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
             'renewal_duration_months' => null,
             'notice_days' => null,
             'condition' => [
-                'amount' => '120.00',
+                'amount' => '120,50',
                 'cycle' => 'monthly',
                 'attribution_mode' => 'cycle_start',
                 'valid_from' => '2026-01-01',
@@ -108,7 +108,8 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
         ->assertHasNoFormErrors();
 
     expect(Contract::query()->count())->toBe(1)
-        ->and(ContractCondition::query()->count())->toBe(1);
+        ->and(ContractCondition::query()->count())->toBe(1)
+        ->and(ContractCondition::query()->sole()->amount)->toBe('120.50');
 });
 
 it('creates and selects a Supplier inline with a dedicated operation', function () {

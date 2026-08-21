@@ -11,6 +11,7 @@ use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Expenses\ManualExpenseLine;
 use App\Domain\Projects\ProjectActualKind;
 use App\Domain\Projects\ProjectState;
+use App\Filament\Forms\DecimalInput;
 use App\Models\Company;
 use App\Models\Contract;
 use App\Models\CostCenter;
@@ -165,15 +166,13 @@ class ExpenseForm
                 ->columnSpan(['default' => 12, 'md' => 3, 'xl' => 2]),
             TextInput::make('note')->label('Nota')
                 ->columnSpan(['default' => 12, 'md' => 9, 'xl' => 4]),
-            TextInput::make('quantity')->label('Q.tà')->inputMode('decimal')->regex('/^-?\d{1,14}(\.\d{1,6})?$/')->live()
+            DecimalInput::make('quantity', 14, 6)->label('Q.tà')->live()
                 ->columnSpan(['default' => 6, 'md' => 3, 'xl' => 1]),
-            TextInput::make('unit_amount')->label('Prezzo unit.')->suffix('EUR')->inputMode('decimal')
-                ->regex('/^-?\d{1,14}(\.\d{1,6})?$/')->live()
+            DecimalInput::make('unit_amount', 14, 6)->label('Prezzo unit.')->suffix('EUR')->live()
                 ->columnSpan(['default' => 6, 'md' => 3, 'xl' => 2]),
             TextInput::make('unit_of_measure')->label('U.M.')->maxLength(64)
                 ->columnSpan(['default' => 6, 'md' => 3, 'xl' => 1]),
-            TextInput::make('amount')->label('Importo')->suffix('EUR')->inputMode('decimal')
-                ->required()->regex('/^-?\d{1,17}(\.\d{1,2})?$/')->live()
+            DecimalInput::make('amount')->label('Importo')->suffix('EUR')->required()->live()
                 ->columnSpan(['default' => 6, 'md' => 3, 'xl' => 2]),
             Checkbox::make('amount_warning_acknowledged')
                 ->label(fn (Get $get): string => self::amountMismatchMessage($get).' Confermo l’Importo indicato.')
@@ -305,8 +304,8 @@ class ExpenseForm
                     : ExpenseLineType::options())
                 ->default($contractActualOnly ? ExpenseLineType::Actual->value : null)
                 ->required()->native(false)->live(),
-            TextInput::make('amount')->label('Importo')->helperText('Valore autoritativo in EUR, netto IVA.')
-                ->suffix('EUR')->inputMode('decimal')->required()->regex('/^-?\d{1,17}(\.\d{1,2})?$/')->live(),
+            DecimalInput::make('amount')->label('Importo')->helperText('Valore autoritativo in EUR, netto IVA.')
+                ->suffix('EUR')->required()->live(),
         ];
     }
 
@@ -314,9 +313,8 @@ class ExpenseForm
     private static function descriptiveLineFields(): array
     {
         return [
-            TextInput::make('quantity')->label('Quantità')->inputMode('decimal')->regex('/^-?\d{1,14}(\.\d{1,6})?$/')->live(),
-            TextInput::make('unit_amount')->label('Importo unitario')->suffix('EUR')->inputMode('decimal')
-                ->regex('/^-?\d{1,14}(\.\d{1,6})?$/')->live(),
+            DecimalInput::make('quantity', 14, 6)->label('Quantità')->live(),
+            DecimalInput::make('unit_amount', 14, 6)->label('Importo unitario')->suffix('EUR')->live(),
             TextInput::make('unit_of_measure')->label('Unità di misura')->maxLength(64),
         ];
     }

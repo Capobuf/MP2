@@ -10,6 +10,7 @@ use App\Actions\Operations\ReplaceContractLifecycleFact;
 use App\Domain\Company\Capability;
 use App\Domain\Contracts\ContractAttributionMode;
 use App\Domain\Contracts\ContractCycleType;
+use App\Filament\Forms\DecimalInput;
 use App\Models\Contract;
 use App\Models\ContractLifecycleFact;
 use App\Models\User;
@@ -18,7 +19,6 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -58,7 +58,7 @@ class ContractLifecycleRelationManager extends RelationManager
             }),
             Action::make('reactivate')->label('Riattiva')->visible(fn (): bool => $this->canMutate())->form([
                 DatePicker::make('start_date')->label('Nuovo inizio')->required(), DatePicker::make('next_expiry_date')->label('Prossima scadenza'),
-                TextInput::make('condition.amount')->label('Importo')->numeric()->minValue(0)->required(),
+                DecimalInput::make('condition.amount')->label('Importo')->minValue(0)->required(),
                 Select::make('condition.cycle')->label('Ciclo')->options(ContractCycleType::options())->required(),
                 Select::make('condition.attribution_mode')->label('Attribuzione')->options(ContractAttributionMode::options())->required(),
                 DatePicker::make('condition.valid_from')->label('Condizione valida dal')->required(), DatePicker::make('condition.valid_to')->label('Valida fino al'),

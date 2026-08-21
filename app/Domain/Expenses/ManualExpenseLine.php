@@ -18,9 +18,9 @@ final class ManualExpenseLine
     {
         $normalized = [
             'type' => $input['type'] ?? null,
-            'amount' => self::trim($input['amount'] ?? null),
-            'quantity' => self::nullableTrim($input['quantity'] ?? null),
-            'unit_amount' => self::nullableTrim($input['unit_amount'] ?? null),
+            'amount' => Decimal::normalizeInput(self::trim($input['amount'] ?? null)),
+            'quantity' => Decimal::normalizeInput(self::nullableTrim($input['quantity'] ?? null)),
+            'unit_amount' => Decimal::normalizeInput(self::nullableTrim($input['unit_amount'] ?? null)),
             'unit_of_measure' => self::nullableTrim($input['unit_of_measure'] ?? null),
             'note' => self::nullableTrim($input['note'] ?? null),
             'amount_warning_acknowledged' => filter_var($input['amount_warning_acknowledged'] ?? false, FILTER_VALIDATE_BOOL),
