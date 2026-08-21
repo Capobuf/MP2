@@ -35,6 +35,8 @@ class CreateContract extends CreateRecord
         $company = Filament::getTenant();
         abort_unless($actor instanceof User && $company instanceof Company, 403);
 
+        $data['renewal_duration_months'] ??= null;
+
         return app(CreateContractAction::class)->execute($actor, $company, $data, $this->operationId);
     }
 

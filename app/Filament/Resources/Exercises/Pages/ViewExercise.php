@@ -25,9 +25,6 @@ class ViewExercise extends ViewRecord
 
     protected function getHeaderActions(): array
     {
-        /** @var Exercise $exercise */
-        $exercise = $this->record;
-
         return [
             Action::make('viewProposal')->label('Apri Proposta')->url(fn (): string => ProposalResource::getUrl('view', ['record' => Proposal::query()->where('exercise_id', $this->exerciseRecord()->id)->latest('id')->firstOrFail()]))->visible(fn (): bool => Proposal::query()->where('exercise_id', $this->exerciseRecord()->id)->exists()),
             Action::make('viewBudget')->label('Apri Budget')->url(fn (): string => BudgetResource::getUrl('view', ['record' => BudgetSnapshot::query()->where('exercise_id', $this->exerciseRecord()->id)->latest('version')->firstOrFail()]))->visible(fn (): bool => BudgetSnapshot::query()->where('exercise_id', $this->exerciseRecord()->id)->exists()),
@@ -50,7 +47,7 @@ class ViewExercise extends ViewRecord
                 }),
             Action::make('createExpense')
                 ->label('Nuova spesa')
-                ->url(ExpenseResource::getUrl('create', ['exercise' => $exercise->id])),
+                ->url(ExpenseResource::getUrl('create')),
         ];
     }
 

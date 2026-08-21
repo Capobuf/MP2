@@ -5,7 +5,11 @@ namespace App\Filament\Resources\Expenses\Pages;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Resources\Expenses\Widgets\ExpenseOverview;
 use App\Livewire\ExpenseDetail;
+use App\Models\Company;
+use App\Models\Exercise;
+use App\Support\ExerciseContext;
 use Filament\Actions\CreateAction;
+use Filament\Facades\Filament;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\Grid;
@@ -28,7 +32,12 @@ class ListExpenses extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [CreateAction::make()->label('Nuova spesa')];
+        return [
+            CreateAction::make()
+                ->label('Nuova spesa')
+                ->disabled(fn (): bool => $this->createDisabledReason() !== null)
+                ->tooltip(fn (): ?string => $this->createDisabledReason()),
+        ];
     }
 
     protected function getHeaderWidgets(): array
@@ -100,5 +109,19 @@ class ListExpenses extends ListRecords
             $this->selectedExpenseId = null;
             $this->dispatch('show-expense-detail', expenseId: null);
         }
+    }
+
+    private function createDisabledReason(): ?string
+    {
+        $company = Filament::getTenant();
+        $exercise = $company instanceof Company
+            ? app(ExerciseContext::class)->current($company)
+            : null;
+
+        if (! $exercise instanceof Exercise) {
+            return 'Seleziona un Esercizio globale prima di creare la Spesa.';
+        }
+
+        return $exercise->isOpen() ? null : 'L’Esercizio globale selezionato è Chiuso.';
     }
 }

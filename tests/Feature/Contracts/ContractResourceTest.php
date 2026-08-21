@@ -8,6 +8,7 @@ use App\Filament\Resources\Contracts\Pages\ListContracts;
 use App\Filament\Resources\Contracts\Pages\ViewContract;
 use App\Filament\Resources\Contracts\RelationManagers\ContractLifecycleRelationManager;
 use App\Filament\Resources\Contracts\RelationManagers\ContractRenewalsRelationManager;
+use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\CompanyCapability;
 use App\Models\Contract;
@@ -57,10 +58,12 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
         ->assertDontSee('Salva & nuovo')
         ->assertFormFieldExists('title')
         ->assertFormFieldExists('supplier_id')
+        ->assertFormComponentActionHidden('supplier_id', 'createOption')
         ->assertFormFieldExists('contractual_start_date')
         ->assertFormFieldExists('next_expiry_date')
         ->assertFormFieldExists('renewal_effective_from')
         ->assertFormFieldExists('automatic_renewal')
+        ->assertFormFieldDoesNotExist('renewal_duration_months')
         ->assertFormFieldExists('condition.amount')
         ->assertFormFieldExists('condition.cycle')
         ->assertFormFieldExists('condition.attribution_mode')
@@ -75,6 +78,11 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
 
             return [];
         })
+        ->fillForm(['next_expiry_date' => '2026-12-31'])
+        ->assertFormFieldExists('renewal_duration_months')
+        ->fillForm(['renewal_duration_months' => 12, 'automatic_renewal' => false])
+        ->assertFormFieldDoesNotExist('renewal_duration_months')
+        ->assertFormSet(['renewal_duration_months' => null])
         ->fillForm([
             'title' => 'Contratto energia',
             'supplier_id' => $supplier->id,
@@ -101,6 +109,33 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
 
     expect(Contract::query()->count())->toBe(1)
         ->and(ContractCondition::query()->count())->toBe(1);
+});
+
+it('creates and selects a Supplier inline with a dedicated operation', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantContractResource($manager, $company);
+    CompanyCapability::query()->create([
+        'company_id' => $company->id,
+        'user_id' => $manager->id,
+        'capability' => Capability::ManageMasterData,
+    ]);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+
+    $component = Livewire::test(CreateContract::class)
+        ->assertFormComponentActionVisible('supplier_id', 'createOption')
+        ->callFormComponentAction('supplier_id', 'createOption', [
+            'legal_name' => 'Fornitore contratto inline',
+            'vat_number' => 'IT12345678901',
+            'notes' => 'Creato dal Contratto',
+        ]);
+
+    $supplier = Supplier::query()->sole();
+    $component->assertFormSet(['supplier_id' => $supplier->id]);
+
+    expect(AuditEvent::query()->where('subject_type', Supplier::class)->sole()->operation_id)
+        ->not->toBe($component->get('operationId'));
 });
 
 it('lists and views tenant Contracts with undefined expiry and annual situations', function () {

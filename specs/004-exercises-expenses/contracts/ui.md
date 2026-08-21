@@ -11,7 +11,7 @@ Navigation `Esercizi`; tenant URLs use list, create and view only.
 The table shows Anno, Stato, Allocato Corrente, Effettivo, Scostamento Operativo and
 number of Spese, ordered by newest year. Create asks only for Anno and always creates
 `Aperto`. View shows exact totals and that year's autonomous Expenses, with a
-preselected `Nuova spesa` link.
+`Nuova spesa` link that uses the globally selected Exercise.
 
 There is no Exercise edit, delete, close, reopen, Budget, next-year, carryover,
 Project, Contract or classification action.
@@ -22,9 +22,10 @@ Navigation `Spese`. The table shows Descrizione, Esercizio, Fornitore, Centro di
 Costo or `Non classificata`, Stato, Allocato Corrente, Effettivo and Scostamento.
 Filters cover Exercise, active/reversed state, Supplier and direct Cost Center.
 
-Create asks for description, notes, one open Exercise, optional active same-company
-Supplier/Cost Center and at least one initial Line in a repeater. Expense, Lines and
-one complete creation event persist atomically.
+Create uses the globally selected Exercise without exposing a second Exercise field;
+the selected Exercise must be open. It asks for description, notes, optional active
+same-company Supplier/Cost Center and at least one initial Line in a repeater.
+Expense, Lines and one complete creation event persist atomically.
 
 View shows OriginKey, state, references and totals; archived referenced master data
 has an `Archiviato` indication. It contains the Righe relation manager and authorized

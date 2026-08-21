@@ -1,17 +1,22 @@
 <?php
 
 use App\Domain\Company\Capability;
+use App\Domain\Expenses\ExerciseStatus;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Resources\Expenses\Pages\CreateExpense;
 use App\Filament\Resources\Expenses\Pages\ListExpenses;
 use App\Filament\Resources\Expenses\Pages\ViewExpense;
+use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\CompanyCapability;
 use App\Models\Contract;
+use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
+use App\Models\Supplier;
 use App\Models\User;
+use App\Support\ExerciseContext;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -29,18 +34,23 @@ function grantExpenseResource(User $user, Company $company, bool $manage = true)
     }
 }
 
-it('creates an expense with conditional Project or Contract ownership fields and no future ownership', function () {
+it('creates an expense in the selected global Exercise without exposing a second Exercise choice', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
     grantExpenseResource($manager, $company);
     $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
     $this->actingAs($manager);
     Filament::setTenant($company);
+    app(ExerciseContext::class)->select($company, $exercise->id);
 
     Livewire::test(CreateExpense::class)
+        ->assertFormFieldDoesNotExist('exercise_id')
+        ->assertFormFieldExists('container')
+        ->assertFormComponentActionHidden('supplier_id', 'createOption')
+        ->assertFormComponentActionHidden('direct_cost_center_id', 'createOption')
         ->assertFormFieldExists('project_id')
         ->assertFormFieldExists('contract_id')
-        ->assertFormFieldExists('actual_kind')
+        ->assertFormFieldDoesNotExist('actual_kind')
         ->assertFormFieldDoesNotExist('contract_owner_id')
         ->assertFormFieldDoesNotExist('budget_id')
         ->assertFormFieldDoesNotExist('proposal_id')
@@ -56,15 +66,102 @@ it('creates an expense with conditional Project or Contract ownership fields and
         ->assertFormFieldDoesNotExist('currency')
         ->assertFormFieldDoesNotExist('vat')
         ->fillForm([
-            'exercise_id' => $exercise->id,
             'description' => 'Licenze',
             'lines' => [['type' => 'estimate', 'amount' => '100.00']],
         ])
         ->call('create')
         ->assertHasNoFormErrors();
 
-    expect(Expense::query()->count())->toBe(1)
+    expect(Expense::query()->sole()->exercise_id)->toBe($exercise->id)
         ->and(ExpenseLine::query()->count())->toBe(1);
+});
+
+it('overrides any browser Exercise state with the selected global Exercise', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $selected = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $injected = Exercise::factory()->for($company)->create(['year' => 2027]);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+    app(ExerciseContext::class)->select($company, $selected->id);
+
+    Livewire::test(CreateExpense::class)
+        ->set('data.exercise_id', $injected->id)
+        ->fillForm([
+            'description' => 'Contesto autoritativo',
+            'lines' => [['type' => 'estimate', 'amount' => '100.00']],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(Expense::query()->sole()->exercise_id)->toBe($selected->id);
+});
+
+it('does not create an expense when the selected global Exercise is closed', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $closed = Exercise::factory()->for($company)->create([
+        'year' => 2025,
+        'status' => ExerciseStatus::Closed,
+    ]);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+    app(ExerciseContext::class)->select($company, $closed->id);
+
+    Livewire::test(ListExpenses::class)
+        ->assertActionDisabled('create');
+
+    Livewire::test(CreateExpense::class)
+        ->fillForm([
+            'description' => 'Non consentita',
+            'lines' => [['type' => 'estimate', 'amount' => '100.00']],
+        ])
+        ->call('create')
+        ->assertHasErrors(['exercise_id']);
+
+    expect(Expense::query()->count())->toBe(0);
+});
+
+it('creates and selects Supplier and Cost Center inline with distinct operations', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    CompanyCapability::query()->create([
+        'company_id' => $company->id,
+        'user_id' => $manager->id,
+        'capability' => Capability::ManageMasterData,
+    ]);
+    $exercise = Exercise::factory()->for($company)->create();
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+    app(ExerciseContext::class)->select($company, $exercise->id);
+
+    $component = Livewire::test(CreateExpense::class)
+        ->assertFormComponentActionVisible('supplier_id', 'createOption')
+        ->assertFormComponentActionVisible('direct_cost_center_id', 'createOption')
+        ->callFormComponentAction('supplier_id', 'createOption', [
+            'legal_name' => 'Fornitore inline',
+            'vat_number' => 'IT12345678901',
+            'notes' => 'Creato dalla Spesa',
+        ]);
+
+    $supplier = Supplier::query()->sole();
+    $component
+        ->assertFormSet(['supplier_id' => $supplier->id])
+        ->callFormComponentAction('direct_cost_center_id', 'createOption', [
+            'name' => 'Centro inline',
+        ]);
+
+    $costCenter = CostCenter::query()->sole();
+    $component->assertFormSet(['direct_cost_center_id' => $costCenter->id]);
+
+    expect(AuditEvent::query()
+        ->whereIn('subject_type', [Supplier::class, CostCenter::class])
+        ->pluck('operation_id')
+        ->unique()
+        ->count())->toBe(2);
 });
 
 it('creates a distinct expense after save and create another', function () {
@@ -74,17 +171,16 @@ it('creates a distinct expense after save and create another', function () {
     $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
     $this->actingAs($manager);
     Filament::setTenant($company);
+    app(ExerciseContext::class)->select($company, $exercise->id);
 
     Livewire::test(CreateExpense::class)
         ->fillForm([
-            'exercise_id' => $exercise->id,
             'description' => 'Prima spesa',
             'lines' => [['type' => 'estimate', 'amount' => '100.00']],
         ])
         ->call('create', true)
         ->assertHasNoFormErrors()
         ->fillForm([
-            'exercise_id' => $exercise->id,
             'description' => 'Seconda spesa',
             'lines' => [['type' => 'estimate', 'amount' => '200.00']],
         ])

@@ -10,6 +10,7 @@ use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\Project;
 use App\Models\User;
+use App\Support\ExerciseContext;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -33,6 +34,7 @@ it('shows only child Expenses and links to prefilled creation without future own
     $autonomous = Expense::factory()->forExercise($exercise)->create();
     $this->actingAs($manager);
     Filament::setTenant($company);
+    app(ExerciseContext::class)->select($company, $exercise->id);
 
     Livewire::test(ProjectExpensesRelationManager::class, [
         'ownerRecord' => $project,
@@ -43,9 +45,10 @@ it('shows only child Expenses and links to prefilled creation without future own
         ->assertTableActionDoesNotExist('delete', record: $child);
 
     Livewire::withQueryParams(['project' => $project->id])->test(CreateExpense::class)
-        ->assertFormSet(['project_id' => $project->id])
+        ->assertFormSet(['container' => 'project', 'project_id' => $project->id])
+        ->assertFormFieldDoesNotExist('exercise_id')
         ->assertFormFieldExists('supplier_id')
-        ->assertFormFieldExists('actual_kind')
+        ->assertFormFieldDoesNotExist('actual_kind')
         ->assertFormFieldDoesNotExist('contract_id')
         ->assertFormFieldDoesNotExist('proposal_id')
         ->assertFormFieldDoesNotExist('budget_id')

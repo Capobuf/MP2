@@ -4,6 +4,7 @@ use App\Domain\Company\Capability;
 use App\Filament\Resources\Contracts\ContractResource;
 use App\Filament\Resources\Contracts\Pages\ViewContract;
 use App\Filament\Resources\Contracts\RelationManagers\ContractExpensesRelationManager;
+use App\Filament\Resources\Expenses\Pages\CreateExpense;
 use App\Filament\Resources\Expenses\Pages\ViewExpense;
 use App\Filament\Resources\Expenses\RelationManagers\ExpenseLinesRelationManager;
 use App\Models\Company;
@@ -13,6 +14,7 @@ use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\User;
+use App\Support\ExerciseContext;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -41,6 +43,14 @@ it('shows Contract Actuals and creation only to operators while system Estimates
         ->assertTableActionDoesNotExist('delete', record: $actual);
 
     expect(ContractResource::getRelations())->toContain(ContractExpensesRelationManager::class);
+
+    app(ExerciseContext::class)->select($company, $exercise->id);
+
+    Livewire::withQueryParams(['contract' => $contract->id])->test(CreateExpense::class)
+        ->assertFormSet(['container' => 'contract', 'contract_id' => $contract->id])
+        ->assertFormFieldDoesNotExist('exercise_id')
+        ->assertFormFieldDoesNotExist('supplier_id')
+        ->assertFormFieldDoesNotExist('direct_cost_center_id');
 });
 
 it('exposes Contract declarations on manual Lines and no mutation on generated Estimate Lines', function () {

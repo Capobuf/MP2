@@ -15,9 +15,10 @@ Archivio and last update. Active Projects are the default view, with an explicit
 archived filter. A Project absent today shows `Assente alla data`.
 
 Create asks for Titolo, optional Descrizione/Note, Stato iniziale, Data di efficacia,
-one open Esercizio, and optional active same-company Centro di Costo for that
-Exercise. It creates one Project and initial annual classification atomically, but no
-Expense or economic value.
+and optional active same-company Centro di Costo. The initial classification uses the
+globally selected open Exercise without exposing a second Exercise field. It creates
+one Project and initial annual classification atomically, but no Expense or economic
+value.
 
 View shows stable OriginKey, current state and reference date, archive visibility,
 annual situations, transitions, Project Expenses, and a filtered Timeline link.
@@ -53,7 +54,7 @@ annulment, or delete action; correction uses a later canonical transition.
 
 Reuse the existing `Spese` Resource and Line relation manager. The Project view
 contains a filtered child table and `Nuova spesa di progetto`, preselecting the
-Project and one open Exercise.
+Project while using the globally selected open Exercise.
 
 Every Expense list/detail shows `Contenitore`: `Autonoma` or a link to its Project.
 Supplier remains on the Expense. Direct Cost Center is shown and selectable only for

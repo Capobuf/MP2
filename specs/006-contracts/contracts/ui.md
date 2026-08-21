@@ -154,8 +154,8 @@ email, notification, invoice, instalment, or payment control.
 ## Spese Effettive di Contratto
 
 The Contract view reuses the existing Expense list/detail and Line relation manager.
-`Nuova Spesa Effettiva` preselects Contract and open Exercise, derives Supplier and
-annual Cost Center, and accepts only Actual Lines.
+`Nuova Spesa Effettiva` preselects Contract, uses the globally selected open Exercise,
+derives Supplier and annual Cost Center, and accepts only Actual Lines.
 
 Ordinary Actual requires Active state on the company-local submission date. Planned
 rejects it. Cessated/Cancelled offers only explicitly declared `Addebito tardivo`,
