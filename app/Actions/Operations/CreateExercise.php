@@ -7,6 +7,8 @@ use App\Domain\Expenses\ExerciseStatus;
 use App\Domain\Expenses\ExpenseAuditSnapshot;
 use App\Models\AuditEvent;
 use App\Models\Company;
+use App\Models\Contract;
+use App\Models\ContractExerciseClassification;
 use App\Models\Exercise;
 use App\Models\Project;
 use App\Models\ProjectExerciseClassification;
@@ -54,6 +56,7 @@ class CreateExercise
             }
 
             $projects = Project::query()->where('company_id', $lockedCompany->id)->orderBy('id')->lockForUpdate()->get();
+            $contracts = Contract::query()->where('company_id', $lockedCompany->id)->orderBy('id')->lockForUpdate()->get();
 
             $exercise = Exercise::query()->create([
                 'company_id' => $lockedCompany->id,
@@ -79,7 +82,26 @@ class CreateExercise
                 $classificationIds[] = $classification->id;
                 $project->increment('revision');
             }
-            if ($projects->isNotEmpty()) {
+            $contractClassificationIds = [];
+            foreach ($contracts as $contract) {
+                $latest = ContractExerciseClassification::query()
+                    ->select('contract_exercise_classifications.*')
+                    ->join('exercises', 'exercises.id', '=', 'contract_exercise_classifications.exercise_id')
+                    ->where('contract_exercise_classifications.contract_id', $contract->id)
+                    ->orderByDesc('exercises.year')
+                    ->orderByDesc('contract_exercise_classifications.id')
+                    ->lockForUpdate()
+                    ->first();
+                $classification = ContractExerciseClassification::query()->create([
+                    'company_id' => $lockedCompany->id,
+                    'contract_id' => $contract->id,
+                    'exercise_id' => $exercise->id,
+                    'cost_center_id' => $latest?->cost_center_id,
+                ]);
+                $contractClassificationIds[] = $classification->id;
+                $contract->increment('revision');
+            }
+            if ($projects->isNotEmpty() || $contracts->isNotEmpty()) {
                 $exercise->increment('revision');
                 $exercise->refresh();
             }
@@ -98,6 +120,7 @@ class CreateExercise
                 'new_value' => [
                     ...ExpenseAuditSnapshot::exercise($exercise),
                     'project_classification_ids' => $classificationIds,
+                    'contract_classification_ids' => $contractClassificationIds,
                 ],
                 'allocated_impact_by_exercise' => $zeroImpact,
                 'actual_impact_by_exercise' => $zeroImpact,

@@ -58,6 +58,17 @@ class ContractRenewalConfiguration extends Model
         return $date;
     }
 
+    public function expiryAnchorDate(): ?Carbon
+    {
+        $date = $this->getAttribute('expiry_anchor_date');
+
+        if ($date !== null && ! $date instanceof Carbon) {
+            throw new \UnexpectedValueException('Invalid persisted Contract renewal anchor date.');
+        }
+
+        return $date;
+    }
+
     /** @return array<string, string> */
     protected function casts(): array
     {

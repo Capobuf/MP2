@@ -1,0 +1,96 @@
+<?php
+
+use App\Actions\Operations\ProcessContractRenewals;
+use App\Domain\Company\AuditEventType;
+use App\Domain\Company\Capability;
+use App\Models\AuditEvent;
+use App\Models\Company;
+use App\Models\CompanyCapability;
+use App\Models\Contract;
+use App\Models\ContractCondition;
+use App\Models\ContractLifecycleFact;
+use App\Models\ContractRenewalConfiguration;
+use App\Models\Exercise;
+use App\Models\Supplier;
+use App\Models\User;
+use Carbon\CarbonImmutable;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    CarbonImmutable::setTestNow('2026-08-20 10:00:00 Europe/Rome');
+});
+
+afterEach(fn () => CarbonImmutable::setTestNow());
+
+function renewalFixture(array $contractOverrides = []): array
+{
+    $actor = User::factory()->create();
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
+        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    }
+    Exercise::factory()->for($company)->create(['year' => 2026, 'status' => 'open']);
+    $supplier = Supplier::factory()->for($company)->create();
+    $contract = Contract::factory()->for($company)->for($supplier)->create(array_merge([
+        'contractual_start_date' => '2023-01-01',
+        'next_expiry_date' => '2024-12-31',
+        'renewal_anchor_date' => '2024-12-31',
+        'automatic_renewal' => true,
+        'renewal_duration_months' => 12,
+    ], $contractOverrides));
+    ContractLifecycleFact::factory()->forContract($contract)->create([
+        'type' => 'activation', 'declared_contractual_date' => '2023-01-01', 'state_change_date' => '2023-01-01', 'created_by_id' => $actor->id,
+    ]);
+    $configuration = ContractRenewalConfiguration::factory()->forContract($contract)->create([
+        'effective_from' => '2023-01-01',
+        'automatic_renewal' => $contract->automatic_renewal,
+        'expiry_anchor_date' => $contract->renewal_anchor_date?->toDateString(),
+        'renewal_duration_months' => $contract->renewal_duration_months,
+        'created_by_id' => $actor->id,
+    ]);
+    ContractCondition::factory()->forContract($contract)->create([
+        'valid_from' => '2023-01-01', 'valid_to' => null, 'created_by_id' => $actor->id,
+    ]);
+
+    return compact('actor', 'company', 'contract', 'configuration');
+}
+
+it('processes every elapsed renewal chronologically once and retry is a no-op', function () {
+    extract(renewalFixture());
+
+    app(ProcessContractRenewals::class)->execute($actor, $contract, (string) Str::uuid());
+    app(ProcessContractRenewals::class)->execute($actor, $contract->refresh(), (string) Str::uuid());
+
+    expect($contract->refresh()->next_expiry_date->toDateString())->toBe('2026-12-31')
+        ->and($contract->lifecycleFacts()->where('type', 'renewal')->orderBy('renewed_expiry_date')->pluck('renewed_expiry_date')->map->toDateString()->all())
+        ->toBe(['2024-12-31', '2025-12-31'])
+        ->and(AuditEvent::query()->where('event_type', AuditEventType::ContractRenewed)->count())->toBe(2);
+});
+
+it('materializes non-renewed expiry as cessated from the following day', function () {
+    extract(renewalFixture([
+        'next_expiry_date' => '2025-12-31', 'renewal_anchor_date' => '2025-12-31', 'automatic_renewal' => false, 'renewal_duration_months' => null,
+    ]));
+    app(ProcessContractRenewals::class)->execute($actor, $contract, (string) Str::uuid());
+
+    expect($contract->refresh()->next_expiry_date)->toBeNull()
+        ->and($contract->stateAtDate('2025-12-31')->value)->toBe('active')
+        ->and($contract->stateAtDate('2026-01-01')->value)->toBe('cessated');
+});
+
+it('runs from the command without opening a page and isolates a broken contract transaction', function () {
+    extract(renewalFixture());
+    $broken = Contract::factory()->for($company)->create([
+        'contractual_start_date' => '2023-01-01',
+        'next_expiry_date' => '2025-12-31', 'renewal_anchor_date' => '2025-12-31',
+    ]);
+
+    $this->artisan('contracts:process-renewals')->assertSuccessful();
+    $this->artisan('contracts:process-renewals')->assertSuccessful();
+
+    expect($contract->refresh()->next_expiry_date->toDateString())->toBe('2026-12-31')
+        ->and($broken->refresh()->next_expiry_date->toDateString())->toBe('2025-12-31');
+});

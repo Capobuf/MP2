@@ -151,7 +151,7 @@ it('updates only descriptive fields with operation idempotency', function () {
     $contract = Contract::factory()->for($company)->for($supplier)->create(['title' => 'Prima']);
     $operationId = (string) Str::uuid();
 
-    app(UpdateContract::class)->execute($actor, $contract, ['title' => ' Dopo ', 'notes' => ' Nota ', 'supplier_id' => 999], $operationId);
+    app(UpdateContract::class)->execute($actor, $contract, ['title' => ' Dopo ', 'notes' => ' Nota ', 'supplier_id' => $supplier->id], $operationId);
     app(UpdateContract::class)->execute($actor, $contract, ['title' => 'Retry ignorato'], $operationId);
 
     expect($contract->refresh()->title)->toBe('Dopo')

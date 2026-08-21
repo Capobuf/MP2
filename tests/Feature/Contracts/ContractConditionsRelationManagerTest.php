@@ -6,6 +6,7 @@ use App\Filament\Resources\Contracts\RelationManagers\ContractConditionsRelation
 use App\Models\Company;
 use App\Models\CompanyCapability;
 use App\Models\Contract;
+use App\Models\ContractCondition;
 use App\Models\ContractLifecycleFact;
 use App\Models\Exercise;
 use App\Models\Supplier;
@@ -64,4 +65,31 @@ it('hides condition mutations from viewers', function () {
         ->assertTableActionHidden('createCondition')
         ->assertTableActionHidden('annul', record: $condition)
         ->assertTableActionDoesNotExist('delete', record: $condition);
+});
+
+it('exposes separate confirmed previews for agreement changes and material corrections', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
+        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $manager->id, 'capability' => $capability]);
+    }
+    Exercise::factory()->for($company)->create(['year' => 2026]);
+    $supplier = Supplier::factory()->for($company)->create();
+    $contract = Contract::factory()->for($company)->for($supplier)->create(['next_expiry_date' => null, 'renewal_anchor_date' => null]);
+    ContractLifecycleFact::factory()->forContract($contract)->create();
+    $condition = ContractCondition::factory()->forContract($contract)->create(['valid_from' => '2026-01-01']);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+
+    Livewire::test(ContractConditionsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
+        ->assertTableActionExists('changeAgreement', record: $condition)
+        ->mountTableAction('changeAgreement', record: $condition)
+        ->assertSchemaComponentExists('impact_preview')
+        ->assertSchemaComponentExists('effective_date_confirmed');
+
+    Livewire::test(ContractConditionsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
+        ->assertTableActionExists('correctMaterialError', record: $condition)
+        ->mountTableAction('correctMaterialError', record: $condition)
+        ->assertSchemaComponentExists('declared_input_error')
+        ->assertSchemaComponentExists('impact_preview');
 });

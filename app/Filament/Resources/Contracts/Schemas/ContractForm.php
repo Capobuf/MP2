@@ -28,9 +28,7 @@ class ContractForm
                 ->schema([
                     TextInput::make('title')->label('Titolo')->required()->maxLength(255),
                     Select::make('supplier_id')->label('Fornitore')
-                        ->options(fn (): array => self::company() instanceof Company
-                            ? Supplier::query()->whereBelongsTo(self::company(), 'company')->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all()
-                            : [])->searchable()->required(),
+                        ->options(fn (): array => self::supplierOptions())->searchable()->required(),
                     Textarea::make('notes')->label('Note')->columnSpanFull(),
                     DatePicker::make('contractual_start_date')->label('Data di inizio')->required(),
                     DatePicker::make('next_expiry_date')->label('Prossima scadenza')
@@ -93,5 +91,15 @@ class ContractForm
         $company = Filament::getTenant();
 
         return $company instanceof Company ? $company : null;
+    }
+
+    /** @return array<int, string> */
+    private static function supplierOptions(): array
+    {
+        $company = self::company();
+
+        return $company instanceof Company
+            ? Supplier::query()->whereBelongsTo($company, 'company')->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all()
+            : [];
     }
 }

@@ -6,6 +6,9 @@ use App\Domain\Projects\ProjectState;
 use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\CompanyCapability;
+use App\Models\Contract;
+use App\Models\ContractExerciseClassification;
+use App\Models\ContractLifecycleFact;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -13,6 +16,7 @@ use App\Models\ExpenseLine;
 use App\Models\Project;
 use App\Models\ProjectExerciseClassification;
 use App\Models\ProjectTransition;
+use App\Models\Supplier;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -135,10 +139,46 @@ it('supports atomic opening and declared late attribution while rejecting invali
 
     $invalid = Expense::factory()->forExercise($exercise)->create();
     ExpenseLine::factory()->for($invalid)->create();
+    $otherContract = Contract::factory()->create();
     expect(fn () => $action->preview($actor, $invalid, ['project_id' => $archived->id]))->toThrow(ValidationException::class)
-        ->and(fn () => $action->preview($actor, $invalid, ['contract_id' => 10]))->toThrow(ValidationException::class);
+        ->and(fn () => $action->preview($actor, $invalid, ['contract_id' => $otherContract->id]))->toThrow(ValidationException::class);
     $invalid->update(['reversed_at' => now()]);
     expect(fn () => $action->preview($actor, $invalid, ['project_id' => $planned->id]))->toThrow(ValidationException::class);
+});
+
+it('moves one whole Actual Expense from Project to Contract and back to Project', function () {
+    [$actor, $company, $exercise, $project] = projectMoveContext();
+    $supplier = Supplier::factory()->for($company)->create();
+    $contract = Contract::factory()->for($company)->for($supplier)->create(['next_expiry_date' => null, 'renewal_anchor_date' => null]);
+    ContractLifecycleFact::factory()->forContract($contract)->create();
+    ContractExerciseClassification::factory()->forContractAndExercise($contract, $exercise)->create();
+    $expense = Expense::factory()->forExercise($exercise)->for($project)->create(['direct_cost_center_id' => null]);
+    $line = ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '15.00']);
+    $action = app(UpdateExpense::class);
+
+    $toContract = $action->preview($actor, $expense, [
+        'project_id' => null,
+        'contract_id' => $contract->id,
+        'reason' => 'Contratto corretto',
+        'supplier_replacement_acknowledged' => true,
+    ]);
+    $action->confirm($actor, $expense, $toContract, (string) Str::uuid());
+    expect($expense->refresh()->project_id)->toBeNull()
+        ->and($expense->contract_id)->toBe($contract->id)
+        ->and($line->refresh()->expense_id)->toBe($expense->id);
+
+    $toProject = $action->preview($actor, $expense, [
+        'contract_id' => null,
+        'project_id' => $project->id,
+        'reason' => 'Progetto corretto',
+    ]);
+    $action->confirm($actor, $expense, $toProject, (string) Str::uuid());
+
+    expect($expense->refresh()->project_id)->toBe($project->id)
+        ->and($expense->contract_id)->toBeNull()
+        ->and($exercise->actual())->toBe('15.00')
+        ->and($contract->refresh()->annualTotals())->not->toHaveKey($exercise->id)
+        ->and($project->refresh()->annualTotals()[$exercise->id]['actual'])->toBe('15.00');
 });
 
 it('rejects stale previews and rolls back ownership revisions and opening on audit failure', function () {

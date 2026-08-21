@@ -3,6 +3,8 @@
 namespace App\Actions\Operations;
 
 use App\Domain\Company\AuditEventType;
+use App\Domain\Contracts\ContractActualKind;
+use App\Domain\Contracts\ContractExpenseActivity;
 use App\Domain\Expenses\ExpenseAuditSnapshot;
 use App\Domain\Expenses\ExpenseImpactPlan;
 use App\Domain\Projects\ProjectActualKind;
@@ -10,6 +12,7 @@ use App\Domain\Projects\ProjectAuditSnapshot;
 use App\Domain\Projects\ProjectExpenseActivity;
 use App\Models\AuditEvent;
 use App\Models\Company;
+use App\Models\Contract;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -19,7 +22,6 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class UpdateExpense
@@ -36,21 +38,32 @@ class UpdateExpense
         $target = Exercise::query()->find($normalized['exercise_id']);
         $sourceProject = $expense->project;
         $targetProject = $normalized['project_id'] === null ? null : Project::query()->find($normalized['project_id']);
-        $this->validateExercisesAndReferences($expense, $source, $target, $sourceProject, $targetProject, $normalized);
+        $sourceContract = $expense->contract;
+        $targetContract = $normalized['contract_id'] === null ? null : Contract::query()->find($normalized['contract_id']);
+        if ($targetContract !== null) {
+            $normalized['supplier_id'] = $targetContract->supplier_id;
+            $normalized['direct_cost_center_id'] = null;
+        } elseif ($targetProject !== null) {
+            $normalized['direct_cost_center_id'] = null;
+        }
+        $this->validateExercisesAndReferences($expense, $source, $target, $sourceProject, $targetProject, $sourceContract, $targetContract, $normalized);
 
         return ExpenseImpactPlan::build(
-            $expense,
-            $source,
-            $target,
-            $normalized['supplier_id'],
-            $normalized['direct_cost_center_id'],
-            $normalized['reason'],
-            $sourceProject,
-            $targetProject,
-            $normalized['actual_kind'],
-            $normalized['activity_note'],
-            $normalized['open_project'],
-            $normalized['overspend_note'],
+            expense: $expense,
+            source: $source,
+            target: $target,
+            supplierId: $normalized['supplier_id'],
+            directCostCenterId: $normalized['direct_cost_center_id'],
+            reason: $normalized['reason'],
+            sourceProject: $sourceProject,
+            targetProject: $targetProject,
+            actualKind: $normalized['actual_kind'],
+            activityNote: $normalized['activity_note'],
+            openProject: $normalized['open_project'],
+            overspendNote: $normalized['overspend_note'],
+            sourceContract: $sourceContract,
+            targetContract: $targetContract,
+            supplierReplacementAcknowledged: $normalized['supplier_replacement_acknowledged'],
         );
     }
 
@@ -72,6 +85,15 @@ class UpdateExpense
             foreach ($projects as $lockedProject) {
                 $transitionRows[$lockedProject->id] = $lockedProject->transitions()->orderBy('effective_date')->orderBy('id')->lockForUpdate()->get();
                 $lockedProject->classifications()->whereIn('exercise_id', $exerciseIds)->orderBy('exercise_id')->lockForUpdate()->get();
+            }
+            $contractIds = array_values(array_unique(array_filter([$preview->sourceContractId, $preview->targetContractId])));
+            sort($contractIds);
+            /** @var array<int, Contract> $contracts */
+            $contracts = Contract::query()->whereIn('id', $contractIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id')->all();
+            foreach ($contracts as $lockedContract) {
+                $lockedContract->setRelation('lifecycleFacts', $lockedContract->lifecycleFacts()->orderBy('id')->lockForUpdate()->get());
+                $lockedContract->setRelation('renewalConfigurations', $lockedContract->renewalConfigurations()->orderBy('id')->lockForUpdate()->get());
+                $lockedContract->classifications()->whereIn('exercise_id', $exerciseIds)->orderBy('exercise_id')->lockForUpdate()->get();
             }
             $lockedExpense = Expense::query()->lockForUpdate()->findOrFail($expense->id);
             $lines = $lockedExpense->lines()->orderBy('id')->lockForUpdate()->get();
@@ -104,35 +126,62 @@ class UpdateExpense
                     throw ValidationException::withMessages(['preview' => 'Un Progetto è cambiato: calcolare una nuova anteprima.']);
                 }
             }
+            foreach ($preview->contractRevisions as $id => $revision) {
+                if (! isset($contracts[(int) $id]) || $contracts[(int) $id]->revision !== $revision) {
+                    throw ValidationException::withMessages(['preview' => 'Un Contratto è cambiato: calcolare una nuova anteprima.']);
+                }
+            }
 
             $source = $exercises[$preview->sourceExerciseId] ?? null;
             $target = $exercises[$preview->targetExerciseId] ?? null;
             $sourceProject = $preview->sourceProjectId === null ? null : ($projects[$preview->sourceProjectId] ?? null);
             $targetProject = $preview->targetProjectId === null ? null : ($projects[$preview->targetProjectId] ?? null);
+            $sourceContract = $preview->sourceContractId === null ? null : ($contracts[$preview->sourceContractId] ?? null);
+            $targetContract = $preview->targetContractId === null ? null : ($contracts[$preview->targetContractId] ?? null);
             $normalized = [
                 'exercise_id' => $preview->targetExerciseId,
                 'supplier_id' => $preview->supplierId,
                 'direct_cost_center_id' => $preview->directCostCenterId,
                 'reason' => $preview->reason,
                 'project_id' => $preview->targetProjectId,
+                'contract_id' => $preview->targetContractId,
                 'actual_kind' => $preview->actualKind,
                 'activity_note' => $preview->activityNote,
                 'open_project' => $preview->openProject,
                 'overspend_note' => $preview->overspendNote,
                 'direct_cost_center_supplied' => true,
+                'supplier_replacement_acknowledged' => $preview->supplierReplacementAcknowledged,
             ];
-            $projectContext = $this->validateExercisesAndReferences($lockedExpense, $source, $target, $sourceProject, $targetProject, $normalized, lockReferences: true);
-            $current = ExpenseImpactPlan::build($lockedExpense, $source, $target, $preview->supplierId, $preview->directCostCenterId, $preview->reason, $sourceProject, $targetProject, $preview->actualKind, $preview->activityNote, $preview->openProject, $preview->overspendNote);
+            $contexts = $this->validateExercisesAndReferences($lockedExpense, $source, $target, $sourceProject, $targetProject, $sourceContract, $targetContract, $normalized, lockReferences: true);
+            $current = ExpenseImpactPlan::build(
+                expense: $lockedExpense,
+                source: $source,
+                target: $target,
+                supplierId: $preview->supplierId,
+                directCostCenterId: $preview->directCostCenterId,
+                reason: $preview->reason,
+                sourceProject: $sourceProject,
+                targetProject: $targetProject,
+                actualKind: $preview->actualKind,
+                activityNote: $preview->activityNote,
+                openProject: $preview->openProject,
+                overspendNote: $preview->overspendNote,
+                sourceContract: $sourceContract,
+                targetContract: $targetContract,
+                supplierReplacementAcknowledged: $preview->supplierReplacementAcknowledged,
+            );
             if (! hash_equals($preview->fingerprint(), $current->fingerprint())) {
                 throw ValidationException::withMessages(['preview' => 'L’impatto è cambiato: calcolare una nuova anteprima.']);
             }
 
             $before = ExpenseAuditSnapshot::expense($lockedExpense, true);
+            $projectContext = $contexts['project'];
+            $contractContext = $contexts['contract'];
             $openingTransition = $targetProject === null || $projectContext === null
                 ? null
                 : app(ProjectExpenseOpening::class)->create($targetProject, $company, $actor, $projectContext, $transitionRows[$targetProject->id]);
             $overspendContext = $projectContext ?? [
-                'actual_kind' => $preview->actualKind === null ? null : ProjectActualKind::from($preview->actualKind),
+                'actual_kind' => null,
                 'activity_note' => $preview->activityNote,
                 'open_project' => false,
                 'overspend_note' => $preview->overspendNote,
@@ -144,8 +193,9 @@ class UpdateExpense
             $lockedExpense->fill([
                 'exercise_id' => $preview->targetExerciseId,
                 'project_id' => $preview->targetProjectId,
+                'contract_id' => $preview->targetContractId,
                 'supplier_id' => $preview->supplierId,
-                'direct_cost_center_id' => $preview->targetProjectId === null ? $preview->directCostCenterId : null,
+                'direct_cost_center_id' => ($preview->targetProjectId === null && $preview->targetContractId === null) ? $preview->directCostCenterId : null,
             ]);
             if (! $lockedExpense->isDirty()) {
                 return $lockedExpense;
@@ -154,6 +204,9 @@ class UpdateExpense
             $lockedExpense->save();
             foreach ($projects as $affectedProject) {
                 $affectedProject->increment('revision', $openingTransition !== null && $affectedProject->is($targetProject) ? 2 : 1);
+            }
+            foreach ($contracts as $affectedContract) {
+                $affectedContract->increment('revision');
             }
             foreach ($exerciseIds as $exerciseId) {
                 $exercises[$exerciseId]->increment('revision');
@@ -175,10 +228,19 @@ class UpdateExpense
                             (string) $impact['variance_after'],
                         ),
                     ])->all(),
+                'source_contract_id' => $preview->sourceContractId,
+                'target_contract_id' => $preview->targetContractId,
+                'contract_impacts' => $preview->contractImpacts,
+                'supplier_replacement_acknowledged' => $preview->supplierReplacementAcknowledged,
                 'actual_kind' => $preview->actualKind,
                 'activity_note' => $preview->activityNote,
                 'opening_transition' => $openingTransition === null ? null : ProjectAuditSnapshot::transition($openingTransition),
                 'overspend_note' => $preview->overspendNote,
+                'contract_activity' => $contractContext === null ? null : [
+                    'actual_kind' => $contractContext['actual_kind']->value,
+                    'activity_note' => $contractContext['activity_note'],
+                    'cycle_matching' => null,
+                ],
             ];
             AuditEvent::query()->create([
                 'operation_id' => $operationId,
@@ -194,8 +256,10 @@ class UpdateExpense
                 'allocated_impact_by_exercise' => $preview->allocatedImpact(),
                 'actual_impact_by_exercise' => $preview->actualImpact(),
                 'reason' => $preview->reason,
-                'reference_type' => ($targetProject ?? $sourceProject) === null ? null : Project::class,
-                'reference_id' => ($targetProject ?? $sourceProject)?->id,
+                'reference_type' => ($targetContract ?? $sourceContract) !== null ? Contract::class : (($targetProject ?? $sourceProject) === null ? null : Project::class),
+                'reference_id' => ($targetContract ?? $sourceContract) !== null
+                    ? ($targetContract ?? $sourceContract)->id
+                    : ($targetProject ?? $sourceProject)?->id,
             ]);
 
             return $lockedExpense;
@@ -223,6 +287,9 @@ class UpdateExpense
             $project = $expense->project_id === null
                 ? null
                 : Project::query()->lockForUpdate()->findOrFail($expense->project_id);
+            $contract = $expense->contract_id === null
+                ? null
+                : Contract::query()->lockForUpdate()->findOrFail($expense->contract_id);
             $lockedExpense = Expense::query()->lockForUpdate()->findOrFail($expense->id);
             Gate::forUser($actor)->authorize('update', $lockedExpense);
             if ($lockedExpense->origin === 'system') {
@@ -247,6 +314,7 @@ class UpdateExpense
             $lockedExpense->revision++;
             $lockedExpense->save();
             $project?->increment('revision');
+            $contract?->increment('revision');
 
             AuditEvent::query()->create([
                 'operation_id' => $validated['operation_id'],
@@ -261,8 +329,8 @@ class UpdateExpense
                 'new_value' => ExpenseAuditSnapshot::expense($lockedExpense),
                 'allocated_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, '0'),
                 'actual_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, '0'),
-                'reference_type' => $project === null ? null : Project::class,
-                'reference_id' => $project?->id,
+                'reference_type' => $contract !== null ? Contract::class : ($project === null ? null : Project::class),
+                'reference_id' => $contract !== null ? $contract->id : $project?->id,
             ]);
 
             return $lockedExpense;
@@ -270,47 +338,57 @@ class UpdateExpense
     }
 
     /** @param array<string, mixed> $input
-     * @return array{exercise_id: int, supplier_id: ?int, direct_cost_center_id: ?int, reason: ?string, project_id: ?int, actual_kind: ?string, activity_note: ?string, open_project: bool, overspend_note: ?string, direct_cost_center_supplied: bool}
+     * @return array{exercise_id: int, supplier_id: ?int, direct_cost_center_id: ?int, reason: ?string, project_id: ?int, contract_id: ?int, actual_kind: ?string, activity_note: ?string, open_project: bool, overspend_note: ?string, direct_cost_center_supplied: bool, supplier_replacement_acknowledged: bool}
      */
     private function normalizeClassification(Expense $expense, array $input): array
     {
-        if (array_key_exists('contract_id', $input) && $input['contract_id'] !== null) {
-            throw ValidationException::withMessages(['contract_id' => 'Il contenitore Contratto non è disponibile in questa versione.']);
-        }
-        /** @var array{exercise_id: int, supplier_id: ?int, direct_cost_center_id: ?int, reason: ?string, project_id: ?int, actual_kind: ?string, activity_note: ?string, open_project: bool, overspend_note: ?string, direct_cost_center_supplied: bool} $validated */
+        /** @var array{exercise_id: int, supplier_id: ?int, direct_cost_center_id: ?int, reason: ?string, project_id: ?int, contract_id: ?int, actual_kind: ?string, activity_note: ?string, open_project: bool, overspend_note: ?string, direct_cost_center_supplied: bool, supplier_replacement_acknowledged: bool} $validated */
         $validated = Validator::make([
             'exercise_id' => $input['exercise_id'] ?? $expense->exercise_id,
             'supplier_id' => array_key_exists('supplier_id', $input) ? $input['supplier_id'] : $expense->supplier_id,
             'direct_cost_center_id' => array_key_exists('direct_cost_center_id', $input) ? $input['direct_cost_center_id'] : $expense->direct_cost_center_id,
             'reason' => $this->nullableTrim($input['reason'] ?? null),
             'project_id' => array_key_exists('project_id', $input) ? $input['project_id'] : $expense->project_id,
+            'contract_id' => array_key_exists('contract_id', $input) ? $input['contract_id'] : $expense->contract_id,
             'actual_kind' => $input['actual_kind'] ?? null,
             'activity_note' => $this->nullableTrim($input['activity_note'] ?? null),
             'open_project' => filter_var($input['open_project'] ?? false, FILTER_VALIDATE_BOOL),
             'overspend_note' => $this->nullableTrim($input['overspend_note'] ?? null),
             'direct_cost_center_supplied' => array_key_exists('direct_cost_center_id', $input),
+            'supplier_replacement_acknowledged' => filter_var($input['supplier_replacement_acknowledged'] ?? false, FILTER_VALIDATE_BOOL),
         ], [
             'exercise_id' => ['required', 'integer'],
             'supplier_id' => ['nullable', 'integer'],
             'direct_cost_center_id' => ['nullable', 'integer'],
             'reason' => ['nullable', 'string'],
             'project_id' => ['nullable', 'integer'],
-            'actual_kind' => ['nullable', Rule::enum(ProjectActualKind::class)],
+            'contract_id' => ['nullable', 'integer'],
+            'actual_kind' => ['nullable', 'string'],
             'activity_note' => ['nullable', 'string'],
             'open_project' => ['boolean'],
             'overspend_note' => ['nullable', 'string'],
             'direct_cost_center_supplied' => ['boolean'],
+            'supplier_replacement_acknowledged' => ['boolean'],
         ])->validate();
 
         return $validated;
     }
 
     /**
-     * @param  array{exercise_id: int, supplier_id: ?int, direct_cost_center_id: ?int, reason: ?string, project_id: ?int, actual_kind: ?string, activity_note: ?string, open_project: bool, overspend_note: ?string, direct_cost_center_supplied: bool}  $input
-     * @return array{actual_kind: ?ProjectActualKind, activity_note: ?string, open_project: bool, overspend_note: ?string, today: string}|null
+     * @param  array{exercise_id: int, supplier_id: ?int, direct_cost_center_id: ?int, reason: ?string, project_id: ?int, contract_id: ?int, actual_kind: ?string, activity_note: ?string, open_project: bool, overspend_note: ?string, direct_cost_center_supplied: bool, supplier_replacement_acknowledged: bool}  $input
+     * @return array{project: array{actual_kind: ?ProjectActualKind, activity_note: ?string, open_project: bool, overspend_note: ?string, today: string}|null, contract: array{actual_kind: ContractActualKind, activity_note: ?string, today: string}|null}
      */
-    private function validateExercisesAndReferences(Expense $expense, ?Exercise $source, ?Exercise $target, ?Project $sourceProject, ?Project $targetProject, array $input, bool $lockReferences = false): ?array
-    {
+    private function validateExercisesAndReferences(
+        Expense $expense,
+        ?Exercise $source,
+        ?Exercise $target,
+        ?Project $sourceProject,
+        ?Project $targetProject,
+        ?Contract $sourceContract,
+        ?Contract $targetContract,
+        array $input,
+        bool $lockReferences = false,
+    ): array {
         if ($source === null || $target === null || $source->company_id !== $expense->company_id || $target->company_id !== $expense->company_id) {
             throw ValidationException::withMessages(['exercise_id' => 'Esercizio non disponibile per questa Azienda.']);
         }
@@ -326,10 +404,19 @@ class UpdateExpense
         if ($input['project_id'] !== null && $targetProject === null) {
             throw ValidationException::withMessages(['project_id' => 'Progetto non disponibile per questa Azienda.']);
         }
-        if ($sourceProject !== null && ! $source->is($target)) {
-            throw ValidationException::withMessages(['exercise_id' => 'Una Spesa di Progetto non cambia Esercizio tramite lo spostamento generico.']);
+        if ($targetContract !== null && $targetContract->company_id !== $expense->company_id) {
+            throw ValidationException::withMessages(['contract_id' => 'Contratto non disponibile per questa Azienda.']);
         }
-        $ownerChanges = $sourceProject?->id !== $targetProject?->id;
+        if ($input['contract_id'] !== null && $targetContract === null) {
+            throw ValidationException::withMessages(['contract_id' => 'Contratto non disponibile per questa Azienda.']);
+        }
+        if ($targetProject !== null && $targetContract !== null) {
+            throw ValidationException::withMessages(['contract_id' => 'Una Spesa non può appartenere contemporaneamente a un Progetto e a un Contratto.']);
+        }
+        if (($sourceProject !== null || $sourceContract !== null) && ! $source->is($target)) {
+            throw ValidationException::withMessages(['exercise_id' => 'Una Spesa contenuta non cambia Esercizio tramite lo spostamento generico.']);
+        }
+        $ownerChanges = $sourceProject?->id !== $targetProject?->id || $sourceContract?->id !== $targetContract?->id;
         if ($ownerChanges && $expense->hasActuals() && $input['reason'] === null) {
             throw ValidationException::withMessages(['reason' => 'Il motivo è obbligatorio per spostare una Spesa con Effettivi.']);
         }
@@ -343,19 +430,30 @@ class UpdateExpense
         }
 
         $this->validateReference(Supplier::class, $input['supplier_id'], $expense->supplier_id, $expense->company_id, 'supplier_id', $lockReferences);
-        if ($targetProject === null) {
-            if ($sourceProject !== null && ! $input['direct_cost_center_supplied']) {
+        if ($targetProject === null && $targetContract === null) {
+            if (($sourceProject !== null || $sourceContract !== null) && ! $input['direct_cost_center_supplied']) {
                 throw ValidationException::withMessages(['direct_cost_center_id' => 'Scegliere esplicitamente un Centro di Costo diretto o Non classificata.']);
             }
             $this->validateReference(CostCenter::class, $input['direct_cost_center_id'], $expense->direct_cost_center_id, $expense->company_id, 'direct_cost_center_id', $lockReferences);
         }
 
-        if (! $ownerChanges || $targetProject === null) {
-            return null;
+        $projectContext = null;
+        $contractContext = null;
+        if ($ownerChanges && $targetProject !== null) {
+            $activeLines = $expense->lines()->active()->orderBy('id')->get()->map(fn ($line): array => ['type' => $line->lineType()]);
+            $projectContext = ProjectExpenseActivity::validate($targetProject, $target, $expense->company, $activeLines, $input);
         }
-        $activeLines = $expense->lines()->active()->orderBy('id')->get()->map(fn ($line): array => ['type' => $line->lineType()]);
+        if ($ownerChanges && $targetContract !== null) {
+            if ($expense->supplier_id !== $targetContract->supplier_id && ! $input['supplier_replacement_acknowledged']) {
+                throw ValidationException::withMessages(['supplier_replacement_acknowledged' => 'Confermare la sostituzione del Fornitore diretto con quello del Contratto.']);
+            }
+            $allLines = $expense->lines()->orderBy('id')->get()->map(fn ($line): array => ['type' => $line->lineType()]);
+            ContractExpenseActivity::assertActualOnly($allLines);
+            $activeLines = $expense->lines()->active()->orderBy('id')->get()->map(fn ($line): array => ['type' => $line->lineType()]);
+            $contractContext = ContractExpenseActivity::validate($targetContract, $target, $expense->company, $activeLines, $input);
+        }
 
-        return ProjectExpenseActivity::validate($targetProject, $target, $expense->company, $activeLines, $input);
+        return ['project' => $projectContext, 'contract' => $contractContext];
     }
 
     /** @param class-string<Supplier|CostCenter> $model */

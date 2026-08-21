@@ -7,6 +7,7 @@ use App\Filament\Resources\Projects\Pages\CreateProject;
 use App\Filament\Resources\Projects\Pages\EditProject;
 use App\Filament\Resources\Projects\Pages\ListProjects;
 use App\Filament\Resources\Projects\Pages\ViewProject;
+use App\Filament\Resources\Projects\RelationManagers\ProjectContractLinksRelationManager;
 use App\Filament\Resources\Projects\RelationManagers\ProjectExpensesRelationManager;
 use App\Filament\Resources\Projects\RelationManagers\ProjectTransitionsRelationManager;
 use App\Filament\Resources\Projects\Schemas\ProjectForm;
@@ -115,6 +116,6 @@ class ProjectResource extends Resource
 
     public static function getRelations(): array
     {
-        return [ProjectExpensesRelationManager::class, ProjectTransitionsRelationManager::class];
+        return [ProjectExpensesRelationManager::class, ProjectTransitionsRelationManager::class, ProjectContractLinksRelationManager::class];
     }
 }

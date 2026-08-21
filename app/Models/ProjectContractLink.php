@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 #[Fillable(['company_id', 'project_id', 'contract_id', 'note', 'archived_at', 'revision'])]
 class ProjectContractLink extends Model
@@ -48,7 +49,17 @@ class ProjectContractLink extends Model
 
     public function isArchived(): bool
     {
-        return $this->archived_at !== null;
+        return $this->archivedAt() !== null;
+    }
+
+    public function archivedAt(): ?Carbon
+    {
+        $date = $this->getAttribute('archived_at');
+        if ($date !== null && ! $date instanceof Carbon) {
+            throw new \UnexpectedValueException('Invalid persisted Project-Contract link archive timestamp.');
+        }
+
+        return $date;
     }
 
     /** @return array<string, string> */

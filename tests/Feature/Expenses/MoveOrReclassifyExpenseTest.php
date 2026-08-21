@@ -6,6 +6,9 @@ use App\Domain\Company\Capability;
 use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\CompanyCapability;
+use App\Models\Contract;
+use App\Models\ContractExerciseClassification;
+use App\Models\ContractLifecycleFact;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -87,4 +90,85 @@ it('reclassifies only to active same-company references and audits descriptive e
     $other = Supplier::factory()->create();
     expect(fn () => app(UpdateExpense::class)->preview($actor, $expense, ['supplier_id' => $other->id]))
         ->toThrow(ValidationException::class);
+});
+
+it('moves one whole Actual Expense between autonomous and Contract ownership with stable identity and totals once', function () {
+    [$actor, $company, $exercise, , $expense] = moveContext();
+    $supplier = Supplier::factory()->for($company)->create();
+    $contract = Contract::factory()->for($company)->for($supplier)->create(['next_expiry_date' => null, 'renewal_anchor_date' => null]);
+    ContractLifecycleFact::factory()->forContract($contract)->create();
+    ContractExerciseClassification::factory()->forContractAndExercise($contract, $exercise)->create();
+    $line = ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '40.00']);
+    $action = app(UpdateExpense::class);
+
+    expect(fn () => $action->preview($actor, $expense, ['contract_id' => $contract->id, 'reason' => 'Attribuzione', 'actual_kind' => 'ordinary']))
+        ->toThrow(ValidationException::class);
+    $plan = $action->preview($actor, $expense, [
+        'contract_id' => $contract->id,
+        'reason' => 'Attribuzione al Contratto',
+        'actual_kind' => 'ordinary',
+        'supplier_replacement_acknowledged' => true,
+    ]);
+    $moved = $action->confirm($actor, $expense, $plan, (string) Str::uuid());
+
+    expect($moved->id)->toBe($expense->id)
+        ->and($line->refresh()->expense_id)->toBe($expense->id)
+        ->and($moved->project_id)->toBeNull()
+        ->and($moved->contract_id)->toBe($contract->id)
+        ->and($moved->supplier_id)->toBe($supplier->id)
+        ->and($moved->direct_cost_center_id)->toBeNull()
+        ->and($contract->refresh()->annualTotals()[$exercise->id]['actual'])->toBe('40.00')
+        ->and($exercise->actual())->toBe('40.00');
+
+    $out = $action->preview($actor, $moved, ['contract_id' => null, 'direct_cost_center_id' => null, 'reason' => 'Ritorno autonoma']);
+    $action->confirm($actor, $moved, $out, (string) Str::uuid());
+
+    expect($expense->refresh()->contract_id)->toBeNull()
+        ->and($expense->supplier_id)->toBe($supplier->id)
+        ->and($expense->direct_cost_center_id)->toBeNull()
+        ->and($contract->refresh()->annualTotals())->not->toHaveKey($exercise->id)
+        ->and($exercise->actual())->toBe('40.00');
+});
+
+it('rejects moving manual Estimates into a Contract and rejects stale Contract previews atomically', function () {
+    [$actor, $company, $exercise, , $expense] = moveContext();
+    $contract = Contract::factory()->for($company)->create(['next_expiry_date' => null, 'renewal_anchor_date' => null]);
+    ContractLifecycleFact::factory()->forContract($contract)->create();
+    ContractExerciseClassification::factory()->forContractAndExercise($contract, $exercise)->create();
+    ExpenseLine::factory()->for($expense)->create(['amount' => '10.00']);
+
+    expect(fn () => app(UpdateExpense::class)->preview($actor, $expense, ['contract_id' => $contract->id]))
+        ->toThrow(ValidationException::class);
+
+    $expense->lines()->update(['type' => 'actual']);
+    $plan = app(UpdateExpense::class)->preview($actor, $expense->refresh(), [
+        'contract_id' => $contract->id, 'reason' => 'Attribuzione', 'supplier_replacement_acknowledged' => true,
+    ]);
+    $contract->increment('revision');
+    expect(fn () => app(UpdateExpense::class)->confirm($actor, $expense, $plan, (string) Str::uuid()))
+        ->toThrow(ValidationException::class)
+        ->and($expense->refresh()->contract_id)->toBeNull()
+        ->and(AuditEvent::query()->count())->toBe(0);
+});
+
+it('rolls back Contract ownership Supplier totals and revisions when audit persistence fails', function () {
+    [$actor, $company, $exercise, , $expense] = moveContext();
+    $supplier = Supplier::factory()->for($company)->create();
+    $contract = Contract::factory()->for($company)->for($supplier)->create(['next_expiry_date' => null, 'renewal_anchor_date' => null]);
+    ContractLifecycleFact::factory()->forContract($contract)->create();
+    ContractExerciseClassification::factory()->forContractAndExercise($contract, $exercise)->create();
+    ExpenseLine::factory()->actual()->for($expense)->create(['amount' => '7.00']);
+    $plan = app(UpdateExpense::class)->preview($actor, $expense, [
+        'contract_id' => $contract->id, 'reason' => 'Attribuzione', 'supplier_replacement_acknowledged' => true,
+    ]);
+    AuditEvent::creating(fn () => throw new RuntimeException('forced contract move rollback'));
+
+    expect(fn () => app(UpdateExpense::class)->confirm($actor, $expense, $plan, (string) Str::uuid()))
+        ->toThrow(RuntimeException::class)
+        ->and($expense->refresh()->contract_id)->toBeNull()
+        ->and($expense->supplier_id)->toBeNull()
+        ->and($contract->refresh()->revision)->toBe(0)
+        ->and($exercise->refresh()->revision)->toBe(0)
+        ->and($contract->annualTotals())->toBe([]);
+    AuditEvent::flushEventListeners();
 });

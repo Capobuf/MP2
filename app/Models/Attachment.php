@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 #[Fillable([
     'company_id', 'contract_id', 'expense_id', 'expense_line_id', 'storage_disk',
@@ -64,7 +65,17 @@ class Attachment extends Model
 
     public function isDetached(): bool
     {
-        return $this->detached_at !== null;
+        return $this->detachedAt() !== null;
+    }
+
+    public function detachedAt(): ?Carbon
+    {
+        $date = $this->getAttribute('detached_at');
+        if ($date !== null && ! $date instanceof Carbon) {
+            throw new \UnexpectedValueException('Invalid persisted Attachment detachment timestamp.');
+        }
+
+        return $date;
     }
 
     /** @return array<string, string> */

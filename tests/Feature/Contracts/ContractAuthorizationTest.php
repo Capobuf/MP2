@@ -1,15 +1,21 @@
 <?php
 
+use App\Actions\Operations\UpdateContractRenewal;
+use App\Domain\Company\AuditEventType;
 use App\Domain\Company\Capability;
 use App\Models\Attachment;
+use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
+use App\Models\ContractRenewalConfiguration;
 use App\Models\Project;
 use App\Models\ProjectContractLink;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -42,4 +48,49 @@ it('maps Contract reads and mutations to exact-company capabilities', function (
         ->and($user->can('delete', $contractA))->toBeFalse()
         ->and($user->can('delete', $linkA))->toBeFalse()
         ->and($user->can('delete', $attachmentA))->toBeFalse();
+});
+
+it('reauthorizes an idempotent renewal retry before returning its receipt', function () {
+    $actor = User::factory()->create();
+    $unauthorized = User::factory()->create();
+    $company = Company::factory()->create();
+    $contract = Contract::factory()->for($company)->create([
+        'contractual_start_date' => '2026-01-01',
+        'next_expiry_date' => '2026-12-31',
+        'renewal_anchor_date' => '2026-12-31',
+    ]);
+    $configuration = ContractRenewalConfiguration::query()->create([
+        'company_id' => $company->id,
+        'contract_id' => $contract->id,
+        'effective_from' => '2026-01-01',
+        'automatic_renewal' => true,
+        'expiry_anchor_date' => '2026-12-31',
+        'renewal_duration_months' => 12,
+        'notice_days' => 30,
+        'created_by_id' => $actor->id,
+    ]);
+    $operationId = (string) Str::uuid();
+    AuditEvent::query()->create([
+        'operation_id' => $operationId,
+        'company_id' => $company->id,
+        'actor_id' => $actor->id,
+        'event_type' => AuditEventType::ContractRenewalChanged,
+        'subject_type' => ContractRenewalConfiguration::class,
+        'subject_id' => $configuration->id,
+        'affected_exercise_ids' => [],
+        'effective_from' => '2026-01-01',
+        'allocated_impact_by_exercise' => [],
+        'actual_impact_by_exercise' => [],
+        'reference_type' => Contract::class,
+        'reference_id' => $contract->id,
+    ]);
+
+    expect(fn () => app(UpdateContractRenewal::class)->execute($unauthorized, $contract, [
+        'effective_from' => '2026-01-01',
+        'automatic_renewal' => true,
+        'expiry_anchor_date' => '2026-12-31',
+        'renewal_duration_months' => 12,
+        'notice_days' => 30,
+        'expected_revision' => $contract->revision,
+    ], $operationId))->toThrow(AuthorizationException::class);
 });

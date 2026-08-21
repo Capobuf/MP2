@@ -8,7 +8,13 @@ use App\Filament\Resources\Contracts\Pages\EditContract;
 use App\Filament\Resources\Contracts\Pages\ListContracts;
 use App\Filament\Resources\Contracts\Pages\ViewContract;
 use App\Filament\Resources\Contracts\RelationManagers\ContractAnnualSituationsRelationManager;
+use App\Filament\Resources\Contracts\RelationManagers\ContractAttachmentsRelationManager;
+use App\Filament\Resources\Contracts\RelationManagers\ContractClassificationsRelationManager;
 use App\Filament\Resources\Contracts\RelationManagers\ContractConditionsRelationManager;
+use App\Filament\Resources\Contracts\RelationManagers\ContractExpensesRelationManager;
+use App\Filament\Resources\Contracts\RelationManagers\ContractLifecycleRelationManager;
+use App\Filament\Resources\Contracts\RelationManagers\ContractRenewalsRelationManager;
+use App\Filament\Resources\Contracts\RelationManagers\ProjectContractLinksRelationManager;
 use App\Filament\Resources\Contracts\Schemas\ContractForm;
 use App\Filament\Resources\Contracts\Schemas\ContractInfolist;
 use App\Filament\Resources\Contracts\Tables\ContractsTable;
@@ -75,7 +81,7 @@ class ContractResource extends Resource
 
         return $company instanceof Company
             ? $query->whereBelongsTo($company, 'company')->with([
-                'company.exercises', 'supplier', 'conditions', 'lifecycleFacts',
+                'company.exercises', 'supplier', 'conditions', 'lifecycleFacts', 'renewalConfigurations',
                 'classifications.costCenter', 'expenses.lines',
             ])
             : $query->whereRaw('1 = 0');
@@ -114,6 +120,15 @@ class ContractResource extends Resource
 
     public static function getRelations(): array
     {
-        return [ContractAnnualSituationsRelationManager::class, ContractConditionsRelationManager::class];
+        return [
+            ContractAnnualSituationsRelationManager::class,
+            ContractClassificationsRelationManager::class,
+            ContractConditionsRelationManager::class,
+            ContractExpensesRelationManager::class,
+            ContractLifecycleRelationManager::class,
+            ContractRenewalsRelationManager::class,
+            ProjectContractLinksRelationManager::class,
+            ContractAttachmentsRelationManager::class,
+        ];
     }
 }

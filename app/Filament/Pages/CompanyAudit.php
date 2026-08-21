@@ -7,13 +7,19 @@ use App\Domain\Company\Capability;
 use App\Domain\Company\ClosingUnclassifiedPolicy;
 use App\Domain\Company\Setting;
 use App\Domain\Projects\ProjectState;
+use App\Models\Attachment;
 use App\Models\AuditEvent;
 use App\Models\Company;
+use App\Models\Contract;
+use App\Models\ContractExerciseClassification;
+use App\Models\ContractLifecycleFact;
+use App\Models\ContractRenewalConfiguration;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\Project;
+use App\Models\ProjectContractLink;
 use App\Models\ProjectExerciseClassification;
 use App\Models\ProjectTransition;
 use App\Models\Supplier;
@@ -53,6 +59,8 @@ class CompanyAudit extends Page implements HasTable
 
     public ?int $project = null;
 
+    public ?int $contract = null;
+
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
@@ -69,6 +77,13 @@ class CompanyAudit extends Page implements HasTable
             ->whereKey($requestedProject)
             ->exists()
                 ? $requestedProject
+                : null;
+        $requestedContract = request()->integer('contract');
+        $this->contract = $requestedContract > 0 && Contract::query()
+            ->where('company_id', $this->company()->id)
+            ->whereKey($requestedContract)
+            ->exists()
+                ? $requestedContract
                 : null;
     }
 
@@ -102,6 +117,12 @@ class CompanyAudit extends Page implements HasTable
                         ->where('company_id', $this->company()->id)
                         ->findOrFail($this->project);
                     $query->forProject($project);
+                }
+                if ($this->contract !== null) {
+                    $contract = Contract::query()
+                        ->where('company_id', $this->company()->id)
+                        ->findOrFail($this->contract);
+                    $query->forContract($contract);
                 }
 
                 return $query->orderByDesc('created_at')->orderByDesc('id');
@@ -176,6 +197,7 @@ class CompanyAudit extends Page implements HasTable
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('operation_id')->label('Operazione')->placeholder('—')->copyable()
                     ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('event_sequence')->label('Sequenza')->sortable(),
             ])
             ->recordActions([
                 Action::make('details')
@@ -206,6 +228,8 @@ class CompanyAudit extends Page implements HasTable
                             ->content(fn (AuditEvent $record): string => self::formatOverspend($record)),
                         Placeholder::make('detail_operation')->label('Identità operazione')
                             ->content(fn (AuditEvent $record): string => $record->operation_id),
+                        Placeholder::make('detail_sequence')->label('Sequenza evento')
+                            ->content(fn (AuditEvent $record): string => (string) $record->event_sequence),
                     ]),
             ])
             ->paginated([10, 25, 50]);
@@ -254,6 +278,12 @@ class CompanyAudit extends Page implements HasTable
             Project::class => 'Progetto',
             ProjectTransition::class => 'Transizione Progetto',
             ProjectExerciseClassification::class => 'Classificazione Progetto',
+            Contract::class => 'Contratto',
+            ContractLifecycleFact::class => 'Evento Contratto',
+            ContractRenewalConfiguration::class => 'Configurazione rinnovo',
+            ContractExerciseClassification::class => 'Classificazione Contratto',
+            ProjectContractLink::class => 'Collegamento Progetto-Contratto',
+            Attachment::class => 'Allegato',
             Company::class => 'Azienda',
             User::class => 'Utente',
             default => class_basename($event->subject_type),
@@ -293,6 +323,7 @@ class CompanyAudit extends Page implements HasTable
                 'origin_key' => 'OriginKey',
                 'exercise_id' => 'Esercizio',
                 'project_id' => 'Progetto',
+                'contract_id' => 'Contratto',
                 'supplier_id' => 'Fornitore',
                 'direct_cost_center_id' => 'Centro di Costo',
                 'description' => 'Descrizione',
@@ -338,6 +369,38 @@ class CompanyAudit extends Page implements HasTable
                 'project_id' => 'Progetto',
                 'exercise_id' => 'Esercizio',
                 'cost_center_id' => 'Centro di Costo',
+            ],
+            Contract::class => [
+                'origin_key' => 'OriginKey',
+                'title' => 'Titolo',
+                'supplier_id' => 'Fornitore',
+                'contractual_start_date' => 'Data inizio',
+                'next_expiry_date' => 'Prossima scadenza',
+                'automatic_renewal' => 'Rinnovo automatico',
+                'archived_at' => 'Archivio',
+                'revision' => 'Revisione',
+            ],
+            ContractExerciseClassification::class => [
+                'contract_id' => 'Contratto',
+                'exercise_id' => 'Esercizio',
+                'cost_center_id' => 'Centro di Costo',
+            ],
+            ProjectContractLink::class => [
+                'project_id' => 'Progetto',
+                'contract_id' => 'Contratto',
+                'note' => 'Nota',
+                'archived_at' => 'Archivio',
+                'revision' => 'Revisione',
+            ],
+            Attachment::class => [
+                'contract_id' => 'Contratto',
+                'expense_id' => 'Spesa',
+                'expense_line_id' => 'Riga',
+                'original_name' => 'File',
+                'media_type' => 'Tipo media',
+                'size_bytes' => 'Dimensione',
+                'sha256' => 'SHA-256',
+                'detached_at' => 'Rimosso il',
             ],
             default => null,
         };
@@ -418,6 +481,7 @@ class CompanyAudit extends Page implements HasTable
 
         $label = match ($event->reference_type) {
             Project::class => 'Progetto',
+            Contract::class => 'Contratto',
             Expense::class => 'Spesa',
             CostCenter::class => 'Centro di Costo',
             Supplier::class => 'Fornitore',

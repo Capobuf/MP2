@@ -6,9 +6,16 @@ use Carbon\CarbonImmutable;
 
 final class ContractStateTimeline
 {
-    /** @param iterable<array<string, mixed>|object> $facts */
-    public static function stateAtDate(string $contractualStartDate, iterable $facts, string $referenceDate): ContractState
-    {
+    /**
+     * @param  iterable<array<string, mixed>|object>  $facts
+     * @param  iterable<array<string, mixed>|object>  $renewalConfigurations
+     */
+    public static function stateAtDate(
+        string $contractualStartDate,
+        iterable $facts,
+        string $referenceDate,
+        iterable $renewalConfigurations = [],
+    ): ContractState {
         $reference = CarbonImmutable::parse($referenceDate)->startOfDay();
         $start = CarbonImmutable::parse($contractualStartDate)->startOfDay();
         $state = $reference->lessThan($start) ? ContractState::Planned : ContractState::Active;
@@ -40,6 +47,20 @@ final class ContractStateTimeline
                 'cancellation' => ContractState::Cancelled,
                 default => $state,
             };
+        }
+
+        if ($state === ContractState::Active) {
+            foreach ($renewalConfigurations as $configuration) {
+                $anchor = self::value($configuration, 'expiry_anchor_date');
+                if ($anchor === null || (bool) self::value($configuration, 'automatic_renewal')) {
+                    continue;
+                }
+                $expiry = CarbonImmutable::parse((string) $anchor)->startOfDay();
+                if ($reference->greaterThan($expiry)
+                    && ContractRenewalSchedule::configurationAtDate($renewalConfigurations, $expiry->toDateString()) === $configuration) {
+                    $state = ContractState::Cessated;
+                }
+            }
         }
 
         return $state;

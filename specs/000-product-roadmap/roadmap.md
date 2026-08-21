@@ -38,7 +38,7 @@ cycle only when dependencies are ready.
 | S2 | `003-master-data` | Anagrafiche | S1 | Manage suppliers, contacts and cost centers with archive/restore | verified |
 | S3 | `004-exercises-expenses` | Esercizi, Spese e Righe | S1,S2 | Create open year and autonomous expenses; estimates/actuals calculate correctly | verified |
 | S4 | `005-projects` | Progetti | S3 | Create project, transition state, attach expenses, see allocation/actual/variance | verified |
-| S5 | `006-contracts` | Contratti | S2,S3 | Create contract, generate annual estimate, handle lifecycle and deadlines | planned |
+| S5 | `006-contracts` | Contratti | S2,S3 | Create contract, generate annual estimate, handle lifecycle and deadlines | verified |
 | S6 | `007-proposal-budget-v1` | Proposta e Budget iniziale | S3,S4,S5 | Prepare isolated proposal and approve immutable Budget v1 | planned |
 | S7 | `008-revisions-alignment-multiyear` | Revisioni, riallineamento e impatto multi-Esercizio | S6 | Reality changes invalidate proposal; revision and multi-year actions stay atomic | planned |
 | S8 | `009-carryover-reprogramming` | Riporto e Riprogrammazione | S4,S7 | Choose one deferral mode and transfer valid amount without double application | planned |
@@ -87,10 +87,10 @@ mutations appear. Every later slice extends the event taxonomy required by §22.
 
 S3 implements the autonomous Expense cases and S4 adds the real Project container.
 FR-005–FR-007, FR-051–FR-052, FR-079–FR-081 and invariants 28.4, 28.5, 28.42,
-28.43 and 28.52 become fully representable only when S5 adds the real Contract
+28.43 and 28.52 became fully representable when S5 added the real Contract
 container, its annual classification and its aggregation. Their primary verification
-anchor is therefore S5 and the rows remain `planned` until every first-level source
-case is exercised. Earlier slices must not add placeholder ownership or classification
+anchor is S5, whose three-owner and aggregate tests now exercise every first-level
+source case. Earlier slices did not add placeholder ownership or classification
 columns to claim complete coverage.
 
 ### Inter-Exercise atomicity

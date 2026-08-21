@@ -107,7 +107,8 @@ class AuditEvent extends Model
                 $reference->where('reference_type', Contract::class)
                     ->where('reference_id', $contract->id);
             })->orWhere('new_value->ownership_impact->source_contract_id', $contract->id)
-                ->orWhere('new_value->ownership_impact->target_contract_id', $contract->id);
+                ->orWhere('new_value->ownership_impact->target_contract_id', $contract->id)
+                ->orWhere('new_value->owner_contract_id', $contract->id);
         });
     }
 

@@ -5,8 +5,10 @@ namespace App\Filament\Resources\Contracts\Pages;
 use App\Actions\Operations\UpdateContract;
 use App\Filament\Resources\Contracts\ContractResource;
 use App\Models\Contract;
+use App\Models\Supplier;
 use App\Models\User;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Pages\EditRecord;
@@ -30,6 +32,8 @@ class EditContract extends EditRecord
     {
         return $schema->components([
             TextInput::make('title')->label('Titolo')->required()->maxLength(255),
+            Select::make('supplier_id')->label('Fornitore')->options(fn (): array => $this->supplierOptions())->required()->searchable()
+                ->helperText('Il Fornitore può cambiare solo prima del primo utilizzo economico del Contratto.'),
             Textarea::make('notes')->label('Note'),
         ]);
     }
@@ -56,5 +60,19 @@ class EditContract extends EditRecord
     protected function getHeaderActions(): array
     {
         return [ViewAction::make()];
+    }
+
+    /** @return array<int, string> */
+    private function supplierOptions(): array
+    {
+        /** @var Contract $contract */
+        $contract = $this->record;
+        $options = Supplier::query()->where('company_id', $contract->company_id)->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all();
+        $current = $contract->supplier;
+        if ($current->isArchived()) {
+            $options[$current->id] = $current->legal_name.' · Archiviato';
+        }
+
+        return $options;
     }
 }

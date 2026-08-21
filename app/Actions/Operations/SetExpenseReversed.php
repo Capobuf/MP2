@@ -3,12 +3,14 @@
 namespace App\Actions\Operations;
 
 use App\Domain\Company\AuditEventType;
+use App\Domain\Contracts\ContractExpenseActivity;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseAuditSnapshot;
 use App\Domain\Projects\ProjectAuditSnapshot;
 use App\Domain\Projects\ProjectExpenseActivity;
 use App\Models\AuditEvent;
 use App\Models\Company;
+use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\Project;
@@ -38,6 +40,9 @@ class SetExpenseReversed
             $project = $expense->project_id === null
                 ? null
                 : Project::query()->lockForUpdate()->findOrFail($expense->project_id);
+            $contract = $expense->contract_id === null
+                ? null
+                : Contract::query()->lockForUpdate()->findOrFail($expense->contract_id);
             $transitions = collect();
             if ($project !== null) {
                 $transitions = $project->transitions()->orderBy('effective_date')->orderBy('id')->lockForUpdate()->get();
@@ -73,6 +78,7 @@ class SetExpenseReversed
             $allocationBefore = $lockedExpense->allocation();
             $actualBefore = $lockedExpense->actual();
             $projectContext = null;
+            $contractContext = null;
             $varianceBefore = null;
             $openingTransition = null;
             $overspendNote = $this->nullableTrim($context['overspend_note'] ?? null);
@@ -90,6 +96,15 @@ class SetExpenseReversed
                     $openingTransition = app(ProjectExpenseOpening::class)->create($project, $company, $actor, $projectContext, $transitions);
                 }
             }
+            if ($contract !== null && ! $reversed) {
+                $contract->setRelation('lifecycleFacts', $contract->lifecycleFacts()->orderBy('id')->lockForUpdate()->get());
+                $contract->setRelation('renewalConfigurations', $contract->renewalConfigurations()->orderBy('id')->lockForUpdate()->get());
+                $activeLines = $lines->reject->isAnnulled()->map(fn ($line): array => ['type' => $line->lineType()]);
+                $contractContext = ContractExpenseActivity::validate($contract, $exercise, $company, $activeLines, [
+                    ...$context,
+                    'activity_note' => $context['activity_note'] ?? $validated['reason'],
+                ]);
+            }
             $before = ExpenseAuditSnapshot::expense($lockedExpense, true);
             $lockedExpense->reversed_at = $reversed ? now() : null;
             $lockedExpense->revision++;
@@ -106,6 +121,7 @@ class SetExpenseReversed
                 ProjectExpenseActivity::assertOverspendNote($company, $overspendContext, $varianceBefore, $varianceAfter);
                 $project->increment('revision', $openingTransition === null ? 1 : 2);
             }
+            $contract?->increment('revision');
             $exercise->increment('revision');
 
             $allocationAfter = $lockedExpense->allocation();
@@ -118,6 +134,13 @@ class SetExpenseReversed
                     'opening_transition' => $openingTransition === null ? null : ProjectAuditSnapshot::transition($openingTransition),
                     'overspend' => ProjectAuditSnapshot::overspend($varianceBefore, ProjectExpenseActivity::annualVariance($project, $exercise)),
                     'overspend_note' => $projectContext['overspend_note'] ?? $overspendNote,
+                ];
+            }
+            if ($contractContext !== null) {
+                $newValue['contract_activity'] = [
+                    'actual_kind' => $contractContext['actual_kind']->value,
+                    'activity_note' => $contractContext['activity_note'],
+                    'cycle_matching' => null,
                 ];
             }
             AuditEvent::query()->create([
@@ -134,8 +157,8 @@ class SetExpenseReversed
                 'allocated_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($allocationAfter, $allocationBefore)),
                 'actual_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($actualAfter, $actualBefore)),
                 'reason' => $validated['reason'],
-                'reference_type' => $project === null ? null : Project::class,
-                'reference_id' => $project?->id,
+                'reference_type' => $contract !== null ? Contract::class : ($project === null ? null : Project::class),
+                'reference_id' => $contract !== null ? $contract->id : $project?->id,
             ]);
 
             return $lockedExpense;

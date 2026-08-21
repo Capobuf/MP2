@@ -31,17 +31,15 @@ class ContractAnnualSituationsRelationManager extends RelationManager
             TextColumn::make('reference_date')->label('Data di riferimento')->state(fn (Exercise $record): string => $this->reference($record)->format('d/m/Y')),
             TextColumn::make('state')->label('Stato')->state(fn (Exercise $record): string => $this->contract()->stateAtDate($this->reference($record)->toDateString())->label())->badge(),
             TextColumn::make('cost_center')->label('Centro di Costo')->state(function (Exercise $record): string {
-                $classification = $this->contract()->classifications()
-                    ->where('exercise_id', $record->id)
-                    ->with('costCenter')
-                    ->first();
+                $classification = $this->contract()->classifications->firstWhere('exercise_id', $record->id);
 
                 return $classification === null || $classification->cost_center_id === null
                     ? 'Non classificato'
                     : $classification->costCenter->name;
             }),
             TextColumn::make('allocation')->label('Allocato')->state(fn (Exercise $record): string => $this->allocation($record)->amount)->money('EUR', locale: 'it'),
-            TextColumn::make('actual')->label('Effettivo')->state(fn (Exercise $record): string => Decimal::sum($this->contract()->expenses()->where('exercise_id', $record->id)->where('origin', 'manual')->with('lines')->get()->map->actual()))->money('EUR', locale: 'it'),
+            TextColumn::make('actual')->label('Effettivo')->state(fn (Exercise $record): string => Decimal::sum($this->contract()->expenses
+                ->where('exercise_id', $record->id)->where('origin', 'manual')->map->actual()))->money('EUR', locale: 'it'),
             TextColumn::make('composition')->label('Composizione esatta')->state(fn (Exercise $record): string => collect($this->allocation($record)->composition)->map(fn (array $item): string => CarbonImmutable::parse($item['attribution_date'])->format('d/m/Y').' · € '.$item['amount'])->implode(' · ') ?: 'Nessun ciclo')->wrap(),
         ])->defaultSort('year')
             ->emptyStateHeading('Nessuna situazione annuale')
@@ -52,6 +50,10 @@ class ContractAnnualSituationsRelationManager extends RelationManager
     {
         $record = $this->getOwnerRecord();
         abort_unless($record instanceof Contract, 404);
+        $record->loadMissing([
+            'company', 'conditions', 'lifecycleFacts', 'renewalConfigurations',
+            'classifications.costCenter', 'expenses.lines',
+        ]);
 
         return $record;
     }
@@ -67,6 +69,6 @@ class ContractAnnualSituationsRelationManager extends RelationManager
     {
         $contract = $this->contract();
 
-        return ContractAnnualAllocation::forYear($contract->conditions()->get(), $exercise->year, fn (string $date) => $contract->stateAtDate($date));
+        return ContractAnnualAllocation::forYear($contract->conditions, $exercise->year, fn (string $date) => $contract->stateAtDate($date));
     }
 }

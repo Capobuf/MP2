@@ -2,10 +2,12 @@
 
 namespace App\Filament\Resources\Expenses\Schemas;
 
+use App\Domain\Contracts\ContractActualKind;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Expenses\ManualExpenseLine;
 use App\Domain\Projects\ProjectActualKind;
 use App\Models\Company;
+use App\Models\Contract;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Project;
@@ -18,6 +20,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 
 class ExpenseForm
@@ -43,6 +46,19 @@ class ExpenseForm
                     ->default(fn (): ?int => request()->integer('project') ?: null)
                     ->searchable()
                     ->live()
+                    ->afterStateUpdated(fn (Set $set, mixed $state): mixed => filled($state) ? $set('contract_id', null) : null)
+                    ->visible(fn (Get $get): bool => blank($get('contract_id')))
+                    ->placeholder('Autonoma'),
+                Select::make('contract_id')
+                    ->label('Contenitore Contratto')
+                    ->options(fn (): array => self::company() instanceof Company
+                        ? Contract::query()->whereBelongsTo(self::company(), 'company')->active()->orderBy('title')->pluck('title', 'id')->all()
+                        : [])
+                    ->default(fn (): ?int => request()->integer('contract') ?: null)
+                    ->searchable()
+                    ->live()
+                    ->afterStateUpdated(fn (Set $set, mixed $state): mixed => filled($state) ? $set('project_id', null) : null)
+                    ->visible(fn (Get $get): bool => blank($get('project_id')))
                     ->placeholder('Autonoma'),
                 Select::make('supplier_id')
                     ->label('Fornitore')
@@ -50,6 +66,8 @@ class ExpenseForm
                         ? Supplier::query()->whereBelongsTo(self::company(), 'company')->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all()
                         : [])
                     ->searchable()
+                    ->visible(fn (Get $get): bool => blank($get('contract_id')))
+                    ->dehydrated(fn (Get $get): bool => blank($get('contract_id')))
                     ->placeholder('Nessuno'),
                 Select::make('direct_cost_center_id')
                     ->label('Centro di Costo')
@@ -58,15 +76,19 @@ class ExpenseForm
                         : [])
                     ->searchable()
                     ->placeholder('Non classificata')
-                    ->visible(fn (Get $get): bool => blank($get('project_id')))
-                    ->dehydrated(fn (Get $get): bool => blank($get('project_id'))),
+                    ->visible(fn (Get $get): bool => blank($get('project_id')) && blank($get('contract_id')))
+                    ->dehydrated(fn (Get $get): bool => blank($get('project_id')) && blank($get('contract_id'))),
             ])->columns(2),
-            Section::make('Attività Effettiva del Progetto')->schema([
-                Select::make('actual_kind')->label('Dichiarazione Effettivo')->options(ProjectActualKind::options())->placeholder('Ordinario'),
-                Checkbox::make('open_project')->label('Conferma apertura atomica se il Progetto è Pianificato'),
+            Section::make('Attività Effettiva del contenitore')->schema([
+                Select::make('actual_kind')->label('Dichiarazione Effettivo')
+                    ->options(fn (Get $get): array => filled($get('contract_id')) ? ContractActualKind::options() : ProjectActualKind::options())
+                    ->placeholder('Ordinario'),
+                Checkbox::make('open_project')->label('Conferma apertura atomica se il Progetto è Pianificato')
+                    ->visible(fn (Get $get): bool => filled($get('project_id'))),
                 Textarea::make('activity_note')->label('Nota attività tardiva, rimborso o correzione')->columnSpanFull(),
-                Textarea::make('overspend_note')->label('Nota di sovraspesa')->columnSpanFull(),
-            ])->columns(2)->visible(fn (Get $get): bool => filled($get('project_id'))),
+                Textarea::make('overspend_note')->label('Nota di sovraspesa')->columnSpanFull()
+                    ->visible(fn (Get $get): bool => filled($get('project_id'))),
+            ])->columns(2)->visible(fn (Get $get): bool => filled($get('project_id')) || filled($get('contract_id'))),
             Section::make('Righe iniziali')->schema([
                 Repeater::make('lines')
                     ->label('Righe')
@@ -90,11 +112,11 @@ class ExpenseForm
     }
 
     /** @return array<int, mixed> */
-    public static function lineFormSections(): array
+    public static function lineFormSections(bool $contractActualOnly = false): array
     {
         return [
             Section::make('Valore economico')->description('Il Tipo appartiene alla Riga. L’Importo resta il valore autoritativo.')
-                ->schema(self::economicLineFields())->columns(2),
+                ->schema(self::economicLineFields($contractActualOnly))->columns(2),
             Section::make('Dettagli descrittivi')->description('Quantità e unitario aiutano la lettura ma non sostituiscono l’Importo.')
                 ->schema(self::descriptiveLineFields())->columns(3),
             Section::make('Nota e verifica')->schema(self::lineNoteFields()),
@@ -103,39 +125,55 @@ class ExpenseForm
 
     public static function projectActivitySection(bool $visible): Section
     {
-        return Section::make('Impatto sul Progetto')
-            ->description('Richiesto solo quando la Riga Effettivo modifica lo stato o l’equilibrio economico del Progetto.')
-            ->schema(self::projectActivityFields($visible))
+        return self::containerActivitySection($visible, false);
+    }
+
+    public static function containerActivitySection(bool $project, bool $contract): Section
+    {
+        return Section::make('Dichiarazione attività del contenitore')
+            ->description('Richiesta quando la Riga Effettivo dipende dallo stato del Progetto o del Contratto.')
+            ->schema(self::containerActivityFields($project, $contract))
             ->columns(2)
-            ->visible($visible);
+            ->visible($project || $contract);
     }
 
     /** @return array<int, mixed> */
     public static function projectActivityFields(bool $visible): array
     {
+        return self::containerActivityFields($visible, false);
+    }
+
+    /** @return array<int, mixed> */
+    public static function containerActivityFields(bool $project, bool $contract): array
+    {
         return [
             Select::make('actual_kind')
                 ->label('Dichiarazione Effettivo')
-                ->options(ProjectActualKind::options())
+                ->options($contract ? ContractActualKind::options() : ProjectActualKind::options())
                 ->placeholder('Ordinario (predefinito)')
-                ->visible($visible),
+                ->visible($project || $contract),
             Checkbox::make('open_project')
                 ->label('Conferma apertura atomica se il Progetto è Pianificato')
-                ->visible($visible),
+                ->visible($project),
             Textarea::make('activity_note')
                 ->label('Nota attività tardiva, rimborso o correzione')
-                ->visible($visible),
+                ->visible($project || $contract),
             Textarea::make('overspend_note')
                 ->label('Nota di sovraspesa')
-                ->visible($visible),
+                ->visible($project),
         ];
     }
 
     /** @return array<int, mixed> */
-    private static function economicLineFields(): array
+    private static function economicLineFields(bool $contractActualOnly = false): array
     {
         return [
-            Select::make('type')->label('Tipo Riga')->options(ExpenseLineType::options())->required()->native(false)->live(),
+            Select::make('type')->label('Tipo Riga')
+                ->options(fn (Get $get): array => $contractActualOnly || filled($get('../../contract_id'))
+                    ? [ExpenseLineType::Actual->value => ExpenseLineType::Actual->label()]
+                    : ExpenseLineType::options())
+                ->default($contractActualOnly ? ExpenseLineType::Actual->value : null)
+                ->required()->native(false)->live(),
             TextInput::make('amount')->label('Importo')->helperText('Valore autoritativo in EUR, netto IVA.')
                 ->suffix('EUR')->inputMode('decimal')->required()->regex('/^-?\d{1,17}(\.\d{1,2})?$/')->live(),
         ];

@@ -6,6 +6,8 @@ use App\Filament\Resources\Contracts\Pages\CreateContract;
 use App\Filament\Resources\Contracts\Pages\EditContract;
 use App\Filament\Resources\Contracts\Pages\ListContracts;
 use App\Filament\Resources\Contracts\Pages\ViewContract;
+use App\Filament\Resources\Contracts\RelationManagers\ContractLifecycleRelationManager;
+use App\Filament\Resources\Contracts\RelationManagers\ContractRenewalsRelationManager;
 use App\Models\Company;
 use App\Models\CompanyCapability;
 use App\Models\Contract;
@@ -136,25 +138,34 @@ it('lists and views tenant Contracts with undefined expiry and annual situations
     $this->get(ContractResource::getUrl('edit', ['record' => $contractA], tenant: $companyA))->assertForbidden();
 });
 
-it('allows only descriptive edit to an operator', function () {
+it('allows descriptive and eligible Supplier edit while keeping contractual dates immutable', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
     grantContractResource($manager, $company);
     $contract = Contract::factory()->for($company)->create(['title' => 'Prima']);
+    $replacement = Supplier::factory()->for($company)->create();
     $this->actingAs($manager);
     Filament::setTenant($company);
 
     Livewire::test(EditContract::class, ['record' => $contract->getRouteKey()])
         ->assertFormFieldExists('title')
         ->assertFormFieldExists('notes')
-        ->assertFormFieldDoesNotExist('supplier_id')
+        ->assertFormFieldExists('supplier_id')
         ->assertFormFieldDoesNotExist('contractual_start_date')
         ->assertFormFieldDoesNotExist('next_expiry_date')
         ->assertFormFieldDoesNotExist('automatic_renewal')
-        ->fillForm(['title' => 'Dopo', 'notes' => 'Aggiornato'])
+        ->fillForm(['title' => 'Dopo', 'notes' => 'Aggiornato', 'supplier_id' => $replacement->id])
         ->call('save')
         ->assertHasNoFormErrors();
 
     expect($contract->refresh()->title)->toBe('Dopo')
+        ->and($contract->supplier_id)->toBe($replacement->id)
         ->and($contract->revision)->toBe(1);
+});
+
+it('registers explicit lifecycle and renewal management surfaces', function () {
+    expect(ContractResource::getRelations())->toContain(
+        ContractLifecycleRelationManager::class,
+        ContractRenewalsRelationManager::class,
+    );
 });

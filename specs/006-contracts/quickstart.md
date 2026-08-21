@@ -138,3 +138,45 @@ After restart, Contract state/history, renewal configurations, next expiry,
 conditions, classifications, generated Estimate identities, manual Actuals, links,
 attachment downloads/checksums, OriginKeys, and Timeline events remain unchanged. No
 validation step deletes persistent data or private evidence.
+
+## Execution evidence — 21 August 2026
+
+The S5 implementation run completed the non-destructive journeys above with this
+evidence:
+
+- `artisan test tests/Unit/Domain/Contracts tests/Feature/Contracts`: 109 tests,
+  746 assertions; this includes private Contract/Expense/Line attachment upload,
+  authorized download, logical detachment, replacement identity, checksum, retry,
+  and storage/transaction rollback.
+- `artisan test tests/Feature/Expenses tests/Feature/Projects`: 98 tests,
+  980 assertions, including three-owner Expense movement and prior-slice
+  regressions.
+- Final `composer test`: 317 tests, 2546 assertions. `composer format:test`,
+  `composer analyse`, `composer validate --strict`, and `composer audit` all passed.
+- The convergence regression group passed 18 tests and 119 assertions. It proves
+  that Expense/Line attachment events remain in the Contract Timeline after an
+  ownership move and that archived Contracts reject renewal, link-state, and
+  attachment-detachment activity until restored.
+- The final authorization convergence regression proves that renewal-operation
+  retries recheck exact-company `modifica_operativita` before resolving an
+  idempotency receipt.
+- `contracts:process-renewals` completed twice without opening the deadlines page.
+  The persistent validation database contained no Contracts, so both executions
+  were intentional no-op runs and created no facts or events; chronological
+  materialization, retry idempotency, and per-Contract isolation are demonstrated by
+  `ProcessContractRenewalsTest` on the dedicated `testing` database.
+- An authenticated browser session selected Company `DOT` and loaded `/admin/1`,
+  `/admin/1/contracts`, `/admin/1/contract-deadlines`, and
+  `/admin/1/company-audit`. Contract and deadline empty states, deadline columns,
+  Timeline detail controls, and the absence of browser-console errors were checked.
+  Mutating vertical-flow steps were not run against the persistent database; their
+  complete behavior and negative paths were exercised on `testing` by the focused
+  suites above.
+- Before the normal Sail restart the persistent snapshot was: zero Contracts,
+  generated Contract Expenses/Lines, renewal facts, Project links, and attachments;
+  maximum AuditEvent ID 84 and maximum event sequence 0. After `sail stop` followed
+  by `sail up -d`, the snapshot was identical and Laravel booted normally.
+- After restart, `/admin` returned 302 to `/admin/login`, `/admin/login` returned
+  200, and the login page loaded in a fresh browser session without errors. The
+  network entry point `http://10.0.0.30:9000/admin` also returned the expected 302
+  to its login page.

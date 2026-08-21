@@ -7,6 +7,7 @@ use App\Filament\Resources\Expenses\Pages\ListExpenses;
 use App\Filament\Resources\Expenses\Pages\ViewExpense;
 use App\Models\Company;
 use App\Models\CompanyCapability;
+use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -28,7 +29,7 @@ function grantExpenseResource(User $user, Company $company, bool $manage = true)
     }
 }
 
-it('creates an expense with an initial line and only supported ownership fields', function () {
+it('creates an expense with conditional Project or Contract ownership fields and no future ownership', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
     grantExpenseResource($manager, $company);
@@ -38,7 +39,8 @@ it('creates an expense with an initial line and only supported ownership fields'
 
     Livewire::test(CreateExpense::class)
         ->assertFormFieldExists('project_id')
-        ->assertFormFieldDoesNotExist('contract_id')
+        ->assertFormFieldExists('contract_id')
+        ->assertFormFieldExists('actual_kind')
         ->assertFormFieldDoesNotExist('contract_owner_id')
         ->assertFormFieldDoesNotExist('budget_id')
         ->assertFormFieldDoesNotExist('proposal_id')
@@ -83,4 +85,26 @@ it('lists and resolves expenses only inside the current tenant', function () {
         ->assertTableActionDoesNotExist('delete', record: $expenseA);
     Livewire::test(ViewExpense::class, ['record' => $expenseA->getRouteKey()])->assertSuccessful();
     $this->get(ExpenseResource::getUrl('view', ['record' => $expenseB], tenant: $companyA))->assertNotFound();
+});
+
+it('shows a confirmed owner preview for Contract movement without future-slice controls', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create();
+    $expense = Expense::factory()->forExercise($exercise)->create();
+    ExpenseLine::factory()->actual()->for($expense)->create();
+    Contract::factory()->for($company)->create();
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+
+    Livewire::test(ViewExpense::class, ['record' => $expense->getRouteKey()])
+        ->mountAction('moveOrReclassify')
+        ->assertSchemaComponentExists('contract_id')
+        ->assertSchemaComponentExists('supplier_replacement_acknowledged')
+        ->assertSchemaComponentExists('impact_preview')
+        ->assertSchemaComponentExists('impact_confirmed')
+        ->assertSchemaComponentDoesNotExist('contract_cycle_id')
+        ->assertSchemaComponentDoesNotExist('invoice_id')
+        ->assertSchemaComponentDoesNotExist('payment_id');
 });

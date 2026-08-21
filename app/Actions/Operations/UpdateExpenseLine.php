@@ -3,6 +3,7 @@
 namespace App\Actions\Operations;
 
 use App\Domain\Company\AuditEventType;
+use App\Domain\Contracts\ContractExpenseActivity;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseAuditSnapshot;
 use App\Domain\Expenses\ManualExpenseLine;
@@ -10,6 +11,7 @@ use App\Domain\Projects\ProjectAuditSnapshot;
 use App\Domain\Projects\ProjectExpenseActivity;
 use App\Models\AuditEvent;
 use App\Models\Company;
+use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -35,6 +37,9 @@ class UpdateExpenseLine
             $project = $unlockedExpense->project_id === null
                 ? null
                 : Project::query()->lockForUpdate()->findOrFail($unlockedExpense->project_id);
+            $contract = $unlockedExpense->contract_id === null
+                ? null
+                : Contract::query()->lockForUpdate()->findOrFail($unlockedExpense->contract_id);
             $transitions = collect();
             if ($project !== null) {
                 $transitions = $project->transitions()->orderBy('effective_date')->orderBy('id')->lockForUpdate()->get();
@@ -72,6 +77,7 @@ class UpdateExpenseLine
             }
 
             $projectContext = null;
+            $contractContext = null;
             $varianceBefore = null;
             $openingTransition = null;
             if ($project !== null) {
@@ -80,6 +86,15 @@ class UpdateExpenseLine
                     $openingTransition = app(ProjectExpenseOpening::class)->create($project, $company, $actor, $projectContext, $transitions);
                 }
                 $varianceBefore = ProjectExpenseActivity::annualVariance($project, $exercise);
+            }
+            if ($contract !== null) {
+                $contract->setRelation('lifecycleFacts', $contract->lifecycleFacts()->orderBy('id')->lockForUpdate()->get());
+                $contract->setRelation('renewalConfigurations', $contract->renewalConfigurations()->orderBy('id')->lockForUpdate()->get());
+                if ($lockedLine->isAnnulled()) {
+                    ContractExpenseActivity::assertActualOnly([$validated]);
+                } else {
+                    $contractContext = ContractExpenseActivity::validate($contract, $exercise, $company, [$validated], $input);
+                }
             }
 
             $lockedLine->save();
@@ -90,6 +105,7 @@ class UpdateExpenseLine
                 }
                 $project->increment('revision', $openingTransition === null ? 1 : 2);
             }
+            $contract?->increment('revision');
             $expense->increment('revision');
             $exercise->increment('revision');
             $expense->refresh();
@@ -102,6 +118,13 @@ class UpdateExpenseLine
                     'opening_transition' => $openingTransition === null ? null : ProjectAuditSnapshot::transition($openingTransition),
                     'overspend' => ProjectAuditSnapshot::overspend($varianceBefore, ProjectExpenseActivity::annualVariance($project, $exercise)),
                     'overspend_note' => $projectContext['overspend_note'] ?? null,
+                ];
+            }
+            if ($contractContext !== null) {
+                $newValue['contract_activity'] = [
+                    'actual_kind' => $contractContext['actual_kind']->value,
+                    'activity_note' => $contractContext['activity_note'],
+                    'cycle_matching' => null,
                 ];
             }
 
@@ -118,9 +141,9 @@ class UpdateExpenseLine
                 'new_value' => $newValue,
                 'allocated_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($expense->allocation(), $allocationBefore)),
                 'actual_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($expense->actual(), $actualBefore)),
-                'reason' => $projectContext === null ? null : ($projectContext['activity_note'] ?? $projectContext['overspend_note']),
-                'reference_type' => $project === null ? Expense::class : Project::class,
-                'reference_id' => $project === null ? $expense->id : $project->id,
+                'reason' => $contractContext !== null ? $contractContext['activity_note'] : ($projectContext === null ? null : ($projectContext['activity_note'] ?? $projectContext['overspend_note'])),
+                'reference_type' => $contract !== null ? Contract::class : ($project === null ? Expense::class : Project::class),
+                'reference_id' => $contract !== null ? $contract->id : ($project === null ? $expense->id : $project->id),
             ]);
 
             return $lockedLine;

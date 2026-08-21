@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Expenses\Pages;
 
 use App\Actions\Operations\UpdateExpense;
+use App\Domain\Contracts\ContractActualKind;
 use App\Domain\Expenses\ExpenseImpactPlan;
 use App\Domain\Projects\ProjectActualKind;
 use App\Domain\Projects\ProjectOverspend;
@@ -10,6 +11,7 @@ use App\Domain\Projects\ProjectOverspendResult;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Support\ProjectOverspendNotifier;
 use App\Livewire\ExpenseDetail;
+use App\Models\Contract;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -87,22 +89,43 @@ class ViewExpense extends ViewRecord
             Select::make('exercise_id')->label('Nuovo Esercizio')
                 ->options(Exercise::query()->where('company_id', $expense->company_id)->open()->orderByDesc('year')->pluck('year', 'id')->all())
                 ->default($expense->exercise_id)->required()->live()->afterStateUpdated($invalidate),
-            Select::make('project_id')->label('Nuovo contenitore')
+            Select::make('project_id')->label('Nuovo Progetto')
                 ->options(Project::query()->where('company_id', $expense->company_id)->active()->orderBy('title')->pluck('title', 'id')->all())
-                ->default($expense->project_id)->placeholder('Autonoma')->live()->afterStateUpdated($invalidate),
+                ->default($expense->project_id)->placeholder('Nessuno')->live()
+                ->afterStateUpdated(function (Set $set, mixed $state) use ($invalidate): void {
+                    if (filled($state)) {
+                        $set('contract_id', null);
+                    }
+                    $invalidate($set);
+                }),
+            Select::make('contract_id')->label('Nuovo Contratto')
+                ->options(Contract::query()->where('company_id', $expense->company_id)->active()->orderBy('title')->pluck('title', 'id')->all())
+                ->default($expense->contract_id)->placeholder('Nessuno')->live()
+                ->afterStateUpdated(function (Set $set, mixed $state) use ($invalidate): void {
+                    if (filled($state)) {
+                        $set('project_id', null);
+                    }
+                    $invalidate($set);
+                }),
             Select::make('supplier_id')->label('Nuovo Fornitore')->options($this->supplierOptions($expense))
-                ->default($expense->supplier_id)->placeholder('Nessuno')->live()->afterStateUpdated($invalidate),
+                ->default($expense->supplier_id)->placeholder('Nessuno')->live()->afterStateUpdated($invalidate)
+                ->visible(fn (Get $get): bool => blank($get('contract_id'))),
             Select::make('direct_cost_center_id')->label('Nuovo Centro di Costo')->options($this->costCenterOptions($expense))
                 ->default($expense->direct_cost_center_id)->placeholder('Non classificata')->live()->afterStateUpdated($invalidate)
-                ->visible(fn (Get $get): bool => blank($get('project_id'))),
+                ->visible(fn (Get $get): bool => blank($get('project_id')) && blank($get('contract_id'))),
             Textarea::make('reason')->label('Motivo')->live()->afterStateUpdated($invalidate),
-            Select::make('actual_kind')->label('Dichiarazione Effettivo')->options(ProjectActualKind::options())->placeholder('Ordinario')
-                ->visible(fn (Get $get): bool => filled($get('project_id')))->live()->afterStateUpdated($invalidate),
+            Select::make('actual_kind')->label('Dichiarazione Effettivo')
+                ->options(fn (Get $get): array => filled($get('contract_id')) ? ContractActualKind::options() : ProjectActualKind::options())
+                ->placeholder('Ordinario')->visible(fn (Get $get): bool => filled($get('project_id')) || filled($get('contract_id')))
+                ->live()->afterStateUpdated($invalidate),
             Checkbox::make('open_project')->label('Conferma apertura atomica se il Progetto è Pianificato')
                 ->visible(fn (Get $get): bool => filled($get('project_id')))->live()->afterStateUpdated($invalidate),
             Textarea::make('activity_note')->label('Nota attività tardiva, rimborso o correzione')
-                ->visible(fn (Get $get): bool => filled($get('project_id')))->live()->afterStateUpdated($invalidate),
-            Textarea::make('overspend_note')->label('Nota di sovraspesa')->live()->afterStateUpdated($invalidate),
+                ->visible(fn (Get $get): bool => filled($get('project_id')) || filled($get('contract_id')))->live()->afterStateUpdated($invalidate),
+            Textarea::make('overspend_note')->label('Nota di sovraspesa')->visible(fn (Get $get): bool => filled($get('project_id')))
+                ->live()->afterStateUpdated($invalidate),
+            Checkbox::make('supplier_replacement_acknowledged')->label('Confermo la sostituzione del Fornitore con quello del Contratto')
+                ->visible(fn (Get $get): bool => filled($get('contract_id')))->live()->afterStateUpdated($invalidate),
             Placeholder::make('impact_preview')->label('Anteprima impatto')
                 ->content(function (Get $get) use ($expense): string {
                     $actor = auth()->user();
@@ -115,11 +138,13 @@ class ViewExpense extends ViewRecord
                             'supplier_id' => $get('supplier_id'),
                             'direct_cost_center_id' => $get('direct_cost_center_id'),
                             'project_id' => $get('project_id'),
+                            'contract_id' => $get('contract_id'),
                             'reason' => $get('reason'),
                             'actual_kind' => $get('actual_kind'),
                             'open_project' => $get('open_project'),
                             'activity_note' => $get('activity_note'),
                             'overspend_note' => $get('overspend_note'),
+                            'supplier_replacement_acknowledged' => $get('supplier_replacement_acknowledged'),
                         ]);
                     } catch (ValidationException $exception) {
                         return collect($exception->errors())->flatten()->first()
@@ -158,7 +183,7 @@ class ViewExpense extends ViewRecord
     private function formatImpact(ExpenseImpactPlan $plan): string
     {
         $rows = ["Identità preservate: {$plan->originKey}; Righe ".implode(', ', $plan->lineIds).'.'];
-        $rows[] = 'Contenitore: '.($plan->sourceProjectId === null ? 'Autonoma' : 'Progetto '.$plan->sourceProjectId).' → '.($plan->targetProjectId === null ? 'Autonoma' : 'Progetto '.$plan->targetProjectId).'.';
+        $rows[] = 'Contenitore: '.$this->ownerLabel($plan->sourceProjectId, $plan->sourceContractId).' → '.$this->ownerLabel($plan->targetProjectId, $plan->targetContractId).'.';
         $rows[] = 'Centro di Costo: '.$this->costCenterLabel($plan->sourceCostCenterId).' → '.$this->costCenterLabel($plan->targetCostCenterId).'.';
         if ($plan->targetProjectId !== null) {
             $project = Project::query()->find($plan->targetProjectId);
@@ -183,6 +208,9 @@ class ViewExpense extends ViewRecord
             };
             $rows[] = "Progetto {$projectId}: Allocato {$impact['allocation_before']} → {$impact['allocation_after']}; Effettivo {$impact['actual_before']} → {$impact['actual_after']}; Scostamento {$impact['variance_before']} → {$impact['variance_after']}{$warning}";
         }
+        foreach ($plan->contractImpacts as $contractId => $impact) {
+            $rows[] = "Contratto {$contractId}: Allocato {$impact['allocation_before']} → {$impact['allocation_after']}; Effettivo {$impact['actual_before']} → {$impact['actual_after']}.";
+        }
 
         return implode(' · ', $rows);
     }
@@ -198,5 +226,14 @@ class ViewExpense extends ViewRecord
         return $costCenter === null
             ? 'Centro di Costo #'.$costCenterId
             : $costCenter->name.($costCenter->isArchived() ? ' · Archiviato' : '');
+    }
+
+    private function ownerLabel(?int $projectId, ?int $contractId): string
+    {
+        if ($projectId !== null) {
+            return 'Progetto '.$projectId;
+        }
+
+        return $contractId === null ? 'Autonoma' : 'Contratto '.$contractId;
     }
 }

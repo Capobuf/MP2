@@ -3,19 +3,24 @@
 namespace App\Filament\Resources\Expenses\RelationManagers;
 
 use App\Actions\Operations\CreateExpenseLine;
+use App\Actions\Operations\DetachAttachment;
 use App\Actions\Operations\SetExpenseLineActive;
 use App\Actions\Operations\UpdateExpenseLine;
+use App\Actions\Operations\UploadAttachment;
 use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Filament\Resources\Expenses\Schemas\ExpenseForm;
 use App\Filament\Support\ProjectOverspendNotifier;
+use App\Models\Attachment;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
@@ -25,6 +30,8 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 
 class ExpenseLinesRelationManager extends RelationManager
@@ -46,8 +53,8 @@ class ExpenseLinesRelationManager extends RelationManager
     public function form(Schema $schema): Schema
     {
         return $schema->components([
-            ...ExpenseForm::lineFormSections(),
-            ExpenseForm::projectActivitySection($this->ownerIsProjectExpense()),
+            ...ExpenseForm::lineFormSections($this->ownerIsContractExpense()),
+            ExpenseForm::containerActivitySection($this->ownerIsProjectExpense(), $this->ownerIsContractExpense()),
             Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
         ]);
     }
@@ -67,6 +74,11 @@ class ExpenseLinesRelationManager extends RelationManager
                     ->badge()->color(fn (string $state): string => $state === 'Attiva' ? 'success' : 'gray'),
                 TextColumn::make('updated_at')->label('Ultima modifica')->dateTime('d/m/Y H:i')
                     ->timezone(fn (ExpenseLine $record): string => $record->expense->company->timezone),
+                TextColumn::make('attachments_live')->label('Allegati')->state(fn (ExpenseLine $record): HtmlString => new HtmlString(
+                    $record->attachments()->attached()->orderBy('id')->get()->map(
+                        fn (Attachment $attachment): string => '<a class="fi-link" href="'.e(route('attachments.download', $attachment)).'">'.e($attachment->original_name).'</a>',
+                    )->implode('<br>') ?: '—',
+                ))->html(),
             ])
             ->headerActions([
                 CreateAction::make()
@@ -138,10 +150,30 @@ class ExpenseLinesRelationManager extends RelationManager
                     ->modalCancelActionLabel('Torna alla riga')
                     ->visible(fn (ExpenseLine $record): bool => $record->isAnnulled() && $this->canMutateOwner())
                     ->form([
-                        ...ExpenseForm::projectActivityFields($this->ownerIsProjectExpense()),
+                        ...ExpenseForm::containerActivityFields($this->ownerIsProjectExpense(), $this->ownerIsContractExpense()),
                         Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
                     ])
                     ->action(fn (ExpenseLine $record, array $data) => $this->setActive($record, true, $data)),
+                Action::make('uploadAttachment')->label('Carica Allegato')->visible(fn (): bool => $this->canManageAttachments())
+                    ->form([
+                        FileUpload::make('file')->label('File')->storeFiles(false)->required(),
+                        Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
+                    ])->action(function (ExpenseLine $record, array $data): void {
+                        $actor = auth()->user();
+                        $file = $data['file'] ?? null;
+                        abort_unless($actor instanceof User && $file instanceof UploadedFile, 403);
+                        app(UploadAttachment::class)->execute($actor, $record, $file, (string) $data['operation_id']);
+                    }),
+                Action::make('detachAttachment')->label('Rimuovi Allegato')->color('warning')->requiresConfirmation()
+                    ->visible(fn (ExpenseLine $record): bool => $this->canManageAttachments() && $record->attachments()->attached()->exists())
+                    ->form([
+                        Select::make('attachment_id')->label('Allegato')->required()->options(fn (ExpenseLine $record): array => $record->attachments()->attached()->orderBy('original_name')->pluck('original_name', 'id')->all()),
+                    ])->action(function (ExpenseLine $record, array $data): void {
+                        $actor = auth()->user();
+                        abort_unless($actor instanceof User, 403);
+                        $attachment = $record->attachments()->attached()->findOrFail((int) $data['attachment_id']);
+                        app(DetachAttachment::class)->execute($actor, $attachment, (string) Str::uuid());
+                    }),
             ]);
     }
 
@@ -157,6 +189,16 @@ class ExpenseLinesRelationManager extends RelationManager
 
         return $actor instanceof User && $expense instanceof Expense && $expense->origin !== 'system' && ! $expense->isReversed()
             && $actor->hasCapability($expense->company, Capability::ManageOperations);
+    }
+
+    private function canManageAttachments(): bool
+    {
+        $actor = auth()->user();
+        $expense = $this->getOwnerRecord();
+
+        return $actor instanceof User && $expense instanceof Expense
+            && ($expense->contract === null || ! $expense->contract->isArchived())
+            && $actor->can('update', $expense);
     }
 
     /** @param array<string, mixed> $data */
@@ -177,5 +219,12 @@ class ExpenseLinesRelationManager extends RelationManager
         $expense = $this->getOwnerRecord();
 
         return $expense instanceof Expense && $expense->project_id !== null;
+    }
+
+    private function ownerIsContractExpense(): bool
+    {
+        $expense = $this->getOwnerRecord();
+
+        return $expense instanceof Expense && $expense->contract_id !== null;
     }
 }

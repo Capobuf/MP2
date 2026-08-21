@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Domain\Contracts\ContractEconomicUse;
 use App\Domain\Contracts\ContractState;
 use App\Domain\Contracts\ContractStateTimeline;
+use App\Domain\Expenses\Decimal;
+use App\Domain\Expenses\ExpenseLineType;
 use Database\Factories\ContractFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -117,7 +120,52 @@ class Contract extends Model
 
     public function isArchived(): bool
     {
-        return $this->archived_at !== null;
+        return $this->archivedAt() !== null;
+    }
+
+    public function archivedAt(): ?Carbon
+    {
+        $date = $this->getAttribute('archived_at');
+        if ($date !== null && ! $date instanceof Carbon) {
+            throw new \UnexpectedValueException('Invalid persisted Contract archive timestamp.');
+        }
+
+        return $date;
+    }
+
+    public function hasEconomicUse(): bool
+    {
+        return ContractEconomicUse::exists($this);
+    }
+
+    /** @return array<int, array{allocation: string, actual: string, has_actuals: bool}> */
+    public function annualTotals(): array
+    {
+        $rows = ExpenseLine::query()
+            ->selectRaw('expenses.exercise_id, expense_lines.type, SUM(expense_lines.amount) AS total_amount, MAX(CASE WHEN expense_lines.type = ? AND expense_lines.amount <> 0 THEN 1 ELSE 0 END) AS has_actuals', [ExpenseLineType::Actual->value])
+            ->join('expenses', 'expenses.id', '=', 'expense_lines.expense_id')
+            ->where('expenses.contract_id', $this->id)
+            ->whereNull('expenses.reversed_at')
+            ->whereNull('expense_lines.annulled_at')
+            ->groupBy('expenses.exercise_id', 'expense_lines.type')
+            ->get();
+        $totals = [];
+
+        foreach ($rows as $row) {
+            $exerciseId = (int) $row->getAttribute('exercise_id');
+            $totals[$exerciseId] ??= ['allocation' => '0.00', 'actual' => '0.00', 'has_actuals' => false];
+            $typeAttribute = $row->getAttribute('type');
+            $type = $typeAttribute instanceof ExpenseLineType ? $typeAttribute->value : (string) $typeAttribute;
+            $amount = Decimal::money((string) $row->getAttribute('total_amount'));
+            if ($type === ExpenseLineType::Estimate->value) {
+                $totals[$exerciseId]['allocation'] = $amount;
+            } elseif ($type === ExpenseLineType::Actual->value) {
+                $totals[$exerciseId]['actual'] = $amount;
+                $totals[$exerciseId]['has_actuals'] = (bool) $row->getAttribute('has_actuals');
+            }
+        }
+
+        return $totals;
     }
 
     public function contractualStartDate(): Carbon
@@ -131,16 +179,42 @@ class Contract extends Model
         return $date;
     }
 
+    public function nextExpiryDate(): ?Carbon
+    {
+        $date = $this->getAttribute('next_expiry_date');
+
+        if ($date !== null && ! $date instanceof Carbon) {
+            throw new \UnexpectedValueException('Invalid persisted Contract expiry date.');
+        }
+
+        return $date;
+    }
+
+    public function renewalAnchorDate(): ?Carbon
+    {
+        $date = $this->getAttribute('renewal_anchor_date');
+
+        if ($date !== null && ! $date instanceof Carbon) {
+            throw new \UnexpectedValueException('Invalid persisted Contract renewal anchor date.');
+        }
+
+        return $date;
+    }
+
     public function stateAtDate(string $date): ContractState
     {
         $facts = $this->relationLoaded('lifecycleFacts')
             ? $this->lifecycleFacts
             : $this->lifecycleFacts()->get();
+        $renewalConfigurations = $this->relationLoaded('renewalConfigurations')
+            ? $this->renewalConfigurations
+            : $this->renewalConfigurations()->get();
 
         return ContractStateTimeline::stateAtDate(
             $this->contractualStartDate()->toDateString(),
             $facts,
             $date,
+            $renewalConfigurations,
         );
     }
 

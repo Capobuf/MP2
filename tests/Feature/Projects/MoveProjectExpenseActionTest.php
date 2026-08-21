@@ -35,7 +35,7 @@ it('shows the S4 owner preview and moves the whole Expense without Contract cont
         ->mountAction('moveOrReclassify')
         ->assertSchemaComponentExists('project_id')
         ->assertSchemaComponentExists('impact_confirmed')
-        ->assertSchemaComponentDoesNotExist('contract_id')
+        ->assertSchemaComponentExists('contract_id')
         ->assertSchemaComponentDoesNotExist('contract_owner_id')
         ->assertSchemaComponentDoesNotExist('proposal_id')
         ->assertSchemaComponentDoesNotExist('budget_id')
@@ -75,5 +75,5 @@ it('exposes declaration opening reason and overspend inputs in the move form', f
         ->assertSchemaComponentExists('actual_kind')
         ->assertSchemaComponentExists('open_project')
         ->assertSchemaComponentExists('overspend_note')
-        ->assertSchemaComponentDoesNotExist('contract_id');
+        ->assertSchemaComponentExists('contract_id');
 });

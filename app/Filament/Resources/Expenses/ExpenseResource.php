@@ -4,11 +4,13 @@ namespace App\Filament\Resources\Expenses;
 
 use App\Actions\Operations\SetExpenseReversed;
 use App\Domain\Company\Capability;
+use App\Domain\Contracts\ContractActualKind;
 use App\Domain\Projects\ProjectActualKind;
 use App\Filament\Resources\Expenses\Pages\CreateExpense;
 use App\Filament\Resources\Expenses\Pages\EditExpense;
 use App\Filament\Resources\Expenses\Pages\ListExpenses;
 use App\Filament\Resources\Expenses\Pages\ViewExpense;
+use App\Filament\Resources\Expenses\RelationManagers\ExpenseAttachmentsRelationManager;
 use App\Filament\Resources\Expenses\Schemas\ExpenseForm;
 use App\Filament\Resources\Expenses\Schemas\ExpenseInfolist;
 use App\Filament\Resources\Expenses\Tables\ExpensesTable;
@@ -122,7 +124,7 @@ class ExpenseResource extends Resource
 
     public static function getRelations(): array
     {
-        return [];
+        return [ExpenseAttachmentsRelationManager::class];
     }
 
     public static function getWidgets(): array
@@ -161,12 +163,13 @@ class ExpenseResource extends Resource
             ->visible(fn (Expense $record): bool => $record->isReversed() && static::canEdit($record))
             ->form([
                 Textarea::make('reason')->label('Motivo')->required(),
-                Select::make('actual_kind')->label('Dichiarazione Effettivo')->options(ProjectActualKind::options())->placeholder('Ordinario')
-                    ->visible(fn (Expense $record): bool => $record->project_id !== null),
+                Select::make('actual_kind')->label('Dichiarazione Effettivo')->placeholder('Ordinario')
+                    ->options(fn (Expense $record): array => $record->contract_id !== null ? ContractActualKind::options() : ProjectActualKind::options())
+                    ->visible(fn (Expense $record): bool => $record->project_id !== null || $record->contract_id !== null),
                 Checkbox::make('open_project')->label('Conferma apertura atomica se il Progetto è Pianificato')
                     ->visible(fn (Expense $record): bool => $record->project_id !== null),
                 Textarea::make('activity_note')->label('Nota attività tardiva, rimborso o correzione')
-                    ->visible(fn (Expense $record): bool => $record->project_id !== null),
+                    ->visible(fn (Expense $record): bool => $record->project_id !== null || $record->contract_id !== null),
                 Textarea::make('overspend_note')->label('Nota di sovraspesa')
                     ->visible(fn (Expense $record): bool => $record->project_id !== null),
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),

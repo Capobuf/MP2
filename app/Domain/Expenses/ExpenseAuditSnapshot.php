@@ -25,6 +25,7 @@ final class ExpenseAuditSnapshot
             'origin_key' => $expense->originKey(),
             'exercise_id' => $expense->exercise_id,
             'project_id' => $expense->project_id,
+            'contract_id' => $expense->contract_id,
             'supplier_id' => $expense->supplier_id,
             'direct_cost_center_id' => $expense->direct_cost_center_id,
             'description' => $expense->description,
