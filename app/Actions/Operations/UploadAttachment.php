@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Models\Contract;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
+use App\Models\Proposal;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
@@ -21,7 +22,7 @@ use Illuminate\Validation\ValidationException;
 
 final class UploadAttachment
 {
-    public function execute(User $actor, Contract|Expense|ExpenseLine $owner, UploadedFile $file, string $operationId): Attachment
+    public function execute(User $actor, Contract|Expense|ExpenseLine|Proposal $owner, UploadedFile $file, string $operationId): Attachment
     {
         Validator::make([
             'file' => $file,
@@ -35,7 +36,11 @@ final class UploadAttachment
         try {
             return DB::transaction(function () use ($actor, $owner, $file, $operationId, &$storedPath): Attachment {
                 [$lockedOwner, $company, $contract] = $this->lockOwner($owner);
-                Gate::forUser($actor)->authorize('create', [Attachment::class, $company]);
+                if ($lockedOwner instanceof Proposal) {
+                    Gate::forUser($actor)->authorize('update', $lockedOwner);
+                } else {
+                    Gate::forUser($actor)->authorize('create', [Attachment::class, $company]);
+                }
                 if ($contract?->isArchived()) {
                     throw ValidationException::withMessages(['attachment' => 'Ripristinare il Contratto prima di aggiungere Allegati.']);
                 }
@@ -102,8 +107,13 @@ final class UploadAttachment
     }
 
     /** @return array{Model, Company, Contract|null} */
-    private function lockOwner(Contract|Expense|ExpenseLine $owner): array
+    private function lockOwner(Contract|Expense|ExpenseLine|Proposal $owner): array
     {
+        if ($owner instanceof Proposal) {
+            $locked = Proposal::query()->lockForUpdate()->findOrFail($owner->id);
+
+            return [$locked, Company::query()->lockForUpdate()->findOrFail($locked->company_id), null];
+        }
         if ($owner instanceof Contract) {
             $locked = Contract::query()->lockForUpdate()->findOrFail($owner->id);
 
@@ -123,10 +133,11 @@ final class UploadAttachment
         return [$locked, Company::query()->lockForUpdate()->findOrFail($expense->company_id), $contract];
     }
 
-    /** @return array{contract_id: int|null, expense_id: int|null, expense_line_id: int|null} */
+    /** @return array{proposal_id: int|null, contract_id: int|null, expense_id: int|null, expense_line_id: int|null} */
     private function ownerColumns(Model $owner): array
     {
         return [
+            'proposal_id' => $owner instanceof Proposal ? $owner->id : null,
             'contract_id' => $owner instanceof Contract ? $owner->id : null,
             'expense_id' => $owner instanceof Expense ? $owner->id : null,
             'expense_line_id' => $owner instanceof ExpenseLine ? $owner->id : null,
@@ -143,6 +154,10 @@ final class UploadAttachment
             return [$owner->expense->exercise_id];
         }
 
+        if ($owner instanceof Proposal) {
+            return [$owner->exercise_id];
+        }
+
         return [];
     }
 
@@ -151,7 +166,7 @@ final class UploadAttachment
     {
         return [
             ...$attachment->only([
-                'id', 'contract_id', 'expense_id', 'expense_line_id', 'original_name',
+                'id', 'proposal_id', 'contract_id', 'expense_id', 'expense_line_id', 'original_name',
                 'media_type', 'size_bytes', 'sha256', 'uploaded_by_id', 'detached_at',
             ]),
             'owner_contract_id' => $ownerContractId,

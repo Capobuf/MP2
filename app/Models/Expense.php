@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'project_id',
     'contract_id',
     'origin',
+    'copied_from_origin_key',
     'supplier_id',
     'direct_cost_center_id',
     'description',
@@ -77,6 +78,12 @@ class Expense extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(ExpenseLine::class);
+    }
+
+    /** @return HasMany<ProposalItem, $this> */
+    public function proposalItems(): HasMany
+    {
+        return $this->hasMany(ProposalItem::class);
     }
 
     /** @return HasMany<Attachment, $this> */

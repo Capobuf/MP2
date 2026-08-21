@@ -2,11 +2,14 @@
 
 namespace App\Livewire;
 
+use App\Filament\Pages\CompanyAccess;
+use App\Filament\Pages\CompanySettings;
 use App\Models\Company;
 use App\Models\User;
 use App\Support\ExerciseContext;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -68,13 +71,28 @@ class ExerciseContextSelector extends Component
     {
         $company = Filament::getTenant();
         $user = auth()->user();
+        $panel = Filament::getCurrentPanel();
+        $currentCompany = $company instanceof Company ? $company : null;
+        $currentUser = $user instanceof User ? $user : null;
 
         return view('livewire.exercise-context-selector', [
-            'company' => $company instanceof Company ? $company : null,
-            'companies' => $user instanceof User ? $user->getTenants(Filament::getCurrentPanel()) : collect(),
-            'exercises' => $company instanceof Company
-                ? $company->exercises()->orderByDesc('year')->get()
+            'company' => $currentCompany,
+            'companies' => $currentUser ? $currentUser->getTenants($panel) : collect(),
+            'exercises' => $currentCompany
+                ? $currentCompany->exercises()->orderByDesc('year')->get()
                 : collect(),
+            'companySettingsUrl' => $currentUser && $currentCompany
+                && Gate::forUser($currentUser)->allows('manageSettings', $currentCompany)
+                    ? CompanySettings::getUrl(['tenant' => $currentCompany])
+                    : null,
+            'companyAccessUrl' => $currentUser && $currentCompany
+                && Gate::forUser($currentUser)->allows('managePermissions', $currentCompany)
+                    ? CompanyAccess::getUrl(['tenant' => $currentCompany])
+                    : null,
+            'companyRegistrationUrl' => $currentUser
+                && Gate::forUser($currentUser)->allows('create', Company::class)
+                    ? $panel->getTenantRegistrationUrl()
+                    : null,
         ]);
     }
 }

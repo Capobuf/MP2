@@ -76,6 +76,18 @@ class Company extends Model implements HasName
         return $this->hasMany(Attachment::class);
     }
 
+    /** @return HasMany<Proposal, $this> */
+    public function proposals(): HasMany
+    {
+        return $this->hasMany(Proposal::class);
+    }
+
+    /** @return HasMany<BudgetSnapshot, $this> */
+    public function budgets(): HasMany
+    {
+        return $this->hasMany(BudgetSnapshot::class);
+    }
+
     public function getFilamentName(): string
     {
         return $this->name;

@@ -52,9 +52,8 @@ it('exposes no ordinary physical delete for Contract governance records or Timel
     }
 });
 
-it('has no suspended state or future workflow classes and routes in the S5 surface', function () {
+it('has no suspended state or workflow classes and routes beyond the implemented S6 surface', function () {
     expect(ContractState::tryFrom('suspended'))->toBeNull()
-        ->and(class_exists('App\\Models\\Proposal'))->toBeFalse()
         ->and(class_exists('App\\Models\\Budget'))->toBeFalse()
         ->and(class_exists('App\\Models\\Revision'))->toBeFalse()
         ->and(class_exists('App\\Models\\ClosingSnapshot'))->toBeFalse()
@@ -63,7 +62,7 @@ it('has no suspended state or future workflow classes and routes in the S5 surfa
         ->and(class_exists('App\\Models\\ContractReplacement'))->toBeFalse();
 
     $surface = collect(Route::getRoutes())->map(fn ($route): string => strtolower(($route->getName() ?? '').' '.$route->uri()))->implode("\n");
-    foreach (['proposal', 'budget', 'revision', 'closing', 'invoice', 'payment', 'reminder', 'report', 'sostituisce'] as $forbidden) {
+    foreach (['revision', 'closing', 'invoice', 'payment', 'reminder', 'report', 'sostituisce'] as $forbidden) {
         expect($surface)->not->toContain($forbidden);
     }
 });

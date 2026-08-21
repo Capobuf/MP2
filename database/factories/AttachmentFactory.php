@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\Contract;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
+use App\Models\Proposal;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -18,6 +19,7 @@ class AttachmentFactory extends Factory
     {
         return [
             'company_id' => Company::factory(),
+            'proposal_id' => null,
             'contract_id' => fn (array $attributes): int => Contract::factory()->create(['company_id' => $attributes['company_id']])->id,
             'expense_id' => null,
             'expense_line_id' => null,
@@ -61,5 +63,10 @@ class AttachmentFactory extends Factory
             'expense_id' => null,
             'expense_line_id' => $line->id,
         ]);
+    }
+
+    public function forProposal(Proposal $proposal): static
+    {
+        return $this->state(fn (): array => ['company_id' => $proposal->company_id, 'proposal_id' => $proposal->id, 'contract_id' => null, 'expense_id' => null, 'expense_line_id' => null]);
     }
 }

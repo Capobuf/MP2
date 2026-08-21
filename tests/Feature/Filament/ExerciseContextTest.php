@@ -2,6 +2,8 @@
 
 use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExerciseStatus;
+use App\Filament\Pages\CompanyAccess;
+use App\Filament\Pages\CompanySettings;
 use App\Filament\Widgets\OperationalOverview;
 use App\Livewire\ExerciseContextSelector;
 use App\Models\Company;
@@ -77,4 +79,50 @@ it('renders the Blade and Livewire global context for the current tenant', funct
         ->assertSee('Stima')
         ->assertSee('Effettivo')
         ->assertSee('Scostamento');
+});
+
+it('exposes authorized Company actions in the global context menu', function () {
+    $administrator = User::factory()->platformAdmin()->create();
+    $company = Company::factory()->create(['name' => 'Azienda Demo']);
+
+    foreach ([Capability::View, Capability::ManageSettings, Capability::ManagePermissions] as $capability) {
+        CompanyCapability::query()->create([
+            'company_id' => $company->id,
+            'user_id' => $administrator->id,
+            'capability' => $capability,
+        ]);
+    }
+
+    $this->actingAs($administrator);
+    Filament::setCurrentPanel('admin');
+    Filament::setTenant($company);
+
+    Livewire::test(ExerciseContextSelector::class)
+        ->assertSee('Impostazioni Azienda')
+        ->assertSee('Accessi e capacità')
+        ->assertSee('Crea Azienda')
+        ->assertSeeHtml('href="'.CompanySettings::getUrl(['tenant' => $company]).'"')
+        ->assertSeeHtml('href="'.CompanyAccess::getUrl(['tenant' => $company]).'"')
+        ->assertSeeHtml('href="'.Filament::getCurrentPanel()->getTenantRegistrationUrl().'"');
+});
+
+it('does not expose unauthorized Company actions', function () {
+    $user = User::factory()->create();
+    $company = Company::factory()->create(['name' => 'Azienda Demo']);
+    CompanyCapability::query()->create([
+        'company_id' => $company->id,
+        'user_id' => $user->id,
+        'capability' => Capability::View,
+    ]);
+
+    $this->actingAs($user);
+    Filament::setCurrentPanel('admin');
+    Filament::setTenant($company);
+
+    Livewire::test(ExerciseContextSelector::class)
+        ->assertSeeHtml('aria-label="Azienda corrente"')
+        ->assertDontSee('Impostazioni Azienda')
+        ->assertDontSee('Accessi e capacità')
+        ->assertDontSee('Crea Azienda')
+        ->assertDontSeeHtml('aria-label="Apri selettore e azioni Azienda"');
 });

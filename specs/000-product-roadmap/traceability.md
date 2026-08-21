@@ -18,24 +18,24 @@ changing its traceability anchor.
 | FR-008 | Identità stabile e OriginKey | §5.4 | S3 — Esercizi, Spese e Righe | verified |
 | FR-009 | Nessuna cancellazione fisica ordinaria | §§5.7, 24.1 | S2 — Anagrafiche | verified |
 | FR-010 | Archivio non economico | §§5.8, 24.3 | S2 — Anagrafiche | verified |
-| FR-011 | Budget Approvato immutabile | §§1.2, 13 | S6 — Proposta e Budget iniziale | planned |
-| FR-012 | Versione iniziale v1 preservata | §13.4 | S6 — Proposta e Budget iniziale | planned |
+| FR-011 | Budget Approvato immutabile | §§1.2, 13 | S6 — Proposta e Budget iniziale | verified |
+| FR-012 | Versione iniziale v1 preservata | §13.4 | S6 — Proposta e Budget iniziale | verified |
 | FR-013 | Revisioni sempre disponibili in Esercizio Aperto | §§12.3, 13.4, 26.3 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
 | FR-014 | Versione Budget esplicita nei report | §§13.7, 25 | S11 — Reportistica ed esportazione | planned |
-| FR-015 | Proposta isolata | §§1.3, 12.1 | S6 — Proposta e Budget iniziale | planned |
-| FR-016 | Una Proposta attiva per Esercizio | §12.2 | S6 — Proposta e Budget iniziale | planned |
-| FR-017 | Proposta limitata al piano | §12.6 | S6 — Proposta e Budget iniziale | planned |
-| FR-018 | Inizializzazione deterministica della Proposta | §§7.6.2, 12.4 | S6 — Proposta e Budget iniziale | planned |
-| FR-019 | Copia con nuova identità e lineage obbligatoria | §12.4 | S6 — Proposta e Budget iniziale | planned |
-| FR-020 | Azioni di piano sulla Spesa | §12.7 | S6 — Proposta e Budget iniziale | planned |
-| FR-021 | Azioni di piano sul Progetto | §12.8 | S6 — Proposta e Budget iniziale | planned |
-| FR-022 | Azioni di piano sul Contratto | §12.9 | S6 — Proposta e Budget iniziale | planned |
-| FR-023 | Relazioni tra nuovi ProposalItem | §12.10 | S6 — Proposta e Budget iniziale | planned |
+| FR-015 | Proposta isolata | §§1.3, 12.1 | S6 — Proposta e Budget iniziale | verified |
+| FR-016 | Una Proposta attiva per Esercizio | §12.2 | S6 — Proposta e Budget iniziale | verified |
+| FR-017 | Proposta limitata al piano | §12.6 | S6 — Proposta e Budget iniziale | verified |
+| FR-018 | Inizializzazione deterministica della Proposta | §§7.6.2, 12.4 | S6 — Proposta e Budget iniziale | verified |
+| FR-019 | Copia con nuova identità e lineage obbligatoria | §12.4 | S6 — Proposta e Budget iniziale | verified |
+| FR-020 | Azioni di piano sulla Spesa | §12.7 | S6 — Proposta e Budget iniziale | verified |
+| FR-021 | Azioni di piano sul Progetto | §12.8 | S6 — Proposta e Budget iniziale | verified |
+| FR-022 | Azioni di piano sul Contratto | §12.9 | S6 — Proposta e Budget iniziale | verified |
+| FR-023 | Relazioni tra nuovi ProposalItem | §12.10 | S6 — Proposta e Budget iniziale | verified |
 | FR-024 | Riallineamento dell'intera sorgente | §§12.11–12.12 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
 | FR-025 | Presa visione delle nuove sorgenti | §12.13 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
 | FR-026 | Incoerenze della Proposta definite in modo chiuso | §12.14 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
-| FR-027 | Precondizioni di approvazione | §§12.15, 13.2 | S6 — Proposta e Budget iniziale | planned |
-| FR-028 | Approvazione atomica su tutti gli Esercizi interessati | §13.3 | S6 — Proposta e Budget iniziale | planned |
+| FR-027 | Precondizioni di approvazione | §§12.15, 13.2 | S6 — Proposta e Budget iniziale | verified |
+| FR-028 | Approvazione atomica su tutti gli Esercizi interessati | §13.3 | S6 — Proposta e Budget iniziale | verified |
 | FR-029 | Applicazione futura senza riscrivere Esercizi Chiusi | §§10, 13.3 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
 | FR-030 | Scarto senza rollback della realtà | §12.16 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
 | FR-031 | Più Esercizi Aperti | §11.1 | S3 — Esercizi, Spese e Righe | verified |
@@ -92,8 +92,8 @@ changing its traceability anchor.
 | FR-082 | Fornitore e Referenti | §21 | S2 — Anagrafiche | verified |
 | FR-083 | Fornitore Archiviato utilizzabile nello storico | §§21.4, 24.6 | S10 — Correzioni post-Chiusura | planned |
 | FR-084 | Timeline esplicativa append-only | §22 | S3 — Esercizi, Spese e Righe | verified |
-| FR-085 | Schemi separati delle Snapshot | §23 | S6 — Proposta e Budget iniziale | planned |
-| FR-086 | Snapshot autonome | §§23.2, 23.13 | S6 — Proposta e Budget iniziale | planned |
+| FR-085 | Schemi separati delle Snapshot | §23 | S6 — Proposta e Budget iniziale | verified |
+| FR-086 | Snapshot autonome | §§23.2, 23.13 | S6 — Proposta e Budget iniziale | verified |
 | FR-087 | Previsto e Non previsto solo al primo livello | §§25.3–25.4 | S11 — Reportistica ed esportazione | planned |
 | FR-088 | Categoria primaria e etichette sovrapponibili | §§25.5–25.7 | S11 — Reportistica ed esportazione | planned |
 | FR-089 | Report con riferimenti espliciti | §§25.1–25.2 | S11 — Reportistica ed esportazione | planned |
@@ -104,7 +104,7 @@ changing its traceability anchor.
 | FR-094 | Operazioni inter-Esercizio atomiche | §10 | S5 — Contratti | verified |
 | FR-095 | Relazioni informative senza effetto economico | §7.3 | S5 — Contratti | planned |
 | FR-096 | Report separato delle correzioni e annotazioni | §§24.11, 25.13 | S11 — Reportistica ed esportazione | planned |
-| FR-097 | Approvazione economica esterna ammessa | §26.11 | S6 — Proposta e Budget iniziale | planned |
+| FR-097 | Approvazione economica esterna ammessa | §26.11 | S6 — Proposta e Budget iniziale | verified |
 | FR-098 | EUR, netto IVA e anno solare | §4.3 | S3 — Esercizi, Spese e Righe | verified |
 | FR-099 | Evoluzione del dominio tramite categorie A–E | §3 | S0 — Foundation e ambiente di sviluppo live | verified |
 | FR-100 | Nessun Forecast | §§1.4, 28.59 | S0 — Foundation e ambiente di sviluppo live | verified |

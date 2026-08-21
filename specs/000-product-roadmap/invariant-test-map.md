@@ -23,13 +23,13 @@ below. Later slices may add integration or regression coverage.
 | 28.14 | Riporto esclusivo del Progetto | S8 — Riporto e Riprogrammazione | planned |
 | 28.15 | Modalità di rinvio | S8 — Riporto e Riprogrammazione | planned |
 | 28.16 | Progetto terminale | S8 — Riporto e Riprogrammazione | planned |
-| 28.17 | Budget immutabile | S6 — Proposta e Budget iniziale | planned |
+| 28.17 | Budget immutabile | S6 — Proposta e Budget iniziale | verified |
 | 28.18 | Revisioni | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
-| 28.19 | Proposta isolata | S6 — Proposta e Budget iniziale | planned |
-| 28.20 | Proposta solo sul piano | S6 — Proposta e Budget iniziale | planned |
-| 28.21 | Nuovi oggetti proposti | S6 — Proposta e Budget iniziale | planned |
+| 28.19 | Proposta isolata | S6 — Proposta e Budget iniziale | verified |
+| 28.20 | Proposta solo sul piano | S6 — Proposta e Budget iniziale | verified |
+| 28.21 | Nuovi oggetti proposti | S6 — Proposta e Budget iniziale | verified |
 | 28.22 | Riallineamento per sorgente | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
-| 28.23 | Approvazione atomica | S6 — Proposta e Budget iniziale | planned |
+| 28.23 | Approvazione atomica | S6 — Proposta e Budget iniziale | verified |
 | 28.24 | Stato alla data | S4 — Progetti | verified |
 | 28.25 | Stato alla Chiusura | S9 — Chiusura | planned |
 | 28.26 | Nessuna riapertura | S9 — Chiusura | planned |
@@ -53,8 +53,8 @@ below. Later slices may add integration or regression coverage.
 | 28.44 | Archivio non economico | S2 — Anagrafiche | verified |
 | 28.45 | Nessuna cancellazione fisica ordinaria | S2 — Anagrafiche | verified |
 | 28.46 | Identità non riutilizzabile | S2 — Anagrafiche | verified |
-| 28.47 | Snapshot autonome | S6 — Proposta e Budget iniziale | planned |
-| 28.48 | Schema Budget | S6 — Proposta e Budget iniziale | planned |
+| 28.47 | Snapshot autonome | S6 — Proposta e Budget iniziale | verified |
+| 28.48 | Schema Budget | S6 — Proposta e Budget iniziale | verified |
 | 28.49 | Schema Chiusura | S9 — Chiusura | planned |
 | 28.50 | Previsto e Non previsto | S11 — Reportistica ed esportazione | planned |
 | 28.51 | Categorie del confronto | S11 — Reportistica ed esportazione | planned |

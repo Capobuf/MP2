@@ -9,6 +9,7 @@ use App\Domain\Company\Setting;
 use App\Domain\Projects\ProjectState;
 use App\Models\Attachment;
 use App\Models\AuditEvent;
+use App\Models\BudgetSnapshot;
 use App\Models\Company;
 use App\Models\Contract;
 use App\Models\ContractExerciseClassification;
@@ -22,6 +23,7 @@ use App\Models\Project;
 use App\Models\ProjectContractLink;
 use App\Models\ProjectExerciseClassification;
 use App\Models\ProjectTransition;
+use App\Models\Proposal;
 use App\Models\Supplier;
 use App\Models\SupplierContact;
 use App\Models\User;
@@ -61,6 +63,10 @@ class CompanyAudit extends Page implements HasTable
 
     public ?int $contract = null;
 
+    public ?int $proposal = null;
+
+    public ?int $budget = null;
+
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
@@ -85,6 +91,10 @@ class CompanyAudit extends Page implements HasTable
             ->exists()
                 ? $requestedContract
                 : null;
+        $requestedProposal = request()->integer('proposal');
+        $this->proposal = $requestedProposal > 0 && Proposal::query()->where('company_id', $this->company()->id)->whereKey($requestedProposal)->exists() ? $requestedProposal : null;
+        $requestedBudget = request()->integer('budget');
+        $this->budget = $requestedBudget > 0 && BudgetSnapshot::query()->where('company_id', $this->company()->id)->whereKey($requestedBudget)->exists() ? $requestedBudget : null;
     }
 
     public static function canAccess(): bool
@@ -123,6 +133,12 @@ class CompanyAudit extends Page implements HasTable
                         ->where('company_id', $this->company()->id)
                         ->findOrFail($this->contract);
                     $query->forContract($contract);
+                }
+                if ($this->proposal !== null) {
+                    $query->where(fn (Builder $filter): Builder => $filter->where(fn (Builder $subject): Builder => $subject->where('subject_type', Proposal::class)->where('subject_id', $this->proposal))->orWhere(fn (Builder $reference): Builder => $reference->where('reference_type', Proposal::class)->where('reference_id', $this->proposal))->orWhere('new_value->proposal_id', $this->proposal));
+                }
+                if ($this->budget !== null) {
+                    $query->where(fn (Builder $filter): Builder => $filter->where(fn (Builder $subject): Builder => $subject->where('subject_type', BudgetSnapshot::class)->where('subject_id', $this->budget))->orWhere(fn (Builder $reference): Builder => $reference->where('reference_type', BudgetSnapshot::class)->where('reference_id', $this->budget))->orWhere('new_value->budget_id', $this->budget));
                 }
 
                 return $query->orderByDesc('created_at')->orderByDesc('id');
@@ -284,6 +300,8 @@ class CompanyAudit extends Page implements HasTable
             ContractExerciseClassification::class => 'Classificazione Contratto',
             ProjectContractLink::class => 'Collegamento Progetto-Contratto',
             Attachment::class => 'Allegato',
+            Proposal::class => 'Proposta',
+            BudgetSnapshot::class => 'Budget',
             Company::class => 'Azienda',
             User::class => 'Utente',
             default => class_basename($event->subject_type),

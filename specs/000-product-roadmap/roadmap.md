@@ -39,7 +39,7 @@ cycle only when dependencies are ready.
 | S3 | `004-exercises-expenses` | Esercizi, Spese e Righe | S1,S2 | Create open year and autonomous expenses; estimates/actuals calculate correctly | verified |
 | S4 | `005-projects` | Progetti | S3 | Create project, transition state, attach expenses, see allocation/actual/variance | verified |
 | S5 | `006-contracts` | Contratti | S2,S3 | Create contract, generate annual estimate, handle lifecycle and deadlines | verified |
-| S6 | `007-proposal-budget-v1` | Proposta e Budget iniziale | S3,S4,S5 | Prepare isolated proposal and approve immutable Budget v1 | planned |
+| S6 | `007-proposal-budget-v1` | Proposta e Budget iniziale | S3,S4,S5 | Prepare isolated proposal and approve immutable Budget v1 | verified |
 | S7 | `008-revisions-alignment-multiyear` | Revisioni, riallineamento e impatto multi-Esercizio | S6 | Reality changes invalidate proposal; revision and multi-year actions stay atomic | planned |
 | S8 | `009-carryover-reprogramming` | Riporto e Riprogrammazione | S4,S7 | Choose one deferral mode and transfer valid amount without double application | planned |
 | S9 | `010-closing` | Chiusura | S5,S7,S8 | Close year with blocking checks, warnings and immutable closing snapshot | planned |

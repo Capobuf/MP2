@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 #[Fillable([
-    'company_id', 'contract_id', 'expense_id', 'expense_line_id', 'storage_disk',
+    'company_id', 'proposal_id', 'contract_id', 'expense_id', 'expense_line_id', 'storage_disk',
     'storage_path', 'original_name', 'media_type', 'size_bytes', 'sha256',
     'uploaded_by_id', 'detached_at', 'detached_by_id',
 ])]
@@ -31,6 +31,12 @@ class Attachment extends Model
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    /** @return BelongsTo<Proposal, $this> */
+    public function proposal(): BelongsTo
+    {
+        return $this->belongsTo(Proposal::class);
     }
 
     /** @return BelongsTo<Contract, $this> */

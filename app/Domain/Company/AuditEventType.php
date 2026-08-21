@@ -64,6 +64,15 @@ enum AuditEventType: string
     case ContractRestored = 'contract_restored';
     case AttachmentUploaded = 'attachment_uploaded';
     case AttachmentDetached = 'attachment_detached';
+    case ProposalInitialized = 'proposal_initialized';
+    case ProposalSourceIncluded = 'proposal_source_included';
+    case ProposalActionPlanned = 'proposal_action_planned';
+    case ProposalActionApplied = 'proposal_action_applied';
+    case ProposalReadinessReviewed = 'proposal_readiness_reviewed';
+    case ProposalMarkedToRealign = 'proposal_marked_to_realign';
+    case ProposalApproved = 'proposal_approved';
+    case ProposalApprovalFailed = 'proposal_approval_failed';
+    case BudgetCreated = 'budget_created';
 
     public function label(): string
     {
@@ -128,6 +137,15 @@ enum AuditEventType: string
             self::ContractRestored => 'Contratto ripristinato',
             self::AttachmentUploaded => 'Allegato caricato',
             self::AttachmentDetached => 'Allegato rimosso dall’oggetto',
+            self::ProposalInitialized => 'Proposta inizializzata',
+            self::ProposalSourceIncluded => 'Sorgente inclusa nella proposta',
+            self::ProposalActionPlanned => 'Decisione di piano registrata',
+            self::ProposalActionApplied => 'Decisione di piano applicata',
+            self::ProposalReadinessReviewed => 'Verifiche proposta ricalcolate',
+            self::ProposalMarkedToRealign => 'Sorgente proposta da riallineare',
+            self::ProposalApproved => 'Proposta approvata',
+            self::ProposalApprovalFailed => 'Approvazione proposta fallita',
+            self::BudgetCreated => 'Budget creato',
         };
     }
 }

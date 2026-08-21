@@ -101,6 +101,12 @@ class Contract extends Model
         return $this->hasMany(Attachment::class);
     }
 
+    /** @return HasMany<ProposalItem, $this> */
+    public function proposalItems(): HasMany
+    {
+        return $this->hasMany(ProposalItem::class);
+    }
+
     /** @param Builder<self> $query */
     public function scopeActive(Builder $query): void
     {

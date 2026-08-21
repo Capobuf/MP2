@@ -72,6 +72,12 @@ class Project extends Model
         return $this->hasMany(ProjectContractLink::class);
     }
 
+    /** @return HasMany<ProposalItem, $this> */
+    public function proposalItems(): HasMany
+    {
+        return $this->hasMany(ProposalItem::class);
+    }
+
     /** @param Builder<self> $query */
     public function scopeActive(Builder $query): void
     {

@@ -278,6 +278,10 @@
     margin-inline-start: auto;
 }
 
+.mp2-context-menu-group-divided {
+    border-top: 1px solid var(--border);
+}
+
 .mp2-row-select-action {
     display: none !important;
 }
@@ -786,16 +790,51 @@
     }
 
     .mp2-context-selector {
-        display: none;
+        gap: 4px;
+    }
+
+    .mp2-context-control {
+        height: 36px;
+        padding-inline: 7px;
+    }
+
+    .mp2-context-company {
+        width: 116px;
+    }
+
+    .mp2-context-exercise {
+        width: 112px;
     }
 }
 
 @media (max-width: 767px) {
+    .fi-global-search-ctn,
+    .fi-global-search {
+        width: 96px !important;
+        min-width: 0;
+    }
+
     .fi-main {
         padding-inline: 16px;
     }
 
     .fi-page-header-main-ctn {
         padding-block: 20px;
+    }
+
+    .mp2-context-company {
+        width: 96px;
+    }
+
+    .mp2-context-exercise {
+        width: 92px;
+    }
+
+    .mp2-context-dot {
+        display: none;
+    }
+
+    .mp2-context-value {
+        font-size: 0.75rem;
     }
 }

@@ -61,6 +61,24 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         return $this->hasMany(ContractCondition::class, 'created_by_id');
     }
 
+    /** @return HasMany<Proposal, $this> */
+    public function createdProposals(): HasMany
+    {
+        return $this->hasMany(Proposal::class, 'created_by_id');
+    }
+
+    /** @return HasMany<Proposal, $this> */
+    public function approvedProposals(): HasMany
+    {
+        return $this->hasMany(Proposal::class, 'approved_by_id');
+    }
+
+    /** @return HasMany<BudgetSnapshot, $this> */
+    public function approvedBudgets(): HasMany
+    {
+        return $this->hasMany(BudgetSnapshot::class, 'approved_by_id');
+    }
+
     /** @return Collection<int, Company> */
     public function getTenants(Panel $panel): Collection
     {
