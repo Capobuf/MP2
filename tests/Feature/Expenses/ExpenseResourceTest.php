@@ -67,6 +67,35 @@ it('creates an expense with conditional Project or Contract ownership fields and
         ->and(ExpenseLine::query()->count())->toBe(1);
 });
 
+it('creates a distinct expense after save and create another', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+
+    Livewire::test(CreateExpense::class)
+        ->fillForm([
+            'exercise_id' => $exercise->id,
+            'description' => 'Prima spesa',
+            'lines' => [['type' => 'estimate', 'amount' => '100.00']],
+        ])
+        ->call('create', true)
+        ->assertHasNoFormErrors()
+        ->fillForm([
+            'exercise_id' => $exercise->id,
+            'description' => 'Seconda spesa',
+            'lines' => [['type' => 'estimate', 'amount' => '200.00']],
+        ])
+        ->call('create', true)
+        ->assertHasNoFormErrors();
+
+    expect(Expense::query()->orderBy('id')->pluck('description')->all())
+        ->toBe(['Prima spesa', 'Seconda spesa'])
+        ->and(ExpenseLine::query()->count())->toBe(2);
+});
+
 it('lists and resolves expenses only inside the current tenant', function () {
     $viewer = User::factory()->create();
     $companyA = Company::factory()->create();

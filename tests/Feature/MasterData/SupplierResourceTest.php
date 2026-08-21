@@ -79,6 +79,33 @@ it('creates suppliers from the tenant resource only for a master data manager', 
     $this->get(SupplierResource::getUrl('create', tenant: $company))->assertForbidden();
 });
 
+it('creates a distinct supplier after save and create another', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantSupplierResourceCapabilities($manager, $company);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+
+    Livewire::test(CreateSupplier::class)
+        ->fillForm([
+            'legal_name' => 'Primo fornitore',
+            'vat_number' => null,
+            'notes' => null,
+        ])
+        ->call('create', true)
+        ->assertHasNoFormErrors()
+        ->fillForm([
+            'legal_name' => 'Secondo fornitore',
+            'vat_number' => null,
+            'notes' => null,
+        ])
+        ->call('create', true)
+        ->assertHasNoFormErrors();
+
+    expect(Supplier::query()->orderBy('id')->pluck('legal_name')->all())
+        ->toBe(['Primo fornitore', 'Secondo fornitore']);
+});
+
 it('defaults to active suppliers and exposes archived and all filters without delete', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();

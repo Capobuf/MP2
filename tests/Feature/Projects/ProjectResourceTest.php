@@ -92,6 +92,37 @@ it('creates a Project from the tenant UI without future-slice or destructive fie
         ->and(Expense::query()->count())->toBe(0);
 });
 
+it('creates a distinct Project after save and create another', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantProjectResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2027]);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+
+    Livewire::test(CreateProject::class)
+        ->fillForm([
+            'title' => 'Primo progetto',
+            'initial_state' => ProjectState::Planned->value,
+            'initial_effective_date' => '2027-01-01',
+            'exercise_id' => $exercise->id,
+        ])
+        ->call('create', true)
+        ->assertHasNoFormErrors()
+        ->fillForm([
+            'title' => 'Secondo progetto',
+            'initial_state' => ProjectState::Planned->value,
+            'initial_effective_date' => '2027-01-01',
+            'exercise_id' => $exercise->id,
+        ])
+        ->call('create', true)
+        ->assertHasNoFormErrors();
+
+    expect(Project::query()->orderBy('id')->pluck('title')->all())
+        ->toBe(['Primo progetto', 'Secondo progetto'])
+        ->and(ProjectExerciseClassification::query()->count())->toBe(2);
+});
+
 it('lists views and resolves Projects only inside the current tenant', function () {
     $viewer = User::factory()->create();
     $companyA = Company::factory()->create(['timezone' => 'Europe/Rome']);

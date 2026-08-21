@@ -36,6 +36,11 @@ class CreateExercise extends CreateRecord
         return app(CreateExerciseAction::class)->execute($actor, $company, $data, $this->operationId);
     }
 
+    protected function afterCreate(): void
+    {
+        $this->operationId = (string) Str::uuid();
+    }
+
     protected function getRedirectUrl(): string
     {
         /** @var Exercise $record */

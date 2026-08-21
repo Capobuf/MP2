@@ -34,6 +34,11 @@ class CreateSupplier extends CreateRecord
         return app(CreateSupplierAction::class)->execute($actor, $company, $data, $this->operationId);
     }
 
+    protected function afterCreate(): void
+    {
+        $this->operationId = (string) Str::uuid();
+    }
+
     protected function getRedirectUrl(): string
     {
         /** @var Supplier $record */

@@ -69,3 +69,22 @@ it('creates only a year and exposes no later-slice fields or edit route', functi
     expect(Exercise::query()->sole()->year)->toBe(2032)
         ->and(array_key_exists('edit', ExerciseResource::getPages()))->toBeFalse();
 });
+
+it('creates a distinct exercise after save and create another', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExerciseResource($manager, $company);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+
+    Livewire::test(CreateExercise::class)
+        ->fillForm(['year' => 2032])
+        ->call('create', true)
+        ->assertHasNoFormErrors()
+        ->fillForm(['year' => 2033])
+        ->call('create', true)
+        ->assertHasNoFormErrors();
+
+    expect(Exercise::query()->orderBy('year')->pluck('year')->all())
+        ->toBe([2032, 2033]);
+});

@@ -40,6 +40,11 @@ class CreateExpense extends CreateRecord
         return $expense;
     }
 
+    protected function afterCreate(): void
+    {
+        $this->operationId = (string) Str::uuid();
+    }
+
     protected function getRedirectUrl(): string
     {
         /** @var Expense $record */

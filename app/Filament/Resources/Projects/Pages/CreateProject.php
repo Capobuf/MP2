@@ -36,6 +36,11 @@ class CreateProject extends CreateRecord
         return app(CreateProjectAction::class)->execute($actor, $company, $data, $this->operationId);
     }
 
+    protected function afterCreate(): void
+    {
+        $this->operationId = (string) Str::uuid();
+    }
+
     protected function getRedirectUrl(): string
     {
         /** @var Project $record */

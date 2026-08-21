@@ -74,6 +74,25 @@ it('creates cost centers for managers without exposing later-slice fields', func
     $this->get(CostCenterResource::getUrl('create', tenant: $company))->assertForbidden();
 });
 
+it('creates a distinct cost center after save and create another', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantCostCenterResourceCapabilities($manager, $company);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+
+    Livewire::test(CreateCostCenter::class)
+        ->fillForm(['name' => 'Operations'])
+        ->call('create', true)
+        ->assertHasNoFormErrors()
+        ->fillForm(['name' => 'Amministrazione'])
+        ->call('create', true)
+        ->assertHasNoFormErrors();
+
+    expect(CostCenter::query()->orderBy('id')->pluck('name')->all())
+        ->toBe(['Operations', 'Amministrazione']);
+});
+
 it('defaults to active cost centers and exposes archived and all filters without delete', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
