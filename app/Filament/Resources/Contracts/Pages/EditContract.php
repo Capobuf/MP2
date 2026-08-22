@@ -34,7 +34,7 @@ class EditContract extends EditRecord
     {
         return $schema->components([
             Section::make('Dati modificabili')
-                ->description('Modifica i dati descrittivi. Scadenze, rinnovo e condizioni economiche si gestiscono dalle azioni dedicate del Contratto.')
+                ->description('Aggiorna titolo, Fornitore quando consentito e note. Scadenze, rinnovo e condizioni economiche si gestiscono dalle azioni dedicate del Contratto.')
                 ->schema([
                     Grid::make(['default' => 1, 'md' => 2])
                         ->schema([
