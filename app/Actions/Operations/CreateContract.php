@@ -45,15 +45,16 @@ class CreateContract
                 ($normalized['automatic_renewal'] ?? false) && ($normalized['next_expiry_date'] ?? null) !== null,
             )],
             'notice_days' => ['nullable', 'integer', 'min:0'],
-            'condition' => ['required', 'array'],
-            'condition.amount' => ['required', 'decimal:0,2', 'min:0'],
-            'condition.cycle' => ['required', Rule::enum(ContractCycleType::class)],
-            'condition.attribution_mode' => ['required', Rule::enum(ContractAttributionMode::class)],
-            'condition.valid_from' => ['required', 'date_format:Y-m-d', 'after_or_equal:contractual_start_date'],
-            'condition.valid_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:condition.valid_from'],
+            'conditions' => ['required', 'array', 'min:1'],
+            'conditions.*.amount' => ['required', 'decimal:0,2', 'min:0'],
+            'conditions.*.cycle' => ['required', Rule::enum(ContractCycleType::class)],
+            'conditions.*.attribution_mode' => ['required', Rule::enum(ContractAttributionMode::class)],
+            'conditions.*.valid_from' => ['required', 'date_format:Y-m-d', 'after_or_equal:contractual_start_date'],
+            'conditions.*.valid_to' => ['nullable', 'date_format:Y-m-d'],
             'classifications' => ['array'],
             'operation_id' => ['required', 'uuid'],
         ])->validate();
+        $this->validateConditionIntervals($validated['conditions']);
 
         return DB::transaction(function () use ($actor, $company, $validated): Contract {
             $lockedCompany = Company::query()->lockForUpdate()->findOrFail($company->id);
@@ -112,16 +113,18 @@ class CreateContract
                 'state_change_date' => $validated['contractual_start_date'],
                 'created_by_id' => $actor->id,
             ]);
-            $condition = ContractCondition::query()->create([
-                'company_id' => $lockedCompany->id,
-                'contract_id' => $contract->id,
-                'cycle' => $validated['condition']['cycle'],
-                'attribution_mode' => $validated['condition']['attribution_mode'],
-                'amount' => $validated['condition']['amount'],
-                'valid_from' => $validated['condition']['valid_from'],
-                'valid_to' => $validated['condition']['valid_to'],
-                'created_by_id' => $actor->id,
-            ]);
+            $conditions = collect($validated['conditions'])
+                ->sortBy('valid_from')
+                ->map(fn (array $condition): ContractCondition => ContractCondition::query()->create([
+                    'company_id' => $lockedCompany->id,
+                    'contract_id' => $contract->id,
+                    'cycle' => $condition['cycle'],
+                    'attribution_mode' => $condition['attribution_mode'],
+                    'amount' => $condition['amount'],
+                    'valid_from' => $condition['valid_from'],
+                    'valid_to' => $condition['valid_to'],
+                    'created_by_id' => $actor->id,
+                ]));
 
             foreach ($exercises as $exercise) {
                 ContractExerciseClassification::query()->create([
@@ -149,12 +152,14 @@ class CreateContract
             $this->event($actor, $contract, $validated['operation_id'], $sequence++, AuditEventType::ContractActivation, $affectedIds, [
                 'lifecycle_fact_id' => $activation->id,
             ], $validated['contractual_start_date']);
-            $this->event($actor, $contract, $validated['operation_id'], $sequence++, AuditEventType::ContractConditionCreated, $affectedIds, [
-                'condition_id' => $condition->id,
-                'amount' => (string) $condition->amount,
-                'cycle' => $condition->cycle,
-                'attribution_mode' => $condition->attribution_mode,
-            ], $validated['condition']['valid_from']);
+            foreach ($conditions as $condition) {
+                $this->event($actor, $contract, $validated['operation_id'], $sequence++, AuditEventType::ContractConditionCreated, $affectedIds, [
+                    'condition_id' => $condition->id,
+                    'amount' => (string) $condition->amount,
+                    'cycle' => $condition->cycle,
+                    'attribution_mode' => $condition->attribution_mode,
+                ], $condition->valid_from->toDateString());
+            }
 
             if ($validated['automatic_renewal'] && $anchor !== null) {
                 $schedule = ContractRenewalSchedule::fromAnchor($anchor, (int) $validated['renewal_duration_months'], $today->toDateString());
@@ -189,28 +194,56 @@ class CreateContract
      */
     private function normalize(array $input, string $operationId): array
     {
-        $condition = is_array($input['condition'] ?? null) ? $input['condition'] : [];
+        $conditions = is_array($input['conditions'] ?? null)
+            ? $input['conditions']
+            : [is_array($input['condition'] ?? null) ? $input['condition'] : []];
 
         return [
             'title' => is_string($input['title'] ?? null) ? trim($input['title']) : ($input['title'] ?? null),
             'notes' => $this->nullableTrim($input['notes'] ?? null),
             'supplier_id' => $input['supplier_id'] ?? null,
             'contractual_start_date' => $input['contractual_start_date'] ?? null,
-            'next_expiry_date' => $input['next_expiry_date'] ?: null,
-            'renewal_effective_from' => $input['renewal_effective_from'] ?? null,
+            'next_expiry_date' => ($input['next_expiry_date'] ?? null) ?: null,
+            'renewal_effective_from' => ($input['renewal_effective_from'] ?? null) ?: ($input['contractual_start_date'] ?? null),
             'automatic_renewal' => $input['automatic_renewal'] ?? true,
-            'renewal_duration_months' => $input['renewal_duration_months'] ?: null,
+            'renewal_duration_months' => ($input['renewal_duration_months'] ?? null) ?: null,
             'notice_days' => ($input['notice_days'] ?? null) === '' ? null : ($input['notice_days'] ?? null),
-            'condition' => [
+            'conditions' => array_map(fn (array $condition): array => [
                 'amount' => $condition['amount'] ?? null,
                 'cycle' => $condition['cycle'] ?? null,
                 'attribution_mode' => $condition['attribution_mode'] ?? null,
                 'valid_from' => $condition['valid_from'] ?? null,
                 'valid_to' => ($condition['valid_to'] ?? null) ?: null,
-            ],
+            ], $conditions),
             'classifications' => $input['classifications'] ?? [],
             'operation_id' => $operationId,
         ];
+    }
+
+    /** @param list<array<string, mixed>> $conditions */
+    private function validateConditionIntervals(array $conditions): void
+    {
+        usort($conditions, fn (array $left, array $right): int => strcmp((string) $left['valid_from'], (string) $right['valid_from']));
+
+        foreach ($conditions as $index => $condition) {
+            $validFrom = CarbonImmutable::parse($condition['valid_from'])->startOfDay();
+            $validTo = $condition['valid_to'] === null
+                ? null
+                : CarbonImmutable::parse($condition['valid_to'])->startOfDay();
+
+            if ($validTo !== null && $validTo->lessThan($validFrom)) {
+                throw ValidationException::withMessages(['conditions' => 'La fine di ogni condizione deve essere uguale o successiva al relativo inizio.']);
+            }
+
+            if ($index === 0) {
+                continue;
+            }
+
+            $previousValidTo = $conditions[$index - 1]['valid_to'];
+            if ($previousValidTo === null || $validFrom->lessThanOrEqualTo(CarbonImmutable::parse($previousValidTo)->startOfDay())) {
+                throw ValidationException::withMessages(['conditions' => 'Le condizioni economiche valide non possono sovrapporsi.']);
+            }
+        }
     }
 
     /**

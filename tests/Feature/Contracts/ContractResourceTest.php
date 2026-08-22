@@ -19,6 +19,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
+use Filament\Resources\RelationManagers\RelationGroup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -54,19 +55,18 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
 
     Livewire::test(CreateContract::class)
         ->assertSee('Le date di fattura e pagamento appartengono alle Spese.')
-        ->assertSee('Nessun prorata')
+        ->assertSee('non producono prorata')
         ->assertDontSee('Salva & nuovo')
         ->assertFormFieldExists('title')
         ->assertFormFieldExists('supplier_id')
         ->assertFormComponentActionHidden('supplier_id', 'createOption')
+        ->assertFormFieldExists('conditions')
         ->assertFormFieldExists('contractual_start_date')
-        ->assertFormFieldExists('next_expiry_date')
-        ->assertFormFieldExists('renewal_effective_from')
-        ->assertFormFieldExists('automatic_renewal')
+        ->assertFormFieldExists('duration_type')
+        ->assertFormFieldDoesNotExist('next_expiry_date')
+        ->assertFormFieldDoesNotExist('automatic_renewal')
         ->assertFormFieldDoesNotExist('renewal_duration_months')
-        ->assertFormFieldExists('condition.amount')
-        ->assertFormFieldExists('condition.cycle')
-        ->assertFormFieldExists('condition.attribution_mode')
+        ->assertFormFieldDoesNotExist('notice_days')
         ->assertFormFieldDoesNotExist('replacement_contract_id')
         ->assertFormFieldDoesNotExist('proposal_id')
         ->assertFormFieldDoesNotExist('budget_id')
@@ -78,8 +78,15 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
 
             return [];
         })
-        ->fillForm(['next_expiry_date' => '2026-12-31'])
+        ->fillForm(['duration_type' => 'indefinite'])
+        ->assertFormFieldDoesNotExist('next_expiry_date')
+        ->assertFormFieldDoesNotExist('renewal_duration_months')
+        ->assertFormFieldDoesNotExist('notice_days')
+        ->fillForm(['duration_type' => 'fixed'])
+        ->assertFormFieldExists('next_expiry_date')
+        ->assertFormFieldExists('automatic_renewal')
         ->assertFormFieldExists('renewal_duration_months')
+        ->assertFormFieldExists('notice_days')
         ->fillForm(['renewal_duration_months' => 12, 'automatic_renewal' => false])
         ->assertFormFieldDoesNotExist('renewal_duration_months')
         ->assertFormSet(['renewal_duration_months' => null])
@@ -87,23 +94,22 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
             'title' => 'Contratto energia',
             'supplier_id' => $supplier->id,
             'contractual_start_date' => '2026-01-01',
-            'next_expiry_date' => null,
-            'renewal_effective_from' => '2026-01-01',
+            'duration_type' => 'indefinite',
             'automatic_renewal' => true,
             'renewal_duration_months' => null,
-            'notice_days' => null,
-            'condition' => [
+            'conditions' => [[
                 'amount' => '120,50',
                 'cycle' => 'monthly',
                 'attribution_mode' => 'cycle_start',
                 'valid_from' => '2026-01-01',
                 'valid_to' => null,
-            ],
+            ]],
             'classifications' => [[
                 'exercise_id' => $exercise->id,
                 'cost_center_id' => null,
             ]],
         ])
+        ->assertFormSet(['renewal_effective_from' => '2026-01-01'])
         ->call('create')
         ->assertHasNoFormErrors();
 
@@ -159,6 +165,11 @@ it('lists and views tenant Contracts with undefined expiry and annual situations
     Livewire::test(ListContracts::class)
         ->assertCanSeeTableRecords([$contractA])
         ->assertCanNotSeeTableRecords([$contractB])
+        ->assertTableFilterExists('supplier')
+        ->assertTableFilterExists('cost_center')
+        ->assertTableFilterExists('automatic_renewal')
+        ->assertTableFilterExists('next_expiry_date')
+        ->assertTableFilterExists('archived_at')
         ->assertTableActionDoesNotExist('delete', record: $contractA)
         ->assertTableActionHidden('edit', record: $contractA);
 
@@ -200,7 +211,9 @@ it('allows descriptive and eligible Supplier edit while keeping contractual date
 });
 
 it('registers explicit lifecycle and renewal management surfaces', function () {
-    expect(ContractResource::getRelations())->toContain(
+    $groups = collect(ContractResource::getRelations())->filter(fn (mixed $relation): bool => $relation instanceof RelationGroup);
+
+    expect($groups->flatMap(fn (RelationGroup $group): array => $group->getManagers())->all())->toContain(
         ContractLifecycleRelationManager::class,
         ContractRenewalsRelationManager::class,
     );

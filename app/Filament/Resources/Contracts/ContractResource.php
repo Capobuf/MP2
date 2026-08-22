@@ -7,7 +7,6 @@ use App\Filament\Resources\Contracts\Pages\CreateContract;
 use App\Filament\Resources\Contracts\Pages\EditContract;
 use App\Filament\Resources\Contracts\Pages\ListContracts;
 use App\Filament\Resources\Contracts\Pages\ViewContract;
-use App\Filament\Resources\Contracts\RelationManagers\ContractAnnualSituationsRelationManager;
 use App\Filament\Resources\Contracts\RelationManagers\ContractAttachmentsRelationManager;
 use App\Filament\Resources\Contracts\RelationManagers\ContractClassificationsRelationManager;
 use App\Filament\Resources\Contracts\RelationManagers\ContractConditionsRelationManager;
@@ -23,6 +22,7 @@ use App\Models\Contract;
 use App\Models\User;
 use BackedEnum;
 use Filament\Facades\Filament;
+use Filament\Resources\RelationManagers\RelationGroup;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -121,14 +121,17 @@ class ContractResource extends Resource
     public static function getRelations(): array
     {
         return [
-            ContractAnnualSituationsRelationManager::class,
-            ContractClassificationsRelationManager::class,
             ContractConditionsRelationManager::class,
+            RelationGroup::make('Scadenze e rinnovi', [
+                ContractLifecycleRelationManager::class,
+                ContractRenewalsRelationManager::class,
+            ]),
             ContractExpensesRelationManager::class,
-            ContractLifecycleRelationManager::class,
-            ContractRenewalsRelationManager::class,
-            ProjectContractLinksRelationManager::class,
             ContractAttachmentsRelationManager::class,
+            RelationGroup::make('Relazioni', [
+                ContractClassificationsRelationManager::class,
+                ProjectContractLinksRelationManager::class,
+            ]),
         ];
     }
 }

@@ -7,6 +7,7 @@ use App\Filament\Resources\Contracts\ContractResource;
 use App\Models\Company;
 use App\Models\Contract;
 use App\Models\User;
+use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
@@ -46,5 +47,10 @@ class CreateContract extends CreateRecord
         $record = $this->record;
 
         return ContractResource::getUrl('view', ['record' => $record]);
+    }
+
+    protected function getCreateFormAction(): Action
+    {
+        return parent::getCreateFormAction()->label('Crea contratto');
     }
 }

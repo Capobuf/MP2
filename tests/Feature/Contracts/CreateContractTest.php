@@ -97,6 +97,72 @@ it('creates the aggregate estimates and ordered timeline atomically and idempote
         );
 });
 
+it('creates several non-overlapping economic conditions in the same operation', function () {
+    $actor = User::factory()->create();
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    grantContractOperations($actor, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $supplier = Supplier::factory()->for($company)->create();
+    $input = validContractInput($supplier, $exercise);
+    $input['contractual_start_date'] = '2026-01-01';
+    unset($input['condition']);
+    $input['conditions'] = [
+        [
+            'amount' => '100.00',
+            'cycle' => 'monthly',
+            'attribution_mode' => 'cycle_start',
+            'valid_from' => '2026-01-01',
+            'valid_to' => '2026-06-30',
+        ],
+        [
+            'amount' => '200.00',
+            'cycle' => 'monthly',
+            'attribution_mode' => 'cycle_start',
+            'valid_from' => '2026-07-01',
+            'valid_to' => null,
+        ],
+    ];
+    $operationId = (string) Str::uuid();
+
+    app(CreateContract::class)->execute($actor, $company, $input, $operationId);
+
+    expect(ContractCondition::query()->orderBy('valid_from')->pluck('amount')->all())->toBe(['100.00', '200.00'])
+        ->and(Expense::query()->where('origin', 'system')->sole()->allocation())->toBe('1800.00')
+        ->and(AuditEvent::query()->where('operation_id', $operationId)->where('event_type', AuditEventType::ContractConditionCreated)->count())->toBe(2);
+});
+
+it('rejects overlapping economic conditions without partial rows', function () {
+    $actor = User::factory()->create();
+    $company = Company::factory()->create();
+    grantContractOperations($actor, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $supplier = Supplier::factory()->for($company)->create();
+    $input = validContractInput($supplier, $exercise);
+    unset($input['condition']);
+    $input['conditions'] = [
+        [
+            'amount' => '100.00',
+            'cycle' => 'monthly',
+            'attribution_mode' => 'cycle_start',
+            'valid_from' => '2026-01-31',
+            'valid_to' => '2026-07-31',
+        ],
+        [
+            'amount' => '200.00',
+            'cycle' => 'monthly',
+            'attribution_mode' => 'cycle_start',
+            'valid_from' => '2026-07-31',
+            'valid_to' => null,
+        ],
+    ];
+
+    expect(fn () => app(CreateContract::class)->execute($actor, $company, $input, (string) Str::uuid()))
+        ->toThrow(ValidationException::class)
+        ->and(Contract::query()->count())->toBe(0)
+        ->and(ContractCondition::query()->count())->toBe(0)
+        ->and(AuditEvent::query()->count())->toBe(0);
+});
+
 it('rejects invalid or archived references without partial rows', function () {
     $actor = User::factory()->create();
     $company = Company::factory()->create();

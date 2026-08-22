@@ -26,6 +26,7 @@ use App\Models\ExpenseLine;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
+use Filament\Resources\RelationManagers\RelationGroup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -120,11 +121,16 @@ it('registers classification link and private attachment governance surfaces wit
     $this->actingAs($user);
     Filament::setTenant($company);
 
-    expect(ContractResource::getRelations())->toContain(
-        ContractClassificationsRelationManager::class,
-        ProjectContractLinksRelationManager::class,
-        ContractAttachmentsRelationManager::class,
-    )->and(ExpenseResource::getRelations())->toContain(ExpenseAttachmentsRelationManager::class)
+    $contractRelations = collect(ContractResource::getRelations());
+    $groupedContractRelations = $contractRelations
+        ->filter(fn (mixed $relation): bool => $relation instanceof RelationGroup)
+        ->flatMap(fn (RelationGroup $group): array => $group->getManagers());
+
+    expect($contractRelations)->toContain(ContractAttachmentsRelationManager::class)
+        ->and($groupedContractRelations)->toContain(
+            ContractClassificationsRelationManager::class,
+            ProjectContractLinksRelationManager::class,
+        )->and(ExpenseResource::getRelations())->toContain(ExpenseAttachmentsRelationManager::class)
         ->and(ProjectResource::getRelations())->toContain(App\Filament\Resources\Projects\RelationManagers\ProjectContractLinksRelationManager::class);
 
     Livewire::test(ContractClassificationsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])

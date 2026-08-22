@@ -6,14 +6,20 @@ use App\Domain\Contracts\ContractAnnualAllocation;
 use App\Domain\Contracts\ContractStateTimeline;
 use App\Domain\Expenses\Decimal;
 use App\Filament\Resources\Contracts\ContractResource;
+use App\Models\Company;
 use App\Models\Contract;
+use App\Models\CostCenter;
 use App\Models\Exercise;
+use App\Models\Supplier;
 use App\Support\ExerciseContext;
 use Carbon\CarbonImmutable;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Support\Enums\Alignment;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -59,13 +65,50 @@ class ContractsTable
             TextColumn::make('updated_at')->label('Ultima modifica')->dateTime('d/m/Y H:i')->sortable()
                 ->toggleable(isToggledHiddenByDefault: true),
         ])->filters([
-            TernaryFilter::make('archived_at')->label('Archivio')->placeholder('Tutti')->trueLabel('Archiviati')->falseLabel('Attivi')->default(false)
+            SelectFilter::make('supplier')->label('Fornitore')
+                ->native(false)
+                ->options(fn (): array => Filament::getTenant() instanceof Company
+                    ? Supplier::query()->whereBelongsTo(Filament::getTenant(), 'company')->orderBy('legal_name')->pluck('legal_name', 'id')->all()
+                    : [])
+                ->query(fn (Builder $query, array $data): Builder => blank($data['value'] ?? null)
+                    ? $query
+                    : $query->where('supplier_id', $data['value'])),
+            SelectFilter::make('cost_center')->label('Centro di Costo')
+                ->native(false)
+                ->options(fn (): array => Filament::getTenant() instanceof Company
+                    ? CostCenter::query()->whereBelongsTo(Filament::getTenant(), 'company')->orderBy('name')->pluck('name', 'id')->all()
+                    : [])
+                ->query(function (Builder $query, array $data): Builder {
+                    $company = Filament::getTenant();
+                    $costCenterId = $data['value'] ?? null;
+                    $exercise = $company instanceof Company ? app(ExerciseContext::class)->current($company) : null;
+
+                    return blank($costCenterId) || $exercise === null
+                        ? $query
+                        : $query->whereHas('classifications', fn (Builder $classification): Builder => $classification
+                            ->where('exercise_id', $exercise->id)
+                            ->where('cost_center_id', $costCenterId));
+                }),
+            TernaryFilter::make('automatic_renewal')->label('Rinnovo automatico')->native(false)
+                ->placeholder('Tutti')->trueLabel('Attivo')->falseLabel('Disattivo'),
+            TernaryFilter::make('next_expiry_date')->label('Durata')->native(false)
+                ->placeholder('Tutte')->trueLabel('Con scadenza')->falseLabel('Senza scadenza')
+                ->queries(
+                    true: fn (Builder $query): Builder => $query->whereNotNull('next_expiry_date'),
+                    false: fn (Builder $query): Builder => $query->whereNull('next_expiry_date'),
+                    blank: fn (Builder $query): Builder => $query,
+                ),
+            TernaryFilter::make('archived_at')->label('Archivio')->native(false)->placeholder('Tutti')->trueLabel('Archiviati')->falseLabel('Attivi')->default(false)
                 ->queries(
                     true: fn (Builder $query): Builder => $query->whereNotNull('archived_at'),
                     false: fn (Builder $query): Builder => $query->whereNull('archived_at'),
                     blank: fn (Builder $query): Builder => $query,
                 ),
-        ])->searchPlaceholder('Cerca per titolo o fornitore')
+        ], layout: FiltersLayout::AboveContent)
+            ->filtersFormColumns(5)
+            ->deferFilters(false)
+            ->reorderableColumns()
+            ->searchPlaceholder('Cerca per titolo o fornitore')
             ->recordUrl(fn (Contract $record): string => ContractResource::getUrl('view', ['record' => $record]))
             ->recordActions([ViewAction::make(), EditAction::make()])
             ->emptyStateHeading('Nessun contratto')

@@ -232,6 +232,90 @@
     background: var(--primary-soft);
 }
 
+.fi-tabs:not(.fi-contained) {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    padding: 4px;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 3%);
+}
+
+.fi-tabs-item {
+    border-radius: 8px;
+}
+
+.fi-tabs-item.fi-active {
+    background: var(--primary-soft) !important;
+}
+
+.fi-tabs-item.fi-active .fi-tabs-item-label,
+.fi-tabs-item.fi-active > .fi-icon {
+    color: var(--primary) !important;
+}
+
+.fi-in-table-repeatable > table {
+    border: 1px solid var(--border) !important;
+    border-radius: 10px;
+    background: var(--surface) !important;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 3%);
+}
+
+.fi-in-table-repeatable > table > thead > tr > th {
+    border-color: var(--border) !important;
+    background: var(--surface-muted) !important;
+    color: var(--text-primary) !important;
+}
+
+.fi-in-table-repeatable > table > tbody,
+.fi-in-table-repeatable > table > tbody > tr,
+.fi-in-table-repeatable > table > tbody > tr > td {
+    border-color: var(--border) !important;
+}
+
+.fi-in-table-repeatable > table > tbody > tr:hover {
+    background: var(--primary-soft);
+}
+
+.mp2-economic-conditions.fi-fo-table-repeater > table {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: 0 1px 2px rgb(15 23 42 / 3%);
+}
+
+.mp2-economic-conditions.fi-fo-table-repeater > table > thead > tr > th {
+    border-color: var(--border) !important;
+    background: var(--surface-muted) !important;
+    color: var(--text-primary) !important;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.mp2-economic-conditions.fi-fo-table-repeater > table > tbody {
+    border-color: var(--border);
+}
+
+.mp2-economic-conditions.fi-fo-table-repeater > table > tbody > tr {
+    border-color: var(--border);
+    background: var(--surface);
+    transition: background-color 100ms ease-out;
+}
+
+.mp2-economic-conditions.fi-fo-table-repeater > table > tbody > tr:hover {
+    background: var(--primary-soft);
+}
+
+.mp2-economic-conditions.fi-fo-table-repeater > table > tbody > tr > td {
+    border-color: var(--border) !important;
+    text-align: center;
+}
+
+.mp2-economic-conditions.fi-fo-table-repeater .fi-input,
+.mp2-economic-conditions.fi-fo-table-repeater .fi-select-input-btn,
+.mp2-economic-conditions.fi-fo-table-repeater .fi-select-input-value-label {
+    text-align: center;
+}
+
 .fi-ta-filters-above-content-ctn .fi-ta-filters {
     padding: 14px 16px;
 }

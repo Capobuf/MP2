@@ -9,9 +9,11 @@ use App\Models\Contract;
 use App\Models\Exercise;
 use Carbon\CarbonImmutable;
 use Filament\Infolists\Components\RepeatableEntry;
+use Filament\Infolists\Components\RepeatableEntry\TableColumn;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Alignment;
 
 class ContractInfolist
 {
@@ -31,20 +33,35 @@ class ContractInfolist
                 TextEntry::make('renewal_duration_months')->label('Durata rinnovo (mesi)')->placeholder('—'),
                 TextEntry::make('notice_days')->label('Preavviso (giorni)')->placeholder('—'),
             ])->columns(3),
-            Section::make('Situazioni annuali')->schema([
-                RepeatableEntry::make('annual_situations')->label('Situazioni annuali')
-                    ->state(fn (Contract $record): array => self::annualRows($record))
-                    ->schema([
-                        TextEntry::make('year')->label('Esercizio'),
-                        TextEntry::make('reference_date')->label('Data di riferimento')->date('d/m/Y'),
-                        TextEntry::make('state')->label('Stato')->badge(),
-                        TextEntry::make('cost_center')->label('Centro di Costo'),
-                        TextEntry::make('allocation')->label('Allocato')->money('EUR', locale: 'it'),
-                        TextEntry::make('actual')->label('Effettivo')->money('EUR', locale: 'it'),
-                        TextEntry::make('variance')->label('Scostamento')->money('EUR', locale: 'it'),
-                        TextEntry::make('composition')->label('Composizione esatta')->wrap(),
-                    ])->columns(3)->columnSpanFull(),
-            ]),
+            Section::make('Situazioni annuali')
+                ->description('Valori e cicli inclusi per ciascun Esercizio, calcolati alla relativa data di riferimento.')
+                ->schema([
+                    RepeatableEntry::make('annual_situations')->hiddenLabel()
+                        ->state(fn (Contract $record): array => self::annualRows($record))
+                        ->table([
+                            TableColumn::make('Esercizio'),
+                            TableColumn::make('Riferimento'),
+                            TableColumn::make('Stato'),
+                            TableColumn::make('Centro di Costo'),
+                            TableColumn::make('Allocato')->alignment(Alignment::End),
+                            TableColumn::make('Effettivo')->alignment(Alignment::End),
+                            TableColumn::make('Scostamento')->alignment(Alignment::End),
+                            TableColumn::make('Composizione')->width('20rem'),
+                        ])
+                        ->schema([
+                            TextEntry::make('year')->label('Esercizio'),
+                            TextEntry::make('reference_date')->label('Riferimento')->date('d/m/Y'),
+                            TextEntry::make('state')->label('Stato')->badge(),
+                            TextEntry::make('cost_center')->label('Centro di Costo'),
+                            TextEntry::make('allocation')->label('Allocato')->money('EUR', locale: 'it'),
+                            TextEntry::make('actual')->label('Effettivo')->money('EUR', locale: 'it'),
+                            TextEntry::make('variance')->label('Scostamento')->money('EUR', locale: 'it'),
+                            TextEntry::make('composition')->label('Composizione')
+                                ->listWithLineBreaks()
+                                ->placeholder('Nessun ciclo')
+                                ->wrap(),
+                        ])->columnSpanFull(),
+                ])->columnSpanFull(),
         ]);
     }
 
@@ -53,7 +70,7 @@ class ContractInfolist
         return $contract->stateAtDate(CarbonImmutable::now($contract->company->timezone)->toDateString())->label();
     }
 
-    /** @return list<array<string, int|string>> */
+    /** @return list<array{year: int, reference_date: string, state: string, cost_center: string, allocation: string, actual: string, variance: string, composition: list<string>}> */
     private static function annualRows(Contract $contract): array
     {
         $today = CarbonImmutable::now($contract->company->timezone)->startOfDay();
@@ -81,7 +98,10 @@ class ContractInfolist
                 'allocation' => $allocation->amount,
                 'actual' => $actual,
                 'variance' => Decimal::subtract($actual, $allocation->amount),
-                'composition' => collect($allocation->composition)->map(fn (array $item): string => $item['attribution_date'].' · € '.$item['amount'])->implode(' · ') ?: 'Nessun ciclo',
+                'composition' => collect($allocation->composition)
+                    ->map(fn (array $item): string => CarbonImmutable::parse($item['attribution_date'])->format('d/m/Y').' · € '.number_format((float) $item['amount'], 2, ',', '.'))
+                    ->values()
+                    ->all(),
             ];
         })->values()->all();
     }
