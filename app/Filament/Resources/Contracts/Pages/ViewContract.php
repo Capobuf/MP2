@@ -32,18 +32,29 @@ class ViewContract extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('timeline')->label('Timeline del Contratto')->url(fn (Contract $record): string => CompanyAudit::getUrl([
-                'tenant' => $record->company,
-                'contract' => $record->id,
-            ])),
-            EditAction::make()->visible(fn (): bool => ! $this->contract()->isArchived()),
-            Action::make('archive')->label('Archivia')->color('warning')->requiresConfirmation()
+            Action::make('timeline')
+                ->label('Timeline')
+                ->color('gray')
+                ->url(fn (Contract $record): string => CompanyAudit::getUrl([
+                    'tenant' => $record->company,
+                    'contract' => $record->id,
+                ])),
+            EditAction::make()
+                ->label('Modifica')
+                ->visible(fn (): bool => ! $this->contract()->isArchived()),
+            Action::make('archive')
+                ->label('Archivia')
+                ->color('warning')
+                ->requiresConfirmation()
                 ->visible(fn (): bool => $this->canArchive())
                 ->form([
                     Hidden::make('contract_revision')->default(fn (): int => $this->contract()->revision),
                     Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
                 ])->action(fn (array $data) => $this->setArchived(true, $data)),
-            Action::make('restore')->label('Ripristina')->color('success')->requiresConfirmation()
+            Action::make('restore')
+                ->label('Ripristina')
+                ->color('success')
+                ->requiresConfirmation()
                 ->visible(fn (): bool => $this->canRestore())
                 ->form([
                     Hidden::make('contract_revision')->default(fn (): int => $this->contract()->revision),
