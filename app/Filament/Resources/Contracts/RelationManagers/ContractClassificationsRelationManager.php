@@ -24,7 +24,7 @@ class ContractClassificationsRelationManager extends RelationManager
 {
     protected static string $relationship = 'classifications';
 
-    protected static ?string $title = 'Classificazioni annuali';
+    protected static ?string $title = 'Classificazioni';
 
     public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
     {

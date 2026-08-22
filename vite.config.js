@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
     plugins: [
         laravel({
-            input: ['resources/css/filament/admin/theme.css'],
+            input: ['resources/css/filament/admin/theme.css', '1.svg', '2.svg'],
             refresh: true,
         }),
         tailwindcss(),

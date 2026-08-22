@@ -18,7 +18,7 @@ class ContractExpensesRelationManager extends RelationManager
 {
     protected static string $relationship = 'expenses';
 
-    protected static ?string $title = 'Spese del Contratto';
+    protected static ?string $title = 'Spese';
 
     public function isReadOnly(): bool
     {

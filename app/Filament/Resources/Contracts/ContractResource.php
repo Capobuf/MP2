@@ -22,7 +22,6 @@ use App\Models\Contract;
 use App\Models\User;
 use BackedEnum;
 use Filament\Facades\Filament;
-use Filament\Resources\RelationManagers\RelationGroup;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -122,16 +121,12 @@ class ContractResource extends Resource
     {
         return [
             ContractConditionsRelationManager::class,
-            RelationGroup::make('Scadenze e rinnovi', [
-                ContractLifecycleRelationManager::class,
-                ContractRenewalsRelationManager::class,
-            ]),
+            ContractRenewalsRelationManager::class,
+            ContractLifecycleRelationManager::class,
             ContractExpensesRelationManager::class,
+            ContractClassificationsRelationManager::class,
+            ProjectContractLinksRelationManager::class,
             ContractAttachmentsRelationManager::class,
-            RelationGroup::make('Relazioni', [
-                ContractClassificationsRelationManager::class,
-                ProjectContractLinksRelationManager::class,
-            ]),
         ];
     }
 }

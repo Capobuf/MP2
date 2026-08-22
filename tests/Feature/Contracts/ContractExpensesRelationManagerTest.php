@@ -16,7 +16,6 @@ use App\Models\ExpenseLine;
 use App\Models\User;
 use App\Support\ExerciseContext;
 use Filament\Facades\Filament;
-use Filament\Resources\RelationManagers\RelationGroup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -43,10 +42,7 @@ it('shows Contract Actuals and creation only to operators while system Estimates
         ->assertTableActionDoesNotExist('edit', record: $estimate)
         ->assertTableActionDoesNotExist('delete', record: $actual);
 
-    expect(collect(ContractResource::getRelations())->contains(
-        fn (mixed $relation): bool => $relation === ContractExpensesRelationManager::class
-            || ($relation instanceof RelationGroup && in_array(ContractExpensesRelationManager::class, $relation->getManagers(), true)),
-    ))->toBeTrue();
+    expect(ContractResource::getRelations())->toContain(ContractExpensesRelationManager::class);
 
     app(ExerciseContext::class)->select($company, $exercise->id);
 

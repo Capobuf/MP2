@@ -3,106 +3,127 @@
 namespace App\Filament\Resources\Contracts\Schemas;
 
 use App\Domain\Contracts\ContractAnnualAllocation;
+use App\Domain\Contracts\ContractAttributionMode;
+use App\Domain\Contracts\ContractCycleType;
 use App\Domain\Contracts\ContractStateTimeline;
 use App\Domain\Expenses\Decimal;
 use App\Models\Contract;
+use App\Models\ContractCondition;
 use App\Models\Exercise;
+use App\Support\ExerciseContext;
 use Carbon\CarbonImmutable;
-use Filament\Infolists\Components\RepeatableEntry;
-use Filament\Infolists\Components\RepeatableEntry\TableColumn;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\Alignment;
+use Illuminate\Support\Number;
 
 class ContractInfolist
 {
+    private const ALLOCATION_PREVIEW_LIMIT = 5;
+
     public static function configure(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('Identità e stato')->schema([
-                TextEntry::make('origin_key')->label('OriginKey')->state(fn (Contract $record): string => $record->originKey()),
-                TextEntry::make('title')->label('Titolo'),
-                TextEntry::make('supplier.legal_name')->label('Fornitore'),
-                TextEntry::make('notes')->label('Note')->placeholder('—'),
-                TextEntry::make('current_state')->label('Stato attuale')->state(fn (Contract $record): string => self::currentState($record))->badge(),
-                TextEntry::make('archive_state')->label('Visibilità')->state(fn (Contract $record): string => $record->isArchived() ? 'Archiviato' : 'Attivo')->badge(),
-                TextEntry::make('contractual_start_date')->label('Data di inizio')->date('d/m/Y'),
-                TextEntry::make('next_expiry_date')->label('Prossima scadenza')->date('d/m/Y')->placeholder('Scadenza non definita'),
-                TextEntry::make('automatic_renewal')->label('Rinnovo automatico')->formatStateUsing(fn (bool $state): string => $state ? 'Sì' : 'No'),
-                TextEntry::make('renewal_duration_months')->label('Durata rinnovo (mesi)')->placeholder('—'),
-                TextEntry::make('notice_days')->label('Preavviso (giorni)')->placeholder('—'),
-            ])->columns(3),
-            Section::make('Situazioni annuali')
-                ->description('Valori e cicli inclusi per ciascun Esercizio, calcolati alla relativa data di riferimento.')
-                ->schema([
-                    RepeatableEntry::make('annual_situations')->hiddenLabel()
-                        ->state(fn (Contract $record): array => self::annualRows($record))
-                        ->table([
-                            TableColumn::make('Esercizio'),
-                            TableColumn::make('Riferimento'),
-                            TableColumn::make('Stato'),
-                            TableColumn::make('Centro di Costo'),
-                            TableColumn::make('Allocato')->alignment(Alignment::End),
-                            TableColumn::make('Effettivo')->alignment(Alignment::End),
-                            TableColumn::make('Scostamento')->alignment(Alignment::End),
-                            TableColumn::make('Composizione')->width('20rem'),
-                        ])
-                        ->schema([
-                            TextEntry::make('year')->label('Esercizio'),
-                            TextEntry::make('reference_date')->label('Riferimento')->date('d/m/Y'),
-                            TextEntry::make('state')->label('Stato')->badge(),
-                            TextEntry::make('cost_center')->label('Centro di Costo'),
-                            TextEntry::make('allocation')->label('Allocato')->money('EUR', locale: 'it'),
-                            TextEntry::make('actual')->label('Effettivo')->money('EUR', locale: 'it'),
-                            TextEntry::make('variance')->label('Scostamento')->money('EUR', locale: 'it'),
-                            TextEntry::make('composition')->label('Composizione')
-                                ->listWithLineBreaks()
-                                ->placeholder('Nessun ciclo')
-                                ->wrap(),
-                        ])->columnSpanFull(),
-                ])->columnSpanFull(),
+            View::make('filament.resources.contracts.components.overview')
+                ->viewData(fn (Contract $record): array => ['overview' => self::overview($record)])
+                ->columnSpanFull(),
         ]);
     }
 
-    private static function currentState(Contract $contract): string
-    {
-        return $contract->stateAtDate(CarbonImmutable::now($contract->company->timezone)->toDateString())->label();
-    }
-
-    /** @return list<array{year: int, reference_date: string, state: string, cost_center: string, allocation: string, actual: string, variance: string, composition: list<string>}> */
-    private static function annualRows(Contract $contract): array
+    /** @return array<string, mixed> */
+    private static function overview(Contract $contract): array
     {
         $today = CarbonImmutable::now($contract->company->timezone)->startOfDay();
+        $selectedExercise = app(ExerciseContext::class)->current($contract->company);
+        $currentCondition = $contract->conditions
+            ->filter(fn (ContractCondition $condition): bool => ! $condition->isAnnulled()
+                && $condition->validFrom()->startOfDay()->lessThanOrEqualTo($today)
+                && ($condition->validTo() === null || $condition->validTo()->endOfDay()->greaterThanOrEqualTo($today)))
+            ->sortByDesc(fn (ContractCondition $condition): string => $condition->validFrom()->toDateString())
+            ->first();
 
-        return $contract->company->exercises->sortBy('year')->map(function (Exercise $exercise) use ($contract, $today): array {
-            $reference = ContractStateTimeline::referenceDateForExercise($exercise->year, $today);
-            $allocation = ContractAnnualAllocation::forYear(
-                $contract->conditions,
-                $exercise->year,
-                fn (string $date) => $contract->stateAtDate($date),
-            );
-            $actual = Decimal::sum($contract->expenses
-                ->where('exercise_id', $exercise->id)
-                ->where('origin', 'manual')
-                ->map(fn ($expense): string => $expense->actual()));
-            $classification = $contract->classifications->firstWhere('exercise_id', $exercise->id);
+        $annualRows = $contract->company->exercises->sortBy('year')->map(
+            fn (Exercise $exercise): array => self::annualRow($contract, $exercise, $today, $selectedExercise?->id),
+        )->values()->all();
 
-            return [
-                'year' => $exercise->year,
-                'reference_date' => $reference->toDateString(),
-                'state' => $contract->stateAtDate($reference->toDateString())->label(),
-                'cost_center' => $classification === null || $classification->cost_center_id === null
-                    ? 'Non classificato'
-                    : $classification->costCenter->name,
-                'allocation' => $allocation->amount,
-                'actual' => $actual,
-                'variance' => Decimal::subtract($actual, $allocation->amount),
-                'composition' => collect($allocation->composition)
-                    ->map(fn (array $item): string => CarbonImmutable::parse($item['attribution_date'])->format('d/m/Y').' · € '.number_format((float) $item['amount'], 2, ',', '.'))
-                    ->values()
-                    ->all(),
-            ];
-        })->values()->all();
+        $selectedRow = collect($annualRows)->firstWhere('selected', true);
+
+        return [
+            'condition' => $currentCondition instanceof ContractCondition ? [
+                'amount' => self::money($currentCondition->amount),
+                'cycle' => ContractCycleType::from($currentCondition->cycle)->label(),
+                'attribution' => ContractAttributionMode::from($currentCondition->attribution_mode)->label(),
+                'valid_from' => $currentCondition->validFrom()->format('d/m/Y'),
+                'valid_to' => $currentCondition->validTo()?->format('d/m/Y') ?? 'Senza termine',
+                'note' => filled($currentCondition->reason) ? $currentCondition->reason : null,
+            ] : null,
+            'terms' => [
+                'automatic_renewal' => $contract->automatic_renewal ? 'Sì' : 'No',
+                'renewal_duration' => $contract->renewal_duration_months === null ? '—' : $contract->renewal_duration_months.' mesi',
+                'notice' => $contract->notice_days === null ? '—' : $contract->notice_days.' giorni',
+            ],
+            'selected' => $selectedRow,
+            'annual' => $annualRows,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private static function annualRow(Contract $contract, Exercise $exercise, CarbonImmutable $today, ?int $selectedExerciseId): array
+    {
+        $reference = ContractStateTimeline::referenceDateForExercise($exercise->year, $today);
+        $allocation = ContractAnnualAllocation::forYear(
+            $contract->conditions,
+            $exercise->year,
+            fn (string $date) => $contract->stateAtDate($date),
+        );
+        $actual = Decimal::sum($contract->expenses
+            ->where('exercise_id', $exercise->id)
+            ->where('origin', 'manual')
+            ->map(fn ($expense): string => $expense->actual()));
+        $classification = $contract->classifications->firstWhere('exercise_id', $exercise->id);
+        $composition = collect($allocation->composition)
+            ->sortBy([
+                ['attribution_date', 'asc'],
+                ['cycle_start', 'asc'],
+            ])
+            ->map(fn (array $item): array => [
+                'cycle_start' => CarbonImmutable::parse($item['cycle_start'])->format('d/m/Y'),
+                'attribution_date' => CarbonImmutable::parse($item['attribution_date'])->format('d/m/Y'),
+                'amount' => self::money($item['amount']),
+            ])->values();
+
+        return [
+            'year' => $exercise->year,
+            'selected' => $exercise->id === $selectedExerciseId,
+            'reference_date' => $reference->format('d/m/Y'),
+            'state' => $contract->stateAtDate($reference->toDateString())->label(),
+            'cost_center' => $classification === null || $classification->cost_center_id === null
+                ? 'Non classificato'
+                : $classification->costCenter->name.($classification->costCenter->isArchived() ? ' · Archiviato' : ''),
+            'allocation' => self::money($allocation->amount),
+            'actual' => self::money($actual),
+            'variance' => self::money(Decimal::subtract($actual, $allocation->amount)),
+            'composition_count' => $composition->count(),
+            'composition_preview' => $composition->take(self::ALLOCATION_PREVIEW_LIMIT)->all(),
+            'has_more_composition' => $composition->count() > self::ALLOCATION_PREVIEW_LIMIT,
+            'first_cycle_start' => $composition->first()['cycle_start'] ?? null,
+            'last_cycle_start' => $composition->last()['cycle_start'] ?? null,
+            'composition' => $composition->all(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public static function allocationDetail(Contract $contract, int $year): array
+    {
+        $today = CarbonImmutable::now($contract->company->timezone)->startOfDay();
+        $exercise = $contract->company->exercises->firstWhere('year', $year);
+
+        abort_unless($exercise instanceof Exercise, 404);
+
+        return self::annualRow($contract, $exercise, $today, null);
+    }
+
+    private static function money(string|int|float $amount): string
+    {
+        return Number::currency((float) $amount, in: 'EUR', locale: 'it');
     }
 }

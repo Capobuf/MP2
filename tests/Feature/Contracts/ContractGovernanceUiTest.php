@@ -26,7 +26,6 @@ use App\Models\ExpenseLine;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
-use Filament\Resources\RelationManagers\RelationGroup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -122,12 +121,8 @@ it('registers classification link and private attachment governance surfaces wit
     Filament::setTenant($company);
 
     $contractRelations = collect(ContractResource::getRelations());
-    $groupedContractRelations = $contractRelations
-        ->filter(fn (mixed $relation): bool => $relation instanceof RelationGroup)
-        ->flatMap(fn (RelationGroup $group): array => $group->getManagers());
-
     expect($contractRelations)->toContain(ContractAttachmentsRelationManager::class)
-        ->and($groupedContractRelations)->toContain(
+        ->and($contractRelations)->toContain(
             ContractClassificationsRelationManager::class,
             ProjectContractLinksRelationManager::class,
         )->and(ExpenseResource::getRelations())->toContain(ExpenseAttachmentsRelationManager::class)
@@ -174,6 +169,7 @@ it('shows terminal Archive and ordered Contract Timeline detail while keeping vi
     Livewire::test(ViewContract::class, ['record' => $contract->id])
         ->assertActionVisible('archive')
         ->assertActionHidden('restore')
+        ->assertActionVisible('createContractActual')
         ->assertActionDoesNotExist('delete')
         ->assertActionDoesNotExist('replace')
         ->assertActionDoesNotExist('sendReminder');
@@ -189,7 +185,8 @@ it('shows terminal Archive and ordered Contract Timeline detail while keeping vi
     $this->actingAs($viewer);
     Livewire::test(ViewContract::class, ['record' => $contract->id])
         ->assertActionHidden('archive')
-        ->assertActionHidden('restore');
+        ->assertActionHidden('restore')
+        ->assertActionHidden('createContractActual');
     Livewire::test(ContractAttachmentsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
         ->assertTableActionHidden('upload');
 });

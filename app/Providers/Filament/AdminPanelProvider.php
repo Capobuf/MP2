@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\Tenancy\RegisterCompany;
 use App\Models\Company;
+use Filament\Enums\ThemeMode;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -30,16 +31,22 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->viteTheme('resources/css/filament/admin/theme.css')
+            ->brandName('MP2')
+            ->brandLogo(fn () => view('filament.components.brand-logo'))
+            ->darkModeBrandLogo(fn () => view('filament.components.brand-logo'))
+            ->brandLogoHeight('2.5rem')
+            ->defaultThemeMode(ThemeMode::Dark)
             ->login()
             ->tenant(Company::class)
             ->tenantRegistration(RegisterCompany::class)
             ->tenantMenu(false)
             ->colors([
-                'primary' => Color::hex('#0057F5'),
-                'success' => Color::hex('#16A34A'),
+                'gray' => Color::hex('#91A3A8'),
+                'primary' => Color::hex('#39D5C4'),
+                'success' => Color::hex('#22C55E'),
                 'warning' => Color::hex('#F59E0B'),
-                'danger' => Color::hex('#DC2626'),
-                'info' => Color::hex('#2563EB'),
+                'danger' => Color::hex('#EF4444'),
+                'info' => Color::hex('#60A5FA'),
             ])
             ->maxContentWidth(Width::Full)
             ->sidebarWidth('14rem')
@@ -47,6 +54,10 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::TOPBAR_START,
                 fn () => view('filament.components.exercise-context-hook'),
+            )
+            ->renderHook(
+                PanelsRenderHook::SIDEBAR_START,
+                fn () => view('filament.components.sidebar-brand'),
             )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')

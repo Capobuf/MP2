@@ -28,3 +28,24 @@ Livewire remain the application UI layer; no SPA or frontend framework is introd
 
 The committed npm lockfile pins the complete dependency graph. Installed dependency
 source under `node_modules/` remains ignored and unmodified.
+
+## Geist Sans asset and MP2 theme consolidation
+
+The MP2 application requires the brand typeface without relying on a remote font
+service. `@fontsource-variable/geist` provides a locally compiled variable-font
+asset that the existing Vite theme can consume directly. The font is configured on
+the panel body so shared Filament components and custom MP2 views use one type scale.
+
+The theme stylesheet is also the single source for the dark-first MP2 roles:
+Abisso canvas, primary/secondary/elevated surfaces, Grafite, borders, text,
+Verde Acqua interaction/focus, and distinct success, information, warning and
+danger semantics. Page-specific styles consume these roles through aliases rather
+than defining a second palette.
+
+| Item | Assessment |
+|---|---|
+| Current slice need | Render the approved MP2 interface in Geist Sans and keep shared components aligned with the Contract visual language. |
+| Why platform fonts are insufficient | Filament and browser system stacks do not guarantee the MP2 brand typeface. |
+| Maintenance and compatibility | Fontsource is actively maintained; the package is static CSS/font data and works with the current Vite pipeline. |
+| License | SIL Open Font License 1.1. |
+| Removal consequence | Remove the import and package; the global CSS falls back to the existing application font stack without changing behavior. |
