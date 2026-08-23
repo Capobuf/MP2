@@ -102,8 +102,10 @@ class RecalculateContractEstimates
                 ]);
             } elseif ($expense !== null) {
                 $line = $expense->lines()->where('type', ExpenseLineType::Estimate->value)->lockForUpdate()->sole();
-                $line->update(['amount' => $allocation->amount]);
-                $expense->increment('revision');
+                if (Decimal::compare((string) $line->amount, $allocation->amount) !== 0) {
+                    $line->update(['amount' => $allocation->amount]);
+                    $expense->increment('revision');
+                }
             }
 
             $impacts[$exercise->id] = [
