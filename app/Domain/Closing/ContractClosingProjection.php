@@ -113,24 +113,18 @@ final class ContractClosingProjection
             if ($exercise->company_id !== $contract->company_id) {
                 continue;
             }
-            $allocation = ContractAnnualAllocation::forYear(
-                $conditions,
-                $exercise->year,
-                fn (string $date) => ContractStateTimeline::stateAtDate(
-                    $contract->contractualStartDate()->toDateString(),
-                    $facts,
-                    $date,
-                    $configurations,
-                ),
-            );
+            $allocation = self::allocationForYear($contract, [
+                'conditions' => $conditions,
+                'lifecycle_facts' => $facts,
+            ], $exercise->year);
             $current = $contract->annualTotals()[$exercise->id]['allocation'] ?? '0.00';
             $exerciseImpacts[$exercise->id] = [
                 'exercise_id' => $exercise->id,
                 'year' => $exercise->year,
                 'allocation_before' => Decimal::money((string) $current),
-                'allocation_after' => $allocation->amount,
-                'allocation_delta' => Decimal::subtract($allocation->amount, (string) $current),
-                'composition' => $allocation->composition,
+                'allocation_after' => $allocation['amount'],
+                'allocation_delta' => Decimal::subtract($allocation['amount'], (string) $current),
+                'composition' => $allocation['composition'],
             ];
         }
         ksort($exerciseImpacts);
@@ -148,5 +142,26 @@ final class ContractClosingProjection
             'exercise_impacts' => $exerciseImpacts,
             'changed' => $projectedEvents !== [],
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $projection
+     * @return array{amount: string, composition: list<array<string, mixed>>}
+     */
+    public static function allocationForYear(Contract $contract, array $projection, int $year): array
+    {
+        $contract->loadMissing('renewalConfigurations');
+        $allocation = ContractAnnualAllocation::forYear(
+            (array) ($projection['conditions'] ?? []),
+            $year,
+            fn (string $date) => ContractStateTimeline::stateAtDate(
+                $contract->contractualStartDate()->toDateString(),
+                (array) ($projection['lifecycle_facts'] ?? []),
+                $date,
+                $contract->renewalConfigurations,
+            ),
+        );
+
+        return ['amount' => $allocation->amount, 'composition' => $allocation->composition];
     }
 }
