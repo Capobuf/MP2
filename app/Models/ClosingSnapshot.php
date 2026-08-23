@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Domain\Closing\ClosingOverspendNotes;
+use App\Domain\Expenses\Decimal;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -35,13 +36,31 @@ class ClosingSnapshot extends Model
         static::creating(function (self $snapshot): void {
             $exercise = Exercise::query()->find($snapshot->exercise_id);
             $company = Company::query()->find($snapshot->company_id);
-            if ($exercise !== null && $company !== null) {
-                $missing = ClosingOverspendNotes::missingRequired($company, $exercise);
-                if ($missing !== []) {
-                    throw ValidationException::withMessages([
-                        'closing' => 'Manca una Nota di sovraspesa che era obbligatoria al momento dell’operazione.',
-                    ]);
-                }
+            if ($exercise === null
+                || $company === null
+                || $exercise->company_id !== $company->id
+                || $exercise->year !== (int) $snapshot->exercise_year) {
+                throw ValidationException::withMessages([
+                    'closing_snapshot' => 'Azienda, Esercizio e anno della Snapshot di Chiusura non sono coerenti.',
+                ]);
+            }
+
+            self::assertBudgetReferences($snapshot, $exercise);
+            self::assertNextExerciseReference($snapshot, $exercise);
+            if (Decimal::compare(
+                (string) $snapshot->total_operational_variance,
+                Decimal::subtract((string) $snapshot->total_closing_actual, (string) $snapshot->total_final_allocation),
+            ) !== 0) {
+                throw ValidationException::withMessages([
+                    'closing_snapshot' => 'I totali della Snapshot di Chiusura non sono coerenti.',
+                ]);
+            }
+
+            $missing = ClosingOverspendNotes::missingRequired($company, $exercise);
+            if ($missing !== []) {
+                throw ValidationException::withMessages([
+                    'closing' => 'Manca una Nota di sovraspesa che era obbligatoria al momento dell’operazione.',
+                ]);
             }
         });
         static::updating(fn (): never => throw new \LogicException('Closing snapshots are immutable.'));
@@ -88,6 +107,50 @@ class ClosingSnapshot extends Model
     public function rows(): HasMany
     {
         return $this->hasMany(ClosingSourceRow::class);
+    }
+
+    private static function assertBudgetReferences(self $snapshot, Exercise $exercise): void
+    {
+        $budgets = BudgetSnapshot::query()
+            ->where('company_id', $exercise->company_id)
+            ->where('exercise_id', $exercise->id)
+            ->orderBy('version')
+            ->get(['id', 'version']);
+        $expectedInitialId = $budgets->first()?->id;
+        $expectedCurrentId = $budgets->last()?->id;
+        if ($snapshot->initial_budget_id !== $expectedInitialId
+            || $snapshot->current_budget_id !== $expectedCurrentId) {
+            throw ValidationException::withMessages([
+                'closing_snapshot' => 'I riferimenti Budget della Snapshot devono essere il Budget v1 e quello corrente dell’Esercizio.',
+            ]);
+        }
+    }
+
+    private static function assertNextExerciseReference(self $snapshot, Exercise $exercise): void
+    {
+        $disposition = (string) $snapshot->next_exercise_disposition;
+        if ($disposition === 'not_created_management_terminated') {
+            if ($snapshot->next_exercise_id !== null) {
+                throw ValidationException::withMessages([
+                    'closing_snapshot' => 'La gestione terminata non può riferire un Esercizio successivo.',
+                ]);
+            }
+
+            return;
+        }
+        if ($snapshot->next_exercise_id === null) {
+            throw ValidationException::withMessages([
+                'closing_snapshot' => 'La disposizione di N+1 richiede un Esercizio successivo coerente.',
+            ]);
+        }
+        $nextExercise = Exercise::query()->find($snapshot->next_exercise_id);
+        if ($nextExercise === null
+            || $nextExercise->company_id !== $exercise->company_id
+            || $nextExercise->year !== $exercise->year + 1) {
+            throw ValidationException::withMessages([
+                'closing_snapshot' => 'N+1 deve essere l’Esercizio immediatamente successivo della stessa Azienda.',
+            ]);
+        }
     }
 
     /** @return array<string, string> */

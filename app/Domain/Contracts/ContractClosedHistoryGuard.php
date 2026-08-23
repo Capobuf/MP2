@@ -12,6 +12,8 @@ final class ContractClosedHistoryGuard
 {
     private static int $automaticMaterializationDepth = 0;
 
+    private static int $historicalRegistrationDepth = 0;
+
     public static function duringAutomaticMaterialization(callable $callback): mixed
     {
         self::$automaticMaterializationDepth++;
@@ -25,6 +27,21 @@ final class ContractClosedHistoryGuard
     public static function automaticMaterializationAllowed(): bool
     {
         return self::$automaticMaterializationDepth > 0;
+    }
+
+    public static function duringHistoricalRegistration(callable $callback): mixed
+    {
+        self::$historicalRegistrationDepth++;
+        try {
+            return $callback();
+        } finally {
+            self::$historicalRegistrationDepth--;
+        }
+    }
+
+    public static function historicalRegistrationAllowed(): bool
+    {
+        return self::$historicalRegistrationDepth > 0;
     }
 
     public static function assertEventDateIsMutable(int|Contract $companyOrContract, string $date): void

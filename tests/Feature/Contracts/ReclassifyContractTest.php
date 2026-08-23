@@ -78,7 +78,7 @@ it('supports Unclassified and rejects stale archived cross-company and closed-ye
     $action->confirm($actor, $contract, $preview, (string) Str::uuid());
     expect($classification->refresh()->cost_center_id)->toBeNull();
 
-    $exercise->update(['status' => 'closed']);
+    closeExerciseFixture($exercise, $actor);
     expect(fn () => $action->preview($actor, $contract, $exercise->refresh(), null))->toThrow(ValidationException::class);
 });
 

@@ -23,7 +23,7 @@ class ContractRenewalConfiguration extends Model
     protected static function booted(): void
     {
         static::creating(function (self $configuration): void {
-            if (ContractClosedHistoryGuard::automaticMaterializationAllowed() || (int) $configuration->company_id < 1) {
+            if (ContractClosedHistoryGuard::historicalRegistrationAllowed() || (int) $configuration->company_id < 1) {
                 return;
             }
             $effective = $configuration->getAttribute('effective_from');

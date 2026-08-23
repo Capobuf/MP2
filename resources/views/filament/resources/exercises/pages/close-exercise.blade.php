@@ -6,7 +6,7 @@
                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Chiusura annuale</p>
                     <h2 class="mt-2 text-2xl font-semibold tracking-tight text-gray-950 dark:text-white">Esercizio {{ $this->getRecord()->year }}</h2>
                     <p class="mt-2 max-w-2xl text-sm leading-6 text-gray-600 dark:text-gray-300">
-                        Lo stato economico viene valutato al 31 dicembre. La Chiusura crea una Snapshot immutabile e l’Esercizio non potrà essere riaperto.
+                        Lo stato economico viene valutato al 31 dicembre. La Chiusura crea una Snapshot immutabile. L’Esercizio non potrà essere riaperto.
                     </p>
                 </div>
                 <div class="rounded-xl border border-gray-200 px-4 py-3 text-sm dark:border-white/10">
@@ -227,7 +227,7 @@
                         <label class="flex gap-3 rounded-xl border border-danger-200 bg-danger-50/60 p-4 dark:border-danger-500/20 dark:bg-danger-500/5">
                             <input type="checkbox" wire:model="closing.confirmed" class="mt-1">
                             <span class="text-sm text-gray-800 dark:text-gray-200">
-                                Confermo la Chiusura dell’Esercizio {{ $this->getRecord()->year }} e comprendo che <strong>l’Esercizio non potrà essere riaperto</strong>.
+                                Confermo la Chiusura dell’Esercizio {{ $this->getRecord()->year }}. <strong>L’Esercizio non potrà essere riaperto.</strong>
                             </span>
                         </label>
                         <div class="mt-4 flex justify-end">

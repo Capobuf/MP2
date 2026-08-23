@@ -4,6 +4,7 @@ use App\Actions\Closing\PrepareExerciseClosing;
 use App\Domain\Company\Capability;
 use App\Models\Company;
 use App\Models\CompanyCapability;
+use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -56,8 +57,11 @@ it('requires the CloseExercise capability independently from ordinary operations
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $operationsOnly = s9ClosingUser($company, [Capability::View, Capability::ManageOperations]);
     $closingOnly = s9ClosingUser($company, [Capability::View, Capability::CloseExercise]);
+    $otherExercise = Exercise::factory()->create(['year' => 2025]);
 
     expect(fn () => app(PrepareExerciseClosing::class)->execute($operationsOnly, $exercise, ['management_continues' => false, 'projects' => []]))
+        ->toThrow(AuthorizationException::class);
+    expect(fn () => app(PrepareExerciseClosing::class)->execute($closingOnly, $otherExercise, ['management_continues' => false, 'projects' => []]))
         ->toThrow(AuthorizationException::class);
 
     $prepared = app(PrepareExerciseClosing::class)->execute($closingOnly, $exercise, ['management_continues' => false, 'projects' => []]);
@@ -137,4 +141,83 @@ it('requires explicit Project state and deferral decisions and caps final Carryo
 
     expect(collect($valid->blocks)->pluck('code'))->not->toContain('carryover_above_limit')
         ->and($valid->projectDecisions[0]['maximum_transferable'])->toBe('60.00');
+});
+
+it('enumerates future Open Exercises changed only by a Project state decision', function (): void {
+    CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
+    $company = Company::factory()->create();
+    $actor = s9ClosingUser($company, [Capability::View, Capability::CloseExercise]);
+    $source = Exercise::factory()->for($company)->create(['year' => 2025]);
+    $future = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $project = Project::factory()->for($company)->create([
+        'initial_state' => 'open',
+        'initial_effective_date' => '2025-01-01',
+    ]);
+
+    $review = app(PrepareExerciseClosing::class)->execute($actor, $source, [
+        'projects' => [$project->id => [
+            'project_id' => $project->id,
+            'final_state' => 'closed',
+            'mode' => 'none',
+            'reason' => 'Chiusura definitiva al 31 dicembre',
+        ]],
+    ])['review'];
+    $futureImpact = collect($review->affectedExercises)->firstWhere('exercise_id', $future->id);
+
+    expect($futureImpact)->not->toBeNull()
+        ->and($futureImpact['allocation_delta'])->toBe('0.00')
+        ->and($futureImpact['state_changed'])->toBeTrue();
+});
+
+it('exposes canonical non-blocking warnings without invoice inference', function (): void {
+    CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
+    $company = Company::factory()->create();
+    $actor = s9ClosingUser($company, [Capability::View, Capability::CloseExercise]);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
+    Exercise::factory()->for($company)->create(['year' => 2026]);
+    $expense = Expense::factory()->forExercise($exercise)->create(['direct_cost_center_id' => null]);
+    ExpenseLine::factory()->for($expense)->create(['amount' => '10.00']);
+    $project = Project::factory()->for($company)->create([
+        'initial_state' => 'planned',
+        'initial_effective_date' => '2025-01-01',
+    ]);
+    Contract::factory()->for($company)->create([
+        'contractual_start_date' => '2025-01-01',
+        'next_expiry_date' => null,
+        'renewal_anchor_date' => null,
+    ]);
+
+    $review = app(PrepareExerciseClosing::class)->execute($actor, $exercise, [
+        'projects' => [$project->id => [
+            'project_id' => $project->id,
+            'final_state' => 'planned',
+            'mode' => 'none',
+        ]],
+    ])['review'];
+    $warningCodes = collect($review->warnings)->pluck('code');
+    $warningText = collect($review->warnings)->pluck('message')->implode(' ');
+
+    expect($warningCodes)->toContain(
+        'allocated_without_actuals',
+        'unclassified_source',
+        'planned_project_never_opened',
+        'contract_without_applicable_condition',
+    )->and(strtolower($warningText))->not->toContain('fattura')
+        ->not->toContain('pagamento');
+});
+
+it('turns missing first-level classification into a block under Company policy', function (): void {
+    CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
+    $company = Company::factory()->create(['unclassified_closing_policy' => 'blocking']);
+    $actor = s9ClosingUser($company, [Capability::View, Capability::CloseExercise]);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
+    $expense = Expense::factory()->forExercise($exercise)->create(['direct_cost_center_id' => null]);
+    ExpenseLine::factory()->for($expense)->create(['amount' => '10.00']);
+
+    $review = app(PrepareExerciseClosing::class)->execute($actor, $exercise, [
+        'management_continues' => false,
+        'projects' => [],
+    ])['review'];
+
+    expect(collect($review->blocks)->pluck('code'))->toContain('unclassified_source');
 });

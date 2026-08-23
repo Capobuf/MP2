@@ -28,6 +28,7 @@ class ContractLifecycleFact extends Model
         static::updating(function (self $fact): void {
             if ($fact->isDirty(['type', 'declared_contractual_date', 'state_change_date', 'renewed_expiry_date', 'renewal_configuration_id', 'annulled_at'])) {
                 self::assertClosedHistoryMutable($fact);
+                self::assertClosedHistoryMutable($fact, original: true);
             }
         });
         static::deleting(function (): never {
@@ -110,14 +111,23 @@ class ContractLifecycleFact extends Model
         ];
     }
 
-    private static function assertClosedHistoryMutable(self $fact): void
+    private static function assertClosedHistoryMutable(self $fact, bool $original = false): void
     {
-        if (ContractClosedHistoryGuard::automaticMaterializationAllowed() || (int) $fact->company_id < 1) {
+        if (ContractClosedHistoryGuard::historicalRegistrationAllowed() || (int) $fact->company_id < 1) {
             return;
         }
-        $date = self::dateString($fact->getAttribute('state_change_date'))
-            ?? self::dateString($fact->getAttribute('renewed_expiry_date'))
-            ?? self::dateString($fact->getAttribute('declared_contractual_date'));
+        if (! $original
+            && ! $fact->exists
+            && ContractClosedHistoryGuard::automaticMaterializationAllowed()
+            && $fact->getAttribute('type') === 'renewal') {
+            return;
+        }
+        $value = static fn (string $attribute): mixed => $original
+            ? $fact->getRawOriginal($attribute)
+            : $fact->getAttribute($attribute);
+        $date = self::dateString($value('state_change_date'))
+            ?? self::dateString($value('renewed_expiry_date'))
+            ?? self::dateString($value('declared_contractual_date'));
         if ($date !== null) {
             ContractClosedHistoryGuard::assertEventDateIsMutable((int) $fact->company_id, $date);
         }

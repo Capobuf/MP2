@@ -3,6 +3,7 @@
 use App\Actions\Closing\CloseExercise;
 use App\Actions\Closing\PrepareExerciseClosing;
 use App\Domain\Company\Capability;
+use App\Models\ClosingSnapshot;
 use App\Models\Company;
 use App\Models\CompanyCapability;
 use App\Models\CostCenter;
@@ -14,6 +15,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
 
@@ -65,4 +67,48 @@ it('materializes zero-net Actual presence autonomously and keeps Snapshot rows i
         ->and(fn () => $snapshot->delete())->toThrow(LogicException::class)
         ->and(fn () => $row->update(['label' => 'Changed']))->toThrow(LogicException::class)
         ->and(fn () => $row->delete())->toThrow(LogicException::class);
+});
+
+it('rejects incoherent tenant Exercise and N+1 Snapshot references', function (): void {
+    $company = Company::factory()->create();
+    $otherCompany = Company::factory()->create();
+    $actor = User::factory()->create();
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
+    $nextExercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $foreignNextExercise = Exercise::factory()->for($otherCompany)->create(['year' => 2026]);
+    $attributes = [
+        'company_id' => $company->id,
+        'company_name' => $company->name,
+        'exercise_id' => $exercise->id,
+        'exercise_year' => 2025,
+        'closed_at' => now(),
+        'closed_by_id' => $actor->id,
+        'initial_budget_id' => null,
+        'current_budget_id' => null,
+        'total_final_allocation' => '0.00',
+        'total_closing_actual' => '0.00',
+        'total_operational_variance' => '0.00',
+        'total_consolidated_carryover' => '0.00',
+        'accepted_warnings' => [],
+        'applied_settings' => [],
+        'next_exercise_disposition' => 'already_existed',
+        'next_exercise_id' => $nextExercise->id,
+    ];
+
+    expect(fn () => ClosingSnapshot::query()->create([
+        ...$attributes,
+        'exercise_year' => 2024,
+        'operation_id' => (string) Str::uuid(),
+    ]))->toThrow(ValidationException::class)
+        ->and(fn () => ClosingSnapshot::query()->create([
+            ...$attributes,
+            'next_exercise_id' => $foreignNextExercise->id,
+            'operation_id' => (string) Str::uuid(),
+        ]))->toThrow(ValidationException::class)
+        ->and(fn () => ClosingSnapshot::query()->create([
+            ...$attributes,
+            'next_exercise_disposition' => 'not_created_management_terminated',
+            'operation_id' => (string) Str::uuid(),
+        ]))->toThrow(ValidationException::class)
+        ->and(ClosingSnapshot::query()->count())->toBe(0);
 });

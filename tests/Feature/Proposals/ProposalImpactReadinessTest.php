@@ -5,7 +5,6 @@ use App\Actions\Proposals\InitializeProposal;
 use App\Actions\Proposals\PlanContract;
 use App\Domain\Company\AuditEventType;
 use App\Domain\Company\Capability;
-use App\Domain\Expenses\ExerciseStatus;
 use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalImpactPlan;
 use App\Domain\Proposals\ProposalReadiness;
@@ -86,7 +85,7 @@ it('enumerates exact multi-Exercise Contract impacts unchanged Budgets stale Dra
         ->and($impact2027['unchanged_budgets'])->toContain(['budget_id' => $unchangedBudget->id, 'version' => 1])
         ->and($impact2027['stale_proposals'])->toContain(['proposal_id' => $otherDraft->id, 'exercise_id' => $exercise2027->id]);
 
-    $exercise2027->update(['status' => ExerciseStatus::Closed]);
+    closeExerciseFixture($exercise2027, $actor);
     $review = app(ProposalReadiness::class)->assessProposal($proposal->refresh());
 
     expect($review['ready'])->toBeFalse()

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Closings;
 use App\Domain\Company\Capability;
 use App\Filament\Resources\Closings\Pages\ViewClosing;
 use App\Filament\Resources\Closings\Schemas\ClosingInfolist;
+use App\Filament\Resources\Exercises\ExerciseResource;
 use App\Models\ClosingSnapshot;
 use App\Models\Company;
 use App\Models\User;
@@ -69,6 +70,23 @@ class ClosingResource extends Resource
         return $company instanceof Company
             ? parent::getEloquentQuery()->whereBelongsTo($company)->with(['exercise', 'closer', 'initialBudget', 'currentBudget', 'nextExercise', 'rows'])
             : parent::getEloquentQuery()->whereRaw('1 = 0');
+    }
+
+    public static function getIndexUrl(
+        array $parameters = [],
+        bool $isAbsolute = true,
+        ?string $panel = null,
+        ?Model $tenant = null,
+        bool $shouldGuessMissingParameters = false,
+    ): string {
+        return ExerciseResource::getUrl(
+            'index',
+            $parameters,
+            $isAbsolute,
+            $panel,
+            $tenant,
+            $shouldGuessMissingParameters,
+        );
     }
 
     public static function getPages(): array

@@ -1,12 +1,16 @@
 <?php
 
 use App\Domain\Company\Capability;
+use App\Filament\Resources\Closings\Pages\ViewClosing as ViewClosingPage;
 use App\Filament\Resources\Exercises\Pages\CloseExercise as CloseExercisePage;
 use App\Filament\Resources\Exercises\Pages\ViewExercise;
 use App\Models\ClosingSnapshot;
 use App\Models\Company;
 use App\Models\CompanyCapability;
+use App\Models\CostCenter;
 use App\Models\Exercise;
+use App\Models\Expense;
+use App\Models\ExpenseLine;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
@@ -68,7 +72,7 @@ it('shows the immutable Closing Snapshot entry point on a Closed Exercise', func
     $company = Company::factory()->create();
     $closer = s9UiUser($company, [Capability::View, Capability::CloseExercise]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
-    ClosingSnapshot::query()->create([
+    $snapshot = ClosingSnapshot::query()->create([
         'company_id' => $company->id,
         'company_name' => $company->name,
         'exercise_id' => $exercise->id,
@@ -101,4 +105,37 @@ it('shows the immutable Closing Snapshot entry point on a Closed Exercise', func
         ->assertActionHidden('closeExercise')
         ->assertActionHidden('initializeProposal')
         ->assertActionHidden('createExpense');
+
+    Livewire::test(ViewClosingPage::class, ['record' => $snapshot->id])
+        ->assertSuccessful()
+        ->assertSee('Snapshot di Chiusura')
+        ->assertSee('Assente')
+        ->assertSee('Nessun avviso accettato.')
+        ->assertSee('Europe/Rome');
+});
+
+it('keeps the reviewed fingerprint while acknowledging warnings and confirms Closing', function (): void {
+    CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
+    $company = Company::factory()->create();
+    $closer = s9UiUser($company, [Capability::View, Capability::CloseExercise]);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
+    $costCenter = CostCenter::factory()->for($company)->create();
+    $expense = Expense::factory()->forExercise($exercise)->create(['direct_cost_center_id' => $costCenter->id]);
+    ExpenseLine::factory()->for($expense)->create(['amount' => '10.00']);
+    $this->actingAs($closer);
+    Filament::setTenant($company);
+
+    $component = Livewire::test(CloseExercisePage::class, ['record' => $exercise->id])
+        ->set('closing.management_continues', false)
+        ->call('reviewClosing');
+    $fingerprint = $component->get('reviewFingerprint');
+
+    $component->set('closing.warnings_acknowledged', true)
+        ->set('closing.confirmed', true);
+    expect($fingerprint)->toBeString()
+        ->and($component->get('reviewFingerprint'))->toBe($fingerprint);
+
+    $component->call('closeExercise')->assertHasNoErrors();
+    expect($exercise->refresh()->isOpen())->toBeFalse()
+        ->and(ClosingSnapshot::query()->where('exercise_id', $exercise->id)->count())->toBe(1);
 });

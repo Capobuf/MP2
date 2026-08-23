@@ -75,73 +75,64 @@ class ProcessContractRenewals
         bool $authorize = false,
         bool $recalculate = true,
     ): bool {
-        return ContractClosedHistoryGuard::duringAutomaticMaterialization(function () use (
-            $actor,
-            $contract,
-            $cutoffDate,
-            $operationId,
-            &$sequence,
-            $openExercises,
-            $authorize,
-            $recalculate,
-        ): bool {
-            $company = Company::query()->lockForUpdate()->findOrFail($contract->company_id);
-            $cutoff = CarbonImmutable::parse($cutoffDate, $company->timezone)->startOfDay();
-            $locked = Contract::query()->lockForUpdate()->findOrFail($contract->id);
-            if ($authorize) {
-                Gate::forUser($actor)->authorize('update', $locked);
+        $company = Company::query()->lockForUpdate()->findOrFail($contract->company_id);
+        $cutoff = CarbonImmutable::parse($cutoffDate, $company->timezone)->toDateString();
+        $locked = Contract::query()->lockForUpdate()->findOrFail($contract->id);
+        if ($authorize) {
+            Gate::forUser($actor)->authorize('update', $locked);
+        }
+
+        $configurations = $locked->renewalConfigurations()->orderBy('effective_from')->orderBy('id')->lockForUpdate()->get();
+        $locked->lifecycleFacts()->orderBy('id')->lockForUpdate()->get();
+        $locked->conditions()->orderBy('id')->lockForUpdate()->get();
+
+        if ($locked->nextExpiryDate() === null || $locked->nextExpiryDate()->toDateString() > $cutoff) {
+            return false;
+        }
+        if ($configurations->isEmpty()) {
+            throw ValidationException::withMessages(['renewal' => 'Manca la configurazione storica applicabile alla scadenza.']);
+        }
+
+        $exerciseIds = $openExercises->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+        while ($locked->nextExpiryDate() !== null && $locked->nextExpiryDate()->toDateString() <= $cutoff) {
+            $expiry = $locked->nextExpiryDate()->toDateString();
+            $configuration = ContractRenewalSchedule::configurationAtDate($configurations, $expiry);
+            if (! $configuration instanceof ContractRenewalConfiguration) {
+                throw ValidationException::withMessages(['renewal' => 'Nessuna configurazione storica è efficace alla scadenza.']);
             }
 
-            $configurations = $locked->renewalConfigurations()->orderBy('effective_from')->orderBy('id')->lockForUpdate()->get();
-            $locked->lifecycleFacts()->orderBy('id')->lockForUpdate()->get();
-            $locked->conditions()->orderBy('id')->lockForUpdate()->get();
-
-            if ($locked->nextExpiryDate() === null || $locked->nextExpiryDate()->startOfDay()->greaterThan($cutoff)) {
-                return false;
-            }
-            if ($configurations->isEmpty()) {
-                throw ValidationException::withMessages(['renewal' => 'Manca la configurazione storica applicabile alla scadenza.']);
-            }
-
-            $exerciseIds = $openExercises->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
-            while ($locked->nextExpiryDate() !== null && ! $locked->nextExpiryDate()->startOfDay()->greaterThan($cutoff)) {
-                $expiry = $locked->nextExpiryDate()->toDateString();
-                $configuration = ContractRenewalSchedule::configurationAtDate($configurations, $expiry);
-                if (! $configuration instanceof ContractRenewalConfiguration) {
-                    throw ValidationException::withMessages(['renewal' => 'Nessuna configurazione storica è efficace alla scadenza.']);
-                }
-
-                if (! $configuration->automatic_renewal) {
-                    $fact = ContractLifecycleFact::query()->firstOrCreate([
-                        'contract_id' => $locked->id,
-                        'state_change_date' => CarbonImmutable::parse($expiry)->addDay()->toDateString(),
-                    ], [
-                        'company_id' => $company->id,
-                        'type' => 'expiry_cessation',
-                        'declared_contractual_date' => $expiry,
-                        'created_by_id' => $actor->id,
-                    ]);
-                    foreach ($locked->conditions()->active()->whereNull('valid_to')->lockForUpdate()->get() as $condition) {
-                        if (! $condition->validFrom()->greaterThan(CarbonImmutable::parse($expiry))) {
-                            $condition->update(['valid_to' => $expiry]);
-                        }
-                    }
-                    $locked->update(['next_expiry_date' => null, 'renewal_anchor_date' => null]);
-                    $this->audit($actor, $locked, $fact, $operationId, $sequence++, AuditEventType::ContractCessated, $exerciseIds, $expiry, [
-                        'cause' => 'expiry_without_renewal',
-                        'state_change_date' => CarbonImmutable::parse($expiry)->addDay()->toDateString(),
-                        'cutoff_date' => $cutoff->toDateString(),
-                    ]);
-                    break;
-                }
-
-                $duration = $configuration->renewal_duration_months;
-                $anchor = $configuration->expiryAnchorDate()?->toDateString();
-                if ($duration === null || $duration < 1 || $anchor === null) {
-                    throw ValidationException::withMessages(['renewal' => 'La configurazione di rinnovo storica è incompleta.']);
-                }
-                $nextExpiry = ContractRenewalSchedule::nextAnchoredExpiry($anchor, $duration, $expiry);
+            if (! $configuration->automatic_renewal) {
                 $fact = ContractLifecycleFact::query()->firstOrCreate([
+                    'contract_id' => $locked->id,
+                    'state_change_date' => CarbonImmutable::parse($expiry)->addDay()->toDateString(),
+                ], [
+                    'company_id' => $company->id,
+                    'type' => 'expiry_cessation',
+                    'declared_contractual_date' => $expiry,
+                    'created_by_id' => $actor->id,
+                ]);
+                foreach ($locked->conditions()->active()->whereNull('valid_to')->lockForUpdate()->get() as $condition) {
+                    if (! $condition->validFrom()->greaterThan(CarbonImmutable::parse($expiry))) {
+                        $condition->update(['valid_to' => $expiry]);
+                    }
+                }
+                $locked->update(['next_expiry_date' => null, 'renewal_anchor_date' => null]);
+                $this->audit($actor, $locked, $fact, $operationId, $sequence++, AuditEventType::ContractCessated, $exerciseIds, $expiry, [
+                    'cause' => 'expiry_without_renewal',
+                    'state_change_date' => CarbonImmutable::parse($expiry)->addDay()->toDateString(),
+                    'cutoff_date' => $cutoff,
+                ]);
+                break;
+            }
+
+            $duration = $configuration->renewal_duration_months;
+            $anchor = $configuration->expiryAnchorDate()?->toDateString();
+            if ($duration === null || $duration < 1 || $anchor === null) {
+                throw ValidationException::withMessages(['renewal' => 'La configurazione di rinnovo storica è incompleta.']);
+            }
+            $nextExpiry = ContractRenewalSchedule::nextAnchoredExpiry($anchor, $duration, $expiry);
+            $fact = ContractClosedHistoryGuard::duringAutomaticMaterialization(
+                fn (): ContractLifecycleFact => ContractLifecycleFact::query()->firstOrCreate([
                     'contract_id' => $locked->id,
                     'renewed_expiry_date' => $expiry,
                 ], [
@@ -151,25 +142,25 @@ class ProcessContractRenewals
                     'state_change_date' => null,
                     'renewal_configuration_id' => $configuration->id,
                     'created_by_id' => $actor->id,
-                ]);
-                $locked->update(['next_expiry_date' => $nextExpiry]);
-                $this->audit($actor, $locked, $fact, $operationId, $sequence++, AuditEventType::ContractRenewed, $exerciseIds, $expiry, [
-                    'renewed_expiry_date' => $expiry,
-                    'next_expiry_date' => $nextExpiry,
-                    'renewal_configuration_id' => $configuration->id,
-                    'renewal_without_condition' => ContractRenewalSchedule::hasRenewalWithoutCondition($locked->conditions, $expiry),
-                    'cutoff_date' => $cutoff->toDateString(),
-                ]);
-            }
+                ]),
+            );
+            $locked->update(['next_expiry_date' => $nextExpiry]);
+            $this->audit($actor, $locked, $fact, $operationId, $sequence++, AuditEventType::ContractRenewed, $exerciseIds, $expiry, [
+                'renewed_expiry_date' => $expiry,
+                'next_expiry_date' => $nextExpiry,
+                'renewal_configuration_id' => $configuration->id,
+                'renewal_without_condition' => ContractRenewalSchedule::hasRenewalWithoutCondition($locked->conditions, $expiry),
+                'cutoff_date' => $cutoff,
+            ]);
+        }
 
-            $locked->increment('revision');
-            $locked->unsetRelation('conditions')->unsetRelation('lifecycleFacts')->unsetRelation('renewalConfigurations');
-            if ($recalculate) {
-                $this->recalculate->recalculateWithinTransaction($actor, $locked, $openExercises, $operationId, $sequence);
-            }
+        $locked->increment('revision');
+        $locked->unsetRelation('conditions')->unsetRelation('lifecycleFacts')->unsetRelation('renewalConfigurations');
+        if ($recalculate) {
+            $this->recalculate->recalculateWithinTransaction($actor, $locked, $openExercises, $operationId, $sequence);
+        }
 
-            return true;
-        });
+        return true;
     }
 
     /**

@@ -73,7 +73,7 @@ it('blocks Closed-year and unauthorized direct mutation without changing Budgets
     $manager = User::factory()->create();
     $company = Company::factory()->create();
     CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $manager->id, 'capability' => Capability::ManageOperations]);
-    $source = Exercise::factory()->for($company)->create(['year' => 2026, 'status' => 'closed']);
+    $source = Exercise::factory()->for($company)->create(['year' => 2026]);
     $destination = Exercise::factory()->for($company)->create(['year' => 2027]);
     $project = Project::factory()->for($company)->create();
     $expense = Expense::factory()->forExercise($source)->for($project)->create();
@@ -81,7 +81,9 @@ it('blocks Closed-year and unauthorized direct mutation without changing Budgets
     $deferral = ProjectDeferral::factory()->carryover('5.00')->create([
         'company_id' => $company->id, 'project_id' => $project->id,
         'source_exercise_id' => $source->id, 'destination_exercise_id' => $destination->id,
+        'carryover_state' => 'consolidated',
     ]);
+    closeExerciseFixture($source, $manager);
     $budgetProposal = Proposal::factory()->for($company)->for($destination)->create();
     $budget = BudgetSnapshot::factory()->for($budgetProposal)->create();
     $budgetUpdatedAt = $budget->updated_at?->toISOString();

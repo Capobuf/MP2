@@ -12,6 +12,7 @@ use App\Domain\Projects\ProjectDeferralMode;
 use App\Domain\Projects\ProjectDeferralValues;
 use App\Domain\Projects\ProjectState;
 use App\Domain\Projects\ProjectStateTimeline;
+use App\Domain\Projects\ProjectTransitionImpact;
 use App\Domain\Proposals\ProposalStatus;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
@@ -22,7 +23,6 @@ use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\Project;
 use App\Models\ProjectDeferral;
-use App\Models\ProjectExerciseClassification;
 use App\Models\ProjectTransition;
 use App\Models\Proposal;
 use App\Models\User;
@@ -35,6 +35,9 @@ final class ReviewExerciseClosing
     /** @param array<string, mixed> $input */
     public function execute(User $actor, Exercise $exercise, array $input = []): ClosingReview
     {
+        $exercise = Exercise::query()
+            ->where('company_id', $exercise->company_id)
+            ->findOrFail($exercise->id);
         $exercise->loadMissing('company');
         Gate::forUser($actor)->authorize('close', $exercise);
 
@@ -118,6 +121,7 @@ final class ReviewExerciseClosing
         $projectRows = [];
         $plannedNextExerciseDelta = '0.00';
 
+        $stateChangedExerciseIds = [];
         foreach ($projects as $project) {
             $row = $this->projectDecision(
                 $project,
@@ -130,6 +134,9 @@ final class ReviewExerciseClosing
                 $blocks,
             );
             $projectRows[] = $row;
+            foreach ($this->projectStateAffectedExerciseIds($project, $exercise, $row, $openExercises, $today) as $affectedExerciseId) {
+                $stateChangedExerciseIds[$affectedExerciseId] = true;
+            }
             $exerciseDeltas[(string) $exercise->id] = Decimal::add(
                 $exerciseDeltas[(string) $exercise->id] ?? '0.00',
                 (string) $row['source_allocation_delta'],
@@ -143,7 +150,7 @@ final class ReviewExerciseClosing
                         $exerciseDeltas[(string) $nextExercise->id] ?? '0.00',
                         (string) $row['destination_allocation_delta'],
                     );
-                } elseif ($managementContinues === true) {
+                } else {
                     $plannedNextExerciseDelta = Decimal::add($plannedNextExerciseDelta, (string) $row['destination_allocation_delta']);
                 }
             }
@@ -194,11 +201,14 @@ final class ReviewExerciseClosing
                     continue;
                 }
                 $exerciseDeltas[$id] = Decimal::add($exerciseDeltas[$id] ?? '0.00', (string) ($impact['allocation_delta'] ?? '0.00'));
+                if (($impact['state_changed'] ?? false) === true) {
+                    $stateChangedExerciseIds[(int) $id] = true;
+                }
             }
             $this->addContractWarnings($contract, $projection, $budgetOriginKeys, $company, $exercise, $yearStart, $yearEnd, $blocks, $warnings);
         }
 
-        $this->addProjectWarnings($projectRows, $budgetOriginKeys, $company, $exercise, $nextExercise, $blocks, $warnings);
+        $this->addProjectWarnings($projects, $projectRows, $budgetOriginKeys, $company, $exercise, $nextExercise, $blocks, $warnings);
 
         if ($nextExercise === null && $managementContinues === false && Decimal::compare($plannedNextExerciseDelta, '0.00') !== 0) {
             $blocks[] = $this->issue('management_termination_has_transfer', 'La gestione terminata richiede Riporti e trasferimenti pari a zero.', 'exercise', $exercise->id);
@@ -212,7 +222,9 @@ final class ReviewExerciseClosing
         $affectedExercises = [];
         foreach ($openExercises as $openExercise) {
             $delta = $exerciseDeltas[(string) $openExercise->id] ?? '0.00';
-            if ($openExercise->id !== $exercise->id && Decimal::compare($delta, '0.00') === 0) {
+            if ($openExercise->id !== $exercise->id
+                && Decimal::compare($delta, '0.00') === 0
+                && ! isset($stateChangedExerciseIds[$openExercise->id])) {
                 continue;
             }
             $affectedExercises[] = [
@@ -221,6 +233,7 @@ final class ReviewExerciseClosing
                 'status' => $openExercise->status()->value,
                 'revision' => $openExercise->revision,
                 'allocation_delta' => $delta,
+                'state_changed' => isset($stateChangedExerciseIds[$openExercise->id]),
             ];
         }
         if ($nextExercise === null && $managementContinues === true) {
@@ -499,6 +512,46 @@ final class ReviewExerciseClosing
         }
     }
 
+    /**
+     * @param  array<string, mixed>  $decision
+     * @param  Collection<int, Exercise>  $openExercises
+     * @return list<int>
+     */
+    private function projectStateAffectedExerciseIds(
+        Project $project,
+        Exercise $exercise,
+        array $decision,
+        Collection $openExercises,
+        CarbonImmutable $today,
+    ): array {
+        $currentState = ProjectState::tryFrom((string) ($decision['current_state'] ?? ''));
+        $finalState = ProjectState::tryFrom((string) ($decision['final_state'] ?? ''));
+        if ($currentState === null || $finalState === null || $currentState === $finalState) {
+            return [];
+        }
+
+        $beforeRows = $project->transitions->map(fn (ProjectTransition $transition): array => [
+            'from_state' => (string) $transition->getRawOriginal('from_state'),
+            'to_state' => (string) $transition->getRawOriginal('to_state'),
+            'effective_date' => $transition->effectiveDate()->toDateString(),
+            'annulled_at' => $transition->annulledAt()?->toISOString(),
+        ])->all();
+        $afterRows = [...$beforeRows, [
+            'from_state' => $currentState->value,
+            'to_state' => $finalState->value,
+            'effective_date' => $exercise->year.'-12-31',
+            'annulled_at' => null,
+        ]];
+
+        return ProjectTransitionImpact::affectedExerciseIds(
+            $project,
+            $openExercises,
+            $beforeRows,
+            $afterRows,
+            $today,
+        );
+    }
+
     private function executedReprogrammingLooksIntact(Project $project, Exercise $source, ProjectDeferral $deferral): bool
     {
         $effects = $deferral->reprogramming_effects;
@@ -562,13 +615,23 @@ final class ReviewExerciseClosing
         }
     }
 
-    /** @param list<array<string, mixed>> $projectRows
+    /** @param Collection<int, Project> $projects
+     * @param  list<array<string, mixed>>  $projectRows
      * @param  Collection<string, int>  $budgetOriginKeys
      * @param  list<array<string, mixed>>  $blocks
      * @param  list<array<string, mixed>>  $warnings
      */
-    private function addProjectWarnings(array $projectRows, Collection $budgetOriginKeys, Company $company, Exercise $exercise, ?Exercise $nextExercise, array &$blocks, array &$warnings): void
+    private function addProjectWarnings(Collection $projects, array $projectRows, Collection $budgetOriginKeys, Company $company, Exercise $exercise, ?Exercise $nextExercise, array &$blocks, array &$warnings): void
     {
+        $projectsById = $projects->keyBy('id');
+        $nextBudget = $nextExercise === null
+            ? null
+            : BudgetSnapshot::query()
+                ->where('company_id', $company->id)
+                ->where('exercise_id', $nextExercise->id)
+                ->with('rows')
+                ->latest('version')
+                ->first();
         foreach ($projectRows as $row) {
             $included = Decimal::compare((string) $row['final_allocation'], '0.00') !== 0
                 || (bool) $row['has_actuals']
@@ -583,21 +646,16 @@ final class ReviewExerciseClosing
             if ($row['final_state'] === ProjectState::Planned->value && ! (bool) $row['was_ever_open_in_exercise']) {
                 $warnings[] = $this->issue('planned_project_never_opened', 'Progetto Pianificato ma mai Aperto nell’Esercizio.', 'project', (int) $row['project_id']);
             }
-            $classified = ProjectExerciseClassification::query()
-                ->where('project_id', (int) $row['project_id'])
-                ->where('exercise_id', $exercise->id)
-                ->whereNotNull('cost_center_id')
-                ->exists();
+            $project = $projectsById->get((int) $row['project_id']);
+            $classified = $project instanceof Project && $project->classifications->contains(
+                fn ($classification): bool => $classification->exercise_id === $exercise->id
+                    && $classification->cost_center_id !== null,
+            );
             if (! $classified) {
                 $this->addClassificationIssue($company, 'project', (int) $row['project_id'], $blocks, $warnings);
             }
             if ($nextExercise !== null) {
-                $nextBudget = BudgetSnapshot::query()
-                    ->where('company_id', $company->id)
-                    ->where('exercise_id', $nextExercise->id)
-                    ->latest('version')
-                    ->first();
-                $budgetRow = $nextBudget?->rows()->where('origin_key', (string) $row['origin_key'])->first();
+                $budgetRow = $nextBudget?->rows->firstWhere('origin_key', (string) $row['origin_key']);
                 if ($budgetRow !== null && $budgetRow->carryover_state === 'provisional'
                     && Decimal::compare((string) $budgetRow->approved_carryover, (string) $row['maximum_transferable']) !== 0) {
                     $warnings[] = $this->issue('approved_provisional_carryover_differs', 'Il Riporto provvisorio nel Budget corrente di N+1 differisce dal massimo consolidabile.', 'project', (int) $row['project_id']);

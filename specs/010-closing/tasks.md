@@ -241,7 +241,7 @@ turning Filament into a second domain layer.
   materialized header/rows/details without S11 comparison/report UI.
 - [ ] **T050 [US8]** Update the Closed Exercise page so ordinary historical mutation
   controls are absent/disabled and `Apri Chiusura` is available.
-- [ ] **T051** Run focused UI tests, Laravel boot and frontend build; perform the
+- [x] **T051** Run focused UI tests, Laravel boot and frontend build; perform the
   authenticated browser journeys from `quickstart.md`.
 
 **Checkpoint**: a user can review, decide, close and inspect history without hidden
@@ -258,19 +258,19 @@ domain behavior.
 - [ ] **T053 [P]** Add explicit exclusion tests proving S9 has not created a reopen
   path, late-correction path, Historical Annotation workflow, Forecast, automatic
   Carryover maximization or automatic Project continuation decision.
-- [ ] **T054** Reconcile every S9-FR-001..041 against automated or browser evidence;
+- [x] **T054** Reconcile every S9-FR-001..041 against automated or browser evidence;
   fix uncovered behavior rather than marking it complete by inspection.
-- [ ] **T055** Run all focused S9 tests and regressions of touched S3–S8 paths.
-- [ ] **T056** Run the full current CI-equivalent quality gate once at the end,
+- [x] **T055** Run all focused S9 tests and regressions of touched S3–S8 paths.
+- [x] **T056** Run the full current CI-equivalent quality gate once at the end,
   including isolated testing migrations, Composer validation/audit, frontend build,
   Pint, PHPStan and full Pest suite.
-- [ ] **T057** Run `git diff --check` and inspect the complete S9 diff for unrelated
+- [x] **T057** Run `git diff --check` and inspect the complete S9 diff for unrelated
   changes or accidental future-slice implementation.
-- [ ] **T058** Record actual evidence in `quickstart.md`; update S9 roadmap,
+- [x] **T058** Record actual evidence in `quickstart.md`; update S9 roadmap,
   FR-034–FR-041 and invariants 28.25–28.28/28.49/28.58 to `implemented`/`verified`
   only to the level genuinely demonstrated. Do not change unrelated S7 metadata as a
   side effect of S9.
-- [ ] **T059** Final browser verification: Closed status, immutable Closing Snapshot,
+- [x] **T059** Final browser verification: Closed status, immutable Closing Snapshot,
   consolidated Carryover/N+1 effect, historical ordinary-edit rejection, no
   console/Livewire errors.
 

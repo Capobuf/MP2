@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Closings\Schemas;
 
 use App\Domain\Proposals\ProposalSourceType;
+use App\Models\ClosingSnapshot;
 use App\Models\ClosingSourceRow;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
@@ -21,8 +22,8 @@ final class ClosingInfolist
                     TextEntry::make('exercise_year')->label('Esercizio'),
                     TextEntry::make('closed_at')->label('Chiuso il')->dateTime('d/m/Y H:i'),
                     TextEntry::make('closer.name')->label('Chiuso da'),
-                    TextEntry::make('initialBudget.version')->label('Budget v1')->formatStateUsing(fn (mixed $state): string => $state === null ? 'Assente' : 'v'.$state),
-                    TextEntry::make('currentBudget.version')->label('Budget corrente')->formatStateUsing(fn (mixed $state): string => $state === null ? 'Assente' : 'v'.$state),
+                    TextEntry::make('initialBudget.version')->label('Budget v1')->formatStateUsing(fn (mixed $state): string => 'v'.$state)->placeholder('Assente'),
+                    TextEntry::make('currentBudget.version')->label('Budget corrente')->formatStateUsing(fn (mixed $state): string => 'v'.$state)->placeholder('Assente'),
                     TextEntry::make('total_final_allocation')->label('Allocato finale')->money('EUR', locale: 'it'),
                     TextEntry::make('total_closing_actual')->label('Effettivo alla Chiusura')->money('EUR', locale: 'it'),
                     TextEntry::make('total_operational_variance')->label('Scostamento operativo')->money('EUR', locale: 'it'),
@@ -38,8 +39,8 @@ final class ClosingInfolist
 
             Section::make('Decisioni ed evidenze')
                 ->schema([
-                    TextEntry::make('accepted_warnings')->label('Avvisi accettati')->formatStateUsing(self::warnings(...))->columnSpanFull()->wrap(),
-                    TextEntry::make('applied_settings')->label('Impostazioni applicate')->formatStateUsing(self::json(...))->columnSpanFull()->wrap(),
+                    TextEntry::make('accepted_warnings')->label('Avvisi accettati')->state(fn (ClosingSnapshot $record): string => self::warnings($record->accepted_warnings))->columnSpanFull()->wrap(),
+                    TextEntry::make('applied_settings')->label('Impostazioni applicate')->state(fn (ClosingSnapshot $record): string => self::json($record->applied_settings))->columnSpanFull()->wrap(),
                     TextEntry::make('operation_id')->label('ID operazione')->copyable(),
                 ]),
 
@@ -56,7 +57,7 @@ final class ClosingInfolist
                     TextEntry::make('final_allocation')->label('Allocato finale')->money('EUR', locale: 'it'),
                     TextEntry::make('closing_actual')->label('Effettivo alla Chiusura')->money('EUR', locale: 'it'),
                     TextEntry::make('operational_variance')->label('Scostamento')->money('EUR', locale: 'it'),
-                    TextEntry::make('detail')->label('Dettaglio materializzato')->formatStateUsing(self::json(...))->columnSpanFull()->wrap(),
+                    TextEntry::make('detail')->label('Dettaglio materializzato')->state(fn (ClosingSourceRow $record): string => self::json($record->detail))->columnSpanFull()->wrap(),
                 ])->columns(4),
             ]),
         ]);
@@ -82,6 +83,6 @@ final class ClosingInfolist
 
     private static function json(mixed $state): string
     {
-        return json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        return json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     }
 }

@@ -35,11 +35,17 @@ it('materializes missed automatic renewals only through the Closing cutoff and r
         'automatic_renewal' => true,
         'renewal_duration_months' => 12,
     ]);
-    ContractRenewalConfiguration::factory()->forContract($contract)->create([
+    $closingConfiguration = ContractRenewalConfiguration::factory()->forContract($contract)->create([
         'effective_from' => '2024-01-01',
         'automatic_renewal' => true,
         'expiry_anchor_date' => '2024-12-31',
         'renewal_duration_months' => 12,
+    ]);
+    ContractRenewalConfiguration::factory()->forContract($contract)->create([
+        'effective_from' => '2026-01-01',
+        'automatic_renewal' => false,
+        'expiry_anchor_date' => '2026-12-31',
+        'renewal_duration_months' => null,
     ]);
     ContractCondition::factory()->forContract($contract)->create([
         'valid_from' => '2024-01-01',
@@ -67,15 +73,16 @@ it('materializes missed automatic renewals only through the Closing cutoff and r
         ->where('contract_id', $contract->id)
         ->where('type', 'renewal')
         ->orderBy('renewed_expiry_date')
-        ->pluck('renewed_expiry_date')
-        ->map(fn (mixed $date): string => (string) $date)
+        ->get()
+        ->map(fn (ContractLifecycleFact $fact): string => $fact->renewedExpiryDate()?->toDateString() ?? '')
         ->all();
 
-    expect($renewedDates)->toBe(['2024-12-31', '2025-12-31'])
-        ->and($contract->nextExpiryDate()?->toDateString())->toBe('2026-12-31')
+    expect($contract->nextExpiryDate()?->toDateString())->toBe('2026-12-31')
+        ->and($renewedDates)->toBe(['2024-12-31', '2025-12-31'])
         ->and(Expense::query()->where('contract_id', $contract->id)->where('exercise_id', $closed2024->id)->exists())->toBeFalse()
         ->and($target->refresh()->allocation())->toBe('120.00')
         ->and($future->refresh()->allocation())->toBe('120.00')
         ->and($snapshot->total_final_allocation)->toBe('120.00')
-        ->and($snapshot->rows()->where('origin_key', $contract->originKey())->sole()->end_state)->toBe('active');
+        ->and($snapshot->rows()->where('origin_key', $contract->originKey())->sole()->end_state)->toBe('active')
+        ->and(data_get($snapshot->rows()->where('origin_key', $contract->originKey())->sole()->detail, 'renewal_configuration_at_31_december.id'))->toBe($closingConfiguration->id);
 });

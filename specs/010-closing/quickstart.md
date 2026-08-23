@@ -315,7 +315,28 @@ git diff --check
 
 ## Evidence
 
-Do not pre-mark this section.
+Independent review evidence recorded on 2026-08-23:
 
-Implementation agent records actual focused test counts, full suite result, quality
-gate, browser journeys and any genuine limitation here.
+- focused S9 plus touched S3-S8 regressions: **60 tests, 414 assertions, PASS**;
+- final focused Closing UI regression: **4 tests, 30 assertions, PASS**;
+- full Pest suite after the browser-discovered fixes: **548 tests, 3937 assertions, PASS**;
+- Composer strict validation: PASS;
+- Composer locked audit: PASS, no advisories;
+- isolated MySQL testing migrations: PASS; the focused and full suites rebuilt the
+  isolated database through RefreshDatabase with the complete migration chain;
+- frontend Vite build: PASS;
+- Pint test mode: PASS;
+- PHPStan without progress output: PASS;
+- application smoke: PASS on the real Filament login and authenticated Exercise surfaces;
+- browser journey: PASS on dedicated Company **S9 Browser Review 20260823**, Exercise
+  2024 -> existing N+1 2025. The journey reviewed totals and affected Exercises,
+  acknowledged the no-Actual warning, consolidated Carryover from 30.00 to 35.00,
+  confirmed irreversible Closing, navigated Closed Exercise -> Closing Snapshot,
+  verified N+1 allocation 35.00 and verified historical mutation actions absent;
+- final browser reloads of Closed Exercise, N+1 and Closing Snapshot: no console errors,
+  page errors, failed Livewire requests or HTTP responses >= 400.
+
+The independent browser journey exposed and this review corrected two defects before
+the final evidence above: confirmation checkboxes invalidated the review fingerprint,
+and the read-only Closing resource lacked a valid index/breadcrumb target. S9 remains
+**implemented**, not **verified**, pending human review of this PR.

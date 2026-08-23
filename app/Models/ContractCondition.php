@@ -114,7 +114,7 @@ class ContractCondition extends Model
 
     private static function assertClosedHistoryUnchangedOnCreate(self $condition): void
     {
-        if (ContractClosedHistoryGuard::automaticMaterializationAllowed() || (int) $condition->company_id < 1) {
+        if (ContractClosedHistoryGuard::historicalRegistrationAllowed() || (int) $condition->company_id < 1) {
             return;
         }
         $from = self::dateString($condition->getAttribute('valid_from'));
@@ -133,7 +133,7 @@ class ContractCondition extends Model
 
     private static function assertClosedHistoryUnchangedOnUpdate(self $condition): void
     {
-        if (ContractClosedHistoryGuard::automaticMaterializationAllowed()) {
+        if (ContractClosedHistoryGuard::historicalRegistrationAllowed()) {
             return;
         }
         $beforeFrom = self::dateString($condition->getRawOriginal('valid_from'));
@@ -145,7 +145,7 @@ class ContractCondition extends Model
         $afterTo = self::dateString($condition->getAttribute('valid_to'));
         $beforeAnnulled = $condition->getRawOriginal('annulled_at') !== null;
         $afterAnnulled = $condition->getAttribute('annulled_at') !== null;
-        $termsChanged = $condition->isDirty(['amount', 'cycle', 'attribution_mode', 'valid_from']);
+        $termsChanged = $condition->isDirty(['amount', 'cycle', 'attribution_mode', 'valid_from', 'valid_to']);
 
         foreach (ContractClosedHistoryGuard::closedYears((int) $condition->company_id) as $year) {
             $beforeApplies = ! $beforeAnnulled && ContractClosedHistoryGuard::periodOverlapsYear($beforeFrom, $beforeTo, $year);

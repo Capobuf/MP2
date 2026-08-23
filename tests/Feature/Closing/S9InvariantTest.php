@@ -38,7 +38,7 @@ it('enforces Closing state at 31 December and the negative-Actual Carryover cap'
     ]);
     $expense = Expense::factory()->forExercise($source)->for($project)->create();
     ExpenseLine::factory()->for($expense)->create(['amount' => '100.00']);
-    ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '-10.00']);
+    ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '-10.00', 'note' => 'Rimborso registrato']);
 
     $valid = app(PrepareExerciseClosing::class)->execute($actor, $source, [
         'projects' => [$project->id => [
@@ -62,12 +62,4 @@ it('enforces Closing state at 31 December and the negative-Actual Carryover cap'
     expect($valid->projectDecisions[0]['current_state'])->toBe('open')
         ->and($valid->projectDecisions[0]['maximum_transferable'])->toBe('100.00')
         ->and(collect($invalid->blocks)->pluck('code'))->toContain('carryover_above_limit');
-});
-
-it('keeps the canonical S9 invariants mapped to dedicated executable coverage', function (): void {
-    expect(file_exists(base_path('tests/Feature/Closing/CloseExerciseTest.php')))->toBeTrue() // 28.58 and Closing Snapshot path
-        ->and(file_exists(base_path('tests/Feature/Closing/ClosingAtomicityTest.php')))->toBeTrue() // 28.27
-        ->and(file_exists(base_path('tests/Feature/Closing/ClosingReviewTest.php')))->toBeTrue() // 28.28
-        ->and(file_exists(base_path('tests/Feature/Closing/ClosedExerciseImmutabilityTest.php')))->toBeTrue() // 28.26
-        ->and(file_exists(base_path('tests/Feature/Closing/ClosingSnapshotTest.php')))->toBeTrue(); // 28.49
 });

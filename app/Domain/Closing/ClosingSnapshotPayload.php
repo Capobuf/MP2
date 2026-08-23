@@ -3,6 +3,7 @@
 namespace App\Domain\Closing;
 
 use App\Domain\Contracts\ContractAnnualAllocation;
+use App\Domain\Contracts\ContractRenewalSchedule;
 use App\Domain\Contracts\ContractState;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Projects\ProjectDeferralMode;
@@ -12,6 +13,7 @@ use App\Models\BudgetSnapshot;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\ContractLifecycleFact;
+use App\Models\ContractRenewalConfiguration;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -46,7 +48,7 @@ final class ClosingSnapshotPayload
             ->where('exercise_id', $exercise->id)
             ->whereNull('project_id')
             ->whereNull('contract_id')
-            ->with(['lines', 'supplier', 'directCostCenter'])
+            ->with(['lines', 'supplier', 'project', 'contract', 'directCostCenter'])
             ->orderBy('id')
             ->get();
         foreach ($standaloneExpenses as $expense) {
@@ -64,6 +66,9 @@ final class ClosingSnapshotPayload
                 'deferrals',
                 'expenses.lines',
                 'expenses.supplier',
+                'expenses.project.classifications.costCenter',
+                'expenses.contract.classifications.costCenter',
+                'expenses.directCostCenter',
             ])
             ->orderBy('id')
             ->get();
@@ -93,6 +98,9 @@ final class ClosingSnapshotPayload
                 'classifications.costCenter',
                 'expenses.lines',
                 'expenses.supplier',
+                'expenses.project.classifications.costCenter',
+                'expenses.contract.classifications.costCenter',
+                'expenses.directCostCenter',
             ])
             ->orderBy('id')
             ->get();
@@ -351,6 +359,27 @@ final class ClosingSnapshotPayload
                 'reason' => $fact->reason,
                 'annulled_at' => $fact->annulledAt()?->toISOString(),
             ])->values()->all();
+        $renewalConfiguration = ContractRenewalSchedule::configurationAtDate(
+            $contract->renewalConfigurations,
+            $yearEnd->toDateString(),
+        );
+        $renewalAtClosing = $renewalConfiguration instanceof ContractRenewalConfiguration
+            ? [
+                'id' => $renewalConfiguration->id,
+                'effective_from' => $renewalConfiguration->effectiveFrom()->toDateString(),
+                'automatic_renewal' => (bool) $renewalConfiguration->automatic_renewal,
+                'expiry_anchor_date' => $renewalConfiguration->expiryAnchorDate()?->toDateString(),
+                'renewal_duration_months' => $renewalConfiguration->renewal_duration_months,
+                'notice_days' => $renewalConfiguration->notice_days,
+            ]
+            : [
+                'id' => null,
+                'effective_from' => null,
+                'automatic_renewal' => (bool) $contract->automatic_renewal,
+                'expiry_anchor_date' => $contract->renewalAnchorDate()?->toDateString(),
+                'renewal_duration_months' => $contract->renewal_duration_months,
+                'notice_days' => $contract->notice_days,
+            ];
 
         return [
             'company_id' => $contract->company_id,
@@ -383,9 +412,10 @@ final class ClosingSnapshotPayload
                 ],
                 'contractual_start_date' => $contract->contractualStartDate()->toDateString(),
                 'next_expiry_date' => $contract->nextExpiryDate()?->toDateString(),
-                'automatic_renewal' => (bool) $contract->automatic_renewal,
-                'renewal_duration_months' => $contract->renewal_duration_months,
-                'notice_days' => $contract->notice_days,
+                'automatic_renewal' => $renewalAtClosing['automatic_renewal'],
+                'renewal_duration_months' => $renewalAtClosing['renewal_duration_months'],
+                'notice_days' => $renewalAtClosing['notice_days'],
+                'renewal_configuration_at_31_december' => $renewalAtClosing,
                 'conditions' => $conditions,
                 'annual_composition' => $annual->composition,
                 'lifecycle_events' => $lifecycle,
@@ -405,12 +435,24 @@ final class ClosingSnapshotPayload
      */
     private static function expenseDetail(Expense $expense, array $eventReferences): array
     {
-        $expense->loadMissing(['lines', 'supplier', 'project', 'contract', 'directCostCenter']);
+        $expense->loadMissing([
+            'lines',
+            'supplier',
+            'project.classifications.costCenter',
+            'contract.classifications.costCenter',
+            'directCostCenter',
+        ]);
         $owner = match (true) {
             $expense->project !== null => ['type' => 'project', 'origin_id' => $expense->project->id, 'origin_key' => $expense->project->originKey(), 'label' => $expense->project->title],
             $expense->contract !== null => ['type' => 'contract', 'origin_id' => $expense->contract->id, 'origin_key' => $expense->contract->originKey(), 'label' => $expense->contract->title],
             default => ['type' => 'standalone', 'origin_id' => null, 'origin_key' => null, 'label' => 'Autonoma'],
         };
+        $classification = $expense->project?->classifications->firstWhere('exercise_id', $expense->exercise_id)
+            ?? $expense->contract?->classifications->firstWhere('exercise_id', $expense->exercise_id);
+        $costCenter = $expense->directCostCenter ?? $classification?->costCenter;
+        $costCenterSource = $expense->direct_cost_center_id !== null
+            ? 'direct'
+            : ($classification === null ? 'unclassified' : 'inherited');
 
         return [
             'expense_id' => $expense->id,
@@ -421,6 +463,11 @@ final class ClosingSnapshotPayload
             'copied_from_origin_key' => $expense->copied_from_origin_key,
             'owner' => $owner,
             'supplier' => ['id' => $expense->supplier_id, 'label' => $expense->supplier?->legal_name],
+            'cost_center' => [
+                'id' => $costCenter?->id,
+                'label' => $costCenter?->name,
+                'source' => $costCenterSource,
+            ],
             'state' => $expense->isReversed() ? 'reversed' : 'active',
             'final_estimate_total' => $expense->allocation(),
             'closing_actual_total' => $expense->actual(),

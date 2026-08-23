@@ -56,12 +56,14 @@ it('rolls back all economic effects if Snapshot materialization fails', function
         }
     });
 
-    expect(fn () => app(CloseExercise::class)->execute($actor, $exercise, [
+    $input = [
         ...$prepared['input'],
         'review_fingerprint' => $prepared['execution_fingerprint'],
         'warnings_acknowledged' => true,
         'confirmed' => true,
-    ], $operationId))->toThrow(RuntimeException::class);
+    ];
+    expect(fn () => app(CloseExercise::class)->execute($actor, $exercise, $input, $operationId))
+        ->toThrow(RuntimeException::class);
 
     expect($exercise->refresh()->isOpen())->toBeTrue()
         ->and(ClosingSnapshot::query()->where('exercise_id', $exercise->id)->exists())->toBeFalse()
@@ -69,4 +71,18 @@ it('rolls back all economic effects if Snapshot materialization fails', function
         ->and(ProjectDeferral::query()->where('project_id', $project->id)->exists())->toBeFalse()
         ->and(AuditEvent::query()->where('operation_id', $operationId)->where('event_type', AuditEventType::ExerciseClosingStarted->value)->exists())->toBeTrue()
         ->and(AuditEvent::query()->where('operation_id', $operationId)->where('event_type', AuditEventType::ExerciseClosingFailed->value)->exists())->toBeTrue();
+
+    $snapshot = app(CloseExercise::class)->execute($actor, $exercise->refresh(), $input, $operationId);
+    $sequences = AuditEvent::query()
+        ->where('operation_id', $operationId)
+        ->orderBy('event_sequence')
+        ->pluck('event_sequence')
+        ->map(fn (mixed $sequence): int => (int) $sequence)
+        ->all();
+
+    expect($snapshot->exercise_id)->toBe($exercise->id)
+        ->and(ClosingSnapshot::query()->where('exercise_id', $exercise->id)->count())->toBe(1)
+        ->and(AuditEvent::query()->where('operation_id', $operationId)->where('event_type', AuditEventType::ExerciseClosingStarted->value)->count())->toBe(1)
+        ->and(AuditEvent::query()->where('operation_id', $operationId)->where('event_type', AuditEventType::ExerciseClosingFailed->value)->count())->toBe(1)
+        ->and($sequences)->toBe(range(0, max($sequences)));
 });

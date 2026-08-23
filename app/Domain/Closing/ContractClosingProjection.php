@@ -21,8 +21,9 @@ final class ContractClosingProjection
      */
     public static function build(Contract $contract, string $cutoffDate, iterable $openExercises): array
     {
-        $contract->loadMissing(['conditions', 'lifecycleFacts', 'renewalConfigurations']);
-        $cutoff = CarbonImmutable::parse($cutoffDate)->startOfDay();
+        $contract->loadMissing(['company', 'conditions', 'lifecycleFacts', 'renewalConfigurations']);
+        $cutoff = CarbonImmutable::parse($cutoffDate, $contract->company->timezone)->startOfDay();
+        $today = CarbonImmutable::now($contract->company->timezone)->startOfDay();
         $conditions = $contract->conditions->map(fn (ContractCondition $condition): array => [
             'id' => $condition->id,
             'amount' => (string) $condition->amount,
@@ -41,12 +42,13 @@ final class ContractClosingProjection
             'renewal_configuration_id' => $fact->renewal_configuration_id,
             'annulled_at' => $fact->annulledAt()?->toISOString(),
         ])->values()->all();
+        $persistedFacts = $facts;
         $configurations = $contract->renewalConfigurations;
         $nextExpiry = $contract->nextExpiryDate()?->toDateString();
         $projectedEvents = [];
         $renewalWithoutCondition = false;
 
-        while ($nextExpiry !== null && ! CarbonImmutable::parse($nextExpiry)->startOfDay()->greaterThan($cutoff)) {
+        while ($nextExpiry !== null && $nextExpiry <= $cutoff->toDateString()) {
             $configuration = ContractRenewalSchedule::configurationAtDate($configurations, $nextExpiry);
             if (! $configuration instanceof ContractRenewalConfiguration) {
                 throw new DomainException('Nessuna configurazione storica è efficace alla scadenza.');
@@ -113,6 +115,19 @@ final class ContractClosingProjection
             if ($exercise->company_id !== $contract->company_id) {
                 continue;
             }
+            $referenceDate = self::annualReferenceDate($exercise->year, $today);
+            $stateBefore = ContractStateTimeline::stateAtDate(
+                $contract->contractualStartDate()->toDateString(),
+                $persistedFacts,
+                $referenceDate,
+                $configurations,
+            );
+            $stateAfter = ContractStateTimeline::stateAtDate(
+                $contract->contractualStartDate()->toDateString(),
+                $facts,
+                $referenceDate,
+                $configurations,
+            );
             $allocation = self::allocationForYear($contract, [
                 'conditions' => $conditions,
                 'lifecycle_facts' => $facts,
@@ -125,6 +140,9 @@ final class ContractClosingProjection
                 'allocation_after' => $allocation['amount'],
                 'allocation_delta' => Decimal::subtract($allocation['amount'], (string) $current),
                 'composition' => $allocation['composition'],
+                'state_before' => $stateBefore->value,
+                'state_after' => $stateAfter->value,
+                'state_changed' => $stateBefore !== $stateAfter,
             ];
         }
         ksort($exerciseImpacts);
@@ -163,5 +181,14 @@ final class ContractClosingProjection
         );
 
         return ['amount' => $allocation->amount, 'composition' => $allocation->composition];
+    }
+
+    private static function annualReferenceDate(int $year, CarbonImmutable $today): string
+    {
+        return match (true) {
+            $year < $today->year => $year.'-12-31',
+            $year > $today->year => $year.'-01-01',
+            default => $today->toDateString(),
+        };
     }
 }

@@ -31,10 +31,10 @@ below. Later slices may add integration or regression coverage.
 | 28.22 | Riallineamento per sorgente | S7 — Revisioni, riallineamento e impatto multi-Esercizio | implemented |
 | 28.23 | Approvazione atomica | S6 — Proposta e Budget iniziale | verified |
 | 28.24 | Stato alla data | S4 — Progetti | verified |
-| 28.25 | Stato alla Chiusura | S9 — Chiusura | planned |
-| 28.26 | Nessuna riapertura | S9 — Chiusura | planned |
-| 28.27 | Chiusura atomica | S9 — Chiusura | planned |
-| 28.28 | Chiusura cronologica | S9 — Chiusura | planned |
+| 28.25 | Stato alla Chiusura | S9 — Chiusura | implemented |
+| 28.26 | Nessuna riapertura | S9 — Chiusura | implemented |
+| 28.27 | Chiusura atomica | S9 — Chiusura | implemented |
+| 28.28 | Chiusura cronologica | S9 — Chiusura | implemented |
 | 28.29 | Correzioni tardive | S10 — Correzioni post-Chiusura | planned |
 | 28.30 | Nessuna riclassificazione storica | S10 — Correzioni post-Chiusura | planned |
 | 28.31 | Riporto storico invariato | S10 — Correzioni post-Chiusura | planned |
@@ -55,7 +55,7 @@ below. Later slices may add integration or regression coverage.
 | 28.46 | Identità non riutilizzabile | S2 — Anagrafiche | verified |
 | 28.47 | Snapshot autonome | S6 — Proposta e Budget iniziale | verified |
 | 28.48 | Schema Budget | S6 — Proposta e Budget iniziale | verified |
-| 28.49 | Schema Chiusura | S9 — Chiusura | planned |
+| 28.49 | Schema Chiusura | S9 — Chiusura | implemented |
 | 28.50 | Previsto e Non previsto | S11 — Reportistica ed esportazione | planned |
 | 28.51 | Categorie del confronto | S11 — Reportistica ed esportazione | planned |
 | 28.52 | Nessun doppio conteggio | S5 — Contratti | verified |
@@ -64,7 +64,7 @@ below. Later slices may add integration or regression coverage.
 | 28.55 | Copia fra Esercizi | S7 — Revisioni, riallineamento e impatto multi-Esercizio | implemented |
 | 28.56 | Scadenze contrattuali | S5 — Contratti | verified |
 | 28.57 | Permessi per Azienda | S1 — Azienda, accesso e impostazioni | verified |
-| 28.58 | Esercizio successivo | S9 — Chiusura | planned |
+| 28.58 | Esercizio successivo | S9 — Chiusura | implemented |
 | 28.59 | Nessun Forecast | S0 — Foundation e ambiente di sviluppo live | verified |
 | 28.60 | Relazioni informative | S5 — Contratti | planned |
 | 28.61 | Plafond | S3 — Esercizi, Spese e Righe | verified |

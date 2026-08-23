@@ -2,11 +2,16 @@
 
 use App\Actions\Closing\CloseExercise;
 use App\Actions\Closing\PrepareExerciseClosing;
+use App\Actions\Operations\ProcessContractRenewals;
 use App\Actions\Proposals\InitializeProposal;
 use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExerciseStatus;
 use App\Models\Company;
 use App\Models\CompanyCapability;
+use App\Models\Contract;
+use App\Models\ContractCondition;
+use App\Models\ContractLifecycleFact;
+use App\Models\ContractRenewalConfiguration;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -80,4 +85,89 @@ it('prevents ordinary historical mutation after Closing', function (): void {
             'created_by_id' => $actor->id,
         ]))->toThrow(ValidationException::class)
         ->and(fn () => app(InitializeProposal::class)->execute($actor, $company, $source->refresh(), (string) Str::uuid()))->toThrow(ValidationException::class);
+});
+
+it('rejects moving Contract and Project facts out of Closed history', function (): void {
+    $company = Company::factory()->create();
+    $actor = User::factory()->create();
+    $closed = Exercise::factory()->for($company)->create(['year' => 2025]);
+    Exercise::factory()->for($company)->create(['year' => 2026]);
+    $contract = Contract::factory()->for($company)->create([
+        'contractual_start_date' => '2025-01-01',
+        'next_expiry_date' => null,
+        'renewal_anchor_date' => null,
+    ]);
+    ContractRenewalConfiguration::factory()->forContract($contract)->create([
+        'effective_from' => '2025-01-01',
+        'automatic_renewal' => false,
+        'expiry_anchor_date' => null,
+        'renewal_duration_months' => null,
+    ]);
+    $condition = ContractCondition::factory()->forContract($contract)->create([
+        'valid_from' => '2025-01-01',
+        'valid_to' => null,
+        'amount' => '10.00',
+    ]);
+    $fact = ContractLifecycleFact::factory()->forContract($contract)->create([
+        'type' => 'cessation',
+        'declared_contractual_date' => '2025-06-30',
+        'state_change_date' => '2025-07-01',
+        'reason' => 'Cessazione originaria',
+    ]);
+    $project = Project::factory()->for($company)->create([
+        'initial_state' => 'open',
+        'initial_effective_date' => '2025-01-01',
+    ]);
+    $transition = ProjectTransition::factory()->for($project)->create([
+        'company_id' => $company->id,
+        'from_state' => 'open',
+        'to_state' => 'closed',
+        'effective_date' => '2025-08-01',
+        'reason' => 'Chiusura originaria',
+    ]);
+    closeExerciseFixture($closed, $actor);
+
+    expect(fn () => $condition->update(['valid_to' => '2025-06-30']))->toThrow(ValidationException::class)
+        ->and(fn () => $fact->update(['state_change_date' => '2026-07-01']))->toThrow(ValidationException::class)
+        ->and(fn () => $transition->update(['effective_date' => '2026-08-01']))->toThrow(ValidationException::class)
+        ->and($condition->refresh()->validTo())->toBeNull()
+        ->and($fact->refresh()->stateChangeDate()?->toDateString())->toBe('2025-07-01')
+        ->and($transition->refresh()->effectiveDate()->toDateString())->toBe('2025-08-01');
+});
+
+it('blocks ordinary non-renewal processing that would rewrite a Closed year', function (): void {
+    $company = Company::factory()->create();
+    $actor = User::factory()->create();
+    CompanyCapability::query()->create([
+        'company_id' => $company->id,
+        'user_id' => $actor->id,
+        'capability' => Capability::ManageOperations,
+    ]);
+    $closed = Exercise::factory()->for($company)->create(['year' => 2025]);
+    Exercise::factory()->for($company)->create(['year' => 2026]);
+    $contract = Contract::factory()->for($company)->create([
+        'contractual_start_date' => '2025-01-01',
+        'next_expiry_date' => '2025-06-30',
+        'renewal_anchor_date' => '2025-06-30',
+        'automatic_renewal' => false,
+        'renewal_duration_months' => null,
+    ]);
+    ContractRenewalConfiguration::factory()->forContract($contract)->create([
+        'effective_from' => '2025-01-01',
+        'automatic_renewal' => false,
+        'expiry_anchor_date' => '2025-06-30',
+        'renewal_duration_months' => null,
+    ]);
+    $condition = ContractCondition::factory()->forContract($contract)->create([
+        'valid_from' => '2025-01-01',
+        'valid_to' => null,
+        'amount' => '10.00',
+    ]);
+    closeExerciseFixture($closed, $actor);
+
+    expect(fn () => app(ProcessContractRenewals::class)->execute($actor, $contract, (string) Str::uuid()))
+        ->toThrow(ValidationException::class)
+        ->and(ContractLifecycleFact::query()->where('contract_id', $contract->id)->where('type', 'expiry_cessation')->exists())->toBeFalse()
+        ->and($condition->refresh()->validTo())->toBeNull()
+        ->and($contract->refresh()->nextExpiryDate()?->toDateString())->toBe('2025-06-30');
 });

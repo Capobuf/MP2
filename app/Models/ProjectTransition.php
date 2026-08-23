@@ -45,6 +45,7 @@ class ProjectTransition extends Model
         static::updating(function (self $transition): void {
             if ($transition->isDirty(['effective_date', 'from_state', 'to_state', 'annulled_at'])) {
                 self::assertDoesNotRewriteClosedHistory($transition);
+                self::assertDoesNotRewriteClosedHistory($transition, original: true);
             }
         });
         static::deleting(function (): never {
@@ -115,10 +116,12 @@ class ProjectTransition extends Model
         ];
     }
 
-    private static function assertDoesNotRewriteClosedHistory(self $transition): void
+    private static function assertDoesNotRewriteClosedHistory(self $transition, bool $original = false): void
     {
         $companyId = (int) $transition->company_id;
-        $effective = $transition->getAttribute('effective_date');
+        $effective = $original
+            ? $transition->getRawOriginal('effective_date')
+            : $transition->getAttribute('effective_date');
         if ($companyId < 1 || $effective === null) {
             return;
         }

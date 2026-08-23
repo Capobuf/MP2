@@ -146,6 +146,10 @@ class CloseExercise extends Page
 
     public function updatedClosing(mixed $value = null, ?string $key = null): void
     {
+        if (in_array($key, ['warnings_acknowledged', 'confirmed'], true)) {
+            return;
+        }
+
         $this->review = null;
         $this->preparedInput = null;
         $this->reviewFingerprint = null;
