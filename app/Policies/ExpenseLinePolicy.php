@@ -16,12 +16,14 @@ class ExpenseLinePolicy
 
     public function create(User $user, Expense $expense): bool
     {
-        return $user->hasCapability($expense->company, Capability::ManageOperations);
+        return $expense->exercise->isOpen()
+            && $user->hasCapability($expense->company, Capability::ManageOperations);
     }
 
     public function update(User $user, ExpenseLine $line): bool
     {
-        return $user->hasCapability($line->expense->company, Capability::ManageOperations);
+        return $line->expense->exercise->isOpen()
+            && $user->hasCapability($line->expense->company, Capability::ManageOperations);
     }
 
     public function delete(User $user, ExpenseLine $line): bool
