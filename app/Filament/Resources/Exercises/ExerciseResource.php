@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Exercises;
 
 use App\Domain\Company\Capability;
+use App\Filament\Resources\Exercises\Pages\CloseExercise;
 use App\Filament\Resources\Exercises\Pages\CreateExercise;
 use App\Filament\Resources\Exercises\Pages\ListExercises;
 use App\Filament\Resources\Exercises\Pages\ViewExercise;
@@ -72,7 +73,7 @@ class ExerciseResource extends Resource
         $company = Filament::getTenant();
 
         return $company instanceof Company
-            ? $query->whereBelongsTo($company, 'company')->with(['expenses.lines'])
+            ? $query->whereBelongsTo($company, 'company')->with(['expenses.lines', 'closingSnapshot'])
             : $query->whereRaw('1 = 0');
     }
 
@@ -101,6 +102,7 @@ class ExerciseResource extends Resource
         return [
             'index' => ListExercises::route('/'),
             'create' => CreateExercise::route('/create'),
+            'close' => CloseExercise::route('/{record}/close'),
             'view' => ViewExercise::route('/{record}'),
         ];
     }
