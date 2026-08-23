@@ -11,12 +11,14 @@ use App\Domain\Projects\ProjectState;
 use App\Models\BudgetSnapshot;
 use App\Models\Contract;
 use App\Models\ContractCondition;
+use App\Models\ContractLifecycleFact;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\Project;
 use App\Models\ProjectContractLink;
 use App\Models\ProjectDeferral;
+use App\Models\ProjectTransition;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -34,6 +36,7 @@ final class ClosingSnapshotPayload
         $yearStart = CarbonImmutable::create($exercise->year, 1, 1, 0, 0, 0, $exercise->company->timezone);
         $yearEnd = CarbonImmutable::create($exercise->year, 12, 31, 0, 0, 0, $exercise->company->timezone);
         $budgets = BudgetSnapshot::query()->where('exercise_id', $exercise->id)->with('rows')->orderBy('version')->get();
+        /** @var Collection<string, int> $budgetOriginKeys */
         $budgetOriginKeys = $budgets->flatMap->rows->pluck('origin_key')->unique()->flip();
         $decisions = collect($projectDecisions)->keyBy('project_id');
         $rows = [];
@@ -66,7 +69,8 @@ final class ClosingSnapshotPayload
             ->get();
         foreach ($projects as $project) {
             $decision = $decisions->get($project->id);
-            if (! self::includeProject($project, $exercise, $budgetOriginKeys, $yearStart, $yearEnd, is_array($decision) ? $decision : null)) {
+            $decision = is_array($decision) ? $decision : null;
+            if (! self::includeProject($project, $exercise, $budgetOriginKeys, $yearStart, $yearEnd, $decision)) {
                 continue;
             }
             $rows[] = self::projectRow(
@@ -74,7 +78,7 @@ final class ClosingSnapshotPayload
                 $exercise,
                 $yearStart,
                 $yearEnd,
-                is_array($decision) ? $decision : null,
+                $decision,
                 $eventReferences[$project->originKey()] ?? [],
             );
         }
@@ -123,7 +127,7 @@ final class ClosingSnapshotPayload
         }
 
         return [
-            'rows' => array_values($rows),
+            'rows' => $rows,
             'total_final_allocation' => $allocation,
             'total_closing_actual' => $actual,
             'total_operational_variance' => $variance,
@@ -131,20 +135,26 @@ final class ClosingSnapshotPayload
         ];
     }
 
+    /** @param Collection<string, int> $budgetOriginKeys */
     private static function includeStandalone(Expense $expense, Collection $budgetOriginKeys, int $year): bool
     {
+        $reversedAt = $expense->getAttribute('reversed_at');
+        $reversedInYear = $reversedAt instanceof \DateTimeInterface && (int) $reversedAt->format('Y') === $year;
+
         return Decimal::compare($expense->allocation(), '0.00') !== 0
             || $expense->hasActuals()
             || $budgetOriginKeys->has($expense->originKey())
-            || ($expense->reversed_at !== null && (int) $expense->reversed_at->format('Y') === $year);
+            || $reversedInYear;
     }
 
-    /** @param array<string, mixed>|null $decision */
+    /** @param Collection<string, int> $budgetOriginKeys
+     * @param array<string, mixed>|null $decision
+     */
     private static function includeProject(Project $project, Exercise $exercise, Collection $budgetOriginKeys, CarbonImmutable $yearStart, CarbonImmutable $yearEnd, ?array $decision): bool
     {
         $totals = $project->annualTotals()[$exercise->id] ?? ['allocation' => '0.00', 'actual' => '0.00', 'has_actuals' => false];
         $state = $project->stateAtDate($yearEnd->toDateString());
-        $transitionInYear = $project->transitions->contains(function ($transition) use ($yearStart, $yearEnd): bool {
+        $transitionInYear = $project->transitions->contains(function (ProjectTransition $transition) use ($yearStart, $yearEnd): bool {
             if ($transition->annulledAt() !== null) {
                 return false;
             }
@@ -158,7 +168,7 @@ final class ClosingSnapshotPayload
             && Decimal::compare((string) $deferral->carryover_amount, '0.00') !== 0);
 
         return Decimal::compare((string) $totals['allocation'], '0.00') !== 0
-            || (bool) ($totals['has_actuals'] ?? false)
+            || (bool) $totals['has_actuals']
             || $outgoingConsolidated
             || $budgetOriginKeys->has($project->originKey())
             || $transitionInYear
@@ -166,15 +176,16 @@ final class ClosingSnapshotPayload
             || in_array($state, [ProjectState::Planned, ProjectState::Open], true);
     }
 
+    /** @param Collection<string, int> $budgetOriginKeys */
     private static function includeContract(Contract $contract, Exercise $exercise, Collection $budgetOriginKeys, CarbonImmutable $yearStart, CarbonImmutable $yearEnd): bool
     {
         $totals = $contract->annualTotals()[$exercise->id] ?? ['allocation' => '0.00', 'actual' => '0.00', 'has_actuals' => false];
         $state = $contract->stateAtDate($yearEnd->toDateString());
         $conditionInYear = $contract->conditions->contains(fn (ContractCondition $condition): bool => self::conditionOverlaps($condition, $yearStart, $yearEnd));
-        $eventInYear = $contract->lifecycleFacts->contains(fn ($fact): bool => self::lifecycleEffectiveDate($fact)?->betweenIncluded($yearStart, $yearEnd) ?? false);
+        $eventInYear = $contract->lifecycleFacts->contains(fn (ContractLifecycleFact $fact): bool => self::lifecycleEffectiveDate($fact)->betweenIncluded($yearStart, $yearEnd));
 
         return Decimal::compare((string) $totals['allocation'], '0.00') !== 0
-            || (bool) ($totals['has_actuals'] ?? false)
+            || (bool) $totals['has_actuals']
             || $budgetOriginKeys->has($contract->originKey())
             || $conditionInYear
             || $eventInYear
@@ -199,7 +210,7 @@ final class ClosingSnapshotPayload
             'supplier_id' => $expense->supplier_id,
             'supplier_label' => $expense->supplier?->legal_name,
             'cost_center_id' => $expense->direct_cost_center_id,
-            'cost_center_label' => $costCenter?->name ?? 'Non classificato',
+            'cost_center_label' => $costCenter === null ? 'Non classificato' : $costCenter->name,
             'end_state' => $expense->isReversed() ? 'reversed' : 'active',
             'has_actuals' => $expense->hasActuals(),
             'final_estimates' => $expense->allocation(),
@@ -226,7 +237,9 @@ final class ClosingSnapshotPayload
         $estimates = Decimal::subtract((string) $totals['allocation'], $incoming);
         $state = $project->stateAtDate($yearEnd->toDateString());
         $outgoing = $project->deferrals->firstWhere('source_exercise_id', $exercise->id);
+        $outgoing = $outgoing instanceof ProjectDeferral ? $outgoing : null;
         $classification = $project->classifications->firstWhere('exercise_id', $exercise->id);
+        $costCenter = $classification === null ? null : $classification->costCenter;
         $balance = ProjectDeferralValues::residual((string) $totals['allocation'], (string) $totals['actual']);
         $balanceFields = match ($state) {
             ProjectState::Closed => ['residual' => null, 'saving' => $balance, 'unused_allocation' => null],
@@ -245,9 +258,9 @@ final class ClosingSnapshotPayload
             'supplier_id' => null,
             'supplier_label' => null,
             'cost_center_id' => $classification?->cost_center_id,
-            'cost_center_label' => $classification?->costCenter?->name ?? 'Non classificato',
+            'cost_center_label' => $costCenter === null ? 'Non classificato' : $costCenter->name,
             'end_state' => $state?->value,
-            'has_actuals' => (bool) ($totals['has_actuals'] ?? false),
+            'has_actuals' => (bool) $totals['has_actuals'],
             'final_estimates' => $estimates,
             'received_carryover' => $incoming,
             'final_allocation' => (string) $totals['allocation'],
@@ -261,7 +274,7 @@ final class ClosingSnapshotPayload
                 'state_at_31_december' => $state?->value,
                 'classification' => [
                     'cost_center_id' => $classification?->cost_center_id,
-                    'cost_center_label' => $classification?->costCenter?->name,
+                    'cost_center_label' => $costCenter?->name,
                 ],
                 'received_carryover' => $incoming,
                 'final_estimates' => $estimates,
@@ -276,12 +289,12 @@ final class ClosingSnapshotPayload
                     : '0.00',
                 'closing_decision' => $decision,
                 'transitions_in_exercise' => $project->transitions
-                    ->filter(fn ($transition): bool => $transition->annulledAt() === null
+                    ->filter(fn (ProjectTransition $transition): bool => $transition->annulledAt() === null
                         && CarbonImmutable::parse($transition->effectiveDate()->toDateString())->betweenIncluded($yearStart, $yearEnd))
-                    ->map(fn ($transition): array => [
+                    ->map(fn (ProjectTransition $transition): array => [
                         'id' => $transition->id,
-                        'from_state' => $transition->from_state->value,
-                        'to_state' => $transition->to_state->value,
+                        'from_state' => (string) $transition->getRawOriginal('from_state'),
+                        'to_state' => (string) $transition->getRawOriginal('to_state'),
                         'effective_date' => $transition->effectiveDate()->toDateString(),
                         'reason' => $transition->reason,
                     ])->values()->all(),
@@ -309,6 +322,7 @@ final class ClosingSnapshotPayload
         $totals = $contract->annualTotals()[$exercise->id] ?? ['allocation' => $annual->amount, 'actual' => '0.00', 'has_actuals' => false];
         $state = $contract->stateAtDate($yearEnd->toDateString());
         $classification = $contract->classifications->firstWhere('exercise_id', $exercise->id);
+        $costCenter = $classification === null ? null : $classification->costCenter;
         $compositionConditionIds = collect($annual->composition)->pluck('condition_id')->map(fn (mixed $id): int => (int) $id)->unique();
         $conditions = $contract->conditions
             ->filter(fn (ContractCondition $condition): bool => self::conditionOverlaps($condition, $yearStart, $yearEnd)
@@ -325,9 +339,9 @@ final class ClosingSnapshotPayload
                 'reason' => $condition->reason,
             ])->values()->all();
         $lifecycle = $contract->lifecycleFacts
-            ->filter(fn ($fact): bool => ($date = self::lifecycleEffectiveDate($fact)) !== null && $date->betweenIncluded($yearStart, $yearEnd))
-            ->sortBy(fn ($fact): string => self::lifecycleEffectiveDate($fact)?->toDateString() ?? '')
-            ->map(fn ($fact): array => [
+            ->filter(fn (ContractLifecycleFact $fact): bool => self::lifecycleEffectiveDate($fact)->betweenIncluded($yearStart, $yearEnd))
+            ->sortBy(fn (ContractLifecycleFact $fact): string => self::lifecycleEffectiveDate($fact)->toDateString())
+            ->map(fn (ContractLifecycleFact $fact): array => [
                 'id' => $fact->id,
                 'type' => (string) $fact->type,
                 'declared_contractual_date' => $fact->declaredContractualDate()->toDateString(),
@@ -349,9 +363,9 @@ final class ClosingSnapshotPayload
             'supplier_id' => $contract->supplier_id,
             'supplier_label' => $contract->supplier?->legal_name,
             'cost_center_id' => $classification?->cost_center_id,
-            'cost_center_label' => $classification?->costCenter?->name ?? 'Non classificato',
+            'cost_center_label' => $costCenter === null ? 'Non classificato' : $costCenter->name,
             'end_state' => $state->value,
-            'has_actuals' => (bool) ($totals['has_actuals'] ?? false),
+            'has_actuals' => (bool) $totals['has_actuals'],
             'final_estimates' => (string) $totals['allocation'],
             'received_carryover' => '0.00',
             'final_allocation' => (string) $totals['allocation'],
@@ -365,7 +379,7 @@ final class ClosingSnapshotPayload
                 'supplier' => ['id' => $contract->supplier_id, 'label' => $contract->supplier?->legal_name],
                 'classification' => [
                     'cost_center_id' => $classification?->cost_center_id,
-                    'cost_center_label' => $classification?->costCenter?->name,
+                    'cost_center_label' => $costCenter?->name,
                 ],
                 'contractual_start_date' => $contract->contractualStartDate()->toDateString(),
                 'next_expiry_date' => $contract->nextExpiryDate()?->toDateString(),
@@ -455,12 +469,12 @@ final class ClosingSnapshotPayload
             && ($condition->validTo() === null || ! $condition->validTo()->lessThan($yearStart));
     }
 
-    private static function lifecycleEffectiveDate(object $fact): ?CarbonImmutable
+    private static function lifecycleEffectiveDate(ContractLifecycleFact $fact): CarbonImmutable
     {
         $value = $fact->stateChangeDate()?->toDateString()
             ?? $fact->renewedExpiryDate()?->toDateString()
-            ?? $fact->declaredContractualDate()?->toDateString();
+            ?? $fact->declaredContractualDate()->toDateString();
 
-        return $value === null ? null : CarbonImmutable::parse($value);
+        return CarbonImmutable::parse($value);
     }
 }
