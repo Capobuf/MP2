@@ -28,7 +28,8 @@ class ExpensePolicy
 
     public function update(User $user, Expense $expense): bool
     {
-        return $user->hasCapability($expense->company, Capability::ManageOperations);
+        return $expense->exercise->isOpen()
+            && $user->hasCapability($expense->company, Capability::ManageOperations);
     }
 
     public function delete(User $user, Expense $expense): bool
