@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Contracts\ContractClosedHistoryGuard;
 use Database\Factories\ContractLifecycleFactFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,6 +22,14 @@ class ContractLifecycleFact extends Model
 
     protected static function booted(): void
     {
+        static::creating(function (self $fact): void {
+            self::assertClosedHistoryMutable($fact);
+        });
+        static::updating(function (self $fact): void {
+            if ($fact->isDirty(['type', 'declared_contractual_date', 'state_change_date', 'renewed_expiry_date', 'renewal_configuration_id', 'annulled_at'])) {
+                self::assertClosedHistoryMutable($fact);
+            }
+        });
         static::deleting(function (): never {
             throw new \LogicException('Contract lifecycle facts cannot be deleted.');
         });
@@ -99,5 +108,27 @@ class ContractLifecycleFact extends Model
             'renewed_expiry_date' => 'date',
             'annulled_at' => 'datetime',
         ];
+    }
+
+    private static function assertClosedHistoryMutable(self $fact): void
+    {
+        if (ContractClosedHistoryGuard::automaticMaterializationAllowed() || (int) $fact->company_id < 1) {
+            return;
+        }
+        $date = self::dateString($fact->getAttribute('state_change_date'))
+            ?? self::dateString($fact->getAttribute('renewed_expiry_date'))
+            ?? self::dateString($fact->getAttribute('declared_contractual_date'));
+        if ($date !== null) {
+            ContractClosedHistoryGuard::assertEventDateIsMutable((int) $fact->company_id, $date);
+        }
+    }
+
+    private static function dateString(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return $value instanceof \DateTimeInterface ? $value->format('Y-m-d') : (string) $value;
     }
 }
