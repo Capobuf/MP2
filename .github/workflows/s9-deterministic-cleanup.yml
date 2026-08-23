@@ -1,0 +1,96 @@
+name: S9 Deterministic Cleanup
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Apply exact known fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def exact(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f'Expected fragment not found in {path}: {old[:100]!r}')
+              p.write_text(text.replace(old, new, 1))
+
+          exact(
+              'app/Actions/Closing/CloseExercise.php',
+              "            if (! is_array($decision) || ! isset($decision['project_id'], $decision['final_state'])) {",
+              "            if (! isset($decision['project_id'], $decision['final_state'])) {",
+          )
+
+          exact(
+              'app/Actions/Closing/ReviewExerciseClosing.php',
+              "                $requestedReductions = $decision['source_estimate_reductions'] ?? [];\n                if (is_array($requestedReductions)) {\n                    foreach ($requestedReductions as $item) {\n                        if (is_array($item)) {\n                            $sourceAmounts[] = $this->amount($item['reduction_amount'] ?? null) ?? '0.00';\n                        }\n                    }\n                }",
+              "                $requestedReductions = $decision['source_estimate_reductions'] ?? [];\n                foreach ($requestedReductions as $item) {\n                    if (is_array($item)) {\n                        $sourceAmounts[] = $this->amount($item['reduction_amount'] ?? null) ?? '0.00';\n                    }\n                }",
+          )
+
+          exact(
+              'app/Filament/Resources/Exercises/Pages/CloseExercise.php',
+              "            /** @var ProjectDeferral|null $deferral */\n            $deferral = $project->deferrals->firstWhere('source_exercise_id', $exercise->id);\n            $mode = $deferral?->mode ?? ProjectDeferralMode::None;",
+              "            $deferral = $project->deferrals->firstWhere('source_exercise_id', $exercise->id);\n            $deferral = $deferral instanceof ProjectDeferral ? $deferral : null;\n            $mode = $deferral === null ? ProjectDeferralMode::None : $deferral->mode;",
+          )
+          exact(
+              'app/Filament/Resources/Exercises/Pages/CloseExercise.php',
+              "                'carryover_amount' => $mode === ProjectDeferralMode::Carryover ? (string) $deferral?->carryover_amount : '',\n                'reprogrammed_amount' => $mode === ProjectDeferralMode::Reprogramming ? (string) $deferral?->reprogrammed_amount : '',",
+              "                'carryover_amount' => $mode === ProjectDeferralMode::Carryover && $deferral !== null ? (string) $deferral->carryover_amount : '',\n                'reprogrammed_amount' => $mode === ProjectDeferralMode::Reprogramming && $deferral !== null ? (string) $deferral->reprogrammed_amount : '',",
+          )
+
+          exact(
+              'tests/Feature/Closing/ClosingSnapshotTest.php',
+              "use LogicException;\n",
+              "",
+          )
+          exact(
+              'tests/Feature/Closing/ClosingSnapshotTest.php',
+              "    ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '-100.00']);",
+              "    ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '-100.00', 'note' => 'Rimborso di compensazione']);",
+          )
+          exact(
+              'tests/Feature/Closing/ClosedExerciseImmutabilityTest.php',
+              "use LogicException;\n",
+              "",
+          )
+          exact(
+              'tests/Feature/Closing/ClosingAtomicityTest.php',
+              "use RuntimeException;\n",
+              "",
+          )
+          PY
+
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+
+      - name: Install locked dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Format touched files
+        run: vendor/bin/pint app/Actions/Closing/CloseExercise.php app/Actions/Closing/ReviewExerciseClosing.php app/Filament/Resources/Exercises/Pages/CloseExercise.php tests/Feature/Closing/ClosingSnapshotTest.php tests/Feature/Closing/ClosedExerciseImmutabilityTest.php tests/Feature/Closing/ClosingAtomicityTest.php
+
+      - name: Commit cleanup
+        run: |
+          git diff --check
+          git add app tests
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix: resolve deterministic S9 verification findings"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
