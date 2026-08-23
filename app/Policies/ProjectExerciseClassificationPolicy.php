@@ -21,7 +21,8 @@ class ProjectExerciseClassificationPolicy
 
     public function update(User $user, ProjectExerciseClassification $classification): bool
     {
-        return $user->hasCapability($classification->project->company, Capability::ManageOperations);
+        return $classification->exercise->isOpen()
+            && $user->hasCapability($classification->project->company, Capability::ManageOperations);
     }
 
     public function delete(User $user, ProjectExerciseClassification $classification): bool
