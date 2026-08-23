@@ -332,7 +332,7 @@ final class ReviewExerciseClosing
                     $blocks[] = $this->issue('project_final_state_invalid', 'Lo stato finale scelto non è ammesso per il Progetto.', 'project', $project->id);
                 } else {
                     $finalState = $candidate;
-                    if ($candidate !== $currentState && $currentState instanceof ProjectState) {
+                    if ($candidate !== $currentState) {
                         $this->validateClosingTransition($project, $currentState, $candidate, $yearEnd, $blocks);
                     }
                 }
