@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Closings\Pages;
 
 use App\Filament\Resources\Closings\ClosingResource;
+use App\Models\ClosingSnapshot;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewClosing extends ViewRecord
@@ -11,6 +12,11 @@ class ViewClosing extends ViewRecord
 
     public function getTitle(): string
     {
-        return 'Chiusura '.$this->record->exercise_year;
+        $record = $this->getRecord();
+        if (! $record instanceof ClosingSnapshot) {
+            throw new \UnexpectedValueException('Invalid Closing Snapshot record.');
+        }
+
+        return 'Chiusura '.$record->exercise_year;
     }
 }
