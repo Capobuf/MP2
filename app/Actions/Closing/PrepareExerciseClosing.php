@@ -62,9 +62,17 @@ final class PrepareExerciseClosing
 
         $nextYear = $exercise->year + 1;
         $contractDelta = '0.00';
-        $projections = collect($review->sourceState['contracts'] ?? [])->keyBy('id');
+        $projections = [];
+        $contractRows = $review->sourceState['contracts'] ?? [];
+        if (is_array($contractRows)) {
+            foreach ($contractRows as $row) {
+                if (is_array($row) && isset($row['id'])) {
+                    $projections[(int) $row['id']] = $row;
+                }
+            }
+        }
         foreach (Contract::query()->where('company_id', $exercise->company_id)->with('renewalConfigurations')->orderBy('id')->get() as $contract) {
-            $projection = $projections->get($contract->id)['projection'] ?? null;
+            $projection = $projections[$contract->id]['projection'] ?? null;
             if (! is_array($projection)) {
                 continue;
             }
