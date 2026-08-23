@@ -9,11 +9,11 @@ return new class extends Migration
     {
         DB::statement('ALTER TABLE project_deferrals DROP CHECK project_deferrals_closed_values');
         DB::statement(
-            "ALTER TABLE project_deferrals ADD CONSTRAINT project_deferrals_closed_values CHECK ("
-            . "(mode = 'none' AND carryover_amount = 0 AND carryover_state IS NULL AND reprogrammed_amount = 0 AND reprogramming_operation_id IS NULL AND reprogramming_effects IS NULL)"
-            . " OR (mode = 'carryover' AND carryover_amount > 0 AND carryover_state IN ('provisional', 'consolidated') AND reprogrammed_amount = 0 AND reprogramming_operation_id IS NULL AND reprogramming_effects IS NULL)"
-            . " OR (mode = 'reprogramming' AND carryover_amount = 0 AND carryover_state IS NULL AND reprogrammed_amount > 0 AND reprogramming_operation_id IS NOT NULL AND reprogramming_effects IS NOT NULL)"
-            . ')'
+            'ALTER TABLE project_deferrals ADD CONSTRAINT project_deferrals_closed_values CHECK ('
+            ."(mode = 'none' AND carryover_amount = 0 AND carryover_state IS NULL AND reprogrammed_amount = 0 AND reprogramming_operation_id IS NULL AND reprogramming_effects IS NULL)"
+            ." OR (mode = 'carryover' AND carryover_amount > 0 AND carryover_state IN ('provisional', 'consolidated') AND reprogrammed_amount = 0 AND reprogramming_operation_id IS NULL AND reprogramming_effects IS NULL)"
+            ." OR (mode = 'reprogramming' AND carryover_amount = 0 AND carryover_state IS NULL AND reprogrammed_amount > 0 AND reprogramming_operation_id IS NOT NULL AND reprogramming_effects IS NOT NULL)"
+            .')'
         );
     }
 
@@ -21,11 +21,11 @@ return new class extends Migration
     {
         DB::statement('ALTER TABLE project_deferrals DROP CHECK project_deferrals_closed_values');
         DB::statement(
-            "ALTER TABLE project_deferrals ADD CONSTRAINT project_deferrals_closed_values CHECK ("
-            . "(mode = 'none' AND carryover_amount = 0 AND carryover_state IS NULL AND reprogrammed_amount = 0 AND reprogramming_operation_id IS NULL AND reprogramming_effects IS NULL)"
-            . " OR (mode = 'carryover' AND carryover_amount > 0 AND carryover_state = 'provisional' AND reprogrammed_amount = 0 AND reprogramming_operation_id IS NULL AND reprogramming_effects IS NULL)"
-            . " OR (mode = 'reprogramming' AND carryover_amount = 0 AND carryover_state IS NULL AND reprogrammed_amount > 0 AND reprogramming_operation_id IS NOT NULL AND reprogramming_effects IS NOT NULL)"
-            . ')'
+            'ALTER TABLE project_deferrals ADD CONSTRAINT project_deferrals_closed_values CHECK ('
+            ."(mode = 'none' AND carryover_amount = 0 AND carryover_state IS NULL AND reprogrammed_amount = 0 AND reprogramming_operation_id IS NULL AND reprogramming_effects IS NULL)"
+            ." OR (mode = 'carryover' AND carryover_amount > 0 AND carryover_state = 'provisional' AND reprogrammed_amount = 0 AND reprogramming_operation_id IS NULL AND reprogramming_effects IS NULL)"
+            ." OR (mode = 'reprogramming' AND carryover_amount = 0 AND carryover_state IS NULL AND reprogrammed_amount > 0 AND reprogramming_operation_id IS NOT NULL AND reprogramming_effects IS NOT NULL)"
+            .')'
         );
     }
 };

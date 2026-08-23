@@ -10,7 +10,6 @@ use App\Domain\Closing\ClosingSnapshotPayload;
 use App\Domain\Company\AuditEventType;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExerciseStatus;
-use App\Domain\Projects\ProjectDeferralMode;
 use App\Domain\Projects\ProjectDeferralValues;
 use App\Domain\Projects\ProjectState;
 use App\Models\AuditEvent;
@@ -411,7 +410,7 @@ final class CloseExercise
     }
 
     /** @param list<int> $projectIds
-     * @param list<int> $contractIds
+     * @param  list<int>  $contractIds
      * @return list<int>
      */
     private function proposalIdsToRealign(int $companyId, array $projectIds, array $contractIds): array
@@ -535,10 +534,9 @@ final class CloseExercise
     }
 
     /**
-     * @param object $subject
-     * @param list<int> $affectedExerciseIds
-     * @param array<string, mixed>|null $previousValue
-     * @param array<string, mixed>|null $newValue
+     * @param  list<int>  $affectedExerciseIds
+     * @param  array<string, mixed>|null  $previousValue
+     * @param  array<string, mixed>|null  $newValue
      */
     private function audit(
         User $actor,

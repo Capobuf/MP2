@@ -55,6 +55,7 @@ final class NormalizeClosingInput
             if ($active?->mode === ProjectDeferralMode::Reprogramming) {
                 $decision['reprogrammed_amount'] = (string) $active->reprogrammed_amount;
                 $decisions[$key] = $decision;
+
                 continue;
             }
             if (! $nextExercise instanceof Exercise) {

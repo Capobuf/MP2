@@ -18,7 +18,7 @@ final class PrepareExerciseClosing
     ) {}
 
     /**
-     * @param array<string, mixed> $input
+     * @param  array<string, mixed>  $input
      * @return array{input: array<string, mixed>, review: ClosingReview, execution_fingerprint: string}
      */
     public function execute(User $actor, Exercise $exercise, array $input): array

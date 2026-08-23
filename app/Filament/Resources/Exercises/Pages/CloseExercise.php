@@ -8,7 +8,6 @@ use App\Domain\Projects\ProjectDeferralMode;
 use App\Domain\Projects\ProjectState;
 use App\Filament\Resources\Closings\ClosingResource;
 use App\Filament\Resources\Exercises\ExerciseResource;
-use App\Models\Company;
 use App\Models\Exercise;
 use App\Models\Project;
 use App\Models\ProjectDeferral;
@@ -18,8 +17,8 @@ use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class CloseExercise extends Page
 {

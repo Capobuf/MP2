@@ -19,8 +19,10 @@ use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\Exercise;
 use App\Models\Expense;
+use App\Models\ExpenseLine;
 use App\Models\Project;
 use App\Models\ProjectDeferral;
+use App\Models\ProjectExerciseClassification;
 use App\Models\Proposal;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -166,12 +168,14 @@ final class ReviewExerciseClosing
         foreach ($contracts as $contract) {
             if (! $this->contractConditionsValid($contract)) {
                 $blocks[] = $this->issue('invalid_contract_conditions', 'Le condizioni economiche del Contratto non sono valide.', 'contract', $contract->id);
+
                 continue;
             }
             try {
                 $projection = ContractClosingProjection::build($contract, $yearEnd->toDateString(), $openExercises);
             } catch (\DomainException $exception) {
                 $blocks[] = $this->issue('contract_recalculation_error', $exception->getMessage(), 'contract', $contract->id);
+
                 continue;
             }
             $contractProjections[$contract->id] = $projection;
@@ -269,8 +273,8 @@ final class ReviewExerciseClosing
     }
 
     /**
-     * @param array<string, mixed>|null $decision
-     * @param list<array<string, mixed>> $blocks
+     * @param  array<string, mixed>|null  $decision
+     * @param  list<array<string, mixed>>  $blocks
      * @return array<string, mixed>
      */
     private function projectDecision(
@@ -469,7 +473,7 @@ final class ReviewExerciseClosing
             if (! is_array($expected)) {
                 return false;
             }
-            $line = \App\Models\ExpenseLine::query()->with('expense')->find($expected['expense_line_id'] ?? null);
+            $line = ExpenseLine::query()->with('expense')->find($expected['expense_line_id'] ?? null);
             if ($line === null || $line->expense === null
                 || $line->expense->company_id !== $project->company_id
                 || $line->expense->project_id !== $project->id
@@ -511,9 +515,9 @@ final class ReviewExerciseClosing
     }
 
     /** @param Collection<int, Expense> $expenses
-     * @param Collection<string, int> $budgetOriginKeys
-     * @param list<array<string, mixed>> $blocks
-     * @param list<array<string, mixed>> $warnings
+     * @param  Collection<string, int>  $budgetOriginKeys
+     * @param  list<array<string, mixed>>  $blocks
+     * @param  list<array<string, mixed>>  $warnings
      */
     private function addStandaloneWarnings(Collection $expenses, Collection $budgetOriginKeys, Company $company, array &$blocks, array &$warnings): void
     {
@@ -532,9 +536,9 @@ final class ReviewExerciseClosing
     }
 
     /** @param list<array<string, mixed>> $projectRows
-     * @param Collection<string, int> $budgetOriginKeys
-     * @param list<array<string, mixed>> $blocks
-     * @param list<array<string, mixed>> $warnings
+     * @param  Collection<string, int>  $budgetOriginKeys
+     * @param  list<array<string, mixed>>  $blocks
+     * @param  list<array<string, mixed>>  $warnings
      */
     private function addProjectWarnings(array $projectRows, Collection $budgetOriginKeys, Company $company, Exercise $exercise, ?Exercise $nextExercise, array &$blocks, array &$warnings): void
     {
@@ -552,7 +556,7 @@ final class ReviewExerciseClosing
             if ($row['final_state'] === ProjectState::Planned->value && ! $row['was_ever_open_in_exercise']) {
                 $warnings[] = $this->issue('planned_project_never_opened', 'Progetto Pianificato ma mai Aperto nell’Esercizio.', 'project', $row['project_id']);
             }
-            $classified = \App\Models\ProjectExerciseClassification::query()
+            $classified = ProjectExerciseClassification::query()
                 ->where('project_id', $row['project_id'])
                 ->where('exercise_id', $exercise->id)
                 ->whereNotNull('cost_center_id')
@@ -576,9 +580,9 @@ final class ReviewExerciseClosing
     }
 
     /** @param array<string, mixed> $projection
-     * @param Collection<string, int> $budgetOriginKeys
-     * @param list<array<string, mixed>> $blocks
-     * @param list<array<string, mixed>> $warnings
+     * @param  Collection<string, int>  $budgetOriginKeys
+     * @param  list<array<string, mixed>>  $blocks
+     * @param  list<array<string, mixed>>  $warnings
      */
     private function addContractWarnings(Contract $contract, array $projection, Collection $budgetOriginKeys, Company $company, Exercise $exercise, CarbonImmutable $yearStart, CarbonImmutable $yearEnd, array &$blocks, array &$warnings): void
     {
@@ -627,7 +631,7 @@ final class ReviewExerciseClosing
     }
 
     /** @param list<array<string, mixed>> $blocks
-     * @param list<array<string, mixed>> $warnings
+     * @param  list<array<string, mixed>>  $warnings
      */
     private function addClassificationIssue(Company $company, string $sourceType, int $sourceId, array &$blocks, array &$warnings): void
     {
@@ -692,7 +696,7 @@ final class ReviewExerciseClosing
         return false;
     }
 
-    /** @param mixed $input
+    /**
      * @return array<int, array<string, mixed>>
      */
     private function projectDecisionInput(mixed $input): array
@@ -760,13 +764,13 @@ final class ReviewExerciseClosing
     }
 
     /**
-     * @param Collection<int, Project> $projects
-     * @param Collection<int, Contract> $contracts
-     * @param Collection<int, Expense> $expenses
-     * @param Collection<int, Proposal> $drafts
-     * @param Collection<int, BudgetSnapshot> $budgets
-     * @param array<int, array<string, mixed>> $submittedDecisions
-     * @param array<int, array<string, mixed>> $contractProjections
+     * @param  Collection<int, Project>  $projects
+     * @param  Collection<int, Contract>  $contracts
+     * @param  Collection<int, Expense>  $expenses
+     * @param  Collection<int, Proposal>  $drafts
+     * @param  Collection<int, BudgetSnapshot>  $budgets
+     * @param  array<int, array<string, mixed>>  $submittedDecisions
+     * @param  array<int, array<string, mixed>>  $contractProjections
      * @return array<string, mixed>
      */
     private function sourceState(Exercise $exercise, Collection $projects, Collection $contracts, Collection $expenses, Collection $drafts, Collection $budgets, ?Exercise $nextExercise, array $submittedDecisions, ?bool $managementContinues, array $contractProjections): array

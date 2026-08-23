@@ -3,7 +3,6 @@
 use App\Actions\Closing\CloseExercise;
 use App\Actions\Closing\PrepareExerciseClosing;
 use App\Domain\Company\Capability;
-use App\Models\ClosingSnapshot;
 use App\Models\Company;
 use App\Models\CompanyCapability;
 use App\Models\CostCenter;

@@ -3,8 +3,8 @@
 namespace App\Domain\Closing;
 
 use App\Domain\Contracts\ContractAnnualAllocation;
+use App\Domain\Contracts\ContractState;
 use App\Domain\Expenses\Decimal;
-use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Projects\ProjectDeferralMode;
 use App\Domain\Projects\ProjectDeferralValues;
 use App\Domain\Projects\ProjectState;
@@ -152,8 +152,7 @@ final class ClosingSnapshotPayload
 
             return $date->betweenIncluded($yearStart, $yearEnd);
         });
-        $outgoingConsolidated = $project->deferrals->contains(fn (ProjectDeferral $deferral): bool =>
-            $deferral->source_exercise_id === $exercise->id
+        $outgoingConsolidated = $project->deferrals->contains(fn (ProjectDeferral $deferral): bool => $deferral->source_exercise_id === $exercise->id
             && $deferral->mode === ProjectDeferralMode::Carryover
             && $deferral->carryover_state === 'consolidated'
             && Decimal::compare((string) $deferral->carryover_amount, '0.00') !== 0);
@@ -179,7 +178,7 @@ final class ClosingSnapshotPayload
             || $budgetOriginKeys->has($contract->originKey())
             || $conditionInYear
             || $eventInYear
-            || in_array($state, [\App\Domain\Contracts\ContractState::Planned, \App\Domain\Contracts\ContractState::Active], true);
+            || in_array($state, [ContractState::Planned, ContractState::Active], true);
     }
 
     /** @param list<array{operation_id: string, event_sequence: int}> $eventReferences
@@ -214,7 +213,7 @@ final class ClosingSnapshotPayload
     }
 
     /** @param array<string, mixed>|null $decision
-     * @param list<array{operation_id: string, event_sequence: int}> $eventReferences
+     * @param  list<array{operation_id: string, event_sequence: int}>  $eventReferences
      * @return array<string, mixed>
      */
     private static function projectRow(Project $project, Exercise $exercise, CarbonImmutable $yearStart, CarbonImmutable $yearEnd, ?array $decision, array $eventReferences): array

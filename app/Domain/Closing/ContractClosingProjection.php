@@ -145,7 +145,7 @@ final class ContractClosingProjection
     }
 
     /**
-     * @param array<string, mixed> $projection
+     * @param  array<string, mixed>  $projection
      * @return array{amount: string, composition: list<array<string, mixed>>}
      */
     public static function allocationForYear(Contract $contract, array $projection, int $year): array

@@ -24,6 +24,7 @@ final class ClosingOverspendNotes
             if ($event->eventType() === AuditEventType::SettingChanged
                 && $event->setting === Setting::OverspendNoteRequired) {
                 $required = (bool) $event->new_value;
+
                 continue;
             }
             if (! $required || ! in_array($exercise->id, array_map('intval', $event->affected_exercise_ids ?? []), true)) {
