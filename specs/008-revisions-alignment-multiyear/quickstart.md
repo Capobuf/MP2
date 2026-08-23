@@ -44,18 +44,21 @@ Run the heavier checks only after all implementation phases are complete:
 ```bash
 ./vendor/bin/sail composer validate --strict
 ./vendor/bin/sail composer audit
+npm ci --no-audit --no-fund
+npm run build
 ./vendor/bin/sail composer format:test
 ./vendor/bin/sail composer analyse
 ./vendor/bin/sail composer test
 git diff --check
 ```
 
-Expected: no validation, audit, formatting, static-analysis, test, or whitespace
-failure.
+Expected: no validation, audit, frontend-build, formatting, static-analysis, test,
+or whitespace failure.
 
 ### Final gate evidence — 2026-08-23
 
 - Composer validation and audit passed; no security advisories were reported.
+- Locked frontend dependency installation and the Vite production build passed.
 - Pint passed and `git diff --check` reported no whitespace error.
 - PHPStan passed repository-wide after the five findings in
   `app/Actions/Operations/CreateContract.php` and
