@@ -4,19 +4,38 @@ namespace App\Domain\Contracts;
 
 use App\Domain\Expenses\ExerciseStatus;
 use App\Models\Contract;
-use App\Models\ContractCondition;
-use App\Models\ContractLifecycleFact;
 use App\Models\Exercise;
 use Carbon\CarbonImmutable;
 use Illuminate\Validation\ValidationException;
 
 final class ContractClosedHistoryGuard
 {
-    public static function assertEventDateIsMutable(Contract $contract, string $date): void
+    private static int $automaticMaterializationDepth = 0;
+
+    public static function duringAutomaticMaterialization(callable $callback): mixed
     {
+        self::$automaticMaterializationDepth++;
+        try {
+            return $callback();
+        } finally {
+            self::$automaticMaterializationDepth--;
+        }
+    }
+
+    public static function automaticMaterializationAllowed(): bool
+    {
+        return self::$automaticMaterializationDepth > 0;
+    }
+
+    public static function assertEventDateIsMutable(int|Contract $companyOrContract, string $date): void
+    {
+        if (self::automaticMaterializationAllowed()) {
+            return;
+        }
+        $companyId = $companyOrContract instanceof Contract ? $companyOrContract->company_id : $companyOrContract;
         $year = CarbonImmutable::parse($date)->year;
         if (Exercise::query()
-            ->where('company_id', $contract->company_id)
+            ->where('company_id', $companyId)
             ->where('status', ExerciseStatus::Closed->value)
             ->where('year', '>=', $year)
             ->exists()) {
@@ -26,42 +45,25 @@ final class ContractClosedHistoryGuard
         }
     }
 
-    public static function assertConditionIsMutable(ContractCondition $condition): void
+    /** @return list<int> */
+    public static function closedYears(int $companyId): array
     {
-        self::assertPeriodIsMutable(
-            $condition->contract,
-            $condition->validFrom()->toDateString(),
-            $condition->validTo()?->toDateString(),
-        );
-    }
-
-    public static function assertConditionPeriodIsMutable(Contract $contract, string $validFrom, ?string $validTo): void
-    {
-        self::assertPeriodIsMutable($contract, $validFrom, $validTo);
-    }
-
-    public static function assertLifecycleFactIsMutable(ContractLifecycleFact $fact): void
-    {
-        $date = $fact->stateChangeDate()?->toDateString()
-            ?? $fact->renewedExpiryDate()?->toDateString()
-            ?? $fact->declaredContractualDate()->toDateString();
-        self::assertEventDateIsMutable($fact->contract, $date);
-    }
-
-    private static function assertPeriodIsMutable(Contract $contract, string $validFrom, ?string $validTo): void
-    {
-        $fromYear = CarbonImmutable::parse($validFrom)->year;
-        $query = Exercise::query()
-            ->where('company_id', $contract->company_id)
+        return Exercise::query()
+            ->where('company_id', $companyId)
             ->where('status', ExerciseStatus::Closed->value)
-            ->where('year', '>=', $fromYear);
-        if ($validTo !== null) {
-            $query->where('year', '<=', CarbonImmutable::parse($validTo)->year);
-        }
-        if ($query->exists()) {
-            throw ValidationException::withMessages([
-                'contract' => 'L’operazione ordinaria modificherebbe condizioni economiche di un Esercizio Chiuso.',
-            ]);
-        }
+            ->orderBy('year')
+            ->pluck('year')
+            ->map(fn (mixed $year): int => (int) $year)
+            ->all();
+    }
+
+    public static function periodOverlapsYear(string $validFrom, ?string $validTo, int $year): bool
+    {
+        $start = CarbonImmutable::parse($validFrom)->startOfDay();
+        $end = $validTo === null ? null : CarbonImmutable::parse($validTo)->startOfDay();
+        $yearStart = CarbonImmutable::create($year, 1, 1)->startOfDay();
+        $yearEnd = CarbonImmutable::create($year, 12, 31)->startOfDay();
+
+        return ! $start->greaterThan($yearEnd) && ($end === null || ! $end->lessThan($yearStart));
     }
 }
