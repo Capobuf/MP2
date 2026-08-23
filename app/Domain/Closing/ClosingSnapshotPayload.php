@@ -148,7 +148,7 @@ final class ClosingSnapshotPayload
     }
 
     /** @param Collection<string, int> $budgetOriginKeys
-     * @param array<string, mixed>|null $decision
+     * @param  array<string, mixed>|null  $decision
      */
     private static function includeProject(Project $project, Exercise $exercise, Collection $budgetOriginKeys, CarbonImmutable $yearStart, CarbonImmutable $yearEnd, ?array $decision): bool
     {
