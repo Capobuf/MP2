@@ -1,0 +1,176 @@
+name: S9 Static Fix
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Apply deterministic PHPStan fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path: str, old: str, new: str, count: int = 1):
+              p = Path(path)
+              text = p.read_text()
+              actual = text.count(old)
+              if actual < count:
+                  raise SystemExit(f'{path}: expected at least {count} occurrences, found {actual}: {old[:80]!r}')
+              text = text.replace(old, new, count)
+              p.write_text(text)
+
+          snapshot = 'app/Domain/Closing/ClosingSnapshotPayload.php'
+          replace(snapshot, 'use App\\Models\\ContractCondition;\n', 'use App\\Models\\ContractCondition;\nuse App\\Models\\ContractLifecycleFact;\n')
+          replace(snapshot, 'use App\\Models\\ProjectDeferral;\n', 'use App\\Models\\ProjectDeferral;\nuse App\\Models\\ProjectTransition;\n')
+          replace(snapshot, "            'rows' => array_values($rows),", "            'rows' => $rows,")
+          replace(snapshot, '''    private static function includeStandalone(Expense $expense, Collection $budgetOriginKeys, int $year): bool
+    {
+        return Decimal::compare($expense->allocation(), '0.00') !== 0
+            || $expense->hasActuals()
+            || $budgetOriginKeys->has($expense->originKey())
+            || ($expense->reversed_at !== null && (int) $expense->reversed_at->format('Y') === $year);
+    }
+''', '''    /** @param Collection<string, int> $budgetOriginKeys */
+    private static function includeStandalone(Expense $expense, Collection $budgetOriginKeys, int $year): bool
+    {
+        $reversedAt = $expense->getAttribute('reversed_at');
+        $reversedInYear = $reversedAt instanceof \\DateTimeInterface && (int) $reversedAt->format('Y') === $year;
+
+        return Decimal::compare($expense->allocation(), '0.00') !== 0
+            || $expense->hasActuals()
+            || $budgetOriginKeys->has($expense->originKey())
+            || $reversedInYear;
+    }
+''')
+          replace(snapshot, '    /** @param array<string, mixed>|null $decision */\n    private static function includeProject(Project $project, Exercise $exercise, Collection $budgetOriginKeys,', '    /** @param Collection<string, int> $budgetOriginKeys\n     * @param array<string, mixed>|null $decision\n     */\n    private static function includeProject(Project $project, Exercise $exercise, Collection $budgetOriginKeys,')
+          replace(snapshot, '    private static function includeContract(Contract $contract, Exercise $exercise, Collection $budgetOriginKeys,', '    /** @param Collection<string, int> $budgetOriginKeys */\n    private static function includeContract(Contract $contract, Exercise $exercise, Collection $budgetOriginKeys,')
+          replace(snapshot, "(bool) ($totals['has_actuals'] ?? false)", "(bool) $totals['has_actuals']", 4)
+          replace(snapshot, "'cost_center_label' => $costCenter?->name ?? 'Non classificato',", "'cost_center_label' => $costCenter === null ? 'Non classificato' : $costCenter->name,")
+          replace(snapshot, "'cost_center_label' => $classification?->costCenter?->name ?? 'Non classificato',", "'cost_center_label' => $classification === null || $classification->costCenter === null ? 'Non classificato' : $classification->costCenter->name,", 2)
+          replace(snapshot, "'cost_center_label' => $classification?->costCenter?->name,", "'cost_center_label' => $classification === null || $classification->costCenter === null ? null : $classification->costCenter->name,", 2)
+          replace(snapshot, '->filter(fn ($transition): bool => $transition->annulledAt() === null', '->filter(fn (ProjectTransition $transition): bool => $transition->annulledAt() === null')
+          replace(snapshot, '->map(fn ($transition): array => [\n                        \'id\' => $transition->id,\n                        \'from_state\' => $transition->from_state->value,\n                        \'to_state\' => $transition->to_state->value,', '->map(fn (ProjectTransition $transition): array => [\n                        \'id\' => $transition->id,\n                        \'from_state\' => (string) $transition->getRawOriginal(\'from_state\'),\n                        \'to_state\' => (string) $transition->getRawOriginal(\'to_state\'),')
+          replace(snapshot, '->contains(fn ($fact): bool => self::lifecycleEffectiveDate($fact)?->betweenIncluded($yearStart, $yearEnd) ?? false)', '->contains(fn (ContractLifecycleFact $fact): bool => self::lifecycleEffectiveDate($fact)?->betweenIncluded($yearStart, $yearEnd) ?? false)')
+          replace(snapshot, '->filter(fn ($fact): bool => ($date = self::lifecycleEffectiveDate($fact)) !== null', '->filter(fn (ContractLifecycleFact $fact): bool => ($date = self::lifecycleEffectiveDate($fact)) !== null')
+          replace(snapshot, '->sortBy(fn ($fact): string => self::lifecycleEffectiveDate($fact)?->toDateString() ?? \'\')', '->sortBy(fn (ContractLifecycleFact $fact): string => self::lifecycleEffectiveDate($fact)?->toDateString() ?? \'\')')
+          replace(snapshot, '->map(fn ($fact): array => [', '->map(fn (ContractLifecycleFact $fact): array => [')
+          replace(snapshot, '    private static function lifecycleEffectiveDate(object $fact): ?CarbonImmutable', '    private static function lifecycleEffectiveDate(ContractLifecycleFact $fact): ?CarbonImmutable')
+
+          review = 'app/Actions/Closing/ReviewExerciseClosing.php'
+          replace(review, '$currentMode = $currentDeferral?->mode ?? ProjectDeferralMode::None;', '$currentMode = $currentDeferral instanceof ProjectDeferral ? $currentDeferral->mode : ProjectDeferralMode::None;')
+          replace(review, 'ProjectDeferralMode::Carryover => (string) $currentDeferral?->carryover_amount,', "ProjectDeferralMode::Carryover => $currentDeferral instanceof ProjectDeferral ? (string) $currentDeferral->carryover_amount : '0.00',")
+          replace(review, 'ProjectDeferralMode::Reprogramming => (string) $currentDeferral?->reprogrammed_amount,', "ProjectDeferralMode::Reprogramming => $currentDeferral instanceof ProjectDeferral ? (string) $currentDeferral->reprogrammed_amount : '0.00',")
+          replace(review, '? (string) $currentDeferral?->reprogrammed_amount\n            : \'0.00\';', "? ($currentDeferral instanceof ProjectDeferral ? (string) $currentDeferral->reprogrammed_amount : '0.00')\n            : '0.00';")
+          replace(review, "?? ($currentMode === ProjectDeferralMode::Carryover ? (string) $currentDeferral?->carryover_amount : '0.00');", "?? ($currentMode === ProjectDeferralMode::Carryover && $currentDeferral instanceof ProjectDeferral ? (string) $currentDeferral->carryover_amount : '0.00');")
+          replace(review, '$reprogrammedAmount = (string) $currentDeferral?->reprogrammed_amount;', "$reprogrammedAmount = $currentDeferral instanceof ProjectDeferral ? (string) $currentDeferral->reprogrammed_amount : '0.00';")
+          replace(review, '''                $sourceTotal = Decimal::sum(collect($decision['source_estimate_reductions'] ?? [])->map(
+                    fn (mixed $item): string => is_array($item) ? ($this->amount($item['reduction_amount'] ?? null) ?? '0.00') : '0.00',
+                ));
+                $destinationTotal = Decimal::sum(collect($decision['destination_plans'] ?? [])->flatMap(
+                    fn (mixed $plan): array => is_array($plan) && is_array($plan['estimate_lines'] ?? null) ? $plan['estimate_lines'] : [],
+                )->map(fn (mixed $line): string => is_array($line) ? ($this->amount($line['amount'] ?? null) ?? '0.00')));
+''', '''                $sourceAmounts = [];
+                foreach (($decision['source_estimate_reductions'] ?? []) as $item) {
+                    if (is_array($item)) {
+                        $sourceAmounts[] = $this->amount($item['reduction_amount'] ?? null) ?? '0.00';
+                    }
+                }
+                $sourceTotal = Decimal::sum($sourceAmounts);
+                $destinationAmounts = [];
+                foreach (($decision['destination_plans'] ?? []) as $plan) {
+                    if (! is_array($plan) || ! is_array($plan['estimate_lines'] ?? null)) {
+                        continue;
+                    }
+                    foreach ($plan['estimate_lines'] as $line) {
+                        if (is_array($line)) {
+                            $destinationAmounts[] = $this->amount($line['amount'] ?? null) ?? '0.00';
+                        }
+                    }
+                }
+                $destinationTotal = Decimal::sum($destinationAmounts);
+''')
+          replace(review, "(bool) ($totals['has_actuals'] ?? false)", "(bool) $totals['has_actuals']", 3)
+          replace(review, '''        foreach ($effects['source_lines'] ?? [] as $expected) {
+            if (! is_array($expected)) {
+                return false;
+            }
+''', "        foreach ($effects['source_lines'] ?? [] as $expected) {\n")
+          replace(review, '''        foreach ($effects['destination_expenses'] ?? [] as $expectedExpense) {
+            if (! is_array($expectedExpense)) {
+                return false;
+            }
+''', "        foreach ($effects['destination_expenses'] ?? [] as $expectedExpense) {\n")
+          replace(review, '''            foreach ($expectedExpense['estimate_lines'] ?? [] as $expectedLine) {
+                if (! is_array($expectedLine)) {
+                    return false;
+                }
+''', "            foreach ($expectedExpense['estimate_lines'] ?? [] as $expectedLine) {\n")
+          replace(review, '''            || collect($projection['conditions'])->contains(fn (array $condition): bool => $this->conditionArrayOverlapsExercise($condition, $yearStart, $yearEnd));
+''', '''            || $this->projectionHasConditionInExercise($projection, $yearStart, $yearEnd);
+''')
+          replace(review, '''    /** @param array<string, mixed> $condition */
+    private function conditionArrayOverlapsExercise(array $condition, CarbonImmutable $yearStart, CarbonImmutable $yearEnd): bool
+    {
+        if (($condition['annulled_at'] ?? null) !== null) {
+            return false;
+        }
+        $from = CarbonImmutable::parse((string) $condition['valid_from']);
+        $to = isset($condition['valid_to']) && $condition['valid_to'] !== null ? CarbonImmutable::parse((string) $condition['valid_to']) : null;
+
+        return ! $from->greaterThan($yearEnd) && ($to === null || ! $to->lessThan($yearStart));
+    }
+''', '''    /** @param array<string, mixed> $projection */
+    private function projectionHasConditionInExercise(array $projection, CarbonImmutable $yearStart, CarbonImmutable $yearEnd): bool
+    {
+        foreach (($projection['conditions'] ?? []) as $condition) {
+            if (is_array($condition) && $this->conditionArrayOverlapsExercise($condition, $yearStart, $yearEnd)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param array<string, mixed> $condition */
+    private function conditionArrayOverlapsExercise(array $condition, CarbonImmutable $yearStart, CarbonImmutable $yearEnd): bool
+    {
+        if (! empty($condition['annulled_at'])) {
+            return false;
+        }
+        $from = CarbonImmutable::parse((string) $condition['valid_from']);
+        $validTo = $condition['valid_to'] ?? null;
+        $to = is_string($validTo) && $validTo !== '' ? CarbonImmutable::parse($validTo) : null;
+
+        return ! $from->greaterThan($yearEnd) && ($to === null || ! $to->lessThan($yearStart));
+    }
+''')
+          replace(review, '$transition->to_state === ProjectState::Open', "(string) $transition->getRawOriginal('to_state') === ProjectState::Open->value")
+
+          close_action = 'app/Actions/Closing/CloseExercise.php'
+          replace(close_action, "            if (! is_array($decision) || ! isset($decision['project_id'], $decision['final_state'])) {", "            if (! isset($decision['project_id'], $decision['final_state'])) {")
+
+          close_page = 'app/Filament/Resources/Exercises/Pages/CloseExercise.php'
+          replace(close_page, '$mode = $deferral?->mode ?? ProjectDeferralMode::None;', '$mode = $deferral instanceof ProjectDeferral ? $deferral->mode : ProjectDeferralMode::None;')
+          replace(close_page, "'carryover_amount' => $mode === ProjectDeferralMode::Carryover ? (string) $deferral?->carryover_amount : '',", "'carryover_amount' => $mode === ProjectDeferralMode::Carryover && $deferral instanceof ProjectDeferral ? (string) $deferral->carryover_amount : '',")
+          replace(close_page, "'reprogrammed_amount' => $mode === ProjectDeferralMode::Reprogramming ? (string) $deferral?->reprogrammed_amount : '',", "'reprogrammed_amount' => $mode === ProjectDeferralMode::Reprogramming && $deferral instanceof ProjectDeferral ? (string) $deferral->reprogrammed_amount : '',")
+          PY
+
+      - name: Commit fixes
+        run: |
+          git diff --check
+          git add app
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix: resolve S9 static analysis findings"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
