@@ -17,7 +17,6 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use RuntimeException;
 
 uses(RefreshDatabase::class);
 

@@ -14,7 +14,6 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use LogicException;
 
 uses(RefreshDatabase::class);
 
@@ -36,7 +35,7 @@ it('materializes zero-net Actual presence autonomously and keeps Snapshot rows i
         'description' => 'Zero net Actual source',
     ]);
     ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '100.00']);
-    ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '-100.00']);
+    ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '-100.00', 'note' => 'Rimborso di compensazione']);
     $prepared = app(PrepareExerciseClosing::class)->execute($actor, $exercise, ['management_continues' => false, 'projects' => []]);
 
     expect($prepared['review']->warnings)->toBe([]);

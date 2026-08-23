@@ -443,7 +443,7 @@ final class CloseExercise
     private function writeProjectBalanceEvents(User $actor, Exercise $exercise, Collection $decisions, string $operationId, int &$sequence): void
     {
         foreach ($decisions as $decision) {
-            if (! is_array($decision) || ! isset($decision['project_id'], $decision['final_state'])) {
+            if (! isset($decision['project_id'], $decision['final_state'])) {
                 continue;
             }
             $state = ProjectState::tryFrom((string) $decision['final_state']);

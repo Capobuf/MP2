@@ -84,9 +84,9 @@ class CloseExercise extends Page
             if (! in_array($state, [ProjectState::Planned, ProjectState::Open], true)) {
                 continue;
             }
-            /** @var ProjectDeferral|null $deferral */
             $deferral = $project->deferrals->firstWhere('source_exercise_id', $exercise->id);
-            $mode = $deferral?->mode ?? ProjectDeferralMode::None;
+            $deferral = $deferral instanceof ProjectDeferral ? $deferral : null;
+            $mode = $deferral === null ? ProjectDeferralMode::None : $deferral->mode;
             $projectState[$project->id] = [
                 'project_id' => $project->id,
                 'title' => $project->title,
@@ -94,8 +94,8 @@ class CloseExercise extends Page
                 'final_state' => $state->value,
                 'current_mode' => $mode->value,
                 'mode' => $mode === ProjectDeferralMode::None ? '' : $mode->value,
-                'carryover_amount' => $mode === ProjectDeferralMode::Carryover ? (string) $deferral?->carryover_amount : '',
-                'reprogrammed_amount' => $mode === ProjectDeferralMode::Reprogramming ? (string) $deferral?->reprogrammed_amount : '',
+                'carryover_amount' => $mode === ProjectDeferralMode::Carryover && $deferral !== null ? (string) $deferral->carryover_amount : '',
+                'reprogrammed_amount' => $mode === ProjectDeferralMode::Reprogramming && $deferral !== null ? (string) $deferral->reprogrammed_amount : '',
                 'reason' => '',
                 'reductions' => [],
             ];

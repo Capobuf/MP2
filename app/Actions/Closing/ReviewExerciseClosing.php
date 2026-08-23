@@ -400,11 +400,9 @@ final class ReviewExerciseClosing
 
                 $sourceAmounts = [];
                 $requestedReductions = $decision['source_estimate_reductions'] ?? [];
-                if (is_array($requestedReductions)) {
-                    foreach ($requestedReductions as $item) {
-                        if (is_array($item)) {
-                            $sourceAmounts[] = $this->amount($item['reduction_amount'] ?? null) ?? '0.00';
-                        }
+                foreach ($requestedReductions as $item) {
+                    if (is_array($item)) {
+                        $sourceAmounts[] = $this->amount($item['reduction_amount'] ?? null) ?? '0.00';
                     }
                 }
                 $sourceTotal = Decimal::sum($sourceAmounts);
