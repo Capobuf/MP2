@@ -23,6 +23,7 @@ use App\Models\ExpenseLine;
 use App\Models\Project;
 use App\Models\ProjectDeferral;
 use App\Models\ProjectExerciseClassification;
+use App\Models\ProjectTransition;
 use App\Models\Proposal;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -79,7 +80,12 @@ final class ReviewExerciseClosing
             ->get();
         $initialBudget = $budgets->first();
         $currentBudget = $budgets->last();
-        $budgetOriginKeys = $budgets->flatMap(fn (BudgetSnapshot $budget) => $budget->rows)->pluck('origin_key')->unique()->flip();
+        /** @var Collection<string, int> $budgetOriginKeys */
+        $budgetOriginKeys = $budgets
+            ->flatMap(fn (BudgetSnapshot $budget) => $budget->rows)
+            ->pluck('origin_key')
+            ->unique()
+            ->flip();
 
         $nextExercise = Exercise::query()
             ->where('company_id', $company->id)
@@ -126,19 +132,19 @@ final class ReviewExerciseClosing
             $projectRows[] = $row;
             $exerciseDeltas[(string) $exercise->id] = Decimal::add(
                 $exerciseDeltas[(string) $exercise->id] ?? '0.00',
-                $row['source_allocation_delta'],
+                (string) $row['source_allocation_delta'],
             );
-            if (Decimal::compare($row['destination_allocation_delta'], '0.00') !== 0) {
+            if (Decimal::compare((string) $row['destination_allocation_delta'], '0.00') !== 0) {
                 if ($nextExercise !== null) {
                     if (! $nextExercise->isOpen()) {
                         $blocks[] = $this->issue('next_exercise_not_open', 'L’Esercizio successivo deve essere Aperto per ricevere il rinvio.', 'exercise', $nextExercise->id);
                     }
                     $exerciseDeltas[(string) $nextExercise->id] = Decimal::add(
                         $exerciseDeltas[(string) $nextExercise->id] ?? '0.00',
-                        $row['destination_allocation_delta'],
+                        (string) $row['destination_allocation_delta'],
                     );
                 } elseif ($managementContinues === true) {
-                    $plannedNextExerciseDelta = Decimal::add($plannedNextExerciseDelta, $row['destination_allocation_delta']);
+                    $plannedNextExerciseDelta = Decimal::add($plannedNextExerciseDelta, (string) $row['destination_allocation_delta']);
                 }
             }
         }
@@ -180,8 +186,14 @@ final class ReviewExerciseClosing
             }
             $contractProjections[$contract->id] = $projection;
             foreach ($projection['exercise_impacts'] as $impact) {
-                $id = (string) $impact['exercise_id'];
-                $exerciseDeltas[$id] = Decimal::add($exerciseDeltas[$id] ?? '0.00', (string) $impact['allocation_delta']);
+                if (! is_array($impact)) {
+                    continue;
+                }
+                $id = (string) ($impact['exercise_id'] ?? '');
+                if ($id === '') {
+                    continue;
+                }
+                $exerciseDeltas[$id] = Decimal::add($exerciseDeltas[$id] ?? '0.00', (string) ($impact['allocation_delta'] ?? '0.00'));
             }
             $this->addContractWarnings($contract, $projection, $budgetOriginKeys, $company, $exercise, $yearStart, $yearEnd, $blocks, $warnings);
         }
@@ -293,12 +305,12 @@ final class ReviewExerciseClosing
             'actual' => '0.00',
             'has_actuals' => false,
         ];
-        /** @var ProjectDeferral|null $currentDeferral */
         $currentDeferral = $project->deferrals->firstWhere('source_exercise_id', $exercise->id);
-        $currentMode = $currentDeferral?->mode ?? ProjectDeferralMode::None;
+        $currentDeferral = $currentDeferral instanceof ProjectDeferral ? $currentDeferral : null;
+        $currentMode = $currentDeferral === null ? ProjectDeferralMode::None : $currentDeferral->mode;
         $currentTransferAmount = match ($currentMode) {
-            ProjectDeferralMode::Carryover => (string) $currentDeferral?->carryover_amount,
-            ProjectDeferralMode::Reprogramming => (string) $currentDeferral?->reprogrammed_amount,
+            ProjectDeferralMode::Carryover => $currentDeferral === null ? '0.00' : (string) $currentDeferral->carryover_amount,
+            ProjectDeferralMode::Reprogramming => $currentDeferral === null ? '0.00' : (string) $currentDeferral->reprogrammed_amount,
             ProjectDeferralMode::None => '0.00',
         };
         $required = in_array($currentState, [ProjectState::Planned, ProjectState::Open], true);
@@ -320,7 +332,7 @@ final class ReviewExerciseClosing
                     $blocks[] = $this->issue('project_final_state_invalid', 'Lo stato finale scelto non è ammesso per il Progetto.', 'project', $project->id);
                 } else {
                     $finalState = $candidate;
-                    if ($candidate !== $currentState) {
+                    if ($candidate !== $currentState && $currentState instanceof ProjectState) {
                         $this->validateClosingTransition($project, $currentState, $candidate, $yearEnd, $blocks);
                     }
                 }
@@ -351,8 +363,8 @@ final class ReviewExerciseClosing
         }
 
         $allocationBefore = (string) $totals['allocation'];
-        $sourceDelta = $currentMode === ProjectDeferralMode::Reprogramming
-            ? (string) $currentDeferral?->reprogrammed_amount
+        $sourceDelta = $currentMode === ProjectDeferralMode::Reprogramming && $currentDeferral !== null
+            ? (string) $currentDeferral->reprogrammed_amount
             : '0.00';
         $allocationBeforeNewTransfer = Decimal::add($allocationBefore, $sourceDelta);
         $maximum = ProjectDeferralValues::maximumTransferable($allocationBeforeNewTransfer, (string) $totals['actual']);
@@ -361,7 +373,7 @@ final class ReviewExerciseClosing
 
         if ($finalMode === ProjectDeferralMode::Carryover) {
             $carryoverAmount = $this->amount($decision['carryover_amount'] ?? null)
-                ?? ($currentMode === ProjectDeferralMode::Carryover ? (string) $currentDeferral?->carryover_amount : '0.00');
+                ?? ($currentMode === ProjectDeferralMode::Carryover && $currentDeferral !== null ? (string) $currentDeferral->carryover_amount : '0.00');
             if (Decimal::compare($carryoverAmount, '0.00') <= 0) {
                 $blocks[] = $this->issue('carryover_amount_required', 'Il Riporto deve essere maggiore di zero; per non trasferire usare Nessuna.', 'project', $project->id);
             } elseif (Decimal::compare($carryoverAmount, $maximum) > 0) {
@@ -369,7 +381,7 @@ final class ReviewExerciseClosing
             }
         } elseif ($finalMode === ProjectDeferralMode::Reprogramming) {
             if ($currentMode === ProjectDeferralMode::Reprogramming) {
-                $reprogrammedAmount = (string) $currentDeferral?->reprogrammed_amount;
+                $reprogrammedAmount = $currentDeferral === null ? '0.00' : (string) $currentDeferral->reprogrammed_amount;
                 $requested = $this->amount($decision['reprogrammed_amount'] ?? null);
                 if ($requested !== null && Decimal::compare($requested, $reprogrammedAmount) !== 0) {
                     $blocks[] = $this->issue('executed_reprogramming_changed', 'La Riprogrammazione già eseguita non può essere riscritta in-place alla Chiusura.', 'project', $project->id);
@@ -385,12 +397,38 @@ final class ReviewExerciseClosing
                 } elseif (Decimal::compare($reprogrammedAmount, $maximum) > 0) {
                     $blocks[] = $this->issue('reprogramming_above_available', 'La Riprogrammazione supera la disponibilità pre-operazione.', 'project', $project->id);
                 }
-                $sourceTotal = Decimal::sum(collect($decision['source_estimate_reductions'] ?? [])->map(
-                    fn (mixed $item): string => is_array($item) ? ($this->amount($item['reduction_amount'] ?? null) ?? '0.00') : '0.00',
-                ));
-                $destinationTotal = Decimal::sum(collect($decision['destination_plans'] ?? [])->flatMap(
-                    fn (mixed $plan): array => is_array($plan) && is_array($plan['estimate_lines'] ?? null) ? $plan['estimate_lines'] : [],
-                )->map(fn (mixed $line): string => is_array($line) ? ($this->amount($line['amount'] ?? null) ?? '0.00') : '0.00'));
+
+                $sourceAmounts = [];
+                $requestedReductions = $decision['source_estimate_reductions'] ?? [];
+                if (is_array($requestedReductions)) {
+                    foreach ($requestedReductions as $item) {
+                        if (is_array($item)) {
+                            $sourceAmounts[] = $this->amount($item['reduction_amount'] ?? null) ?? '0.00';
+                        }
+                    }
+                }
+                $sourceTotal = Decimal::sum($sourceAmounts);
+
+                $destinationAmounts = [];
+                $destinationPlans = $decision['destination_plans'] ?? [];
+                if (is_array($destinationPlans)) {
+                    foreach ($destinationPlans as $plan) {
+                        if (! is_array($plan)) {
+                            continue;
+                        }
+                        $estimateLines = $plan['estimate_lines'] ?? [];
+                        if (! is_array($estimateLines)) {
+                            continue;
+                        }
+                        foreach ($estimateLines as $line) {
+                            if (is_array($line)) {
+                                $destinationAmounts[] = $this->amount($line['amount'] ?? null) ?? '0.00';
+                            }
+                        }
+                    }
+                }
+                $destinationTotal = Decimal::sum($destinationAmounts);
+
                 if (Decimal::compare($sourceTotal, $reprogrammedAmount) !== 0 || Decimal::compare($destinationTotal, $reprogrammedAmount) !== 0) {
                     $blocks[] = $this->issue('reprogramming_unbalanced', 'Riduzione origine, incremento destinazione e Importo Riprogrammato devono coincidere.', 'project', $project->id);
                 }
@@ -428,7 +466,7 @@ final class ReviewExerciseClosing
             'destination_allocation_delta' => $destinationDelta,
             'final_allocation' => $finalAllocation,
             'actual' => (string) $totals['actual'],
-            'has_actuals' => (bool) ($totals['has_actuals'] ?? false),
+            'has_actuals' => (bool) $totals['has_actuals'],
             'operational_variance' => Decimal::subtract((string) $totals['actual'], $finalAllocation),
             'maximum_transferable' => $maximum,
             'reason' => $reason,
@@ -443,9 +481,9 @@ final class ReviewExerciseClosing
     /** @param list<array<string, mixed>> $blocks */
     private function validateClosingTransition(Project $project, ProjectState $currentState, ProjectState $finalState, CarbonImmutable $yearEnd, array &$blocks): void
     {
-        $rows = $project->transitions->map(fn ($transition): array => [
-            'from_state' => $transition->from_state,
-            'to_state' => $transition->to_state,
+        $rows = $project->transitions->map(fn (ProjectTransition $transition): array => [
+            'from_state' => (string) $transition->getRawOriginal('from_state'),
+            'to_state' => (string) $transition->getRawOriginal('to_state'),
             'effective_date' => $transition->effectiveDate()->toDateString(),
             'annulled_at' => $transition->annulledAt()?->toISOString(),
         ])->all();
@@ -470,9 +508,6 @@ final class ReviewExerciseClosing
             return false;
         }
         foreach ($effects['source_lines'] ?? [] as $expected) {
-            if (! is_array($expected)) {
-                return false;
-            }
             $line = ExpenseLine::query()->with('expense')->find($expected['expense_line_id'] ?? null);
             if ($line === null || $line->expense === null
                 || $line->expense->company_id !== $project->company_id
@@ -487,9 +522,6 @@ final class ReviewExerciseClosing
             }
         }
         foreach ($effects['destination_expenses'] ?? [] as $expectedExpense) {
-            if (! is_array($expectedExpense)) {
-                return false;
-            }
             $expense = Expense::query()->find($expectedExpense['expense_id'] ?? null);
             if ($expense === null || $expense->company_id !== $project->company_id
                 || $expense->project_id !== $project->id
@@ -498,9 +530,6 @@ final class ReviewExerciseClosing
                 return false;
             }
             foreach ($expectedExpense['estimate_lines'] ?? [] as $expectedLine) {
-                if (! is_array($expectedLine)) {
-                    return false;
-                }
                 $line = $expense->lines()->find($expectedLine['expense_line_id'] ?? null);
                 if ($line === null
                     || (int) $line->revision !== (int) ($expectedLine['line_revision_after'] ?? -1)
@@ -543,26 +572,26 @@ final class ReviewExerciseClosing
     private function addProjectWarnings(array $projectRows, Collection $budgetOriginKeys, Company $company, Exercise $exercise, ?Exercise $nextExercise, array &$blocks, array &$warnings): void
     {
         foreach ($projectRows as $row) {
-            $included = Decimal::compare($row['final_allocation'], '0.00') !== 0
-                || $row['has_actuals']
-                || $budgetOriginKeys->has($row['origin_key'])
+            $included = Decimal::compare((string) $row['final_allocation'], '0.00') !== 0
+                || (bool) $row['has_actuals']
+                || $budgetOriginKeys->has((string) $row['origin_key'])
                 || in_array($row['final_state'], [ProjectState::Planned->value, ProjectState::Open->value], true);
             if (! $included) {
                 continue;
             }
-            if (Decimal::compare($row['final_allocation'], '0.00') > 0 && ! $row['has_actuals']) {
-                $warnings[] = $this->issue('allocated_without_actuals', 'Allocato presente, nessun Effettivo registrato.', 'project', $row['project_id']);
+            if (Decimal::compare((string) $row['final_allocation'], '0.00') > 0 && ! (bool) $row['has_actuals']) {
+                $warnings[] = $this->issue('allocated_without_actuals', 'Allocato presente, nessun Effettivo registrato.', 'project', (int) $row['project_id']);
             }
-            if ($row['final_state'] === ProjectState::Planned->value && ! $row['was_ever_open_in_exercise']) {
-                $warnings[] = $this->issue('planned_project_never_opened', 'Progetto Pianificato ma mai Aperto nell’Esercizio.', 'project', $row['project_id']);
+            if ($row['final_state'] === ProjectState::Planned->value && ! (bool) $row['was_ever_open_in_exercise']) {
+                $warnings[] = $this->issue('planned_project_never_opened', 'Progetto Pianificato ma mai Aperto nell’Esercizio.', 'project', (int) $row['project_id']);
             }
             $classified = ProjectExerciseClassification::query()
-                ->where('project_id', $row['project_id'])
+                ->where('project_id', (int) $row['project_id'])
                 ->where('exercise_id', $exercise->id)
                 ->whereNotNull('cost_center_id')
                 ->exists();
             if (! $classified) {
-                $this->addClassificationIssue($company, 'project', $row['project_id'], $blocks, $warnings);
+                $this->addClassificationIssue($company, 'project', (int) $row['project_id'], $blocks, $warnings);
             }
             if ($nextExercise !== null) {
                 $nextBudget = BudgetSnapshot::query()
@@ -570,10 +599,10 @@ final class ReviewExerciseClosing
                     ->where('exercise_id', $nextExercise->id)
                     ->latest('version')
                     ->first();
-                $budgetRow = $nextBudget?->rows()->where('origin_key', $row['origin_key'])->first();
+                $budgetRow = $nextBudget?->rows()->where('origin_key', (string) $row['origin_key'])->first();
                 if ($budgetRow !== null && $budgetRow->carryover_state === 'provisional'
                     && Decimal::compare((string) $budgetRow->approved_carryover, (string) $row['maximum_transferable']) !== 0) {
-                    $warnings[] = $this->issue('approved_provisional_carryover_differs', 'Il Riporto provvisorio nel Budget corrente di N+1 differisce dal massimo consolidabile.', 'project', $row['project_id']);
+                    $warnings[] = $this->issue('approved_provisional_carryover_differs', 'Il Riporto provvisorio nel Budget corrente di N+1 differisce dal massimo consolidabile.', 'project', (int) $row['project_id']);
                 }
             }
         }
@@ -590,28 +619,30 @@ final class ReviewExerciseClosing
             'allocation_after' => '0.00',
             'composition' => [],
         ];
-        $totals = $contract->annualTotals()[$exercise->id] ?? ['actual' => '0.00', 'has_actuals' => false];
+        $impact = is_array($impact) ? $impact : ['allocation_after' => '0.00', 'composition' => []];
+        $totals = $contract->annualTotals()[$exercise->id] ?? ['allocation' => '0.00', 'actual' => '0.00', 'has_actuals' => false];
+        $lifecycleFacts = is_array($projection['lifecycle_facts'] ?? null) ? $projection['lifecycle_facts'] : [];
         $stateStart = ContractStateTimeline::stateAtDate(
             $contract->contractualStartDate()->toDateString(),
-            $projection['lifecycle_facts'],
+            $lifecycleFacts,
             $yearStart->toDateString(),
             $contract->renewalConfigurations,
         );
         $stateEnd = ContractStateTimeline::stateAtDate(
             $contract->contractualStartDate()->toDateString(),
-            $projection['lifecycle_facts'],
+            $lifecycleFacts,
             $yearEnd->toDateString(),
             $contract->renewalConfigurations,
         );
-        $included = Decimal::compare((string) $impact['allocation_after'], '0.00') !== 0
-            || (bool) ($totals['has_actuals'] ?? false)
+        $included = Decimal::compare((string) ($impact['allocation_after'] ?? '0.00'), '0.00') !== 0
+            || (bool) $totals['has_actuals']
             || $budgetOriginKeys->has($contract->originKey())
             || in_array($stateEnd, [ContractState::Planned, ContractState::Active], true)
-            || collect($projection['conditions'])->contains(fn (array $condition): bool => $this->conditionArrayOverlapsExercise($condition, $yearStart, $yearEnd));
+            || $this->projectionHasConditionInExercise($projection, $yearStart, $yearEnd);
         if (! $included) {
             return;
         }
-        if (Decimal::compare((string) $impact['allocation_after'], '0.00') > 0 && ! (bool) ($totals['has_actuals'] ?? false)) {
+        if (Decimal::compare((string) ($impact['allocation_after'] ?? '0.00'), '0.00') > 0 && ! (bool) $totals['has_actuals']) {
             $warnings[] = $this->issue('allocated_without_actuals', 'Allocato presente, nessun Effettivo registrato.', 'contract', $contract->id);
         }
         $classified = $contract->classifications->contains(
@@ -620,9 +651,10 @@ final class ReviewExerciseClosing
         if (! $classified) {
             $this->addClassificationIssue($company, 'contract', $contract->id, $blocks, $warnings);
         }
+        $composition = $impact['composition'] ?? [];
         if ((in_array($stateStart, [ContractState::Planned, ContractState::Active], true)
             || in_array($stateEnd, [ContractState::Planned, ContractState::Active], true))
-            && ($impact['composition'] ?? []) === []) {
+            && is_array($composition) && $composition === []) {
             $warnings[] = $this->issue('contract_without_applicable_condition', 'Contratto Attivo o Pianificato senza condizione economica Valida applicabile nell’Esercizio.', 'contract', $contract->id);
         }
         if ((bool) ($projection['renewal_without_condition'] ?? false)) {
@@ -666,14 +698,35 @@ final class ReviewExerciseClosing
         return true;
     }
 
+    /** @param array<string, mixed> $projection */
+    private function projectionHasConditionInExercise(array $projection, CarbonImmutable $yearStart, CarbonImmutable $yearEnd): bool
+    {
+        $conditions = $projection['conditions'] ?? [];
+        if (! is_array($conditions)) {
+            return false;
+        }
+        foreach ($conditions as $condition) {
+            if (is_array($condition) && $this->conditionArrayOverlapsExercise($condition, $yearStart, $yearEnd)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** @param array<string, mixed> $condition */
     private function conditionArrayOverlapsExercise(array $condition, CarbonImmutable $yearStart, CarbonImmutable $yearEnd): bool
     {
-        if (($condition['annulled_at'] ?? null) !== null) {
+        if (! empty($condition['annulled_at'])) {
             return false;
         }
-        $from = CarbonImmutable::parse((string) $condition['valid_from']);
-        $to = isset($condition['valid_to']) && $condition['valid_to'] !== null ? CarbonImmutable::parse((string) $condition['valid_to']) : null;
+        $fromValue = $condition['valid_from'] ?? null;
+        if (! is_string($fromValue) || $fromValue === '') {
+            return false;
+        }
+        $from = CarbonImmutable::parse($fromValue);
+        $validTo = $condition['valid_to'] ?? null;
+        $to = is_string($validTo) && $validTo !== '' ? CarbonImmutable::parse($validTo) : null;
 
         return ! $from->greaterThan($yearEnd) && ($to === null || ! $to->lessThan($yearStart));
     }
@@ -688,7 +741,8 @@ final class ReviewExerciseClosing
                 continue;
             }
             $date = CarbonImmutable::parse($transition->effectiveDate()->toDateString());
-            if ($date->betweenIncluded($yearStart, $yearEnd) && $transition->to_state === ProjectState::Open) {
+            if ($date->betweenIncluded($yearStart, $yearEnd)
+                && (string) $transition->getRawOriginal('to_state') === ProjectState::Open->value) {
                 return true;
             }
         }
