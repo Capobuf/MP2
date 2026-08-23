@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Closings\Schemas;
 
+use App\Domain\Proposals\ProposalSourceType;
 use App\Models\ClosingSourceRow;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
@@ -63,7 +64,9 @@ final class ClosingInfolist
 
     private static function projectRow(ClosingSourceRow $record): bool
     {
-        return $record->source_type->value === 'project';
+        $sourceType = $record->getAttribute('source_type');
+
+        return $sourceType instanceof ProposalSourceType && $sourceType === ProposalSourceType::Project;
     }
 
     private static function warnings(mixed $state): string
