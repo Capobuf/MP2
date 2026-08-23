@@ -23,6 +23,14 @@ class Exercise extends Model
 
     protected static function booted(): void
     {
+        static::updating(function (self $exercise): void {
+            if ($exercise->getRawOriginal('status') === ExerciseStatus::Closed->value
+                && $exercise->isDirty('status')
+                && $exercise->status() === ExerciseStatus::Open) {
+                throw new \LogicException('Closed Exercises cannot be reopened.');
+            }
+        });
+
         static::deleting(function (): never {
             throw new \LogicException('Exercises cannot be deleted.');
         });
@@ -74,6 +82,12 @@ class Exercise extends Model
     public function latestBudget(): HasOne
     {
         return $this->hasOne(BudgetSnapshot::class)->ofMany('version', 'max');
+    }
+
+    /** @return HasOne<ClosingSnapshot, $this> */
+    public function closingSnapshot(): HasOne
+    {
+        return $this->hasOne(ClosingSnapshot::class);
     }
 
     /** @param Builder<self> $query */
