@@ -1,0 +1,33 @@
+name: S9 Format Preview
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  format-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath, intl, mbstring, pdo_mysql
+          coverage: none
+          tools: composer:v2
+
+      - name: Install locked dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Format with Pint
+        run: vendor/bin/pint
+
+      - name: Print formatting diff
+        if: always()
+        run: git diff --check; git diff -- app database tests
