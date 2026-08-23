@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Expenses\ExerciseStatus;
 use App\Domain\Projects\ProjectState;
 use App\Domain\Projects\ProjectTransitionStatus;
 use Carbon\CarbonImmutable;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 
 #[Fillable([
     'company_id',
@@ -37,6 +39,14 @@ class ProjectTransition extends Model
 
     protected static function booted(): void
     {
+        static::creating(function (self $transition): void {
+            self::assertDoesNotRewriteClosedHistory($transition);
+        });
+        static::updating(function (self $transition): void {
+            if ($transition->isDirty(['effective_date', 'from_state', 'to_state', 'annulled_at'])) {
+                self::assertDoesNotRewriteClosedHistory($transition);
+            }
+        });
         static::deleting(function (): never {
             throw new \LogicException('Project transitions cannot be deleted.');
         });
@@ -103,5 +113,27 @@ class ProjectTransition extends Model
             'active_effective_date' => 'date',
             'annulled_at' => 'datetime',
         ];
+    }
+
+    private static function assertDoesNotRewriteClosedHistory(self $transition): void
+    {
+        $companyId = (int) $transition->company_id;
+        $effective = $transition->getAttribute('effective_date');
+        if ($companyId < 1 || $effective === null) {
+            return;
+        }
+        $date = $effective instanceof \DateTimeInterface
+            ? CarbonImmutable::instance($effective)
+            : CarbonImmutable::parse((string) $effective);
+        $closedAtOrAfter = Exercise::query()
+            ->where('company_id', $companyId)
+            ->where('status', ExerciseStatus::Closed->value)
+            ->where('year', '>=', $date->year)
+            ->exists();
+        if ($closedAtOrAfter) {
+            throw ValidationException::withMessages([
+                'transition' => 'Una transizione ordinaria non può modificare lo stato storico di un Esercizio Chiuso.',
+            ]);
+        }
     }
 }
