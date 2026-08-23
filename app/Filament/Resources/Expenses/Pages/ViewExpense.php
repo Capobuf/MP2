@@ -31,12 +31,41 @@ use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
+use Illuminate\Contracts\View\View;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class ViewExpense extends ViewRecord
 {
     protected static string $resource = ExpenseResource::class;
+
+    public function getHeader(): ?View
+    {
+        $expense = $this->expenseRecord();
+
+        return view('filament.resources.expenses.components.object-header', [
+            'expense' => $expense,
+            'expensesUrl' => ExpenseResource::getUrl('index', tenant: $expense->company),
+            'money' => [
+                'allocation' => Number::currency((float) $expense->allocation(), in: 'EUR', locale: 'it'),
+                'actual' => Number::currency((float) $expense->actual(), in: 'EUR', locale: 'it'),
+                'variance' => Number::currency((float) $expense->operationalVariance(), in: 'EUR', locale: 'it'),
+            ],
+        ]);
+    }
+
+    public function getMaxContentWidth(): Width
+    {
+        return Width::Full;
+    }
+
+    /** @return array<string, string> */
+    public function getExtraBodyAttributes(): array
+    {
+        return ['class' => 'mp2-object-page mp2-expense-object-page'];
+    }
 
     public function content(Schema $schema): Schema
     {
@@ -51,7 +80,8 @@ class ViewExpense extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            EditAction::make()->label('Modifica')->color('primary'),
+            EditAction::make()->label('Modifica')->icon('heroicon-m-pencil-square')->color('primary')
+                ->extraAttributes(['class' => 'mp2-object-primary-action']),
             ActionGroup::make([
                 $this->moveOrReclassifyAction(),
                 ExpenseResource::reverseAction(),
@@ -76,6 +106,16 @@ class ViewExpense extends ViewRecord
                 ProjectOverspendNotifier::sendForOperation((string) $data['operation_id']);
                 $record->refresh();
             });
+    }
+
+    private function expenseRecord(): Expense
+    {
+        $record = $this->getRecord();
+        if (! $record instanceof Expense) {
+            throw new \UnexpectedValueException('Invalid Expense record.');
+        }
+
+        return $record;
     }
 
     /** @return array<int, mixed> */

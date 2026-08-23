@@ -12,7 +12,7 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-it('shows all canonical readiness labels impacts and no S7 resolution controls', function (): void {
+it('shows all canonical readiness labels, impacts and S7 resolution controls', function (): void {
     $proposal = Proposal::factory()->create();
     $user = User::factory()->create();
     foreach ([Capability::View, Capability::ManageProposals] as $capability) {
@@ -23,5 +23,15 @@ it('shows all canonical readiness labels impacts and no S7 resolution controls',
     }
     $this->actingAs($user);
     Filament::setTenant($proposal->company);
-    Livewire::test(ViewProposal::class, ['record' => $proposal->id])->assertActionExists('reviewReadiness')->assertSee('Allineato')->assertSee('Da prendere in visione')->assertSee('Da riallineare')->assertSee('Incoerente')->assertSee('Esercizi interessati')->assertActionDoesNotExist('reloadReality')->assertActionDoesNotExist('keepProposal');
+    Livewire::test(ViewProposal::class, ['record' => $proposal->id])
+        ->assertActionExists('reviewReadiness')
+        ->assertActionExists('reloadReality')
+        ->assertActionExists('keepProposal')
+        ->assertActionExists('manualRealignment')
+        ->assertActionExists('acknowledgeSource')
+        ->assertSee('Allineato')
+        ->assertSee('Da prendere in visione')
+        ->assertSee('Da riallineare')
+        ->assertSee('Incoerente')
+        ->assertSee('Esercizi interessati');
 });

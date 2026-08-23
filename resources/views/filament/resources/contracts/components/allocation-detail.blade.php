@@ -25,7 +25,7 @@
                     <tr>
                         <th scope="col">Inizio ciclo</th>
                         <th scope="col">Data di attribuzione</th>
-                        <th scope="col" class="mp2-contract-number">Importo</th>
+                        <th scope="col" class="mp2-object-number">Importo</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -33,7 +33,7 @@
                         <tr>
                             <td>{{ $item['cycle_start'] }}</td>
                             <td>{{ $item['attribution_date'] }}</td>
-                            <td class="mp2-contract-number">{{ $item['amount'] }}</td>
+                            <td class="mp2-object-number">{{ $item['amount'] }}</td>
                         </tr>
                     @endforeach
                 </tbody>

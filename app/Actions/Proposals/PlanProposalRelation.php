@@ -40,7 +40,7 @@ final class PlanProposalRelation
             if ($duplicate) {
                 throw ValidationException::withMessages(['relation' => 'Il collegamento è già presente nella Proposta.']);
             }
-            $sequence = ((int) $locked->actions()->max('sequence')) + 1;
+            $sequence = ((int) $locked->actionHistory()->max('sequence')) + 1;
             $action = $locked->actions()->create(['company_id' => $locked->company_id, 'proposal_item_id' => null, 'sequence' => $sequence, 'action_type' => ProposalActionType::LinkProjectContract, 'payload_version' => 1, 'payload' => $validated, 'created_by_id' => $actor->id, 'operation_id' => $operationId]);
             $locked->increment('revision');
             AuditEvent::query()->create([

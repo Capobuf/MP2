@@ -31,7 +31,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->viteTheme('resources/css/filament/admin/theme.css')
-            ->brandName('MP2')
+            ->brandName('Master Plan IT')
             ->brandLogo(fn () => view('filament.components.brand-logo'))
             ->darkModeBrandLogo(fn () => view('filament.components.brand-logo'))
             ->brandLogoHeight('2.5rem')

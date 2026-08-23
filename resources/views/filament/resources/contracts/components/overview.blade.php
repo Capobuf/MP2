@@ -1,12 +1,12 @@
-<div class="mp2-contract-overview">
-    <div class="mp2-contract-overview-grid">
-        <section class="mp2-contract-workspace-panel mp2-contract-agreement" aria-labelledby="contract-agreement-title">
-            <div class="mp2-contract-section-heading">
-                <span class="mp2-contract-section-icon" aria-hidden="true">
+<div class="mp2-object-overview mp2-contract-overview">
+    <div class="mp2-object-overview-grid">
+        <section class="mp2-object-workspace-panel mp2-contract-agreement" aria-labelledby="contract-agreement-title">
+            <div class="mp2-object-section-heading">
+                <span class="mp2-object-section-icon" aria-hidden="true">
                     <x-filament::icon icon="heroicon-o-document-text" />
                 </span>
                 <div>
-                    <p class="mp2-contract-eyebrow">Accordo corrente</p>
+                    <p class="mp2-object-eyebrow">Accordo corrente</p>
                     <h2 id="contract-agreement-title">Accordo attuale</h2>
                 </div>
             </div>
@@ -41,7 +41,7 @@
                     @endif
                 </dl>
             @else
-                <div class="mp2-contract-empty-state">
+                <div class="mp2-object-empty-state">
                     <x-filament::icon icon="heroicon-o-minus-circle" aria-hidden="true" />
                     <p>Nessuna condizione economica vigente</p>
                 </div>
@@ -69,19 +69,19 @@
             </div>
         </section>
 
-        <section class="mp2-contract-workspace-panel mp2-contract-current-exercise" aria-labelledby="contract-current-exercise-title">
-            <div class="mp2-contract-section-heading">
-                <span class="mp2-contract-section-icon" aria-hidden="true">
+        <section class="mp2-object-workspace-panel mp2-contract-current-exercise" aria-labelledby="contract-current-exercise-title">
+            <div class="mp2-object-section-heading">
+                <span class="mp2-object-section-icon" aria-hidden="true">
                     <x-filament::icon icon="heroicon-o-chart-bar-square" />
                 </span>
                 <div>
-                    <p class="mp2-contract-eyebrow">Contesto globale</p>
+                    <p class="mp2-object-eyebrow">Contesto globale</p>
                     <h2 id="contract-current-exercise-title">Situazione Esercizio corrente</h2>
                 </div>
             </div>
 
             @if ($overview['selected'] !== null)
-                <dl class="mp2-contract-exercise-context">
+                <dl class="mp2-object-exercise-context">
                     <div>
                         <dt>Esercizio</dt>
                         <dd>{{ $overview['selected']['year'] }}</dd>
@@ -94,13 +94,13 @@
                         <dt>Stato alla data</dt>
                         <dd>{{ $overview['selected']['state'] }}</dd>
                     </div>
-                    <div class="mp2-contract-cost-center">
+                    <div class="mp2-object-cost-center">
                         <dt>Centro di Costo</dt>
                         <dd>{{ $overview['selected']['cost_center'] }}</dd>
                     </div>
                 </dl>
 
-                <dl class="mp2-contract-economic-summary">
+                <dl class="mp2-object-economic-summary">
                     <div>
                         <dt>Allocato</dt>
                         <dd>{{ $overview['selected']['allocation'] }}</dd>
@@ -164,7 +164,7 @@
                     @endif
                 </div>
             @else
-                <div class="mp2-contract-empty-state">
+                <div class="mp2-object-empty-state">
                     <x-filament::icon icon="heroicon-o-calendar-days" aria-hidden="true" />
                     <p>Nessun Esercizio disponibile nel contesto globale.</p>
                 </div>
@@ -172,32 +172,32 @@
         </section>
     </div>
 
-    <section class="mp2-contract-annual-section" aria-labelledby="contract-annual-title">
-        <div class="mp2-contract-annual-heading">
+    <section class="mp2-object-annual-section" aria-labelledby="contract-annual-title">
+        <div class="mp2-object-annual-heading">
             <div>
-                <p class="mp2-contract-eyebrow">Andamento pluriennale</p>
+                <p class="mp2-object-eyebrow">Andamento pluriennale</p>
                 <h2 id="contract-annual-title">Situazioni annuali</h2>
             </div>
             <p>Valori calcolati alla data di riferimento canonica di ciascun Esercizio.</p>
         </div>
 
-        <div class="mp2-contract-annual-table-wrap" tabindex="0" role="region" aria-label="Situazioni annuali del Contratto">
-            <table class="mp2-contract-annual-table">
+        <div class="mp2-object-annual-table-wrap" tabindex="0" role="region" aria-label="Situazioni annuali del Contratto">
+            <table class="mp2-object-annual-table mp2-contract-annual-table">
                 <thead>
                     <tr>
                         <th scope="col">Esercizio</th>
                         <th scope="col">Riferimento</th>
                         <th scope="col">Stato</th>
                         <th scope="col">Centro di Costo</th>
-                        <th scope="col" class="mp2-contract-number">Allocato</th>
-                        <th scope="col" class="mp2-contract-number">Effettivo</th>
-                        <th scope="col" class="mp2-contract-number">Scostamento</th>
-                        <th scope="col" class="mp2-contract-table-action"><span class="fi-sr-only">Azioni</span></th>
+                        <th scope="col" class="mp2-object-number">Allocato</th>
+                        <th scope="col" class="mp2-object-number">Effettivo</th>
+                        <th scope="col" class="mp2-object-number">Scostamento</th>
+                        <th scope="col" class="mp2-object-table-action"><span class="fi-sr-only">Azioni</span></th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($overview['annual'] as $row)
-                        <tr @class(['mp2-contract-annual-selected' => $row['selected']])>
+                        <tr @class(['mp2-object-annual-selected' => $row['selected']])>
                             <th scope="row">
                                 <span>{{ $row['year'] }}</span>
                                 @if ($row['selected'])
@@ -205,12 +205,12 @@
                                 @endif
                             </th>
                             <td>{{ $row['reference_date'] }}</td>
-                            <td><span class="mp2-contract-table-state">{{ $row['state'] }}</span></td>
+                            <td><span class="mp2-object-table-state">{{ $row['state'] }}</span></td>
                             <td>{{ $row['cost_center'] }}</td>
-                            <td class="mp2-contract-number">{{ $row['allocation'] }}</td>
-                            <td class="mp2-contract-number">{{ $row['actual'] }}</td>
-                            <td class="mp2-contract-number">{{ $row['variance'] }}</td>
-                            <td class="mp2-contract-table-action">
+                            <td class="mp2-object-number">{{ $row['allocation'] }}</td>
+                            <td class="mp2-object-number">{{ $row['actual'] }}</td>
+                            <td class="mp2-object-number">{{ $row['variance'] }}</td>
+                            <td class="mp2-object-table-action">
                                 @if ($row['composition'] !== [])
                                     {{ ($this->allocationDetailAction)(['year' => $row['year']]) }}
                                 @endif
@@ -218,7 +218,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="mp2-contract-table-empty">Nessuna situazione annuale disponibile.</td>
+                            <td colspan="8" class="mp2-object-table-empty">Nessuna situazione annuale disponibile.</td>
                         </tr>
                     @endforelse
                 </tbody>

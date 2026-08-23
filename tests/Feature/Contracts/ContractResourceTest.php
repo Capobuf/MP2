@@ -183,6 +183,8 @@ it('lists and views tenant Contracts with undefined expiry and annual situations
 
     Livewire::test(ViewContract::class, ['record' => $contractA->getRouteKey()])
         ->assertSuccessful()
+        ->assertSeeHtml('class="mp2-object-header')
+        ->assertSeeHtml('data-object-icon="contract"')
         ->assertSee('Visibile')
         ->assertSee($contractA->supplier->legal_name)
         ->assertSee('Attivo')

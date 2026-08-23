@@ -69,7 +69,13 @@ class ProposalItem extends Model
     /** @return HasMany<ProposalAction, $this> */
     public function actions(): HasMany
     {
-        return $this->hasMany(ProposalAction::class);
+        return $this->hasMany(ProposalAction::class)->where('status', 'active')->orderBy('sequence');
+    }
+
+    /** @return HasMany<ProposalAction, $this> */
+    public function actionHistory(): HasMany
+    {
+        return $this->hasMany(ProposalAction::class)->orderBy('sequence');
     }
 
     protected function casts(): array

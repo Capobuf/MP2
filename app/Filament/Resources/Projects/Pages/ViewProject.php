@@ -10,6 +10,7 @@ use App\Filament\Resources\Projects\ProjectResource;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Project;
+use App\Models\ProjectTransition;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
@@ -20,12 +21,44 @@ use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Support\Enums\Width;
+use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class ViewProject extends ViewRecord
 {
     protected static string $resource = ProjectResource::class;
+
+    public function getHeader(): ?View
+    {
+        $project = $this->projectRecord();
+        $today = now($project->company->timezone)->toImmutable()->startOfDay();
+        $nextTransition = $project->transitions
+            ->filter(fn (ProjectTransition $transition): bool => $transition->annulledAt() === null
+                && $transition->effectiveDate()->startOfDay()->greaterThan($today))
+            ->sortBy(fn (ProjectTransition $transition): string => $transition->effectiveDate()->toDateString())
+            ->first();
+
+        return view('filament.resources.projects.components.object-header', [
+            'project' => $project,
+            'currentState' => $project->stateAtDate($today->toDateString()),
+            'nextTransition' => $nextTransition,
+            'today' => $today,
+            'projectsUrl' => ProjectResource::getUrl('index', tenant: $project->company),
+        ]);
+    }
+
+    public function getMaxContentWidth(): Width
+    {
+        return Width::Full;
+    }
+
+    /** @return array<string, string> */
+    public function getExtraBodyAttributes(): array
+    {
+        return ['class' => 'mp2-object-page mp2-project-object-page'];
+    }
 
     public function hasCombinedRelationManagerTabsWithContent(): bool
     {
@@ -42,13 +75,18 @@ class ViewProject extends ViewRecord
         return [
             Action::make('timeline')
                 ->label('Timeline del Progetto')
+                ->icon('heroicon-m-chart-bar')
+                ->color('gray')
+                ->outlined()
                 ->url(fn (Project $record): string => CompanyAudit::getUrl([
                     'tenant' => $record->company,
                     'project' => $record->id,
                 ])),
-            EditAction::make(),
+            EditAction::make()->label('Modifica')->icon('heroicon-m-pencil-square')->color('gray')->outlined(),
             Action::make('reclassify')
                 ->label('Riclassifica annualità')
+                ->icon('heroicon-m-arrows-right-left')
+                ->extraAttributes(['class' => 'mp2-object-primary-action'])
                 ->modalHeading('Riclassifica il Progetto')
                 ->modalDescription('L’anteprima riclassifica tutte le Spese figlie dell’Esercizio senza modificarne identità o importi.')
                 ->modalSubmitActionLabel('Conferma riclassificazione')

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Proposals\Schemas;
 
 use App\Domain\Proposals\ProposalImpactPlan;
 use App\Domain\Proposals\ProposalPlanData;
+use App\Domain\Proposals\ProposalPurpose;
 use App\Domain\Proposals\ProposalReadiness;
 use App\Models\Proposal;
 use App\Models\ProposalItem;
@@ -20,9 +21,13 @@ class ProposalInfolist
             Section::make('Proposta')->schema([
                 TextEntry::make('exercise.year')->label('Esercizio'),
                 TextEntry::make('purpose')->label('Finalità')->formatStateUsing(fn ($state): string => $state->label()),
+                TextEntry::make('referenceBudget.version')->label('Budget di riferimento')->formatStateUsing(fn (mixed $state): string => $state === null ? '—' : 'v'.$state),
                 TextEntry::make('status')->label('Stato')->formatStateUsing(fn ($state): string => $state->label())->badge(),
                 TextEntry::make('planned_allocation')->label('Allocato pianificato')->state(fn ($record): string => $record->plannedAllocation())->money('EUR', locale: 'it'),
                 TextEntry::make('actual_notice')->label('Realtà effettiva')->state('Realtà effettiva in sola lettura: gli Effettivi non sono decisioni di piano.'),
+                TextEntry::make('revision_context')->label('Contesto revisione')->state(fn (Proposal $record): string => $record->purpose === ProposalPurpose::Revision
+                    ? 'La realtà corrente è la base; il Budget approvato è un confronto immutabile.'
+                    : 'La realtà corrente è la base della proposta iniziale.'),
             ])->columns(3),
             Section::make('Elementi')->schema([
                 RepeatableEntry::make('items')->label('')->schema([
@@ -33,17 +38,21 @@ class ProposalInfolist
                     TextEntry::make('baseline_allocation')->label('Allocato base')->state(fn (ProposalItem $record): string => self::itemImpact($record)['before'] ?? '0.00')->money('EUR', locale: 'it'),
                     TextEntry::make('result_allocation')->label('Allocato risultante')->state(fn (ProposalItem $record): string => self::itemImpact($record)['after'] ?? '0.00')->money('EUR', locale: 'it'),
                     TextEntry::make('readiness_state')->label('Verifica')->formatStateUsing(fn ($state): string => $state->label())->badge(),
-                    TextEntry::make('readiness_reasons')->label('Motivi verifica')->formatStateUsing(fn (mixed $state): string => collect(ProposalPlanData::rows($state, 'readiness_reasons'))->pluck('message')->implode(' · '))->placeholder('Nessun motivo'),
+                    TextEntry::make('readiness_reasons')->label('Motivi verifica')->state(fn (ProposalItem $record): string => collect(ProposalPlanData::rows($record->readiness_reasons, 'readiness_reasons'))->pluck('message')->implode(' · '))->placeholder('Nessun motivo'),
                     TextEntry::make('read_only_source')->label('Archivio')->formatStateUsing(fn (bool $state): string => $state ? 'Archiviato · sola lettura' : 'Operativo'),
                     TextEntry::make('baseline.plan_baseline')->label('Piano base')->formatStateUsing(self::json(...))->columnSpanFull()->wrap(),
                     TextEntry::make('result')->label('Piano risultante')->formatStateUsing(self::json(...))->columnSpanFull()->wrap(),
                 ])->columns(3),
             ]),
-            Section::make('Decisioni tipizzate')->schema([
-                RepeatableEntry::make('actions')->label('')->schema([
+            Section::make('Storico decisioni')->schema([
+                RepeatableEntry::make('actionHistory')->label('')->schema([
                     TextEntry::make('sequence')->label('Ordine'),
                     TextEntry::make('action_type')->label('Azione')->formatStateUsing(fn ($state): string => $state->label()),
+                    TextEntry::make('status')->label('Stato')->formatStateUsing(fn ($state): string => $state->label())->badge(),
                     TextEntry::make('reason')->label('Motivazione')->placeholder('—'),
+                    TextEntry::make('withdrawn_at')->label('Ritirata il')->dateTime('d/m/Y H:i')->placeholder('—'),
+                    TextEntry::make('withdrawer.name')->label('Ritirata da')->placeholder('—'),
+                    TextEntry::make('withdraw_reason')->label('Motivo ritiro')->placeholder('—'),
                     TextEntry::make('operation_id')->label('Identità operazione')->copyable(),
                 ])->columns(4),
             ]),
@@ -57,7 +66,7 @@ class ProposalInfolist
                 TextEntry::make('affected_exercises')->label('Esercizi interessati')->state(function (Proposal $record): array {
                     $review = app(ProposalReadiness::class)->assessProposal($record);
 
-                    return collect($review['impacts'])->map(fn (array $impact): string => $impact['year'].' · Allocato '.$impact['allocation_before'].' → '.$impact['allocation_after'].' EUR · Delta '.$impact['allocation_delta'].' EUR')->all();
+                    return collect($review['impacts'])->map(fn (array $impact): string => $impact['year'].' · '.($impact['will_apply'] ? 'Verrà applicato' : 'Storico invariato').' · Allocato '.$impact['allocation_before'].' → '.$impact['allocation_after'].' EUR · Delta '.$impact['allocation_delta'].' EUR'.($impact['historical_divergence'] ? ' · Divergenza: '.$impact['divergence_reason'] : ''))->all();
                 })->listWithLineBreaks(),
                 TextEntry::make('affected_sources')->label('Sorgenti interessate')->state(function (Proposal $record): array {
                     $review = app(ProposalReadiness::class)->assessProposal($record);
@@ -79,7 +88,7 @@ class ProposalInfolist
 
                     return collect($review['impacts'])->flatMap(fn (array $impact): array => collect(ProposalPlanData::rows($impact['stale_proposals'] ?? null, 'stale_proposals'))->map(fn (array $proposal): string => 'Proposta #'.$proposal['proposal_id'].' · Esercizio #'.$proposal['exercise_id'])->all())->unique()->values()->all();
                 })->listWithLineBreaks()->placeholder('Nessuna Proposta concorrente'),
-                TextEntry::make('realignment_boundary')->label('Riallineamento')->state('Ricarica realtà, Mantieni proposta e revisione manuale appartengono alla slice S7 e non sono disponibili in S6.'),
+                TextEntry::make('realignment_boundary')->label('Risoluzione')->state('Le sorgenti cambiate richiedono un riallineamento completo; le nuove sorgenti richiedono una presa visione esplicita.'),
             ])->columns(2),
         ]);
     }

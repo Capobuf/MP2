@@ -57,8 +57,8 @@ it('does not represent later-slice actions or directed replacement', function ()
         expect(ProposalActionType::tryFrom($excluded))->toBeNull();
     }
 
-    expect(ProposalPurpose::cases())->toHaveCount(1)
-        ->and(ProposalPurpose::cases()[0])->toBe(ProposalPurpose::InitialBudget);
+    expect(ProposalPurpose::cases())->toHaveCount(2)
+        ->and(ProposalPurpose::cases())->toContain(ProposalPurpose::InitialBudget, ProposalPurpose::Revision);
 });
 
 it('requires exact stable relation identities and never fuzzy labels', function (): void {
@@ -101,7 +101,7 @@ it('enforces one parallel Draft per company and Exercise at the database boundar
         ->toThrow(QueryException::class);
 });
 
-it('does not expose Revision resolution carryover replacement closing forecast delete or export controls', function (): void {
+it('does not expose carryover replacement closing forecast delete or export controls', function (): void {
     $viewer = User::factory()->create();
     $proposal = Proposal::factory()->create();
     foreach ([Capability::View, Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
@@ -116,7 +116,7 @@ it('does not expose Revision resolution carryover replacement closing forecast d
     Filament::setTenant($proposal->company);
 
     $proposalPage = Livewire::test(ViewProposal::class, ['record' => $proposal->getRouteKey()]);
-    foreach (['revision', 'realign', 'keepProposal', 'carryover', 'reprogramming', 'replace', 'closing', 'forecast', 'delete', 'export'] as $action) {
+    foreach (['carryover', 'reprogramming', 'replace', 'closing', 'forecast', 'delete', 'export'] as $action) {
         $proposalPage->assertActionDoesNotExist($action);
     }
 

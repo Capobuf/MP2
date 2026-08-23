@@ -24,11 +24,11 @@ below. Later slices may add integration or regression coverage.
 | 28.15 | Modalità di rinvio | S8 — Riporto e Riprogrammazione | planned |
 | 28.16 | Progetto terminale | S8 — Riporto e Riprogrammazione | planned |
 | 28.17 | Budget immutabile | S6 — Proposta e Budget iniziale | verified |
-| 28.18 | Revisioni | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
+| 28.18 | Revisioni | S7 — Revisioni, riallineamento e impatto multi-Esercizio | implemented |
 | 28.19 | Proposta isolata | S6 — Proposta e Budget iniziale | verified |
 | 28.20 | Proposta solo sul piano | S6 — Proposta e Budget iniziale | verified |
 | 28.21 | Nuovi oggetti proposti | S6 — Proposta e Budget iniziale | verified |
-| 28.22 | Riallineamento per sorgente | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
+| 28.22 | Riallineamento per sorgente | S7 — Revisioni, riallineamento e impatto multi-Esercizio | implemented |
 | 28.23 | Approvazione atomica | S6 — Proposta e Budget iniziale | verified |
 | 28.24 | Stato alla data | S4 — Progetti | verified |
 | 28.25 | Stato alla Chiusura | S9 — Chiusura | planned |
@@ -61,7 +61,7 @@ below. Later slices may add integration or regression coverage.
 | 28.52 | Nessun doppio conteggio | S5 — Contratti | verified |
 | 28.53 | Valuta e IVA | S3 — Esercizi, Spese e Righe | verified |
 | 28.54 | Annualità dell'Effettivo | S3 — Esercizi, Spese e Righe | verified |
-| 28.55 | Copia fra Esercizi | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
+| 28.55 | Copia fra Esercizi | S7 — Revisioni, riallineamento e impatto multi-Esercizio | implemented |
 | 28.56 | Scadenze contrattuali | S5 — Contratti | verified |
 | 28.57 | Permessi per Azienda | S1 — Azienda, accesso e impostazioni | verified |
 | 28.58 | Esercizio successivo | S9 — Chiusura | planned |

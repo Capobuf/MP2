@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Proposals\ProposalReadiness;
+use App\Domain\Proposals\ProposalReadinessReason;
 use App\Domain\Proposals\ProposalReadinessState;
 use App\Domain\Proposals\ProposalSourceSnapshot;
 use App\Models\Expense;
@@ -19,4 +20,9 @@ it('marks a whole existing source for realignment when its revision changes', fu
     $expense->increment('revision');
     $item->load(['proposal', 'expense', 'actions']);
     expect(app(ProposalReadiness::class)->assessItem($item)['state'])->toBe(ProposalReadinessState::ToRealign);
+});
+
+it('does not expose the removed generic invalid-action reason', function (): void {
+    expect(collect(ProposalReadinessReason::cases())->map->value->all())
+        ->not->toContain('invalid_action');
 });

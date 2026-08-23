@@ -54,7 +54,7 @@ class CreateContract
             'classifications' => ['array'],
             'operation_id' => ['required', 'uuid'],
         ])->validate();
-        $this->validateConditionIntervals($validated['conditions']);
+        $validated['conditions'] = $this->validateConditionIntervals($validated['conditions']);
 
         return DB::transaction(function () use ($actor, $company, $validated): Contract {
             $lockedCompany = Company::query()->lockForUpdate()->findOrFail($company->id);
@@ -158,7 +158,7 @@ class CreateContract
                     'amount' => (string) $condition->amount,
                     'cycle' => $condition->cycle,
                     'attribution_mode' => $condition->attribution_mode,
-                ], $condition->valid_from->toDateString());
+                ], $condition->validFrom()->toDateString());
             }
 
             if ($validated['automatic_renewal'] && $anchor !== null) {
@@ -220,8 +220,11 @@ class CreateContract
         ];
     }
 
-    /** @param list<array<string, mixed>> $conditions */
-    private function validateConditionIntervals(array $conditions): void
+    /**
+     * @param  array<array-key, array<string, mixed>>  $conditions
+     * @return list<array<string, mixed>>
+     */
+    private function validateConditionIntervals(array $conditions): array
     {
         usort($conditions, fn (array $left, array $right): int => strcmp((string) $left['valid_from'], (string) $right['valid_from']));
 
@@ -244,6 +247,8 @@ class CreateContract
                 throw ValidationException::withMessages(['conditions' => 'Le condizioni economiche valide non possono sovrapporsi.']);
             }
         }
+
+        return $conditions;
     }
 
     /**

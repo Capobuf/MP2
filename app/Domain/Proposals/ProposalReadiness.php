@@ -34,12 +34,12 @@ final class ProposalReadiness
         $source = $item->expense ?? $item->project ?? $item->contract;
         if ($source === null) {
             if ($item->expense_id !== null || $item->project_id !== null || $item->contract_id !== null) {
-                return $this->result(ProposalReadinessState::Inconsistent, ProposalReadinessReason::SourceMissing);
+                return $this->result(ProposalReadinessState::Inconsistent, ProposalReadinessReason::ArchivedSourceWithoutRestore);
             }
             try {
                 $this->validateSemanticItem($item);
-            } catch (\Throwable) {
-                return $this->result(ProposalReadinessState::Inconsistent, ProposalReadinessReason::InvalidAction);
+            } catch (ValidationException $exception) {
+                return $this->inconsistent($exception);
             }
 
             return ['state' => ProposalReadinessState::Aligned, 'reasons' => []];
@@ -52,8 +52,8 @@ final class ProposalReadiness
         }
         try {
             $this->validateSemanticItem($item);
-        } catch (\Throwable) {
-            return $this->result(ProposalReadinessState::Inconsistent, ProposalReadinessReason::InvalidAction);
+        } catch (ValidationException $exception) {
+            return $this->inconsistent($exception);
         }
 
         return ['state' => ProposalReadinessState::Aligned, 'reasons' => []];
@@ -70,10 +70,15 @@ final class ProposalReadiness
         $missing = $catalogKeys->diff($itemKeys)->values()->all();
         $blocks = [];
         if (! $proposal->exercise->isOpen()) {
-            $blocks[] = $this->reason(ProposalReadinessReason::ExerciseClosed);
+            $blocks[] = $this->reason(ProposalReadinessReason::ClosedExerciseAction);
         }
-        if (BudgetSnapshot::query()->where('exercise_id', $proposal->exercise_id)->exists()) {
+        $latestBudget = BudgetSnapshot::query()->where('exercise_id', $proposal->exercise_id)->latest('version')->first();
+        if ($proposal->purpose === ProposalPurpose::InitialBudget && $latestBudget !== null) {
             $blocks[] = $this->reason(ProposalReadinessReason::BudgetAlreadyExists);
+        }
+        if ($proposal->purpose === ProposalPurpose::Revision
+            && ($latestBudget === null || $proposal->reference_budget_id !== $latestBudget->id)) {
+            $blocks[] = $this->reason(ProposalReadinessReason::StaleConcurrentAction);
         }
         if ($missing !== []) {
             $blocks[] = $this->reason(ProposalReadinessReason::NewSource);
@@ -92,8 +97,12 @@ final class ProposalReadiness
             }
         }
         $impacts = ProposalImpactPlan::build($proposal);
-        if (collect($impacts)->contains(fn (array $impact): bool => ! $impact['is_open'])) {
-            $blocks[] = $this->reason(ProposalReadinessReason::ExerciseClosed);
+        foreach ($impacts as $impact) {
+            if (($impact['blocks'] ?? []) !== []) {
+                $blocks[] = $this->reason($impact['year'] === null
+                    ? ProposalReadinessReason::PartialMultiExerciseEffect
+                    : ProposalReadinessReason::ClosedExerciseAction);
+            }
         }
         $blocks = collect($blocks)->unique('code')->values()->all();
 
@@ -105,6 +114,17 @@ final class ProposalReadiness
         BudgetPayloadGuard::assertPlanOnly($item->result);
         foreach ($item->actions as $action) {
             ProposalActionPayload::validate($action->action_type, $action->payload);
+            if ($action->action_type === ProposalActionType::CopyExpense) {
+                $source = Expense::query()->where('company_id', $item->company_id)->find($action->payload['source_expense_id']);
+                if ($source === null
+                    || $source->project_id !== null
+                    || $source->contract_id !== null
+                    || $source->isReversed()
+                    || (int) $source->revision !== (int) $action->payload['source_revision']
+                    || ProposalSourceSnapshot::fingerprint(ProposalSourceSnapshot::expense($source)) !== $action->payload['source_fingerprint']) {
+                    throw ValidationException::withMessages(['source_expense_id' => 'La Spesa origine copiata è cambiata o non è più autonoma e attiva.']);
+                }
+            }
         }
         match ($item->source_type) {
             ProposalSourceType::Expense => ExpensePlan::validateForApproval($item),
@@ -117,6 +137,17 @@ final class ProposalReadiness
     private function result(ProposalReadinessState $state, ProposalReadinessReason $reason): array
     {
         return ['state' => $state, 'reasons' => [$this->reason($reason)]];
+    }
+
+    /** @return array{state: ProposalReadinessState, reasons: array<int, array{code: string, message: string}>} */
+    private function inconsistent(ValidationException $exception): array
+    {
+        return [
+            'state' => ProposalReadinessState::Inconsistent,
+            'reasons' => collect(ProposalReadinessReason::fromValidation($exception))
+                ->map(fn (ProposalReadinessReason $reason): array => $this->reason($reason))
+                ->all(),
+        ];
     }
 
     /** @return array{code: string, message: string} */

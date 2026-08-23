@@ -65,14 +65,23 @@ enum AuditEventType: string
     case AttachmentUploaded = 'attachment_uploaded';
     case AttachmentDetached = 'attachment_detached';
     case ProposalInitialized = 'proposal_initialized';
+    case ProposalRevisionInitialized = 'proposal_revision_initialized';
     case ProposalSourceIncluded = 'proposal_source_included';
+    case ProposalSourceAcknowledged = 'proposal_source_acknowledged';
     case ProposalActionPlanned = 'proposal_action_planned';
+    case ProposalActionWithdrawn = 'proposal_action_withdrawn';
     case ProposalActionApplied = 'proposal_action_applied';
     case ProposalReadinessReviewed = 'proposal_readiness_reviewed';
     case ProposalMarkedToRealign = 'proposal_marked_to_realign';
+    case ProposalRealityReloaded = 'proposal_reality_reloaded';
+    case ProposalPlanKept = 'proposal_plan_kept';
+    case ProposalManuallyRealigned = 'proposal_manually_realigned';
     case ProposalApproved = 'proposal_approved';
+    case ProposalDiscarded = 'proposal_discarded';
     case ProposalApprovalFailed = 'proposal_approval_failed';
     case BudgetCreated = 'budget_created';
+    case BudgetRevisionCreated = 'budget_revision_created';
+    case HistoricalDivergenceRecorded = 'historical_divergence_recorded';
 
     public function label(): string
     {
@@ -138,14 +147,23 @@ enum AuditEventType: string
             self::AttachmentUploaded => 'Allegato caricato',
             self::AttachmentDetached => 'Allegato rimosso dall’oggetto',
             self::ProposalInitialized => 'Proposta inizializzata',
+            self::ProposalRevisionInitialized => 'Revisione inizializzata',
             self::ProposalSourceIncluded => 'Sorgente inclusa nella proposta',
+            self::ProposalSourceAcknowledged => 'Sorgente presa in visione',
             self::ProposalActionPlanned => 'Decisione di piano registrata',
+            self::ProposalActionWithdrawn => 'Decisione di piano ritirata',
             self::ProposalActionApplied => 'Decisione di piano applicata',
             self::ProposalReadinessReviewed => 'Verifiche proposta ricalcolate',
             self::ProposalMarkedToRealign => 'Sorgente proposta da riallineare',
+            self::ProposalRealityReloaded => 'Realtà ricaricata nella proposta',
+            self::ProposalPlanKept => 'Decisioni di proposta mantenute',
+            self::ProposalManuallyRealigned => 'Sorgente riallineata manualmente',
             self::ProposalApproved => 'Proposta approvata',
+            self::ProposalDiscarded => 'Proposta scartata',
             self::ProposalApprovalFailed => 'Approvazione proposta fallita',
             self::BudgetCreated => 'Budget creato',
+            self::BudgetRevisionCreated => 'Revisione Budget creata',
+            self::HistoricalDivergenceRecorded => 'Divergenza storica registrata',
         };
     }
 }

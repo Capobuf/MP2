@@ -46,7 +46,7 @@ class ViewContract extends ViewRecord
     /** @return array<string, string> */
     public function getExtraBodyAttributes(): array
     {
-        return ['class' => 'mp2-contract-object-page'];
+        return ['class' => 'mp2-object-page mp2-contract-object-page'];
     }
 
     public function hasCombinedRelationManagerTabsWithContent(): bool

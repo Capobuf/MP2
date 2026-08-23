@@ -20,7 +20,7 @@ changing its traceability anchor.
 | FR-010 | Archivio non economico | §§5.8, 24.3 | S2 — Anagrafiche | verified |
 | FR-011 | Budget Approvato immutabile | §§1.2, 13 | S6 — Proposta e Budget iniziale | verified |
 | FR-012 | Versione iniziale v1 preservata | §13.4 | S6 — Proposta e Budget iniziale | verified |
-| FR-013 | Revisioni sempre disponibili in Esercizio Aperto | §§12.3, 13.4, 26.3 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
+| FR-013 | Revisioni sempre disponibili in Esercizio Aperto | §§12.3, 13.4, 26.3 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | implemented |
 | FR-014 | Versione Budget esplicita nei report | §§13.7, 25 | S11 — Reportistica ed esportazione | planned |
 | FR-015 | Proposta isolata | §§1.3, 12.1 | S6 — Proposta e Budget iniziale | verified |
 | FR-016 | Una Proposta attiva per Esercizio | §12.2 | S6 — Proposta e Budget iniziale | verified |
@@ -31,13 +31,13 @@ changing its traceability anchor.
 | FR-021 | Azioni di piano sul Progetto | §12.8 | S6 — Proposta e Budget iniziale | verified |
 | FR-022 | Azioni di piano sul Contratto | §12.9 | S6 — Proposta e Budget iniziale | verified |
 | FR-023 | Relazioni tra nuovi ProposalItem | §12.10 | S6 — Proposta e Budget iniziale | verified |
-| FR-024 | Riallineamento dell'intera sorgente | §§12.11–12.12 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
-| FR-025 | Presa visione delle nuove sorgenti | §12.13 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
-| FR-026 | Incoerenze della Proposta definite in modo chiuso | §12.14 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
+| FR-024 | Riallineamento dell'intera sorgente | §§12.11–12.12 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | implemented |
+| FR-025 | Presa visione delle nuove sorgenti | §12.13 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | implemented |
+| FR-026 | Incoerenze della Proposta definite in modo chiuso | §12.14 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | implemented |
 | FR-027 | Precondizioni di approvazione | §§12.15, 13.2 | S6 — Proposta e Budget iniziale | verified |
 | FR-028 | Approvazione atomica su tutti gli Esercizi interessati | §13.3 | S6 — Proposta e Budget iniziale | verified |
-| FR-029 | Applicazione futura senza riscrivere Esercizi Chiusi | §§10, 13.3 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
-| FR-030 | Scarto senza rollback della realtà | §12.16 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | planned |
+| FR-029 | Applicazione futura senza riscrivere Esercizi Chiusi | §§10, 13.3 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | implemented |
+| FR-030 | Scarto senza rollback della realtà | §12.16 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | implemented |
 | FR-031 | Più Esercizi Aperti | §11.1 | S3 — Esercizi, Spese e Righe | verified |
 | FR-032 | Divieto di Effettivi in un anno futuro | §11.3 | S3 — Esercizi, Spese e Righe | verified |
 | FR-033 | Dichiarazione annuale autoritativa dell'Effettivo | §§6.4, 11.3 | S3 — Esercizi, Spese e Righe | verified |

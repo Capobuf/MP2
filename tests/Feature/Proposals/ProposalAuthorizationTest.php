@@ -7,6 +7,7 @@ use App\Models\CompanyCapability;
 use App\Models\Proposal;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -28,4 +29,8 @@ it('maps proposal and budget authority to the exact company capabilities', funct
         ->and($user->can('update', $budget))->toBeFalse()
         ->and($user->can('delete', $proposal))->toBeFalse()
         ->and($user->can('view', $otherProposal))->toBeFalse();
+
+    $proposal->update(['status' => 'discarded', 'discarded_by_id' => $user->id, 'discarded_at' => now(), 'discard_reason' => 'Fine', 'discard_operation_id' => (string) Str::uuid()]);
+    expect($user->can('update', $proposal->fresh()))->toBeFalse()
+        ->and($user->can('approve', $proposal->fresh()))->toBeFalse();
 });

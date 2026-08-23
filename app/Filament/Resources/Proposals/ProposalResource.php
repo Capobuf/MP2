@@ -79,7 +79,7 @@ class ProposalResource extends Resource
     {
         $company = Filament::getTenant();
 
-        return $company instanceof Company ? parent::getEloquentQuery()->whereBelongsTo($company)->with(['exercise', 'creator', 'items', 'actions']) : parent::getEloquentQuery()->whereRaw('1 = 0');
+        return $company instanceof Company ? parent::getEloquentQuery()->whereBelongsTo($company)->with(['exercise', 'creator', 'referenceBudget', 'items', 'actions', 'actionHistory.withdrawer']) : parent::getEloquentQuery()->whereRaw('1 = 0');
     }
 
     public static function getPages(): array

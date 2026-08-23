@@ -3,28 +3,26 @@
     aria-label="Dettaglio Spesa #{{ $expense->id }}"
     x-on:keydown.escape.window.capture="if (! document.querySelector('[role=dialog]')) $wire.close()"
 >
-    <header class="mp2-expense-panel-header">
-        <div class="mp2-expense-panel-title">
-            <p class="mp2-eyebrow">Spesa #{{ $expense->id }}</p>
-            <h2>{{ $expense->description }}</h2>
-        </div>
+    @if ($compact)
+        <header class="mp2-expense-panel-header">
+            <div class="mp2-expense-panel-title">
+                <p class="mp2-eyebrow">Spesa #{{ $expense->id }}</p>
+                <h2>{{ $expense->description }}</h2>
+            </div>
 
-        @if ($compact)
             <x-filament::icon-button
                 wire:click="close"
                 icon="heroicon-m-x-mark"
                 label="Chiudi dettaglio"
                 color="gray"
             />
-        @endif
-    </header>
+        </header>
 
-    <div class="mp2-expense-panel-toolbar">
-        <span class="mp2-status-badge {{ $expense->isReversed() ? 'mp2-status-muted' : 'mp2-status-success' }}">
-            {{ $expense->isReversed() ? 'Stornata' : 'Attiva' }}
-        </span>
+        <div class="mp2-expense-panel-toolbar">
+            <span class="mp2-status-badge {{ $expense->isReversed() ? 'mp2-status-muted' : 'mp2-status-success' }}">
+                {{ $expense->isReversed() ? 'Stornata' : 'Attiva' }}
+            </span>
 
-        @if ($compact)
             <x-filament-actions::group
                 :actions="[
                     $this->editExpenseAction,
@@ -39,26 +37,28 @@
                 button
                 outlined
             />
-        @endif
-    </div>
+        </div>
+    @endif
 
-    <section class="mp2-detail-section" aria-labelledby="expense-summary-{{ $expense->id }}">
-        <h3 id="expense-summary-{{ $expense->id }}">Riepilogo economico</h3>
-        <dl class="mp2-economic-summary">
-            <div>
-                <dt>Stima</dt>
-                <dd class="mp2-money-estimate">{{ $this->money($expense->allocation()) }}</dd>
-            </div>
-            <div>
-                <dt>Effettivo</dt>
-                <dd class="mp2-money-actual">{{ $this->money($expense->actual()) }}</dd>
-            </div>
-            <div>
-                <dt>Scostamento</dt>
-                <dd>{{ $this->money($expense->operationalVariance()) }}</dd>
-            </div>
-        </dl>
-    </section>
+    @if ($compact)
+        <section class="mp2-detail-section" aria-labelledby="expense-summary-{{ $expense->id }}">
+            <h3 id="expense-summary-{{ $expense->id }}">Riepilogo economico</h3>
+            <dl class="mp2-economic-summary">
+                <div>
+                    <dt>Stima</dt>
+                    <dd class="mp2-money-estimate">{{ $this->money($expense->allocation()) }}</dd>
+                </div>
+                <div>
+                    <dt>Effettivo</dt>
+                    <dd class="mp2-money-actual">{{ $this->money($expense->actual()) }}</dd>
+                </div>
+                <div>
+                    <dt>Scostamento</dt>
+                    <dd>{{ $this->money($expense->operationalVariance()) }}</dd>
+                </div>
+            </dl>
+        </section>
+    @endif
 
     <section class="mp2-detail-section" aria-labelledby="expense-data-{{ $expense->id }}">
         <h3 id="expense-data-{{ $expense->id }}">Dati principali</h3>

@@ -135,5 +135,5 @@ it('blocks approval when the canonical Contract boundary changes after confirmat
     $review = app(ProposalReadiness::class)->assessProposal($proposal->refresh());
 
     expect($review['ready'])->toBeFalse()
-        ->and(collect($review['blocks'])->pluck('code')->all())->toContain('invalid_action');
+        ->and(collect($review['blocks'])->pluck('code')->all())->toContain('stale_concurrent_action');
 });

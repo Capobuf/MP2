@@ -4,7 +4,9 @@ namespace App\Actions\Proposals;
 
 use App\Domain\Company\AuditEventType;
 use App\Domain\Company\Capability;
+use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalImpactPlan;
+use App\Domain\Proposals\ProposalPurpose;
 use App\Domain\Proposals\ProposalReadiness;
 use App\Domain\Proposals\ProposalReadinessReason;
 use App\Domain\Proposals\ProposalSourceType;
@@ -39,7 +41,7 @@ use Illuminate\Validation\ValidationException;
 
 final class ApproveProposal
 {
-    public function __construct(private ProposalReadiness $readiness, private ApplyProjectPlan $projects, private ApplyContractPlan $contracts, private ApplyExpensePlan $expenses, private ApplyProposalRelations $relations, private MaterializeBudgetV1 $materialize) {}
+    public function __construct(private ProposalReadiness $readiness, private ApplyProjectPlan $projects, private ApplyContractPlan $contracts, private ApplyExpensePlan $expenses, private ApplyProposalRelations $relations, private MaterializeBudgetSnapshot $materialize) {}
 
     /**
      * @param  array<string, mixed>  $evidence
@@ -70,10 +72,28 @@ final class ApproveProposal
                 $locked->setRelation('items', $preliminary);
                 $exerciseIds = collect(ProposalImpactPlan::affectedExerciseIds($locked));
                 $exercises = Exercise::query()->whereIn('id', $exerciseIds)->orderBy('id')->lockForUpdate()->get();
-                if ($exercises->count() !== $exerciseIds->count() || $exercises->contains(fn (Exercise $exercise): bool => $exercise->company_id !== $company->id || ! $exercise->isOpen())) {
-                    throw ValidationException::withMessages(['exercises' => 'Tutti gli Esercizi interessati devono essere Aperti e della stessa Azienda.']);
+                if ($exercises->count() !== $exerciseIds->count() || $exercises->contains(fn (Exercise $exercise): bool => $exercise->company_id !== $company->id)) {
+                    throw ValidationException::withMessages(['exercises' => 'Tutti gli Esercizi interessati devono appartenere alla stessa Azienda.']);
                 }
-                $expenseIds = $preliminary->pluck('expense_id')->filter()->sort()->values();
+                if (! $exercises->firstWhere('id', $locked->exercise_id)?->isOpen()) {
+                    throw ValidationException::withMessages(['exercise' => 'L’Esercizio principale deve essere Aperto.']);
+                }
+                $budgets = BudgetSnapshot::query()->where('exercise_id', $locked->exercise_id)->orderBy('version')->lockForUpdate()->get();
+                $latestBudget = $budgets->last();
+                if ($locked->purpose === ProposalPurpose::Revision) {
+                    if (blank($evidence['reason'] ?? null)) {
+                        throw ValidationException::withMessages(['reason' => 'La motivazione della Revisione è obbligatoria.']);
+                    }
+                    if ($latestBudget === null || $locked->reference_budget_id !== $latestBudget->id) {
+                        throw ValidationException::withMessages(['reference_budget' => 'Il Budget di riferimento non è più l’ultima versione approvata.']);
+                    }
+                } elseif ($latestBudget !== null) {
+                    throw ValidationException::withMessages(['budget' => 'La Proposta iniziale non può creare una seconda versione.']);
+                }
+                $copySourceIds = $preliminary->flatMap(fn (ProposalItem $item): array => $item->actions
+                    ->where('action_type', ProposalActionType::CopyExpense)
+                    ->pluck('payload.source_expense_id')->filter()->map(fn (mixed $id): int => (int) $id)->all());
+                $expenseIds = $preliminary->pluck('expense_id')->filter()->merge($copySourceIds)->unique()->sort()->values();
                 $projectIds = $preliminary->pluck('project_id')->filter()->sort()->values();
                 $contractIds = $preliminary->pluck('contract_id')->filter()->sort()->values();
                 Expense::query()->whereIn('id', $expenseIds)->orderBy('id')->lockForUpdate()->get();
@@ -88,7 +108,7 @@ final class ApproveProposal
                 ContractExerciseClassification::query()->whereIn('contract_id', $contractIds)->orderBy('id')->lockForUpdate()->get();
                 ProjectContractLink::query()->where(fn ($query) => $query->whereIn('project_id', $projectIds)->orWhereIn('contract_id', $contractIds))->orderBy('id')->lockForUpdate()->get();
                 $items = ProposalItem::query()->where('proposal_id', $locked->id)->with(['expense', 'project', 'contract', 'actions'])->orderBy('id')->lockForUpdate()->get();
-                $actions = ProposalAction::query()->where('proposal_id', $locked->id)->with('item')->orderBy('sequence')->lockForUpdate()->get();
+                $actions = ProposalAction::query()->where('proposal_id', $locked->id)->where('status', 'active')->with('item')->orderBy('sequence')->lockForUpdate()->get();
                 Supplier::query()->whereIn('id', $items->pluck('result')->map(fn (array $result) => $result['supplier_id'] ?? null)->filter())->orderBy('id')->lockForUpdate()->get();
                 CostCenter::query()->whereIn('id', $items->pluck('result')->map(fn (array $result) => $result['cost_center_id'] ?? $result['direct_cost_center_id'] ?? null)->filter())->orderBy('id')->lockForUpdate()->get();
                 Attachment::query()->whereIn('id', $attachmentIds)->orderBy('id')->lockForUpdate()->get();

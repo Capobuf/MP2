@@ -230,14 +230,17 @@ class ContractForm
 
     private static function syncSuggestedContractualStart(Get $get, Set $set, mixed $state, mixed $updatedDate = null): void
     {
-        $suggested = collect(is_array($state) ? $state : [])
+        $dates = collect(is_array($state) ? $state : [])
             ->map(fn (mixed $condition): ?string => is_array($condition) && filled($condition['valid_from'] ?? null)
                 ? (string) $condition['valid_from']
                 : null)
-            ->when(filled($updatedDate), fn ($dates) => $dates->push((string) $updatedDate))
-            ->filter()
-            ->sort()
-            ->first();
+            ->filter();
+
+        if (filled($updatedDate)) {
+            $dates->push((string) $updatedDate);
+        }
+
+        $suggested = $dates->sort()->first();
         $previousSuggestion = $get('suggested_contractual_start_date', isAbsolute: true);
         $currentStart = $get('contractual_start_date', isAbsolute: true);
 

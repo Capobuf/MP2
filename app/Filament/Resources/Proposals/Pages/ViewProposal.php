@@ -3,18 +3,23 @@
 namespace App\Filament\Resources\Proposals\Pages;
 
 use App\Actions\Operations\UploadAttachment;
+use App\Actions\Proposals\AcknowledgeProposalSource;
 use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\CopyExpenseIntoProposal;
+use App\Actions\Proposals\DiscardProposal;
 use App\Actions\Proposals\IncludeProposalSource;
 use App\Actions\Proposals\PlanContract;
 use App\Actions\Proposals\PlanExpense;
 use App\Actions\Proposals\PlanProject;
 use App\Actions\Proposals\PlanProposalRelation;
+use App\Actions\Proposals\RealignProposalItem;
 use App\Actions\Proposals\ReviewProposalReadiness;
 use App\Domain\Contracts\ContractState;
 use App\Domain\Projects\ProjectState;
 use App\Domain\Proposals\ProposalActionType;
+use App\Domain\Proposals\ProposalPurpose;
 use App\Domain\Proposals\ProposalReadiness;
+use App\Domain\Proposals\ProposalRealignmentChoice;
 use App\Domain\Proposals\ProposalSourceType;
 use App\Filament\Forms\DecimalInput;
 use App\Filament\Pages\CompanyAudit;
@@ -32,6 +37,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
@@ -65,9 +71,9 @@ class ViewProposal extends ViewRecord
     {
         return [
             Action::make('timeline')->label('Timeline della Proposta')->url(fn (): string => CompanyAudit::getUrl(['tenant' => $this->proposal()->company, 'proposal' => $this->proposal()->id])),
-            Action::make('viewBudget')->label('Apri Budget v1')->url(fn (): string => BudgetResource::getUrl('view', ['record' => $this->proposal()->budget()->sole()], tenant: $this->proposal()->company))->visible(fn (): bool => $this->proposal()->budget()->exists()),
-            Action::make('approveBudget')->label('Approva e crea Budget v1')->color('success')->requiresConfirmation()->modalHeading('Approva Proposta e crea Budget v1')->modalDescription(fn (): string => 'La conferma rivalida e applica atomicamente il piano. '.$this->approvalSummary())->modalSubmitActionLabel('Approva e crea Budget v1')->visible(fn (): bool => $this->canApprove())->disabled(fn (): bool => ! $this->approvalReady())->tooltip(fn (): ?string => $this->approvalReady() ? null : 'Risolvere tutti i blocchi di verifica prima dell’approvazione.')->form([
-                Placeholder::make('final_impact')->label('Impatto finale da approvare')->content(fn (): string => $this->approvalSummary()), TextInput::make('external_subject')->label('Soggetto approvante esterno')->maxLength(255), TextInput::make('external_venue')->label('Sede o verbale')->maxLength(255), Textarea::make('reason')->label('Nota di approvazione'), FileUpload::make('new_evidence')->label('Nuova evidenza privata')->storeFiles(false), Select::make('attachment_ids')->label('Evidenze già presenti')->multiple()->options(fn (): array => Attachment::query()->where('company_id', $this->proposal()->company_id)->whereNull('detached_at')->orderBy('original_name')->pluck('original_name', 'id')->all()), Hidden::make('evidence_operation_id')->default(fn (): string => $this->evidenceOperationId), Hidden::make('operation_id')->default(fn (): string => $this->approvalOperationId),
+            Action::make('viewBudget')->label(fn (): string => 'Apri Budget v'.$this->proposal()->budget()->value('version'))->url(fn (): string => BudgetResource::getUrl('view', ['record' => $this->proposal()->budget()->sole()], tenant: $this->proposal()->company))->visible(fn (): bool => $this->proposal()->budget()->exists()),
+            Action::make('approveBudget')->label(fn (): string => 'Approva e crea Budget v'.$this->nextBudgetVersion())->color('success')->requiresConfirmation()->modalHeading(fn (): string => 'Approva '.($this->proposal()->purpose === ProposalPurpose::Revision ? 'Revisione' : 'Proposta').' e crea Budget v'.$this->nextBudgetVersion())->modalDescription(fn (): string => 'La conferma rivalida e applica atomicamente il piano. '.$this->approvalSummary())->modalSubmitActionLabel(fn (): string => 'Approva e crea Budget v'.$this->nextBudgetVersion())->visible(fn (): bool => $this->canApprove())->disabled(fn (): bool => ! $this->approvalReady())->tooltip(fn (): ?string => $this->approvalReady() ? null : 'Risolvere tutti i blocchi di verifica prima dell’approvazione.')->form([
+                Placeholder::make('final_impact')->label('Impatto finale da approvare')->content(fn (): string => $this->approvalSummary()), TextInput::make('external_subject')->label('Soggetto approvante esterno')->maxLength(255), TextInput::make('external_venue')->label('Sede o verbale')->maxLength(255), Textarea::make('reason')->label('Motivazione della Revisione')->required(fn (): bool => $this->proposal()->purpose === ProposalPurpose::Revision), FileUpload::make('new_evidence')->label('Nuova evidenza privata')->storeFiles(false), Select::make('attachment_ids')->label('Evidenze già presenti')->multiple()->options(fn (): array => Attachment::query()->where('company_id', $this->proposal()->company_id)->whereNull('detached_at')->orderBy('original_name')->pluck('original_name', 'id')->all()), Hidden::make('evidence_operation_id')->default(fn (): string => $this->evidenceOperationId), Hidden::make('operation_id')->default(fn (): string => $this->approvalOperationId),
             ])->action(function (array $data): void {
                 $ids = array_map('intval', $data['attachment_ids'] ?? []);
                 $file = $data['new_evidence'] ?? null;
@@ -81,6 +87,49 @@ class ViewProposal extends ViewRecord
             Action::make('reviewReadiness')->label('Ricalcola verifiche')->visible(fn (): bool => $this->canPlan())->form([Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid())])->action(function (array $data): void {
                 $this->record = app(ReviewProposalReadiness::class)->execute($this->actor(), $this->proposal(), $data['operation_id']);
                 $this->refreshProposal('Verifiche ricalcolate');
+            }),
+            Action::make('discardProposal')->label('Scarta proposta')->color('danger')->visible(fn (): bool => $this->canPlan())->requiresConfirmation()->modalDescription('Lo scarto conserva la Proposta e il suo storico. La realtà viva e tutti i Budget restano invariati.')->form([
+                Textarea::make('reason')->label('Motivazione')->required(),
+                Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
+            ])->action(function (array $data): void {
+                $this->record = app(DiscardProposal::class)->execute($this->actor(), $this->proposal(), $data['reason'], $data['operation_id']);
+                $this->refreshProposal('Proposta scartata senza modificare la realtà');
+            }),
+            Action::make('reloadReality')->label('Ricarica realtà')->visible(fn (): bool => $this->canRealign())->requiresConfirmation()->modalDescription('Tutte le decisioni che toccano la sorgente saranno ritirate. La realtà corrente sostituirà integralmente piano base e risultato.')->form([
+                Select::make('item_id')->label('Sorgente da riallineare')->options(fn (): array => $this->realignmentItemOptions())->required(),
+                Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
+                Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+            ])->action(function (array $data): void {
+                app(RealignProposalItem::class)->execute($this->actor(), $this->proposal(), $this->realignmentItem((int) $data['item_id']), ProposalRealignmentChoice::Reload, null, [], $data['operation_id'], (int) $data['proposal_revision']);
+                $this->refreshProposal('Realtà ricaricata per l’intera sorgente');
+            }),
+            Action::make('keepProposal')->label('Mantieni proposta')->visible(fn (): bool => $this->canRealign())->requiresConfirmation()->modalDescription('La realtà corrente diventa il nuovo piano base e tutte le decisioni attive della sorgente vengono rivalidate e riapplicate.')->form([
+                Select::make('item_id')->label('Sorgente da riallineare')->options(fn (): array => $this->realignmentItemOptions())->required(),
+                Textarea::make('reason')->label('Motivazione')->required(),
+                Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
+                Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+            ])->action(function (array $data): void {
+                app(RealignProposalItem::class)->execute($this->actor(), $this->proposal(), $this->realignmentItem((int) $data['item_id']), ProposalRealignmentChoice::Keep, $data['reason'], [], $data['operation_id'], (int) $data['proposal_revision']);
+                $this->refreshProposal('Decisioni riapplicate alla realtà corrente');
+            }),
+            Action::make('manualRealignment')->label('Rivedi manualmente')->visible(fn (): bool => $this->canRealign())->requiresConfirmation()->modalDescription('Selezionare le decisioni da mantenere. Le altre saranno ritirate senza riscriverne lo storico.')->form([
+                Select::make('item_id')->label('Sorgente da riallineare')->options(fn (): array => $this->realignmentItemOptions())->required()->live(),
+                CheckboxList::make('retained_action_ids')->label('Decisioni da mantenere')->options(fn (): array => $this->proposal()->actions()->get()->mapWithKeys(fn ($action): array => [$action->id => '#'.$action->sequence.' · '.$action->action_type->label()])->all()),
+                Textarea::make('reason')->label('Nota di revisione'),
+                Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
+                Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+            ])->action(function (array $data): void {
+                app(RealignProposalItem::class)->execute($this->actor(), $this->proposal(), $this->realignmentItem((int) $data['item_id']), ProposalRealignmentChoice::Manual, $data['reason'] ?? null, array_map('intval', $data['retained_action_ids'] ?? []), $data['operation_id'], (int) $data['proposal_revision']);
+                $this->refreshProposal('Revisione manuale confermata');
+            }),
+            Action::make('acknowledgeSource')->label('Prendi visione')->visible(fn (): bool => $this->canAcknowledge())->requiresConfirmation()->modalDescription('Conferma la realtà corrente della sorgente. La presa visione non crea una modifica economica e non tocca gli Effettivi; eventuali variazioni di Stima vanno preparate prima con un’azione tipizzata.')->form([
+                Select::make('item_id')->label('Nuova sorgente')->options(fn (): array => $this->acknowledgementItemOptions())->required(),
+                Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
+                Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+            ])->action(function (array $data): void {
+                $item = $this->proposal()->items()->where('readiness_state', 'to_review')->findOrFail((int) $data['item_id']);
+                app(AcknowledgeProposalSource::class)->execute($this->actor(), $this->proposal(), $item, $data['operation_id'], (int) $data['proposal_revision']);
+                $this->refreshProposal('Sorgente presa in visione');
             }),
             ActionGroup::make([
                 Action::make('includeClosedProject')->label('Seleziona Progetto da riaprire')->visible(fn (): bool => $this->canPlan())->form([Select::make('source_id')->label('Progetto Chiuso o Cancellato')->options(fn (): array => $this->eligibleProjectOptions())->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision)])->action(function (array $data): void {
@@ -143,7 +192,7 @@ class ViewProposal extends ViewRecord
                     $this->refreshProposal('Ripristino pianificato');
                 }),
                 Action::make('copyExpense')->label('Copia Spesa autonoma')->visible(fn (): bool => $this->canPlan())->form([
-                    Select::make('source_expense_id')->label('Spesa autonoma di altro Esercizio Aperto')->options(fn (): array => Expense::query()->where('company_id', $this->proposal()->company_id)->where('exercise_id', '<>', $this->proposal()->exercise_id)->whereNull('project_id')->whereNull('contract_id')->whereNull('reversed_at')->whereHas('exercise', fn ($query) => $query->where('status', 'open'))->orderBy('description')->pluck('description', 'id')->all())->required(),
+                    Select::make('source_expense_id')->label('Spesa autonoma di altro Esercizio')->options(fn (): array => Expense::query()->where('company_id', $this->proposal()->company_id)->where('exercise_id', '<>', $this->proposal()->exercise_id)->whereNull('project_id')->whereNull('contract_id')->whereNull('reversed_at')->orderBy('description')->pluck('description', 'id')->all())->required(),
                     Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
                 ])->action(function (array $data): void {
                     app(CopyExpenseIntoProposal::class)->execute($this->actor(), $this->proposal(), Expense::query()->findOrFail($data['source_expense_id']), $data['operation_id'], (int) $data['proposal_revision']);
@@ -283,6 +332,37 @@ class ViewProposal extends ViewRecord
         return $this->proposal()->status->value === 'draft' && auth()->user()?->can('update', $this->proposal()) === true;
     }
 
+    private function canRealign(): bool
+    {
+        return $this->canPlan() && $this->proposal()->items()->where('readiness_state', 'to_realign')->exists();
+    }
+
+    private function canAcknowledge(): bool
+    {
+        return $this->canPlan() && $this->proposal()->items()->where('readiness_state', 'to_review')->exists();
+    }
+
+    /** @return array<int, string> */
+    private function acknowledgementItemOptions(): array
+    {
+        return $this->proposal()->items()->where('readiness_state', 'to_review')->orderBy('id')->get()
+            ->mapWithKeys(fn (ProposalItem $item): array => [$item->id => $item->source_type->label().' · '.$item->proposal_item_id])
+            ->all();
+    }
+
+    /** @return array<int, string> */
+    private function realignmentItemOptions(): array
+    {
+        return $this->proposal()->items()->where('readiness_state', 'to_realign')->orderBy('id')->get()
+            ->mapWithKeys(fn (ProposalItem $item): array => [$item->id => $item->source_type->label().' · '.$item->proposal_item_id])
+            ->all();
+    }
+
+    private function realignmentItem(int $id): ProposalItem
+    {
+        return $this->proposal()->items()->where('readiness_state', 'to_realign')->findOrFail($id);
+    }
+
     private function canApprove(): bool
     {
         return $this->proposal()->status->value === 'draft' && auth()->user()?->can('approve', $this->proposal()) === true;
@@ -291,6 +371,13 @@ class ViewProposal extends ViewRecord
     private function approvalReady(): bool
     {
         return app(ProposalReadiness::class)->assessProposal($this->proposal())['ready'];
+    }
+
+    private function nextBudgetVersion(): int
+    {
+        $proposal = $this->proposal();
+
+        return $proposal->reference_budget_id === null ? 1 : $proposal->referenceBudget->version + 1;
     }
 
     private function approvalSummary(): string
@@ -323,7 +410,7 @@ class ViewProposal extends ViewRecord
 
     private function refreshProposal(string $title): void
     {
-        $this->record = $this->proposal()->refresh()->load(['exercise', 'creator', 'items', 'actions']);
+        $this->record = $this->proposal()->refresh()->load(['exercise', 'creator', 'referenceBudget', 'items', 'actions', 'actionHistory']);
         Notification::make()->title($title)->success()->send();
     }
 

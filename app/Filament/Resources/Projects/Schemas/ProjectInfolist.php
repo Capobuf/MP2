@@ -6,66 +6,62 @@ use App\Domain\Projects\ProjectAnnualSituation;
 use App\Domain\Projects\ProjectState;
 use App\Models\Project;
 use App\Models\ProjectTransition;
+use App\Support\ExerciseContext;
 use Carbon\CarbonImmutable;
-use Filament\Infolists\Components\RepeatableEntry;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Number;
 
 class ProjectInfolist
 {
     public static function configure(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('Identità e stato')->schema([
-                TextEntry::make('origin_key')->label('OriginKey')->state(fn (Project $record): string => $record->originKey()),
-                TextEntry::make('title')->label('Titolo'),
-                TextEntry::make('description')->label('Descrizione')->placeholder('—'),
-                TextEntry::make('notes')->label('Note')->placeholder('—'),
-                TextEntry::make('initial_state')->label('Stato iniziale')->formatStateUsing(fn ($state): string => $state->label())->badge(),
-                TextEntry::make('initial_effective_date')->label('Data efficacia iniziale')->date('d/m/Y'),
-                TextEntry::make('current_state')->label('Stato attuale')->state(fn (Project $record): string => self::currentState($record))->badge(),
-                TextEntry::make('archive_state')->label('Visibilità')->state(fn (Project $record): string => $record->isArchived() ? 'Archiviato' : 'Attivo')->badge(),
-            ])->columns(3),
-            Section::make('Situazioni annuali')->schema([
-                RepeatableEntry::make('annual_situations')
-                    ->label('Situazioni annuali')
-                    ->state(fn (Project $record): array => self::annualRows($record))
-                    ->schema([
-                        TextEntry::make('year')->label('Esercizio'),
-                        TextEntry::make('reference_date')->label('Data di riferimento')->date('d/m/Y'),
-                        TextEntry::make('reference_rule')->label('Regola di riferimento')->wrap(),
-                        TextEntry::make('state')->label('Stato')->badge(),
-                        TextEntry::make('cost_center')->label('Centro di Costo')->placeholder('Non classificato'),
-                        TextEntry::make('allocation')->label('Allocato')->money('EUR', locale: 'it'),
-                        TextEntry::make('actual')->label('Effettivo')->money('EUR', locale: 'it'),
-                        TextEntry::make('variance')->label('Scostamento')->money('EUR', locale: 'it'),
-                        TextEntry::make('future_transitions')->label('Transizioni pianificate dopo il 1° gennaio')->wrap(),
-                    ])->columns(3)
-                    ->columnSpanFull(),
-            ]),
+            View::make('filament.resources.projects.components.overview')
+                ->viewData(fn (Project $record): array => ['overview' => self::overview($record)])
+                ->columnSpanFull(),
         ]);
     }
 
-    private static function currentState(Project $project): string
+    /** @return array<string, mixed> */
+    private static function overview(Project $project): array
     {
         $today = CarbonImmutable::now($project->company->timezone)->toDateString();
+        $reference = CarbonImmutable::parse($today)->startOfDay();
+        $selectedExercise = app(ExerciseContext::class)->current($project->company);
+        $annualRows = self::annualRows($project, $reference, $selectedExercise?->id);
 
-        return $project->stateAtDate($today)?->label() ?? 'Assente alla data';
+        return [
+            'profile' => [
+                'origin_key' => $project->originKey(),
+                'description' => filled($project->description) ? $project->description : '—',
+                'notes' => filled($project->notes) ? $project->notes : '—',
+                'initial_state' => $project->initialState()->label(),
+                'initial_effective_date' => $project->initialEffectiveDate()->format('d/m/Y'),
+                'current_state' => $project->stateAtDate($today)?->label() ?? 'Assente alla data',
+                'visibility' => $project->isArchived() ? 'Archiviato' : 'Attivo',
+            ],
+            'selected' => collect($annualRows)->firstWhere('selected', true),
+            'annual' => $annualRows,
+        ];
     }
 
-    /** @return list<array<string, int|string|null>> */
-    private static function annualRows(Project $project): array
+    /** @return list<array<string, int|string|bool|null>> */
+    private static function annualRows(Project $project, CarbonImmutable $today, ?int $selectedExerciseId): array
     {
-        $today = CarbonImmutable::now($project->company->timezone)->startOfDay();
-
-        return array_map(function (ProjectAnnualSituation $situation) use ($project, $today): array {
+        return array_map(function (ProjectAnnualSituation $situation) use ($project, $today, $selectedExerciseId): array {
             $row = $situation->toArray();
+            $row['selected'] = $situation->exerciseId === $selectedExerciseId;
+            $row['reference_date'] = CarbonImmutable::parse($situation->referenceDate)->format('d/m/Y');
             $row['reference_rule'] = match (true) {
                 $situation->year < $today->year => '31 dicembre dell’Esercizio passato',
                 $situation->year === $today->year => 'Data odierna aziendale',
                 default => '1° gennaio dell’Esercizio futuro',
             };
+            $row['cost_center'] ??= 'Non classificato';
+            $row['allocation'] = self::money($situation->allocation);
+            $row['actual'] = self::money($situation->actual);
+            $row['variance'] = self::money($situation->variance);
             $row['future_transitions'] = $situation->year <= $today->year
                 ? 'Non applicabile'
                 : ($project->transitions
@@ -87,5 +83,10 @@ class ProjectInfolist
     private static function stateLabel(mixed $state): string
     {
         return ($state instanceof ProjectState ? $state : ProjectState::from((string) $state))->label();
+    }
+
+    private static function money(string $amount): string
+    {
+        return Number::currency((float) $amount, in: 'EUR', locale: 'it');
     }
 }

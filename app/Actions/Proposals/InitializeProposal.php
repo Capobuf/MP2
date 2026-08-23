@@ -3,6 +3,7 @@
 namespace App\Actions\Proposals;
 
 use App\Domain\Company\AuditEventType;
+use App\Domain\Proposals\ProposalPurpose;
 use App\Domain\Proposals\ProposalSourceCatalog;
 use App\Domain\Proposals\ProposalSourceSnapshot;
 use App\Models\AuditEvent;
@@ -35,7 +36,7 @@ final class InitializeProposal
 
             $receipt = AuditEvent::query()->where('operation_id', $operationId)->first();
             if ($receipt !== null) {
-                if ($receipt->eventType() !== AuditEventType::ProposalInitialized || $receipt->subject_type !== Proposal::class || $receipt->company_id !== $lockedCompany->id) {
+                if (! in_array($receipt->eventType(), [AuditEventType::ProposalInitialized, AuditEventType::ProposalRevisionInitialized], true) || $receipt->subject_type !== Proposal::class || $receipt->company_id !== $lockedCompany->id) {
                     throw ValidationException::withMessages(['operation_id' => 'Identificativo operazione già utilizzato.']);
                 }
 
@@ -49,15 +50,27 @@ final class InitializeProposal
             if (! $lockedExercise->isOpen()) {
                 throw ValidationException::withMessages(['exercise_id' => 'L’Esercizio deve essere Aperto.']);
             }
-            if (BudgetSnapshot::query()->where('exercise_id', $lockedExercise->id)->exists()) {
-                throw ValidationException::withMessages(['exercise_id' => 'L’Esercizio possiede già un Budget.']);
-            }
             if (Proposal::query()->where('company_id', $lockedCompany->id)->where('exercise_id', $lockedExercise->id)->where('status', 'draft')->exists()) {
                 throw ValidationException::withMessages(['exercise_id' => 'Esiste già una Proposta attiva per questo Esercizio.']);
             }
 
+            $referenceBudget = BudgetSnapshot::query()
+                ->where('company_id', $lockedCompany->id)
+                ->where('exercise_id', $lockedExercise->id)
+                ->orderByDesc('version')
+                ->lockForUpdate()
+                ->first();
+            $purpose = $referenceBudget === null ? ProposalPurpose::InitialBudget : ProposalPurpose::Revision;
+
             $sources = $this->catalog->forExercise($lockedExercise);
-            $proposal = Proposal::query()->create(['company_id' => $lockedCompany->id, 'exercise_id' => $lockedExercise->id, 'purpose' => 'initial_budget', 'status' => 'draft', 'created_by_id' => $actor->id]);
+            $proposal = Proposal::query()->create([
+                'company_id' => $lockedCompany->id,
+                'exercise_id' => $lockedExercise->id,
+                'reference_budget_id' => $referenceBudget?->id,
+                'purpose' => $purpose,
+                'status' => 'draft',
+                'created_by_id' => $actor->id,
+            ]);
 
             foreach ($sources as $source) {
                 $model = $source['model'];
@@ -78,9 +91,10 @@ final class InitializeProposal
 
             AuditEvent::query()->create([
                 'operation_id' => $operationId, 'company_id' => $lockedCompany->id, 'actor_id' => $actor->id,
-                'event_type' => AuditEventType::ProposalInitialized, 'subject_type' => Proposal::class, 'subject_id' => $proposal->id,
+                'event_type' => $purpose === ProposalPurpose::Revision ? AuditEventType::ProposalRevisionInitialized : AuditEventType::ProposalInitialized, 'subject_type' => Proposal::class, 'subject_id' => $proposal->id,
                 'affected_exercise_ids' => [$lockedExercise->id], 'effective_from' => now($lockedCompany->timezone)->toDateString(),
-                'previous_value' => null, 'new_value' => ['exercise_id' => $lockedExercise->id, 'exercise_revision' => $lockedExercise->revision, 'item_count' => $sources->count(), 'origin_keys' => $sources->pluck('origin_key')->values()->all()],
+                'previous_value' => $referenceBudget === null ? null : ['reference_budget_id' => $referenceBudget->id, 'reference_budget_version' => $referenceBudget->version],
+                'new_value' => ['exercise_id' => $lockedExercise->id, 'exercise_revision' => $lockedExercise->revision, 'purpose' => $purpose->value, 'reference_budget_id' => $referenceBudget?->id, 'item_count' => $sources->count(), 'origin_keys' => $sources->pluck('origin_key')->values()->all()],
                 'allocated_impact_by_exercise' => [(string) $lockedExercise->id => '0.00'], 'actual_impact_by_exercise' => [(string) $lockedExercise->id => '0.00'],
             ]);
 

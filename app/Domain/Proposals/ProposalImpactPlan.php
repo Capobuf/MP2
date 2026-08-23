@@ -27,7 +27,8 @@ final class ProposalImpactPlan
             $exercise = $exercises->get($exerciseId);
             if ($exercise === null) {
                 return [
-                    'exercise_id' => $exerciseId, 'year' => null, 'is_open' => false,
+                    'exercise_id' => $exerciseId, 'year' => null, 'is_open' => false, 'will_apply' => false,
+                    'historical_divergence' => false, 'divergence_reason' => null,
                     'allocation_before' => '0.00', 'allocation_after' => '0.00', 'allocation_delta' => '0.00',
                     'sources' => [], 'unchanged_budgets' => [], 'stale_proposals' => $stale, 'warnings' => [],
                     'blocks' => ['Esercizio interessato non disponibile nella stessa Azienda.'],
@@ -39,8 +40,11 @@ final class ProposalImpactPlan
                     || Decimal::compare($row['before'], $row['after']) !== 0
                     || $row['state_before'] !== $row['state_after']
                     || in_array($exerciseId, $row['explicit_exercise_ids'], true),
-            )->map(function (array $row): array {
+            );
+            $directTarget = $rows->contains(fn (array $row): bool => in_array($exerciseId, $row['direct_exercise_ids'], true));
+            $rows = $rows->map(function (array $row): array {
                 unset($row['explicit_exercise_ids']);
+                unset($row['direct_exercise_ids']);
 
                 return $row;
             })->values();
@@ -56,12 +60,18 @@ final class ProposalImpactPlan
             if ($stale !== []) {
                 $warnings[] = 'Altre Proposte in Bozza sulle sorgenti interessate diventeranno Da riallineare.';
             }
+            $historicalDivergence = ! $exercise->isOpen() && ($before !== $after || $rows->contains(fn (array $row): bool => $row['state_before'] !== $row['state_after']));
+            $divergenceReason = $historicalDivergence ? 'L’Esercizio è Chiuso: lo storico resta invariato e viene registrata la differenza prodotta dalle regole correnti.' : null;
+            if ($historicalDivergence) {
+                $warnings[] = $divergenceReason;
+            }
 
             return [
-                'exercise_id' => $exerciseId, 'year' => $exercise->year, 'is_open' => $exercise->isOpen(),
+                'exercise_id' => $exerciseId, 'year' => $exercise->year, 'is_open' => $exercise->isOpen(), 'will_apply' => $exercise->isOpen(),
+                'historical_divergence' => $historicalDivergence, 'divergence_reason' => $divergenceReason,
                 'allocation_before' => $before, 'allocation_after' => $after, 'allocation_delta' => Decimal::subtract($after, $before),
                 'sources' => $rows->all(), 'unchanged_budgets' => $budgets, 'stale_proposals' => $stale,
-                'warnings' => $warnings, 'blocks' => $exercise->isOpen() ? [] : ['L’Esercizio interessato non è Aperto.'],
+                'warnings' => $warnings, 'blocks' => ! $exercise->isOpen() && $directTarget ? ['Una decisione tenta di modificare direttamente un Esercizio Chiuso.'] : [],
             ];
         })->values()->all();
     }
@@ -148,6 +158,7 @@ final class ProposalImpactPlan
             'before' => $before, 'after' => $after, 'delta' => Decimal::subtract($after, $before),
             'state_before' => $stateBefore, 'state_after' => $stateAfter,
             'explicit_exercise_ids' => self::explicitExerciseIds($item),
+            'direct_exercise_ids' => self::directExerciseIds($item),
         ];
     }
 
@@ -236,6 +247,17 @@ final class ProposalImpactPlan
             foreach (array_keys($action->payload['exercise_impacts'] ?? []) as $exerciseId) {
                 $ids->push($exerciseId);
             }
+        }
+
+        return $ids->filter(fn (mixed $id): bool => is_numeric($id))->map(fn (mixed $id): int => (int) $id)->unique()->values()->all();
+    }
+
+    /** @return list<int> */
+    private static function directExerciseIds(ProposalItem $item): array
+    {
+        $ids = collect([data_get($item->baseline, 'plan_baseline.exercise_id'), $item->result['exercise_id'] ?? null]);
+        foreach ($item->actions as $action) {
+            $ids->push($action->payload['exercise_id'] ?? $action->payload['target_exercise_id'] ?? null);
         }
 
         return $ids->filter(fn (mixed $id): bool => is_numeric($id))->map(fn (mixed $id): int => (int) $id)->unique()->values()->all();

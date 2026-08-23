@@ -7,17 +7,19 @@ use App\Domain\Proposals\BudgetSnapshotPayload;
 use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalImpactPlan;
 use App\Domain\Proposals\ProposalPlanData;
+use App\Domain\Proposals\ProposalPurpose;
 use App\Models\Attachment;
 use App\Models\AuditEvent;
 use App\Models\BudgetSnapshot;
 use App\Models\Contract;
+use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
-final class MaterializeBudgetV1
+final class MaterializeBudgetSnapshot
 {
     /**
      * @param  array<string, Expense|Project|Contract>  $identities
@@ -37,11 +39,17 @@ final class MaterializeBudgetV1
         foreach ($staleProposals as $stale) {
             $eventSequences['stale:'.$stale['proposal_id']] = count($eventSequences);
         }
+        $divergences = collect($impacts)->where('historical_divergence', true)->values();
+        foreach ($divergences as $divergence) {
+            $eventSequences['divergence:'.$divergence['exercise_id']] = count($eventSequences);
+        }
         $eventSequences[-1] = count($eventSequences);
         $eventSequences[-2] = count($eventSequences);
         $payload = BudgetSnapshotPayload::build($proposal, $identities, $eventSequences);
         $approvalEvidence = ['external_subject' => $evidence['external_subject'] ?? null, 'external_venue' => $evidence['external_venue'] ?? null, 'reason' => $evidence['reason'] ?? null, 'attachment_ids' => collect($attachmentIds)->map(fn (mixed $id): int => (int) $id)->unique()->sort()->values()->all()];
-        $budget = BudgetSnapshot::query()->create(['company_id' => $proposal->company_id, 'exercise_id' => $proposal->exercise_id, 'proposal_id' => $proposal->id, 'version' => 1, 'purpose' => 'initial_budget', 'approved_at' => now(), 'approved_by_id' => $actor->id, 'previous_budget_id' => null, 'total_approved_allocation' => $payload['total'], 'affected_exercises' => $impacts, 'operation_id' => $operationId]);
+        $previousBudget = BudgetSnapshot::query()->where('exercise_id', $proposal->exercise_id)->latest('version')->first();
+        $version = $previousBudget === null ? 1 : $previousBudget->version + 1;
+        $budget = BudgetSnapshot::query()->create(['company_id' => $proposal->company_id, 'exercise_id' => $proposal->exercise_id, 'proposal_id' => $proposal->id, 'version' => $version, 'purpose' => $proposal->purpose, 'approved_at' => now(), 'approved_by_id' => $actor->id, 'previous_budget_id' => $previousBudget?->id, 'total_approved_allocation' => $payload['total'], 'affected_exercises' => $impacts, 'operation_id' => $operationId]);
         self::checkpoint($checkpoint, 'after_budget_header');
 
         foreach ($proposal->actions->sortBy('sequence') as $action) {
@@ -79,20 +87,40 @@ final class MaterializeBudgetV1
                 'reason' => 'La sorgente viva è cambiata durante l’approvazione di un’altra Proposta.', 'reference_type' => BudgetSnapshot::class, 'reference_id' => $budget->id,
             ]);
         }
+        foreach ($divergences as $divergence) {
+            AuditEvent::query()->create([
+                'operation_id' => $operationId,
+                'event_sequence' => $sequence++,
+                'company_id' => $proposal->company_id,
+                'actor_id' => $actor->id,
+                'event_type' => AuditEventType::HistoricalDivergenceRecorded,
+                'subject_type' => Exercise::class,
+                'subject_id' => $divergence['exercise_id'],
+                'affected_exercise_ids' => [$divergence['exercise_id']],
+                'effective_from' => now($proposal->company->timezone)->toDateString(),
+                'previous_value' => ['allocation' => $divergence['allocation_before'], 'sources' => $divergence['sources']],
+                'new_value' => ['allocation_if_recalculated' => $divergence['allocation_after'], 'applied' => false, 'budget_unchanged' => true, 'reason' => $divergence['divergence_reason']],
+                'allocated_impact_by_exercise' => [(string) $divergence['exercise_id'] => $divergence['allocation_delta']],
+                'actual_impact_by_exercise' => [(string) $divergence['exercise_id'] => '0.00'],
+                'reason' => $divergence['divergence_reason'],
+                'reference_type' => BudgetSnapshot::class,
+                'reference_id' => $budget->id,
+            ]);
+        }
         $affectedExerciseIds = collect($impacts)->pluck('exercise_id')->all();
         $zeroActualImpact = collect($affectedExerciseIds)->mapWithKeys(fn (int $id): array => [(string) $id => '0.00'])->all();
-        AuditEvent::query()->create(['operation_id' => $operationId, 'event_sequence' => $sequence++, 'company_id' => $proposal->company_id, 'actor_id' => $actor->id, 'event_type' => AuditEventType::ProposalApproved, 'subject_type' => Proposal::class, 'subject_id' => $proposal->id, 'affected_exercise_ids' => $affectedExerciseIds, 'effective_from' => now($proposal->company->timezone)->toDateString(), 'previous_value' => ['status' => 'draft'], 'new_value' => ['status' => 'approved', 'budget_id' => $budget->id, 'version' => 1, 'approval_evidence' => $approvalEvidence, 'applied_impacts' => $impacts], 'allocated_impact_by_exercise' => collect($impacts)->mapWithKeys(fn (array $impact): array => [(string) $impact['exercise_id'] => $impact['allocation_delta']])->all(), 'actual_impact_by_exercise' => $zeroActualImpact, 'reason' => $evidence['reason'] ?? null, 'reference_type' => BudgetSnapshot::class, 'reference_id' => $budget->id]);
+        AuditEvent::query()->create(['operation_id' => $operationId, 'event_sequence' => $sequence++, 'company_id' => $proposal->company_id, 'actor_id' => $actor->id, 'event_type' => AuditEventType::ProposalApproved, 'subject_type' => Proposal::class, 'subject_id' => $proposal->id, 'affected_exercise_ids' => $affectedExerciseIds, 'effective_from' => now($proposal->company->timezone)->toDateString(), 'previous_value' => ['status' => 'draft'], 'new_value' => ['status' => 'approved', 'budget_id' => $budget->id, 'version' => $version, 'approval_evidence' => $approvalEvidence, 'applied_impacts' => $impacts], 'allocated_impact_by_exercise' => collect($impacts)->mapWithKeys(fn (array $impact): array => [(string) $impact['exercise_id'] => $impact['allocation_delta']])->all(), 'actual_impact_by_exercise' => $zeroActualImpact, 'reason' => $evidence['reason'] ?? null, 'reference_type' => BudgetSnapshot::class, 'reference_id' => $budget->id]);
         AuditEvent::query()->create([
             'operation_id' => $operationId,
             'event_sequence' => $sequence,
             'company_id' => $proposal->company_id,
             'actor_id' => $actor->id,
-            'event_type' => AuditEventType::BudgetCreated,
+            'event_type' => $proposal->purpose === ProposalPurpose::Revision ? AuditEventType::BudgetRevisionCreated : AuditEventType::BudgetCreated,
             'subject_type' => BudgetSnapshot::class,
             'subject_id' => $budget->id,
             'affected_exercise_ids' => collect($impacts)->pluck('exercise_id')->all(),
             'effective_from' => now($proposal->company->timezone)->toDateString(),
-            'new_value' => ['proposal_id' => $proposal->id, 'budget_id' => $budget->id, 'version' => 1, 'total_approved_allocation' => $payload['total'], 'approval_evidence' => $approvalEvidence, 'affected_exercises' => $impacts],
+            'new_value' => ['proposal_id' => $proposal->id, 'budget_id' => $budget->id, 'version' => $version, 'previous_budget_id' => $previousBudget?->id, 'total_approved_allocation' => $payload['total'], 'approval_evidence' => $approvalEvidence, 'affected_exercises' => $impacts],
             'allocated_impact_by_exercise' => collect($impacts)->mapWithKeys(fn (array $impact): array => [(string) $impact['exercise_id'] => $impact['allocation_delta']])->all(),
             'actual_impact_by_exercise' => $zeroActualImpact,
         ]);

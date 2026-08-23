@@ -10,7 +10,7 @@ final class ProposalActionPayload
     /** @var array<string, list<string>> */
     private const ALLOWED = [
         'create_expense' => ['description', 'notes', 'exercise_id', 'supplier_id', 'cost_center_id', 'project_id', 'project_item_id', 'estimate_lines'],
-        'copy_expense' => ['source_expense_id', 'target_exercise_id', 'description', 'notes', 'supplier_id', 'cost_center_id', 'estimate_lines'],
+        'copy_expense' => ['source_expense_id', 'source_revision', 'source_fingerprint', 'target_exercise_id', 'description', 'notes', 'supplier_id', 'cost_center_id', 'estimate_lines'],
         'set_expense_estimates' => ['estimate_lines'], 'set_expense_owner' => ['exercise_id', 'project_id', 'project_item_id'],
         'set_expense_supplier' => ['supplier_id'], 'set_expense_cost_center' => ['cost_center_id'], 'reverse_expense' => ['reason'], 'restore_expense' => ['reason'],
         'create_project' => ['title', 'description', 'notes', 'initial_state', 'initial_effective_date', 'exercise_id', 'cost_center_id'],
@@ -40,7 +40,7 @@ final class ProposalActionPayload
 
         match ($type) {
             ProposalActionType::CreateExpense => self::require($payload, ['description', 'exercise_id', 'estimate_lines']),
-            ProposalActionType::CopyExpense => self::require($payload, ['source_expense_id', 'target_exercise_id', 'description', 'estimate_lines']),
+            ProposalActionType::CopyExpense => self::require($payload, ['source_expense_id', 'source_revision', 'source_fingerprint', 'target_exercise_id', 'description', 'estimate_lines']),
             ProposalActionType::SetExpenseEstimates => self::require($payload, ['estimate_lines']),
             ProposalActionType::CreateProject => self::require($payload, ['title', 'initial_state', 'initial_effective_date', 'exercise_id']),
             ProposalActionType::PlanProjectTransition => self::require($payload, ['from_state', 'to_state', 'effective_date']),

@@ -14,6 +14,7 @@ class ProposalsTable
         return $table->defaultSort('updated_at', 'desc')->columns([
             TextColumn::make('exercise.year')->label('Esercizio')->sortable(),
             TextColumn::make('purpose')->label('Finalità')->formatStateUsing(fn ($state): string => $state->label()),
+            TextColumn::make('referenceBudget.version')->label('Riferimento')->formatStateUsing(fn (mixed $state): string => $state === null ? '—' : 'v'.$state),
             TextColumn::make('status')->label('Stato')->formatStateUsing(fn ($state): string => $state->label())->badge(),
             TextColumn::make('items_count')->label('Elementi')->counts('items'),
             TextColumn::make('planned_allocation')->label('Allocato pianificato')->state(fn (Proposal $record): string => $record->plannedAllocation())->money('EUR', locale: 'it'),

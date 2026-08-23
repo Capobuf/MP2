@@ -24,7 +24,6 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
 
@@ -49,7 +48,7 @@ it('does not erase a Project allocation outside the Proposal main Exercise', fun
         ->and($impacts[0]['allocation_after'])->toBe('0.00');
 });
 
-it('enumerates exact multi-Exercise Contract impacts unchanged Budgets stale Drafts and closed blocks', function (): void {
+it('enumerates exact multi-Exercise Contract impacts unchanged Budgets stale Drafts and closed divergences', function (): void {
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
     $exercise2026 = Exercise::factory()->for($company)->create(['year' => 2026]);
     $exercise2027 = Exercise::factory()->for($company)->create(['year' => 2027]);
@@ -91,8 +90,9 @@ it('enumerates exact multi-Exercise Contract impacts unchanged Budgets stale Dra
     $review = app(ProposalReadiness::class)->assessProposal($proposal->refresh());
 
     expect($review['ready'])->toBeFalse()
-        ->and(collect($review['blocks'])->pluck('code')->all())->toContain('exercise_closed')
-        ->and(fn () => app(ApproveProposal::class)->execute($actor, $proposal->refresh(), (string) Str::uuid()))->toThrow(ValidationException::class);
+        ->and(collect($review['impacts'])->firstWhere('exercise_id', $exercise2027->id)['historical_divergence'])->toBeTrue()
+        ->and(collect($review['blocks'])->pluck('code')->all())->toContain('stale_concurrent_action')
+        ->not->toContain('closed_exercise_action');
 });
 
 it('applies the approved Contract allocation to every affected open Exercise', function (): void {

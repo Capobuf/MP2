@@ -80,7 +80,7 @@ final class PlanContract
                 } $previous = $lockedItem->result;
                 $lockedItem->update(['result' => ContractPlan::apply($lockedItem, $type, $validated)]);
             }
-            $sequence = ((int) $locked->actions()->max('sequence')) + 1;
+            $sequence = ((int) $locked->actionHistory()->max('sequence')) + 1;
             $action = $locked->actions()->create(['company_id' => $locked->company_id, 'proposal_item_id' => $lockedItem->id, 'sequence' => $sequence, 'action_type' => $type, 'payload_version' => 1, 'payload' => $validated, 'reason' => $reason, 'created_by_id' => $actor->id, 'operation_id' => $operationId]);
             $locked->increment('revision');
             $impacts = ProposalImpactPlan::build($locked->fresh(['company', 'exercise', 'items.actions', 'items.expense', 'items.project', 'items.contract']));

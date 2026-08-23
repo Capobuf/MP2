@@ -114,6 +114,8 @@ it('toggles the sibling expense detail from the row without exposing a detail bu
 
     Livewire::test(ViewExpense::class, ['record' => $expense->getRouteKey()])
         ->assertSeeLivewire(ExpenseDetail::class)
+        ->assertSeeHtml('class="mp2-object-header')
+        ->assertSeeHtml('data-object-icon="expense"')
         ->assertDontSee('Panoramica')
         ->assertDontSee('Timeline della Spesa');
 });

@@ -68,11 +68,8 @@ final class ApplyContractPlan
         if (($result['planned_conditions'] ?? []) !== [] || ($result['planned_lifecycle'] ?? []) !== [] || ($result['renewal_configurations'] ?? []) !== []) {
             $exerciseIds->push(...Exercise::query()->where('company_id', $item->company_id)->open()->pluck('id')->map(fn (mixed $id): int => (int) $id)->all());
         }
-        $exercises = Exercise::query()->where('company_id', $item->company_id)->whereIn('id', $exerciseIds->unique())->orderBy('id')->get();
+        $exercises = Exercise::query()->where('company_id', $item->company_id)->whereIn('id', $exerciseIds->unique())->open()->orderBy('id')->get();
         foreach ($exercises as $exercise) {
-            if (! $exercise->isOpen()) {
-                throw ValidationException::withMessages(['exercise' => 'Ogni Esercizio interessato dal Contratto deve essere Aperto.']);
-            }
             $allocation = ContractAnnualAllocation::forYear($contract->conditions, $exercise->year, fn (string $date) => ContractStateTimeline::stateAtDate($contract->contractualStartDate()->toDateString(), $contract->lifecycleFacts, $date, $contract->renewalConfigurations));
             $systemExpense = Expense::query()->where('contract_id', $contract->id)->where('exercise_id', $exercise->id)->where('origin', 'system')->first();
             if ($systemExpense === null && $allocation->amount !== '0.00') {

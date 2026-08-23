@@ -238,6 +238,9 @@ it('lists views and resolves Projects only inside the current tenant', function 
 
     Livewire::test(ViewProject::class, ['record' => $projectA->getRouteKey()])
         ->assertSuccessful()
+        ->assertSeeHtml('class="mp2-object-header')
+        ->assertSeeHtml('data-object-icon="project"')
+        ->assertSee('Situazione Esercizio corrente')
         ->assertSee('project:'.$projectA->id)
         ->assertSee('Assente alla data')
         ->assertSee('31/12/2025')

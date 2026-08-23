@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['company_id', 'year', 'status', 'revision'])]
 /** @property ExerciseStatus $status */
@@ -60,6 +61,12 @@ class Exercise extends Model
     public function budgets(): HasMany
     {
         return $this->hasMany(BudgetSnapshot::class);
+    }
+
+    /** @return HasOne<BudgetSnapshot, $this> */
+    public function latestBudget(): HasOne
+    {
+        return $this->hasOne(BudgetSnapshot::class)->ofMany('version', 'max');
     }
 
     /** @param Builder<self> $query */

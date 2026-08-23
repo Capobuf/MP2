@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property int $company_id
  * @property int $exercise_id
  */
-#[Fillable(['company_id', 'exercise_id', 'purpose', 'status', 'created_by_id', 'approved_by_id', 'approved_at', 'approval_operation_id', 'revision'])]
+#[Fillable(['company_id', 'exercise_id', 'reference_budget_id', 'purpose', 'status', 'created_by_id', 'approved_by_id', 'discarded_by_id', 'approved_at', 'discarded_at', 'discard_reason', 'approval_operation_id', 'discard_operation_id', 'revision'])]
 class Proposal extends Model
 {
     /** @use HasFactory<ProposalFactory> */
@@ -59,6 +59,18 @@ class Proposal extends Model
         return $this->belongsTo(User::class, 'approved_by_id');
     }
 
+    /** @return BelongsTo<User, $this> */
+    public function discarder(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'discarded_by_id');
+    }
+
+    /** @return BelongsTo<BudgetSnapshot, $this> */
+    public function referenceBudget(): BelongsTo
+    {
+        return $this->belongsTo(BudgetSnapshot::class, 'reference_budget_id');
+    }
+
     /** @return HasMany<ProposalItem, $this> */
     public function items(): HasMany
     {
@@ -67,6 +79,12 @@ class Proposal extends Model
 
     /** @return HasMany<ProposalAction, $this> */
     public function actions(): HasMany
+    {
+        return $this->hasMany(ProposalAction::class)->where('status', 'active')->orderBy('sequence');
+    }
+
+    /** @return HasMany<ProposalAction, $this> */
+    public function actionHistory(): HasMany
     {
         return $this->hasMany(ProposalAction::class)->orderBy('sequence');
     }
@@ -100,6 +118,6 @@ class Proposal extends Model
 
     protected function casts(): array
     {
-        return ['purpose' => ProposalPurpose::class, 'status' => ProposalStatus::class, 'approved_at' => 'datetime', 'revision' => 'integer'];
+        return ['purpose' => ProposalPurpose::class, 'status' => ProposalStatus::class, 'approved_at' => 'datetime', 'discarded_at' => 'datetime', 'revision' => 'integer'];
     }
 }

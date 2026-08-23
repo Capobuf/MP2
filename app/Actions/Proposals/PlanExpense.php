@@ -97,7 +97,7 @@ final class PlanExpense
      */
     private function append(User $actor, Proposal $proposal, ProposalItem $item, ProposalActionType $type, array $payload, ?string $reason, string $operationId, array $previous): ProposalAction
     {
-        $sequence = ((int) $proposal->actions()->max('sequence')) + 1;
+        $sequence = ((int) $proposal->actionHistory()->max('sequence')) + 1;
         $action = $proposal->actions()->create(['company_id' => $proposal->company_id, 'proposal_item_id' => $item->id, 'sequence' => $sequence, 'action_type' => $type, 'payload_version' => 1, 'payload' => $payload, 'reason' => $reason, 'created_by_id' => $actor->id, 'operation_id' => $operationId]);
         $proposal->increment('revision');
         $impacts = ProposalImpactPlan::build($proposal->fresh(['company', 'exercise', 'items.actions', 'items.expense', 'items.project', 'items.contract']));
