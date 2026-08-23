@@ -104,7 +104,6 @@ class ProcessContractRenewals
             }
 
             $exerciseIds = $openExercises->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
-            $changed = false;
             while ($locked->nextExpiryDate() !== null && ! $locked->nextExpiryDate()->startOfDay()->greaterThan($cutoff)) {
                 $expiry = $locked->nextExpiryDate()->toDateString();
                 $configuration = ContractRenewalSchedule::configurationAtDate($configurations, $expiry);
@@ -133,7 +132,6 @@ class ProcessContractRenewals
                         'state_change_date' => CarbonImmutable::parse($expiry)->addDay()->toDateString(),
                         'cutoff_date' => $cutoff->toDateString(),
                     ]);
-                    $changed = true;
                     break;
                 }
 
@@ -162,11 +160,6 @@ class ProcessContractRenewals
                     'renewal_without_condition' => ContractRenewalSchedule::hasRenewalWithoutCondition($locked->conditions, $expiry),
                     'cutoff_date' => $cutoff->toDateString(),
                 ]);
-                $changed = true;
-            }
-
-            if (! $changed) {
-                return false;
             }
 
             $locked->increment('revision');
