@@ -1,7 +1,9 @@
 name: S9 Static Fix
 
 on:
-  pull_request:
+  push:
+    branches:
+      - spec/s9-closing
 
 permissions:
   contents: write
@@ -11,10 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Checkout PR head
+      - name: Checkout branch
         uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Apply deterministic PHPStan fixes
         run: |
@@ -79,7 +79,7 @@ jobs:
                 ));
                 $destinationTotal = Decimal::sum(collect($decision['destination_plans'] ?? [])->flatMap(
                     fn (mixed $plan): array => is_array($plan) && is_array($plan['estimate_lines'] ?? null) ? $plan['estimate_lines'] : [],
-                )->map(fn (mixed $line): string => is_array($line) ? ($this->amount($line['amount'] ?? null) ?? '0.00')));
+                )->map(fn (mixed $line): string => is_array($line) ? ($this->amount($line['amount'] ?? null) ?? '0.00') : '0.00'));
 ''', '''                $sourceAmounts = [];
                 foreach (($decision['source_estimate_reductions'] ?? []) as $item) {
                     if (is_array($item)) {
@@ -173,4 +173,4 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "fix: resolve S9 static analysis findings"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          git push origin HEAD:spec/s9-closing
