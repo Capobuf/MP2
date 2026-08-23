@@ -1,0 +1,42 @@
+name: S9 Final Format
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+
+      - name: Install locked dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Format Closing Snapshot payload
+        run: vendor/bin/pint app/Domain/Closing/ClosingSnapshotPayload.php
+
+      - name: Commit formatting if needed
+        run: |
+          git diff --check
+          git add app/Domain/Closing/ClosingSnapshotPayload.php
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "style: format Closing Snapshot payload"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
