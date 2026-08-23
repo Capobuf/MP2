@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Domain\Closing\ClosingOverspendNotes;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Validation\ValidationException;
 
 #[Fillable([
     'company_id',
@@ -30,6 +32,18 @@ class ClosingSnapshot extends Model
 {
     protected static function booted(): void
     {
+        static::creating(function (self $snapshot): void {
+            $exercise = Exercise::query()->find($snapshot->exercise_id);
+            $company = Company::query()->find($snapshot->company_id);
+            if ($exercise !== null && $company !== null) {
+                $missing = ClosingOverspendNotes::missingRequired($company, $exercise);
+                if ($missing !== []) {
+                    throw ValidationException::withMessages([
+                        'closing' => 'Manca una Nota di sovraspesa che era obbligatoria al momento dell’operazione.',
+                    ]);
+                }
+            }
+        });
         static::updating(fn (): never => throw new \LogicException('Closing snapshots are immutable.'));
         static::deleting(fn (): never => throw new \LogicException('Closing snapshots cannot be deleted.'));
     }
