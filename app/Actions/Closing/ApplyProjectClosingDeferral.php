@@ -21,7 +21,7 @@ final class ApplyProjectClosingDeferral
     ) {}
 
     /**
-     * @param array<string, mixed> $decision
+     * @param  array<string, mixed>  $decision
      * @return array{changed: bool, deferral: ProjectDeferral|null, previous: array<string, mixed>, current: array<string, mixed>}
      */
     public function executeWithinTransaction(
@@ -157,7 +157,7 @@ final class ApplyProjectClosingDeferral
     }
 
     /** @param array<string, mixed> $previous
-     * @param array<string, mixed> $current
+     * @param  array<string, mixed>  $current
      */
     private function sourceDelta(array $previous, array $current): string
     {
@@ -168,7 +168,7 @@ final class ApplyProjectClosingDeferral
     }
 
     /** @param array<string, mixed> $previous
-     * @param array<string, mixed> $current
+     * @param  array<string, mixed>  $current
      */
     private function destinationDelta(array $previous, array $current): string
     {
