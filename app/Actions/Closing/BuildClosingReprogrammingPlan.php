@@ -16,7 +16,6 @@ final class BuildClosingReprogrammingPlan
     public function __construct(private readonly PlanProjectDeferral $planner) {}
 
     /**
-     * @param  mixed  $requestedReductions
      * @return array{source_estimate_reductions: list<array<string, mixed>>, destination_plans: list<array<string, mixed>>, reprogrammed_amount: string}
      */
     public function build(Project $project, Exercise $source, Exercise $destination, mixed $requestedReductions): array
