@@ -56,7 +56,7 @@ class RecalculateContractEstimates
         string $operationId,
         int &$sequence,
     ): array {
-        $contract->load(['conditions', 'lifecycleFacts']);
+        $contract->load(['conditions', 'lifecycleFacts', 'renewalConfigurations']);
         $impacts = [];
 
         foreach ($exercises as $exercise) {
@@ -71,6 +71,7 @@ class RecalculateContractEstimates
                     $contract->contractualStartDate()->toDateString(),
                     $contract->lifecycleFacts,
                     $date,
+                    $contract->renewalConfigurations,
                 ),
             );
             $expense = Expense::query()
