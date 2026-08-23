@@ -88,6 +88,12 @@ class Company extends Model implements HasName
         return $this->hasMany(BudgetSnapshot::class);
     }
 
+    /** @return HasMany<ClosingSnapshot, $this> */
+    public function closingSnapshots(): HasMany
+    {
+        return $this->hasMany(ClosingSnapshot::class);
+    }
+
     public function getFilamentName(): string
     {
         return $this->name;
