@@ -15,7 +15,10 @@ use Illuminate\Validation\ValidationException;
 
 final class ApplyProjectClosingDeferral
 {
-    public function __construct(private readonly ApplyProjectDeferral $apply) {}
+    public function __construct(
+        private readonly ApplyProjectDeferral $apply,
+        private readonly BuildClosingReprogrammingPlan $reprogramming,
+    ) {}
 
     /**
      * @param array<string, mixed> $decision
@@ -58,14 +61,34 @@ final class ApplyProjectClosingDeferral
         }
 
         $rawDecision = is_array($decision['decision_payload'] ?? null) ? $decision['decision_payload'] : [];
+        $sourceReductions = [];
+        $destinationPlans = [];
+        $reprogrammedAmount = '0.00';
+        if ($mode === ProjectDeferralMode::Reprogramming) {
+            $plan = $this->reprogramming->build(
+                $project,
+                $source,
+                $destination,
+                $rawDecision['source_estimate_reductions'] ?? null,
+            );
+            $sourceReductions = $plan['source_estimate_reductions'];
+            $destinationPlans = $plan['destination_plans'];
+            $reprogrammedAmount = $plan['reprogrammed_amount'];
+            if (Decimal::compare($reprogrammedAmount, (string) $decision['reprogrammed_amount']) !== 0) {
+                throw ValidationException::withMessages([
+                    'reprogrammed_amount' => 'La Riprogrammazione è cambiata rispetto al riepilogo confermato.',
+                ]);
+            }
+        }
+
         $payload = [
             'source_exercise_id' => $source->id,
             'destination_exercise_id' => $destination->id,
             'mode' => $mode->value,
             'carryover_amount' => $mode === ProjectDeferralMode::Carryover ? (string) $decision['carryover_amount'] : '0.00',
-            'reprogrammed_amount' => $mode === ProjectDeferralMode::Reprogramming ? (string) $decision['reprogrammed_amount'] : '0.00',
-            'source_estimate_reductions' => $rawDecision['source_estimate_reductions'] ?? [],
-            'destination_plans' => $rawDecision['destination_plans'] ?? [],
+            'reprogrammed_amount' => $reprogrammedAmount,
+            'source_estimate_reductions' => $sourceReductions,
+            'destination_plans' => $destinationPlans,
         ];
         $resolved = $this->apply->executeDirect($project, $source, $destination, $payload, $operationId);
         $deferral = ProjectDeferral::query()
