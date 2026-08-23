@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseLineType;
+use App\Domain\Projects\ProjectDeferralMode;
 use App\Domain\Projects\ProjectState;
 use App\Domain\Projects\ProjectStateTimeline;
 use Database\Factories\ProjectFactory;
@@ -76,6 +77,12 @@ class Project extends Model
     public function proposalItems(): HasMany
     {
         return $this->hasMany(ProposalItem::class);
+    }
+
+    /** @return HasMany<ProjectDeferral, $this> */
+    public function deferrals(): HasMany
+    {
+        return $this->hasMany(ProjectDeferral::class);
     }
 
     /** @param Builder<self> $query */
@@ -177,6 +184,24 @@ class Project extends Model
                 $totals[$exerciseId]['actual'] = $amount;
                 $totals[$exerciseId]['has_actuals'] = (bool) $row->getAttribute('has_actuals');
             }
+        }
+
+        $carryovers = $this->relationLoaded('deferrals')
+            ? $this->deferrals->where('mode', ProjectDeferralMode::Carryover)
+                ->groupBy('destination_exercise_id')
+                ->map(fn ($rows): string => Decimal::sum($rows->pluck('carryover_amount')))
+            : ProjectDeferral::query()
+                ->where('project_id', $this->id)
+                ->where('mode', ProjectDeferralMode::Carryover->value)
+                ->selectRaw('destination_exercise_id, SUM(carryover_amount) AS total_amount')
+                ->groupBy('destination_exercise_id')
+                ->pluck('total_amount', 'destination_exercise_id')
+                ->map(fn (mixed $amount): string => Decimal::money((string) $amount));
+
+        foreach ($carryovers as $exerciseId => $amount) {
+            $exerciseId = (int) $exerciseId;
+            $totals[$exerciseId] ??= ['allocation' => '0.00', 'actual' => '0.00', 'has_actuals' => false];
+            $totals[$exerciseId]['allocation'] = Decimal::add($totals[$exerciseId]['allocation'], $amount);
         }
 
         return $totals;

@@ -21,6 +21,7 @@ class ExpenseLineFactory extends Factory
             'unit_of_measure' => null,
             'note' => null,
             'annulled_at' => null,
+            'revision' => 0,
         ];
     }
 

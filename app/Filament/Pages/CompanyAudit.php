@@ -6,6 +6,7 @@ use App\Domain\Company\AuditEventType;
 use App\Domain\Company\Capability;
 use App\Domain\Company\ClosingUnclassifiedPolicy;
 use App\Domain\Company\Setting;
+use App\Domain\Projects\ProjectDeferralMode;
 use App\Domain\Projects\ProjectState;
 use App\Models\Attachment;
 use App\Models\AuditEvent;
@@ -21,6 +22,7 @@ use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\Project;
 use App\Models\ProjectContractLink;
+use App\Models\ProjectDeferral;
 use App\Models\ProjectExerciseClassification;
 use App\Models\ProjectTransition;
 use App\Models\Proposal;
@@ -266,6 +268,12 @@ class CompanyAudit extends Page implements HasTable
         }
 
         if (is_array($value)) {
+            if ($event->eventType() === AuditEventType::ProjectDeferralChanged) {
+                $deferral = self::formatDeferralValue($value);
+                if ($deferral !== null) {
+                    return $deferral;
+                }
+            }
             $formatted = self::formatMasterDataValue($event, $value);
 
             if ($formatted !== null) {
@@ -292,6 +300,7 @@ class CompanyAudit extends Page implements HasTable
             Expense::class => 'Spesa',
             ExpenseLine::class => 'Riga',
             Project::class => 'Progetto',
+            ProjectDeferral::class => 'Rinvio Progetto',
             ProjectTransition::class => 'Transizione Progetto',
             ProjectExerciseClassification::class => 'Classificazione Progetto',
             Contract::class => 'Contratto',
@@ -454,6 +463,24 @@ class CompanyAudit extends Page implements HasTable
         }
 
         return implode(' · ', $parts);
+    }
+
+    /** @param array<string, mixed> $value */
+    private static function formatDeferralValue(array $value): ?string
+    {
+        $state = $value['resolved_project_deferral'] ?? $value['action_payload'] ?? $value;
+        if (! is_array($state) || ! isset($state['mode'])) {
+            return null;
+        }
+        $mode = ProjectDeferralMode::tryFrom((string) $state['mode'])?->label() ?? (string) $state['mode'];
+        $source = $state['source_exercise_id'] ?? $value['source_exercise_id'] ?? '—';
+        $destination = $state['destination_exercise_id'] ?? $value['destination_exercise_id'] ?? '—';
+
+        return 'Modalità: '.$mode
+            .' · Riporto: € '.($state['carryover_amount'] ?? '0.00')
+            .' · Riprogrammato: € '.($state['reprogrammed_amount'] ?? '0.00')
+            .' · Esercizio origine: '.$source
+            .' · Esercizio destinazione: '.$destination;
     }
 
     private function company(): Company

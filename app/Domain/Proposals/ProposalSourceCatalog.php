@@ -3,6 +3,7 @@
 namespace App\Domain\Proposals;
 
 use App\Domain\Contracts\ContractState;
+use App\Domain\Expenses\Decimal;
 use App\Domain\Projects\ProjectState;
 use App\Models\BudgetSourceRow;
 use App\Models\Contract;
@@ -31,7 +32,7 @@ final class ProposalSourceCatalog
             })->with('lines')->orderBy('id')->get()
             ->each(fn (Expense $expense) => $sources->push(['source_type' => ProposalSourceType::Expense, 'origin_key' => $expense->originKey(), 'model' => $expense, 'read_only' => $expense->isReversed()]));
 
-        Project::query()->where('company_id', $exercise->company_id)->with(['transitions', 'expenses.lines'])->orderBy('id')->get()
+        Project::query()->where('company_id', $exercise->company_id)->with(['transitions', 'expenses.lines', 'deferrals'])->orderBy('id')->get()
             ->filter(fn (Project $project): bool => $this->projectIncluded($project, $exercise->id, $start, $end))
             ->each(fn (Project $project) => $sources->push(['source_type' => ProposalSourceType::Project, 'origin_key' => $project->originKey(), 'model' => $project, 'read_only' => $project->isArchived()]));
 
@@ -49,9 +50,12 @@ final class ProposalSourceCatalog
             ->filter(fn (string $date): bool => $date >= $start && $date <= $end)->unique();
         $activeInYear = $dates->contains(fn (string $date): bool => in_array($project->stateAtDate($date), [ProjectState::Planned, ProjectState::Open], true));
         $hasValues = $project->expenses->where('exercise_id', $exerciseId)->contains(fn (Expense $expense): bool => $expense->lines->isNotEmpty());
+        $hasCarryover = $project->deferrals->contains(fn ($deferral): bool => $deferral->destination_exercise_id === $exerciseId
+            && $deferral->mode->value === 'carryover'
+            && Decimal::compare((string) $deferral->carryover_amount, '0.00') > 0);
         $hasTransition = $project->transitions->contains(fn ($transition): bool => $transition->annulledAt() === null && $transition->effectiveDate()->toDateString() >= $start && $transition->effectiveDate()->toDateString() <= $end);
 
-        return $activeInYear || $hasValues || $hasTransition;
+        return $activeInYear || $hasValues || $hasCarryover || $hasTransition;
     }
 
     private function contractIncluded(Contract $contract, int $exerciseId, string $start, string $end): bool

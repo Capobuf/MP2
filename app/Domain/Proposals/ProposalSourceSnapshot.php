@@ -7,6 +7,7 @@ use App\Models\Contract;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\Project;
+use App\Models\ProjectDeferral;
 
 final class ProposalSourceSnapshot
 {
@@ -34,8 +35,9 @@ final class ProposalSourceSnapshot
     /** @return array<string, mixed> */
     public static function project(Project $project, int $exerciseId): array
     {
-        $project->loadMissing(['transitions', 'classifications.costCenter', 'expenses.lines', 'contractLinks']);
+        $project->loadMissing(['transitions', 'classifications.costCenter', 'expenses.lines', 'contractLinks', 'deferrals']);
         $expenses = $project->expenses->where('exercise_id', $exerciseId)->sortBy('id');
+        $incoming = $project->deferrals->firstWhere('destination_exercise_id', $exerciseId);
 
         return self::canonical([
             'plan_baseline' => [
@@ -46,6 +48,7 @@ final class ProposalSourceSnapshot
                 'classification' => $project->classifications->where('exercise_id', $exerciseId)->map(fn ($row): array => ['id' => $row->id, 'cost_center_id' => $row->cost_center_id, 'cost_center_label' => $row->costCenter?->name])->values()->all(),
                 'expense_plan' => $expenses->map(fn (Expense $expense): array => self::expense($expense)['plan_baseline'])->values()->all(),
                 'contract_links' => $project->contractLinks->map->only(['id', 'contract_id', 'archived_at'])->values()->all(),
+                'incoming_deferral' => self::incomingDeferral($incoming, $exerciseId),
             ],
             'actual_context' => ['has_actuals' => $expenses->contains(fn (Expense $expense): bool => $expense->hasActuals()), 'expenses' => $expenses->map(fn (Expense $expense): array => self::expense($expense)['actual_context'])->values()->all()],
         ]);
@@ -90,7 +93,21 @@ final class ProposalSourceSnapshot
     {
         usort($lines, fn (ExpenseLine $a, ExpenseLine $b): int => $a->id <=> $b->id);
 
-        return array_map(fn (ExpenseLine $line): array => ['id' => $line->id, 'type' => $line->lineType()->value, 'amount' => (string) $line->amount, 'quantity' => $line->quantity, 'unit_amount' => $line->unit_amount, 'unit_of_measure' => $line->unit_of_measure, 'note' => $line->note, 'annulled_at' => self::date($line->annulled_at)], $lines);
+        return array_map(fn (ExpenseLine $line): array => ['id' => $line->id, 'type' => $line->lineType()->value, 'amount' => (string) $line->amount, 'quantity' => $line->quantity, 'unit_amount' => $line->unit_amount, 'unit_of_measure' => $line->unit_of_measure, 'note' => $line->note, 'annulled_at' => self::date($line->annulled_at), 'revision' => (int) $line->revision], $lines);
+    }
+
+    /** @return array<string, mixed> */
+    private static function incomingDeferral(?ProjectDeferral $deferral, int $destinationExerciseId): array
+    {
+        return [
+            'source_exercise_id' => $deferral?->source_exercise_id,
+            'destination_exercise_id' => $destinationExerciseId,
+            'mode' => $deferral?->mode->value ?? 'none',
+            'carryover_amount' => $deferral === null ? '0.00' : $deferral->carryover_amount,
+            'carryover_state' => $deferral?->carryover_state,
+            'reprogrammed_amount' => $deferral === null ? '0.00' : $deferral->reprogrammed_amount,
+            'reprogramming_operation_id' => $deferral?->reprogramming_operation_id,
+        ];
     }
 
     private static function date(mixed $value): ?string

@@ -65,9 +65,19 @@ final class ExpensePlan
     }
 
     /** @param array<string, mixed> $result */
-    public static function validateNew(Proposal $proposal, array $result): void
+    public static function validateNew(Proposal $proposal, array $result, ProposalActionType $type = ProposalActionType::CreateExpense): void
     {
-        self::validateResult($proposal, null, $result, ProposalActionType::CreateExpense);
+        self::validateResult($proposal, null, $result, $type);
+
+        $projectId = filled($result['project_id'] ?? null) ? (int) $result['project_id'] : null;
+        $projectItemId = filled($result['project_item_id'] ?? null) ? (string) $result['project_item_id'] : null;
+        if ($type === ProposalActionType::CreateExpense && $projectId !== null) {
+            throw ValidationException::withMessages(['project_id' => 'Per una nuova Spesa di un Progetto già vivo usare Nuova allocazione.']);
+        }
+        if ($type === ProposalActionType::CreateProjectAllocation
+            && ($projectId === null || $projectItemId !== null || (int) ($result['exercise_id'] ?? $proposal->exercise_id) !== $proposal->exercise_id)) {
+            throw ValidationException::withMessages(['project_id' => 'Nuova allocazione richiede un Progetto già vivo nell’Esercizio principale della Proposta.']);
+        }
     }
 
     /** @param array<string, mixed> $result */
@@ -155,7 +165,7 @@ final class ExpensePlan
     }
 
     /** @param array<string, mixed> $result */
-    private static function plannedProjectAcceptsExpense(array $result, Exercise $exercise): bool
+    public static function plannedProjectAcceptsExpense(array $result, Exercise $exercise): bool
     {
         $start = $exercise->year.'-01-01';
         $end = $exercise->year.'-12-31';

@@ -17,12 +17,12 @@ below. Later slices may add integration or regression coverage.
 | 28.8 | Allocato del Progetto | S4 — Progetti | verified |
 | 28.9 | Allocato del Contratto | S5 — Contratti | verified |
 | 28.10 | Scostamento Operativo | S3 — Esercizi, Spese e Righe | verified |
-| 28.11 | Residuo e disponibilità riportabile | S8 — Riporto e Riprogrammazione | planned |
-| 28.12 | Riporto entro il limite | S8 — Riporto e Riprogrammazione | planned |
-| 28.13 | Effettivo negativo | S8 — Riporto e Riprogrammazione | planned |
-| 28.14 | Riporto esclusivo del Progetto | S8 — Riporto e Riprogrammazione | planned |
-| 28.15 | Modalità di rinvio | S8 — Riporto e Riprogrammazione | planned |
-| 28.16 | Progetto terminale | S8 — Riporto e Riprogrammazione | planned |
+| 28.11 | Residuo e disponibilità riportabile | S8 — Riporto e Riprogrammazione | verified |
+| 28.12 | Riporto entro il limite | S8 — Riporto e Riprogrammazione | verified |
+| 28.13 | Effettivo negativo | S8 — Riporto e Riprogrammazione | verified |
+| 28.14 | Riporto esclusivo del Progetto | S8 — Riporto e Riprogrammazione | verified |
+| 28.15 | Modalità di rinvio | S8 — Riporto e Riprogrammazione | verified |
+| 28.16 | Progetto terminale | S8 — Riporto e Riprogrammazione | verified |
 | 28.17 | Budget immutabile | S6 — Proposta e Budget iniziale | verified |
 | 28.18 | Revisioni | S7 — Revisioni, riallineamento e impatto multi-Esercizio | implemented |
 | 28.19 | Proposta isolata | S6 — Proposta e Budget iniziale | verified |

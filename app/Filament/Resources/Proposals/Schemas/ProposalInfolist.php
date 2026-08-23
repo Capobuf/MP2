@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Proposals\Schemas;
 
+use App\Domain\Projects\ProjectDeferralMode;
 use App\Domain\Proposals\ProposalImpactPlan;
 use App\Domain\Proposals\ProposalPlanData;
 use App\Domain\Proposals\ProposalPurpose;
@@ -37,6 +38,10 @@ class ProposalInfolist
                     TextEntry::make('baseline.actual_context.actual_total')->label('Effettivo (sola lettura)')->money('EUR', locale: 'it')->placeholder('—'),
                     TextEntry::make('baseline_allocation')->label('Allocato base')->state(fn (ProposalItem $record): string => self::itemImpact($record)['before'] ?? '0.00')->money('EUR', locale: 'it'),
                     TextEntry::make('result_allocation')->label('Allocato risultante')->state(fn (ProposalItem $record): string => self::itemImpact($record)['after'] ?? '0.00')->money('EUR', locale: 'it'),
+                    TextEntry::make('result.incoming_deferral.mode')->label('Modalità rinvio risultante')->formatStateUsing(fn (mixed $state): string => ProjectDeferralMode::tryFrom((string) $state)?->label() ?? ProjectDeferralMode::None->label())->visible(self::projectItem(...)),
+                    TextEntry::make('result.incoming_deferral.carryover_amount')->label('Riporto provvisorio risultante')->money('EUR', locale: 'it')->visible(self::projectItem(...)),
+                    TextEntry::make('result.incoming_deferral.reprogrammed_amount')->label('Riprogrammato risultante')->money('EUR', locale: 'it')->visible(self::projectItem(...)),
+                    TextEntry::make('result.incoming_deferral.destination_plans')->label('Anteprima nuove allocazioni da Riprogrammazione')->state(fn (ProposalItem $record): array => collect(ProposalPlanData::rows(data_get($record->result, 'incoming_deferral.destination_plans'), 'destination_plans'))->map(fn (array $plan): string => ($plan['description'] ?? 'Spesa').' · Copiata da '.($plan['copied_from_origin_key'] ?? '—').' · '.count($plan['estimate_lines'] ?? []).' Righe Stima')->all())->listWithLineBreaks()->placeholder('Nessuna')->visible(self::projectItem(...))->columnSpanFull(),
                     TextEntry::make('readiness_state')->label('Verifica')->formatStateUsing(fn ($state): string => $state->label())->badge(),
                     TextEntry::make('readiness_reasons')->label('Motivi verifica')->state(fn (ProposalItem $record): string => collect(ProposalPlanData::rows($record->readiness_reasons, 'readiness_reasons'))->pluck('message')->implode(' · '))->placeholder('Nessun motivo'),
                     TextEntry::make('read_only_source')->label('Archivio')->formatStateUsing(fn (bool $state): string => $state ? 'Archiviato · sola lettura' : 'Operativo'),
@@ -108,5 +113,10 @@ class ProposalInfolist
     private static function json(mixed $state): string
     {
         return json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    }
+
+    private static function projectItem(ProposalItem $record): bool
+    {
+        return $record->source_type->value === 'project';
     }
 }

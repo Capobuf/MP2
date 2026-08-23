@@ -50,11 +50,20 @@ final class ApplyProjectPlan
                         continue;
                     } $existing = $expense->lines()->create(['type' => ExpenseLineType::Estimate, 'amount' => $line['amount'], 'note' => $line['note'] ?? null]);
                 } else {
-                    $existing->update(['amount' => $line['amount'], 'note' => $line['note'] ?? null, 'annulled_at' => ($line['annulled'] ?? false) ? now() : null]);
+                    $existing->fill(['amount' => $line['amount'], 'note' => $line['note'] ?? null, 'annulled_at' => ($line['annulled'] ?? false) ? now() : null]);
+                    if ($existing->isDirty()) {
+                        $existing->revision++;
+                    }
+                    $existing->save();
                 }
                 $plannedIds[] = $existing->id;
             }
-            $expense->lines()->where('type', ExpenseLineType::Estimate->value)->whereNotIn('id', $plannedIds)->whereNull('annulled_at')->update(['annulled_at' => now()]);
+            $omitted = $expense->lines()->where('type', ExpenseLineType::Estimate->value)->whereNotIn('id', $plannedIds)->whereNull('annulled_at')->get();
+            foreach ($omitted as $line) {
+                $line->annulled_at = now();
+                $line->revision++;
+                $line->save();
+            }
             $expense->increment('revision');
         }
         if ($project->isArchived() && collect(ProposalPlanData::rows($result['planned_transitions'] ?? null, 'planned_transitions'))->contains(fn (array $transition): bool => in_array($transition['to_state'], ['planned', 'open'], true))) {

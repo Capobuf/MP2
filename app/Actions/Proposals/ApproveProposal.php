@@ -8,7 +8,6 @@ use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalImpactPlan;
 use App\Domain\Proposals\ProposalPurpose;
 use App\Domain\Proposals\ProposalReadiness;
-use App\Domain\Proposals\ProposalReadinessReason;
 use App\Domain\Proposals\ProposalSourceType;
 use App\Models\Attachment;
 use App\Models\AuditEvent;
@@ -25,6 +24,7 @@ use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\Project;
 use App\Models\ProjectContractLink;
+use App\Models\ProjectDeferral;
 use App\Models\ProjectExerciseClassification;
 use App\Models\ProjectTransition;
 use App\Models\Proposal;
@@ -33,7 +33,6 @@ use App\Models\ProposalItem;
 use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -41,7 +40,7 @@ use Illuminate\Validation\ValidationException;
 
 final class ApproveProposal
 {
-    public function __construct(private ProposalReadiness $readiness, private ApplyProjectPlan $projects, private ApplyContractPlan $contracts, private ApplyExpensePlan $expenses, private ApplyProposalRelations $relations, private MaterializeBudgetSnapshot $materialize) {}
+    public function __construct(private ProposalReadiness $readiness, private ApplyProjectPlan $projects, private ApplyContractPlan $contracts, private ApplyExpensePlan $expenses, private ApplyProjectDeferral $deferrals, private ApplyProposalRelations $relations, private MarkProposalItemsToRealign $markToRealign, private MaterializeBudgetSnapshot $materialize) {}
 
     /**
      * @param  array<string, mixed>  $evidence
@@ -93,12 +92,33 @@ final class ApproveProposal
                 $copySourceIds = $preliminary->flatMap(fn (ProposalItem $item): array => $item->actions
                     ->where('action_type', ProposalActionType::CopyExpense)
                     ->pluck('payload.source_expense_id')->filter()->map(fn (mixed $id): int => (int) $id)->all());
-                $expenseIds = $preliminary->pluck('expense_id')->filter()->merge($copySourceIds)->unique()->sort()->values();
+                $deferralActions = $preliminary->flatMap(fn (ProposalItem $item) => $item->actions->where('action_type', ProposalActionType::PlanProjectDeferral));
+                $deferralSourceExpenseIds = $deferralActions->flatMap(function (ProposalAction $action): array {
+                    $reductions = $action->payload['source_estimate_reductions'] ?? [];
+                    if (! is_array($reductions)) {
+                        throw new \LogicException('Invalid Project deferral source reductions.');
+                    }
+
+                    return collect($reductions)
+                        ->map(fn (mixed $reduction): int => (int) data_get($reduction, 'source_expense_id'))
+                        ->all();
+                });
+                $expenseIds = $preliminary->pluck('expense_id')->filter()->merge($copySourceIds)->merge($deferralSourceExpenseIds)->unique()->sort()->values();
                 $projectIds = $preliminary->pluck('project_id')->filter()->sort()->values();
                 $contractIds = $preliminary->pluck('contract_id')->filter()->sort()->values();
-                Expense::query()->whereIn('id', $expenseIds)->orderBy('id')->lockForUpdate()->get();
                 Project::query()->whereIn('id', $projectIds)->orderBy('id')->lockForUpdate()->get();
                 Contract::query()->whereIn('id', $contractIds)->orderBy('id')->lockForUpdate()->get();
+                $lockedDeferrals = ProjectDeferral::query()->whereIn('project_id', $projectIds)->orderBy('id')->lockForUpdate()->get();
+                $effectExpenseIds = $lockedDeferrals->flatMap(function (ProjectDeferral $deferral): array {
+                    $effects = $deferral->reprogramming_effects ?? [];
+
+                    return [
+                        ...collect($effects['source_lines'] ?? [])->pluck('expense_id')->map(fn (mixed $id): int => (int) $id)->all(),
+                        ...collect($effects['destination_expenses'] ?? [])->pluck('expense_id')->map(fn (mixed $id): int => (int) $id)->all(),
+                    ];
+                });
+                $expenseIds = $expenseIds->merge($effectExpenseIds)->unique()->sort()->values();
+                Expense::query()->whereIn('id', $expenseIds)->orderBy('id')->lockForUpdate()->get();
                 ExpenseLine::query()->whereIn('expense_id', $expenseIds)->orderBy('id')->lockForUpdate()->get();
                 ProjectTransition::query()->whereIn('project_id', $projectIds)->orderBy('id')->lockForUpdate()->get();
                 ProjectExerciseClassification::query()->whereIn('project_id', $projectIds)->orderBy('id')->lockForUpdate()->get();
@@ -134,9 +154,35 @@ final class ApproveProposal
                     $identities[$item->proposal_item_id] = $this->expenses->execute($item, $identities, $actor);
                     self::checkpoint($checkpoint, 'after_expense');
                 }
+                foreach ($items->where('source_type', ProposalSourceType::Project) as $item) {
+                    $action = $item->actions->where('action_type', ProposalActionType::PlanProjectDeferral)->sortByDesc('sequence')->first();
+                    if ($action === null) {
+                        continue;
+                    }
+                    $project = $identities[$item->proposal_item_id] ?? null;
+                    if (! $project instanceof Project) {
+                        throw ValidationException::withMessages(['project' => 'Identità Progetto del rinvio non risolta.']);
+                    }
+                    $resolved = $this->deferrals->execute($item, $action, $project, $checkpoint);
+                    $item->update(['result' => [
+                        ...$item->result,
+                        'incoming_deferral' => [
+                            ...(array) ($item->result['incoming_deferral'] ?? []),
+                            'reprogramming_operation_id' => $resolved['current']['reprogramming_operation_id'],
+                            'resolved_effects' => $resolved['reprogramming_effects'],
+                        ],
+                    ]]);
+                    self::checkpoint($checkpoint, 'after_project_deferral');
+                }
                 $this->relations->execute($locked, $identities);
                 self::checkpoint($checkpoint, 'after_live_apply');
-                $this->markCompetingDraftsStale($locked, $items);
+                $this->markToRealign->execute(
+                    $locked->company_id,
+                    $items->pluck('expense_id')->filter()->map(fn (mixed $id): int => (int) $id)->values()->all(),
+                    $items->pluck('project_id')->filter()->map(fn (mixed $id): int => (int) $id)->values()->all(),
+                    $items->pluck('contract_id')->filter()->map(fn (mixed $id): int => (int) $id)->values()->all(),
+                    $locked->id,
+                );
 
                 return $this->materialize->execute($locked, $identities, $actor, $operationId, $evidence, $attachmentIds, $checkpoint, $review['impacts']);
             }, 3);
@@ -144,31 +190,6 @@ final class ApproveProposal
             $this->recordFailedApproval($actor, $proposal, $operationId, $exception);
             throw $exception;
         }
-    }
-
-    /** @param Collection<int, ProposalItem> $items */
-    private function markCompetingDraftsStale(Proposal $proposal, $items): void
-    {
-        $query = ProposalItem::query()->where('company_id', $proposal->company_id)->where('proposal_id', '!=', $proposal->id)
-            ->whereHas('proposal', fn ($builder) => $builder->where('status', 'draft'))
-            ->where(function ($builder) use ($items): void {
-                foreach (['expense_id', 'project_id', 'contract_id'] as $column) {
-                    $ids = $items->pluck($column)->filter();
-                    if ($ids->isNotEmpty()) {
-                        $builder->orWhereIn($column, $ids);
-                    }
-                }
-            });
-        $proposalIds = (clone $query)->pluck('proposal_id')->unique();
-        if ($proposalIds->isEmpty()) {
-            return;
-        }
-        $query->update([
-            'readiness_state' => 'to_realign',
-            'readiness_reasons' => json_encode([['code' => ProposalReadinessReason::SourceChanged->value, 'message' => ProposalReadinessReason::SourceChanged->message()]], JSON_THROW_ON_ERROR),
-            'updated_at' => now(),
-        ]);
-        Proposal::query()->whereIn('id', $proposalIds)->increment('revision');
     }
 
     private function recordFailedApproval(User $actor, Proposal $proposal, string $operationId, \Throwable $exception): void

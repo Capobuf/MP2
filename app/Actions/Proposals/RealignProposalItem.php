@@ -4,7 +4,9 @@ namespace App\Actions\Proposals;
 
 use App\Domain\Company\AuditEventType;
 use App\Domain\Proposals\ProposalActionReplay;
+use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalImpactPlan;
+use App\Domain\Proposals\ProposalReadiness;
 use App\Domain\Proposals\ProposalRealignmentChoice;
 use App\Domain\Proposals\ProposalSourceSnapshot;
 use App\Domain\Proposals\ProposalSourceType;
@@ -32,7 +34,7 @@ use Illuminate\Validation\ValidationException;
 
 final class RealignProposalItem
 {
-    public function __construct(private ProposalActionReplay $replay) {}
+    public function __construct(private ProposalActionReplay $replay, private ProposalReadiness $readiness) {}
 
     /**
      * @param  list<int>  $retainedActionIds
@@ -100,7 +102,9 @@ final class RealignProposalItem
                 throw ValidationException::withMessages(['retained_actions' => 'Una decisione selezionata non appartiene alla sorgente.']);
             }
 
-            $result = $this->replay->replay($lockedItem, $snapshot, $retained);
+            $retainsDeferral = $lockedItem->source_type === ProposalSourceType::Project
+                && $retained->contains(fn (ProposalAction $action): bool => $action->action_type === ProposalActionType::PlanProjectDeferral);
+            $result = $this->replay->replay($lockedItem, $snapshot, $retained, ! $retainsDeferral);
             $withdrawn = $touching->whereNotIn('id', $retained->pluck('id'))->values();
             foreach ($withdrawn as $action) {
                 $action->update([
@@ -129,6 +133,13 @@ final class RealignProposalItem
                 'last_aligned_at' => now(),
                 'last_aligned_by_id' => $actor->id,
             ]);
+            if ($retainsDeferral) {
+                $assessment = $this->readiness->assessItem($lockedItem->fresh(['proposal', 'project', 'actions']));
+                $lockedItem->update([
+                    'readiness_state' => $assessment['state'],
+                    'readiness_reasons' => $assessment['reasons'],
+                ]);
+            }
             $lockedProposal->increment('revision');
 
             if ($checkpoint !== null) {

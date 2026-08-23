@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'unit_of_measure',
     'note',
     'annulled_at',
+    'revision',
 ])]
 /** @property ExpenseLineType $type */
 class ExpenseLine extends Model
@@ -77,6 +78,7 @@ class ExpenseLine extends Model
             'quantity' => 'decimal:6',
             'unit_amount' => 'decimal:6',
             'annulled_at' => 'datetime',
+            'revision' => 'integer',
         ];
     }
 }

@@ -6,6 +6,7 @@ use App\Domain\Company\AuditEventType;
 use App\Domain\Contracts\ContractExpenseActivity;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseAuditSnapshot;
+use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Expenses\ManualExpenseLine;
 use App\Domain\Projects\ProjectAuditSnapshot;
 use App\Domain\Projects\ProjectExpenseActivity;
@@ -70,10 +71,15 @@ class UpdateExpenseLine
             $actualBefore = $expense->actual();
             $before = ExpenseAuditSnapshot::line($lockedLine);
             $validated = ManualExpenseLine::validate($input, $company, $exercise, false);
+            $wasEstimate = $lockedLine->lineType() === ExpenseLineType::Estimate;
             $lockedLine->fill($validated);
 
             if (! $lockedLine->isDirty()) {
                 return $lockedLine;
+            }
+
+            if ($project !== null && ($wasEstimate || $lockedLine->lineType() === ExpenseLineType::Estimate)) {
+                $lockedLine->revision++;
             }
 
             $projectContext = null;

@@ -50,7 +50,7 @@ it('manually includes eligible closed Projects and cessated Contracts and permit
         'description' => 'Spesa sul Progetto riaperto', 'exercise_id' => $exercise->id, 'supplier_id' => null,
         'cost_center_id' => null, 'project_id' => $project->id, 'project_item_id' => null,
         'estimate_lines' => [['proposal_line_id' => (string) Str::uuid(), 'line_id' => null, 'amount' => '10.00', 'note' => null, 'annulled' => false]],
-    ], null, (string) Str::uuid(), 3);
+    ], 'Nuova allocazione per Progetto riaperto', (string) Str::uuid(), 3, ProposalActionType::CreateProjectAllocation);
     app(PlanContract::class)->execute($actor, $proposal->refresh(), $contractItem->refresh(), ProposalActionType::AddContractCondition, [
         'cycle' => 'annual', 'attribution_mode' => 'cycle_start', 'amount' => '100.00', 'valid_from' => '2026-02-01', 'valid_to' => null, 'reason' => 'Nuove condizioni',
     ], 'Nuove condizioni', (string) Str::uuid(), 4);

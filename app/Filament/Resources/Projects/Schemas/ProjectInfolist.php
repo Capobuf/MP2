@@ -59,9 +59,14 @@ class ProjectInfolist
                 default => '1° gennaio dell’Esercizio futuro',
             };
             $row['cost_center'] ??= 'Non classificato';
+            $row['estimates'] = self::money($situation->estimates);
+            $row['received_carryover'] = self::money($situation->receivedCarryover);
             $row['allocation'] = self::money($situation->allocation);
             $row['actual'] = self::money($situation->actual);
             $row['variance'] = self::money($situation->variance);
+            $row['residual'] = self::money($situation->residual);
+            $row['maximum_transferable'] = self::money($situation->maximumTransferable);
+            $row['incoming_deferral_amount'] = self::money($situation->incomingDeferralAmount);
             $row['future_transitions'] = $situation->year <= $today->year
                 ? 'Non applicabile'
                 : ($project->transitions

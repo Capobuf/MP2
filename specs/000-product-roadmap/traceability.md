@@ -66,9 +66,9 @@ changing its traceability anchor.
 | FR-056 | Effettivi compatibili con lo stato del Progetto | §16.5 | S4 — Progetti | verified |
 | FR-057 | Transizioni del Progetto valutate alla data | §§9.3, 16.4 | S4 — Progetti | verified |
 | FR-058 | Avvisi di Sovraspesa | §16.8 | S4 — Progetti | verified |
-| FR-059 | Modalità Nessuna, Riporto o Riprogrammazione mutuamente esclusive | §16.10 | S8 — Riporto e Riprogrammazione | planned |
-| FR-060 | Formule del Riporto | §§8.4, 17 | S8 — Riporto e Riprogrammazione | planned |
-| FR-061 | Effettivo negativo non genera Riporto oltre l'Allocato | §§17.5, 28.13 | S8 — Riporto e Riprogrammazione | planned |
+| FR-059 | Modalità Nessuna, Riporto o Riprogrammazione mutuamente esclusive | §16.10 | S8 — Riporto e Riprogrammazione | verified |
+| FR-060 | Formule del Riporto | §§8.4, 17 | S8 — Riporto e Riprogrammazione | verified |
+| FR-061 | Effettivo negativo non genera Riporto oltre l'Allocato | §§17.5, 28.13 | S8 — Riporto e Riprogrammazione | verified |
 | FR-062 | Dati contrattuali, rinnovo e scadenza | §18.2 | S5 — Contratti | verified |
 | FR-063 | Separazione durata, ciclo e rinnovo | §18.3 | S5 — Contratti | verified |
 | FR-064 | Stato del Contratto alla data | §§9.4, 18.4 | S5 — Contratti | verified |

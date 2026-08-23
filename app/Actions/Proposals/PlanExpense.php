@@ -60,11 +60,14 @@ final class PlanExpense
             if ($lockedProposal->revision !== $expectedRevision) {
                 throw ValidationException::withMessages(['revision' => 'La Proposta è cambiata: ricaricare prima di continuare.']);
             }
-            if (! in_array($type, [ProposalActionType::CreateExpense, ProposalActionType::CopyExpense], true)) {
+            if (! in_array($type, [ProposalActionType::CreateExpense, ProposalActionType::CopyExpense, ProposalActionType::CreateProjectAllocation], true)) {
                 throw ValidationException::withMessages(['action_type' => 'Azione di creazione Spesa non valida.']);
             }
+            if ($type === ProposalActionType::CreateProjectAllocation && blank($reason)) {
+                throw ValidationException::withMessages(['reason' => 'La Nota per la nuova allocazione è obbligatoria.']);
+            }
             $validated = ProposalActionPayload::validate($type, $payload);
-            ExpensePlan::validateNew($lockedProposal, $validated);
+            ExpensePlan::validateNew($lockedProposal, $validated, $type);
             $result = $validated;
             unset($result['source_expense_id'], $result['target_exercise_id']);
             $result['exercise_id'] = $validated['exercise_id'] ?? $validated['target_exercise_id'];

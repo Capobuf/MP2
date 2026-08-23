@@ -6,12 +6,13 @@ use App\Models\CompanyCapability;
 use App\Models\Proposal;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-it('exposes project and same-proposal child planning without later-slice controls', function (): void {
+it('exposes Project planning, Rinvio and independent new allocation controls', function (): void {
     $proposal = Proposal::factory()->create();
     $user = User::factory()->create();
     foreach ([Capability::View, Capability::ManageProposals] as $capability) {
@@ -19,5 +20,19 @@ it('exposes project and same-proposal child planning without later-slice control
     }
     $this->actingAs($user);
     Filament::setTenant($proposal->company);
-    Livewire::test(ViewProposal::class, ['record' => $proposal->id])->assertActionExists('includeClosedProject')->assertActionExists('createPlannedProject')->assertActionExists('planProjectTransition')->assertActionExists('createPlannedExpense')->assertActionExists('planProjectChildExpenses')->assertActionExists('planProjectExpenseEstimates')->assertActionExists('planProjectCostCenter')->assertActionDoesNotExist('carryover')->assertActionDoesNotExist('reprogramming');
+    Livewire::test(ViewProposal::class, ['record' => $proposal->id])
+        ->assertActionExists('includeClosedProject')->assertActionExists('createPlannedProject')->assertActionExists('planProjectTransition')
+        ->assertActionExists('planProjectDeferral')->assertActionExists('createProjectAllocation')->assertActionExists('createPlannedExpense')
+        ->assertActionExists('planProjectChildExpenses')->assertActionExists('planProjectExpenseEstimates')->assertActionExists('planProjectCostCenter')
+        ->assertActionDoesNotExist('carryover')->assertActionDoesNotExist('reprogramming')
+        ->mountAction('planProjectDeferral')
+        ->assertSchemaComponentExists('mode', checkComponentUsing: fn (Select $component): bool => $component->getOptions() === [
+            'none' => 'Nessuna',
+            'carryover' => 'Riporto',
+            'reprogramming' => 'Riprogrammazione',
+        ])
+        ->assertSchemaComponentExists('carryover_amount')
+        ->assertSchemaComponentExists('source_estimate_reductions')
+        ->assertSchemaComponentExists('deferral_formula')
+        ->assertSchemaComponentExists('reason');
 });

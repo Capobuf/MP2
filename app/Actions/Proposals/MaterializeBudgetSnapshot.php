@@ -15,6 +15,7 @@ use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\Project;
+use App\Models\ProjectDeferral;
 use App\Models\Proposal;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
@@ -70,7 +71,18 @@ final class MaterializeBudgetSnapshot
                 'subject_type' => $live === null ? Proposal::class : $live->getMorphClass(), 'subject_id' => $live === null ? $proposal->id : $live->id,
                 'affected_exercise_ids' => $affectedExerciseIds, 'effective_from' => now($proposal->company->timezone)->toDateString(),
                 'previous_value' => ['proposal_id' => $proposal->id, 'proposal_item_id' => $item?->proposal_item_id, 'baseline_revision' => $item?->baseline_revision, 'plan' => data_get($plannedEvent?->previous_value, 'plan', data_get($item?->baseline, 'plan_baseline'))],
-                'new_value' => ['proposal_id' => $proposal->id, 'proposal_action_id' => $action->id, 'action_type' => $action->action_type->value, 'action_payload' => $action->payload, 'approved_plan' => data_get($plannedEvent?->new_value, 'result', $item?->result), 'live_type' => $live?->getMorphClass(), 'live_id' => $live?->id, 'budget_id' => $budget->id],
+                'new_value' => [
+                    'proposal_id' => $proposal->id, 'proposal_action_id' => $action->id, 'action_type' => $action->action_type->value,
+                    'action_payload' => $action->payload, 'approved_plan' => data_get($plannedEvent?->new_value, 'result', $item?->result),
+                    'live_type' => $live?->getMorphClass(), 'live_id' => $live?->id, 'budget_id' => $budget->id,
+                    ...($action->action_type === ProposalActionType::PlanProjectDeferral && $live instanceof Project
+                        ? ['resolved_project_deferral' => ProjectDeferral::query()
+                            ->where('project_id', $live->id)
+                            ->where('source_exercise_id', $action->payload['source_exercise_id'])
+                            ->where('destination_exercise_id', $action->payload['destination_exercise_id'])
+                            ->first()?->only(['id', 'mode', 'carryover_amount', 'carryover_state', 'reprogrammed_amount', 'reprogramming_operation_id', 'reprogramming_effects'])]
+                        : []),
+                ],
                 'allocated_impact_by_exercise' => $actionAllocatedImpact,
                 'actual_impact_by_exercise' => collect($affectedExerciseIds)->mapWithKeys(fn (int $exerciseId): array => [(string) $exerciseId => '0.00'])->all(),
                 'reason' => $action->reason, 'reference_type' => BudgetSnapshot::class, 'reference_id' => $budget->id,
@@ -149,7 +161,7 @@ final class MaterializeBudgetSnapshot
     private function appliedEventType(ProposalActionType $type, array $payload): AuditEventType
     {
         return match ($type) {
-            ProposalActionType::CreateExpense, ProposalActionType::CopyExpense => AuditEventType::ExpenseCreated,
+            ProposalActionType::CreateExpense, ProposalActionType::CopyExpense, ProposalActionType::CreateProjectAllocation => AuditEventType::ExpenseCreated,
             ProposalActionType::SetExpenseEstimates => AuditEventType::ExpenseLineUpdated,
             ProposalActionType::SetExpenseOwner, ProposalActionType::SetExpenseCostCenter => AuditEventType::ExpenseMovedOrReclassified,
             ProposalActionType::SetExpenseSupplier => AuditEventType::ExpenseUpdated,
@@ -159,6 +171,7 @@ final class MaterializeBudgetSnapshot
             ProposalActionType::PlanProjectChildExpenses => AuditEventType::ExpenseLineUpdated,
             ProposalActionType::SetProjectCostCenter => AuditEventType::ProjectClassificationChanged,
             ProposalActionType::PlanProjectTransition => AuditEventType::ProjectTransitionPlanned,
+            ProposalActionType::PlanProjectDeferral => AuditEventType::ProjectDeferralChanged,
             ProposalActionType::CreateContract => AuditEventType::ContractCreated,
             ProposalActionType::AddContractCondition => AuditEventType::ContractConditionCreated,
             ProposalActionType::ChangeContractEconomics => AuditEventType::ContractConditionChanged,

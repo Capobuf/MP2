@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExerciseStatus;
+use App\Domain\Projects\ProjectDeferralMode;
 use Database\Factories\ExerciseFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -63,6 +64,12 @@ class Exercise extends Model
         return $this->hasMany(BudgetSnapshot::class);
     }
 
+    /** @return HasMany<ProjectDeferral, $this> */
+    public function incomingProjectDeferrals(): HasMany
+    {
+        return $this->hasMany(ProjectDeferral::class, 'destination_exercise_id');
+    }
+
     /** @return HasOne<BudgetSnapshot, $this> */
     public function latestBudget(): HasOne
     {
@@ -93,7 +100,16 @@ class Exercise extends Model
 
     public function allocation(): string
     {
-        return $this->lineTotal('estimate');
+        $carryover = $this->relationLoaded('incomingProjectDeferrals')
+            ? Decimal::sum($this->incomingProjectDeferrals
+                ->where('mode', ProjectDeferralMode::Carryover)
+                ->pluck('carryover_amount'))
+            : Decimal::sum(ProjectDeferral::query()
+                ->where('destination_exercise_id', $this->id)
+                ->where('mode', ProjectDeferralMode::Carryover->value)
+                ->pluck('carryover_amount'));
+
+        return Decimal::add($this->lineTotal('estimate'), $carryover);
     }
 
     public function actual(): string

@@ -6,6 +6,7 @@ use App\Domain\Company\AuditEventType;
 use App\Domain\Contracts\ContractExpenseActivity;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseAuditSnapshot;
+use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Expenses\ManualExpenseLine;
 use App\Domain\Projects\ProjectAuditSnapshot;
 use App\Domain\Projects\ProjectExpenseActivity;
@@ -102,6 +103,9 @@ class SetExpenseLineActive
             }
             $before = ExpenseAuditSnapshot::line($lockedLine);
             $lockedLine->annulled_at = $active ? null : now();
+            if ($project !== null && $lockedLine->lineType() === ExpenseLineType::Estimate) {
+                $lockedLine->revision++;
+            }
             $lockedLine->save();
             if ($project !== null) {
                 $varianceAfter = ProjectExpenseActivity::annualVariance($project, $exercise);

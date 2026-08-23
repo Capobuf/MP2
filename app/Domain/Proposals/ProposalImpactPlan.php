@@ -91,6 +91,8 @@ final class ProposalImpactPlan
             }
             foreach ($item->actions as $action) {
                 self::appendExerciseId($ids, $action->payload['exercise_id'] ?? null);
+                self::appendExerciseId($ids, $action->payload['source_exercise_id'] ?? null);
+                self::appendExerciseId($ids, $action->payload['destination_exercise_id'] ?? null);
                 foreach (array_keys($action->payload['exercise_impacts'] ?? []) as $exerciseId) {
                     self::appendExerciseId($ids, $exerciseId);
                 }
@@ -188,6 +190,31 @@ final class ProposalImpactPlan
             fn (array $expense): bool => (int) ($expense['exercise_id'] ?? $item->proposal->exercise_id) === $exercise->id,
         )->map(fn (array $expense): string => self::allocation($expense)));
         $after = $controlsExercise ? $plannedAfter : Decimal::money($before);
+        $baselineDeferral = (array) data_get($item->baseline, 'plan_baseline.incoming_deferral', []);
+        $plannedDeferral = (array) ($result['incoming_deferral'] ?? $baselineDeferral);
+        $sourceExerciseId = (int) ($plannedDeferral['source_exercise_id'] ?? 0);
+        $destinationExerciseId = (int) ($plannedDeferral['destination_exercise_id'] ?? 0);
+        $baselineMode = (string) ($baselineDeferral['mode'] ?? 'none');
+        $plannedMode = (string) ($plannedDeferral['mode'] ?? 'none');
+        if ($exercise->id === $sourceExerciseId) {
+            if ($baselineMode === 'reprogramming' && $plannedMode !== 'reprogramming') {
+                $after = Decimal::add($after, (string) ($baselineDeferral['reprogrammed_amount'] ?? '0.00'));
+            }
+            if ($baselineMode !== 'reprogramming' && $plannedMode === 'reprogramming') {
+                $after = Decimal::subtract($after, (string) ($plannedDeferral['reprogrammed_amount'] ?? '0.00'));
+            }
+        }
+        if ($exercise->id === $destinationExerciseId) {
+            if ($baselineMode === 'reprogramming' && $plannedMode !== 'reprogramming') {
+                $after = Decimal::subtract($after, (string) ($baselineDeferral['reprogrammed_amount'] ?? '0.00'));
+            }
+            if ($baselineMode !== 'reprogramming' && $plannedMode === 'reprogramming') {
+                $after = Decimal::add($after, (string) ($plannedDeferral['reprogrammed_amount'] ?? '0.00'));
+            }
+            if ($plannedMode === 'carryover') {
+                $after = Decimal::add($after, (string) ($plannedDeferral['carryover_amount'] ?? '0.00'));
+            }
+        }
         $reference = $exercise->year.'-12-31';
         $beforeState = $item->project?->stateAtDate($reference)?->value;
         $initialState = ProjectState::from((string) ($result['initial_state'] ?? 'planned'));
@@ -244,6 +271,8 @@ final class ProposalImpactPlan
         $ids = collect([data_get($item->baseline, 'plan_baseline.exercise_id'), $item->result['exercise_id'] ?? null]);
         foreach ($item->actions as $action) {
             $ids->push($action->payload['exercise_id'] ?? null);
+            $ids->push($action->payload['source_exercise_id'] ?? null);
+            $ids->push($action->payload['destination_exercise_id'] ?? null);
             foreach (array_keys($action->payload['exercise_impacts'] ?? []) as $exerciseId) {
                 $ids->push($exerciseId);
             }
@@ -258,6 +287,8 @@ final class ProposalImpactPlan
         $ids = collect([data_get($item->baseline, 'plan_baseline.exercise_id'), $item->result['exercise_id'] ?? null]);
         foreach ($item->actions as $action) {
             $ids->push($action->payload['exercise_id'] ?? $action->payload['target_exercise_id'] ?? null);
+            $ids->push($action->payload['source_exercise_id'] ?? null);
+            $ids->push($action->payload['destination_exercise_id'] ?? null);
         }
 
         return $ids->filter(fn (mixed $id): bool => is_numeric($id))->map(fn (mixed $id): int => (int) $id)->unique()->values()->all();

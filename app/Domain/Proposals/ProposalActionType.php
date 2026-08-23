@@ -16,6 +16,8 @@ enum ProposalActionType: string
     case PlanProjectChildExpenses = 'plan_project_child_expenses';
     case SetProjectCostCenter = 'set_project_cost_center';
     case PlanProjectTransition = 'plan_project_transition';
+    case PlanProjectDeferral = 'plan_project_deferral';
+    case CreateProjectAllocation = 'create_project_allocation';
     case CreateContract = 'create_contract';
     case AddContractCondition = 'add_contract_condition';
     case ChangeContractEconomics = 'change_contract_economics';
@@ -26,6 +28,13 @@ enum ProposalActionType: string
 
     public function label(): string
     {
+        if ($this === self::PlanProjectDeferral) {
+            return 'Rinvio';
+        }
+        if ($this === self::CreateProjectAllocation) {
+            return 'Nuova allocazione';
+        }
+
         return str($this->value)->replace('_', ' ')->title()->toString();
     }
 }

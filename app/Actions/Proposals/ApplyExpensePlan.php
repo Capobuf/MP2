@@ -57,12 +57,23 @@ final class ApplyExpensePlan
                 $annulledAt = array_key_exists('annulled', $line)
                     ? ($annulled ? ($existing->annulled_at ?? now()) : null)
                     : $existing->annulled_at;
-                $existing->update(['amount' => $line['amount'], 'note' => $line['note'] ?? null, 'annulled_at' => $annulledAt]);
+                $existing->fill(['amount' => $line['amount'], 'note' => $line['note'] ?? null, 'annulled_at' => $annulledAt]);
+                if ($project !== null && $existing->isDirty()) {
+                    $existing->revision++;
+                }
+                $existing->save();
             }
             $plannedIds[] = $existing->id;
         }
         if (array_key_exists('estimate_lines', $result)) {
-            $expense->lines()->where('type', ExpenseLineType::Estimate->value)->whereNotIn('id', $plannedIds)->whereNull('annulled_at')->update(['annulled_at' => now()]);
+            $omitted = $expense->lines()->where('type', ExpenseLineType::Estimate->value)->whereNotIn('id', $plannedIds)->whereNull('annulled_at')->get();
+            foreach ($omitted as $line) {
+                $line->annulled_at = now();
+                if ($project !== null) {
+                    $line->revision++;
+                }
+                $line->save();
+            }
         }
         $expense->increment('revision');
         $exercise->increment('revision');

@@ -78,7 +78,15 @@
 
                 <dl class="mp2-object-economic-summary">
                     <div>
-                        <dt>Allocato</dt>
+                        <dt>Stime</dt>
+                        <dd>{{ $overview['selected']['estimates'] }}</dd>
+                    </div>
+                    <div>
+                        <dt>Riporto ricevuto</dt>
+                        <dd>{{ $overview['selected']['received_carryover'] }}</dd>
+                    </div>
+                    <div>
+                        <dt>Allocato corrente</dt>
                         <dd>{{ $overview['selected']['allocation'] }}</dd>
                     </div>
                     <div>
@@ -86,10 +94,25 @@
                         <dd>{{ $overview['selected']['actual'] }}</dd>
                     </div>
                     <div>
-                        <dt>Scostamento</dt>
+                        <dt>Scostamento operativo</dt>
                         <dd>{{ $overview['selected']['variance'] }}</dd>
                     </div>
+                    <div>
+                        <dt>Residuo</dt>
+                        <dd>{{ $overview['selected']['residual'] }}</dd>
+                    </div>
+                    <div>
+                        <dt>Disponibilità massima riportabile</dt>
+                        <dd>{{ $overview['selected']['maximum_transferable'] }}</dd>
+                    </div>
+                    <div>
+                        <dt>Rinvio ricevuto</dt>
+                        <dd>{{ $overview['selected']['incoming_deferral_mode'] }} · {{ $overview['selected']['incoming_deferral_amount'] }}</dd>
+                    </div>
                 </dl>
+                @if ($overview['selected']['carryover_above_current_maximum'])
+                    <p role="alert" class="mp2-object-warning">Riporto provvisorio superiore al massimo corrente</p>
+                @endif
             @else
                 <div class="mp2-object-empty-state">
                     <x-filament::icon icon="heroicon-o-calendar-days" aria-hidden="true" />
@@ -116,9 +139,14 @@
                         <th scope="col">Riferimento</th>
                         <th scope="col">Stato</th>
                         <th scope="col">Centro di Costo</th>
-                        <th scope="col" class="mp2-object-number">Allocato</th>
+                        <th scope="col" class="mp2-object-number">Stime</th>
+                        <th scope="col" class="mp2-object-number">Riporto ricevuto</th>
+                        <th scope="col" class="mp2-object-number">Allocato corrente</th>
                         <th scope="col" class="mp2-object-number">Effettivo</th>
-                        <th scope="col" class="mp2-object-number">Scostamento</th>
+                        <th scope="col" class="mp2-object-number">Scostamento operativo</th>
+                        <th scope="col" class="mp2-object-number">Residuo</th>
+                        <th scope="col" class="mp2-object-number">Massimo riportabile</th>
+                        <th scope="col">Rinvio ricevuto</th>
                         <th scope="col">Transizioni pianificate</th>
                     </tr>
                 </thead>
@@ -137,14 +165,24 @@
                             </td>
                             <td><span class="mp2-object-table-state">{{ $row['state'] }}</span></td>
                             <td>{{ $row['cost_center'] }}</td>
+                            <td class="mp2-object-number">{{ $row['estimates'] }}</td>
+                            <td class="mp2-object-number">{{ $row['received_carryover'] }}</td>
                             <td class="mp2-object-number">{{ $row['allocation'] }}</td>
                             <td class="mp2-object-number">{{ $row['actual'] }}</td>
                             <td class="mp2-object-number">{{ $row['variance'] }}</td>
+                            <td class="mp2-object-number">{{ $row['residual'] }}</td>
+                            <td class="mp2-object-number">{{ $row['maximum_transferable'] }}</td>
+                            <td>
+                                {{ $row['incoming_deferral_mode'] }} · {{ $row['incoming_deferral_amount'] }}
+                                @if ($row['carryover_above_current_maximum'])
+                                    <small class="mp2-object-table-secondary">Riporto provvisorio superiore al massimo corrente</small>
+                                @endif
+                            </td>
                             <td>{{ $row['future_transitions'] }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="mp2-object-table-empty">Nessuna situazione annuale disponibile.</td>
+                            <td colspan="13" class="mp2-object-table-empty">Nessuna situazione annuale disponibile.</td>
                         </tr>
                     @endforelse
                 </tbody>

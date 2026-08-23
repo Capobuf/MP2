@@ -4,6 +4,7 @@ namespace App\Actions\Operations;
 
 use App\Domain\Company\AuditEventType;
 use App\Domain\Projects\ProjectAuditSnapshot;
+use App\Domain\Projects\ProjectDeferralTerminalGuard;
 use App\Domain\Projects\ProjectState;
 use App\Domain\Projects\ProjectStateTimeline;
 use App\Domain\Projects\ProjectTransitionImpact;
@@ -47,6 +48,7 @@ class ReplaceProjectTransition
             $exercises = Exercise::query()->where('company_id', $company->id)->open()->orderBy('id')->lockForUpdate()->get();
             $project = Project::query()->lockForUpdate()->findOrFail($transition->project_id);
             $transitions = $project->transitions()->orderBy('effective_date')->orderBy('id')->lockForUpdate()->get();
+            $deferrals = $project->deferrals()->with('sourceExercise')->orderBy('id')->lockForUpdate()->get();
             $lockedTransition = $transitions->firstWhere('id', $transition->id);
             abort_unless($lockedTransition instanceof ProjectTransition, 404);
             Gate::forUser($actor)->authorize('update', $lockedTransition);
@@ -109,6 +111,7 @@ class ReplaceProjectTransition
             } catch (\DomainException $exception) {
                 throw ValidationException::withMessages(['transition' => $exception->getMessage()]);
             }
+            ProjectDeferralTerminalGuard::validate($project, $deferrals, $afterRows);
 
             $before = ProjectAuditSnapshot::transition($lockedTransition);
             $lockedTransition->update([

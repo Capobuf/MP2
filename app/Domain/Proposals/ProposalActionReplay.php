@@ -13,7 +13,7 @@ final class ProposalActionReplay
      * @param  iterable<int, ProposalAction>|null  $actions
      * @return array<string, mixed>
      */
-    public function replay(ProposalItem $item, array $freshSnapshot, ?iterable $actions = null): array
+    public function replay(ProposalItem $item, array $freshSnapshot, ?iterable $actions = null, bool $validateSemantic = true): array
     {
         $item->loadMissing(['proposal', 'expense', 'project', 'contract']);
         $working = clone $item;
@@ -44,11 +44,13 @@ final class ProposalActionReplay
             };
         }
 
-        match ($working->source_type) {
-            ProposalSourceType::Expense => ExpensePlan::validateForApproval($working),
-            ProposalSourceType::Project => ProjectPlan::validateForApproval($working),
-            ProposalSourceType::Contract => ContractPlan::validateForApproval($working),
-        };
+        if ($validateSemantic) {
+            match ($working->source_type) {
+                ProposalSourceType::Expense => ExpensePlan::validateForApproval($working),
+                ProposalSourceType::Project => ProjectPlan::validateForApproval($working),
+                ProposalSourceType::Contract => ContractPlan::validateForApproval($working),
+            };
+        }
 
         return $working->result;
     }

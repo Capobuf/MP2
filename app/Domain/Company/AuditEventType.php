@@ -39,6 +39,7 @@ enum AuditEventType: string
     case ProjectOverspendIncreased = 'project_overspend_increased';
     case ProjectArchived = 'project_archived';
     case ProjectRestored = 'project_restored';
+    case ProjectDeferralChanged = 'project_deferral_changed';
     case ContractCreated = 'contract_created';
     case ContractCensused = 'contract_censused';
     case ContractUpdated = 'contract_updated';
@@ -121,6 +122,7 @@ enum AuditEventType: string
             self::ProjectOverspendIncreased => 'Sovraspesa progetto aumentata',
             self::ProjectArchived => 'Progetto archiviato',
             self::ProjectRestored => 'Progetto ripristinato',
+            self::ProjectDeferralChanged => 'Rinvio progetto modificato',
             self::ContractCreated => 'Contratto creato',
             self::ContractCensused => 'Contratto censito tardivamente',
             self::ContractUpdated => 'Contratto modificato',

@@ -2,27 +2,35 @@
 
 namespace App\Filament\Resources\Projects\Pages;
 
+use App\Actions\Operations\ChangeProjectDeferral;
 use App\Actions\Operations\SetProjectArchived;
 use App\Actions\Operations\UpdateProjectClassification;
+use App\Domain\Projects\ProjectDeferralMode;
 use App\Domain\Projects\ProjectState;
 use App\Filament\Pages\CompanyAudit;
 use App\Filament\Resources\Projects\ProjectResource;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Project;
+use App\Models\ProjectDeferral;
 use App\Models\ProjectTransition;
+use App\Models\Supplier;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -145,6 +153,100 @@ class ViewProject extends ViewRecord
                     $action->confirm($actor, $this->record, $preview, (string) $data['operation_id']);
                     $this->record->refresh();
                 }),
+            Action::make('manage_deferral')
+                ->label('Gestisci rinvio')
+                ->icon('heroicon-m-arrow-right-circle')
+                ->color('gray')
+                ->outlined()
+                ->modalHeading('Gestisci rinvio del Progetto')
+                ->modalDescription('Sostituisce o rimuove un rinvio già applicato. I Budget esistenti restano invariati e i Draft interessati saranno da riallineare.')
+                ->modalSubmitActionLabel('Conferma cambio rinvio')
+                ->visible(fn (): bool => $this->canManageDeferral())
+                ->form([
+                    Select::make('deferral_id')
+                        ->label('Passaggio tra Esercizi')
+                        ->options(fn (): array => $this->manageableDeferrals()->mapWithKeys(
+                            fn (ProjectDeferral $deferral): array => [$deferral->id => $deferral->sourceExercise->year.' → '.$deferral->destinationExercise->year.' · '.$deferral->mode->label()],
+                        )->all())
+                        ->live()
+                        ->required(),
+                    Select::make('mode')
+                        ->label('Nuova modalità')
+                        ->options(function (Get $get): array {
+                            $deferral = ProjectDeferral::query()->find($get('deferral_id'));
+
+                            return match ($deferral?->mode) {
+                                ProjectDeferralMode::Carryover => [
+                                    ProjectDeferralMode::None->value => ProjectDeferralMode::None->label(),
+                                    ProjectDeferralMode::Reprogramming->value => ProjectDeferralMode::Reprogramming->label(),
+                                ],
+                                ProjectDeferralMode::Reprogramming => [
+                                    ProjectDeferralMode::None->value => ProjectDeferralMode::None->label(),
+                                    ProjectDeferralMode::Carryover->value => ProjectDeferralMode::Carryover->label(),
+                                ],
+                                default => [],
+                            };
+                        })
+                        ->live()
+                        ->required(),
+                    TextInput::make('carryover_amount')
+                        ->label('Riporto provvisorio')
+                        ->numeric()
+                        ->minValue(0.01)
+                        ->prefix('€')
+                        ->visible(fn (Get $get): bool => $get('mode') === ProjectDeferralMode::Carryover->value)
+                        ->required(fn (Get $get): bool => $get('mode') === ProjectDeferralMode::Carryover->value),
+                    Repeater::make('source_estimate_reductions')
+                        ->label('Stime origine da ridurre')
+                        ->schema([
+                            Select::make('source_line_id')
+                                ->label('Riga Stima')
+                                ->options(fn (Get $get): array => $this->reprogrammableLineOptions((int) $get('../../deferral_id')))
+                                ->required(),
+                            TextInput::make('reduction_amount')->label('Riduzione')->numeric()->minValue(0.01)->prefix('€')->required(),
+                            Select::make('destination_supplier_id')
+                                ->label('Fornitore destinazione')
+                                ->options(fn (): array => ['none' => 'Nessun Fornitore'] + Supplier::query()->where('company_id', $this->projectRecord()->company_id)->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all())
+                                ->required(),
+                        ])
+                        ->columns(3)
+                        ->minItems(1)
+                        ->visible(fn (Get $get): bool => $get('mode') === ProjectDeferralMode::Reprogramming->value)
+                        ->required(fn (Get $get): bool => $get('mode') === ProjectDeferralMode::Reprogramming->value),
+                    Textarea::make('reason')->label('Motivazione')->required()->maxLength(2000),
+                    Placeholder::make('deferral_preview')
+                        ->label('Anteprima esatta')
+                        ->content(fn (Get $get): string => $this->deferralPreviewText($get)),
+                    Checkbox::make('impact_confirmed')
+                        ->label('Confermo l’impatto corrente, il riallineamento dei Draft e l’immutabilità dei Budget esistenti')
+                        ->accepted()
+                        ->required(),
+                    Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
+                ])
+                ->action(function (array $data): void {
+                    $actor = auth()->user();
+                    abort_unless($actor instanceof User, 403);
+                    $deferral = ProjectDeferral::query()
+                        ->where('project_id', $this->projectRecord()->id)
+                        ->with(['sourceExercise', 'destinationExercise'])
+                        ->findOrFail((int) $data['deferral_id']);
+                    $input = $this->deferralInput($data);
+                    $action = app(ChangeProjectDeferral::class);
+                    $preview = $action->preview($actor, $this->projectRecord()->refresh(), $deferral->sourceExercise, $deferral->destinationExercise, $input);
+                    $action->execute(
+                        $actor,
+                        $this->projectRecord()->refresh(),
+                        $deferral->sourceExercise->refresh(),
+                        $deferral->destinationExercise->refresh(),
+                        $input,
+                        (string) $data['reason'],
+                        (string) $data['operation_id'],
+                        $preview['project_revision'],
+                        $preview['fingerprint'],
+                    );
+                    $this->record->refresh();
+                    Notification::make()->title('Rinvio del Progetto modificato')->success()->send();
+                }),
             Action::make('archive')
                 ->label('Archivia')
                 ->color('warning')
@@ -207,6 +309,96 @@ class ViewProject extends ViewRecord
             && $actor->can('update', $project)
             && ! $project->isArchived()
             && in_array($project->stateAtDate($today), [ProjectState::Closed, ProjectState::Cancelled], true);
+    }
+
+    private function canManageDeferral(): bool
+    {
+        $actor = auth()->user();
+
+        return $actor instanceof User
+            && $actor->can('update', $this->projectRecord())
+            && $this->manageableDeferrals()->isNotEmpty();
+    }
+
+    /** @return Collection<int, ProjectDeferral> */
+    private function manageableDeferrals(): Collection
+    {
+        return $this->projectRecord()->deferrals()
+            ->with(['sourceExercise', 'destinationExercise'])
+            ->whereIn('mode', [ProjectDeferralMode::Carryover->value, ProjectDeferralMode::Reprogramming->value])
+            ->get()
+            ->filter(fn (ProjectDeferral $deferral): bool => $deferral->sourceExercise->isOpen() && $deferral->destinationExercise->isOpen());
+    }
+
+    /** @return array<int, string> */
+    private function reprogrammableLineOptions(int $deferralId): array
+    {
+        $deferral = ProjectDeferral::query()->where('project_id', $this->projectRecord()->id)->find($deferralId);
+        if ($deferral === null) {
+            return [];
+        }
+
+        return $this->projectRecord()->expenses()
+            ->where('exercise_id', $deferral->source_exercise_id)
+            ->whereNull('reversed_at')
+            ->with(['lines' => fn ($query) => $query->where('type', 'estimate')->whereNull('annulled_at')->orderBy('id')])
+            ->orderBy('id')
+            ->get()
+            ->flatMap(fn ($expense) => $expense->lines->mapWithKeys(
+                fn ($line): array => [$line->id => $expense->originKey().' · '.$expense->description.' · € '.$line->amount],
+            ))
+            ->all();
+    }
+
+    private function deferralPreviewText(Get $get): string
+    {
+        $actor = auth()->user();
+        $deferral = ProjectDeferral::query()->where('project_id', $this->projectRecord()->id)->with(['sourceExercise', 'destinationExercise'])->find($get('deferral_id'));
+        if (! $actor instanceof User || $deferral === null || blank($get('mode'))) {
+            return 'Selezionare passaggio e nuova modalità per calcolare l’anteprima.';
+        }
+        try {
+            $preview = app(ChangeProjectDeferral::class)->preview(
+                $actor,
+                $this->projectRecord()->refresh(),
+                $deferral->sourceExercise,
+                $deferral->destinationExercise,
+                $this->deferralInput([
+                    'mode' => $get('mode'),
+                    'carryover_amount' => $get('carryover_amount'),
+                    'source_estimate_reductions' => $get('source_estimate_reductions'),
+                ]),
+            );
+        } catch (ValidationException $exception) {
+            return (string) (collect($exception->errors())->flatten()->first() ?? 'Anteprima non disponibile.');
+        }
+
+        return 'Allocato origine disponibile: € '.$preview['source_allocation']
+            .' · Effettivo origine: € '.$preview['source_actual']
+            .' · Massimo riportabile: € '.$preview['maximum_transferable']
+            .' · Righe origine ripristinate: '.$preview['source_lines_restored']
+            .' · Righe destinazione annullate: '.$preview['destination_lines_annulled']
+            .'. Le allocazioni indipendenti non verranno modificate.';
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function deferralInput(array $data): array
+    {
+        return [
+            'mode' => $data['mode'] ?? null,
+            'carryover_amount' => $data['carryover_amount'] ?? null,
+            'source_estimate_reductions' => collect((array) ($data['source_estimate_reductions'] ?? []))->map(function (mixed $reduction): array {
+                $row = is_array($reduction) ? $reduction : [];
+                if (($row['destination_supplier_id'] ?? null) === 'none') {
+                    $row['destination_supplier_id'] = null;
+                }
+
+                return $row;
+            })->values()->all(),
+        ];
     }
 
     private function canRestore(): bool

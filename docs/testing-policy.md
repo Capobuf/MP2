@@ -118,29 +118,21 @@ owning slice is implemented.
 
 ## Local workflow
 
-During implementation:
+During implementation, run the smallest relevant checks needed for fast feedback.
 
-1. run the smallest relevant test;
-2. run the current story/slice test group;
-3. before phase completion, run the complete implemented suite.
+Run broader focused tests when a coherent behavior is complete.
 
-Do not rerun the full suite after every cosmetic edit.
+Do not rerun the full repository suite after every implementation step or cosmetic
+change.
+
+Before declaring a complete feature or slice finished, run the same repository-wide
+quality gates required by the current CI workflow.
 
 ## Pull-request CI
 
-Baseline gates:
+The current `.github/workflows/quality.yml` is the executable source of truth for the
+repository-wide CI gate.
 
-1. `composer validate --strict`;
-2. `composer audit --locked --no-interaction`;
-3. Pint in check mode;
-4. Larastan;
-5. test DB initialization/migrations;
-6. Pest suite;
-7. application bootstrap/smoke verification.
-
-Frontend build is absent until Vite is introduced by a future slice.
-
-Dusk is added only to workflows for slices that actually require it.
 
 ## CI performance
 

@@ -13,6 +13,7 @@ use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\Project;
 use App\Models\ProjectContractLink;
+use App\Models\ProjectDeferral;
 use App\Models\Proposal;
 use App\Models\ProposalItem;
 use Carbon\CarbonImmutable;
@@ -34,12 +35,14 @@ final class BudgetSnapshotPayload
         foreach ($proposal->items->sortBy('id') as $item) {
             $live = self::liveIdentity($item, $identities);
             $allocation = self::allocation($live, $proposal->exercise_id);
+            $carryover = $live instanceof Project ? self::carryover($live, $proposal->exercise_id) : '0.00';
+            $estimates = $live instanceof Project ? Decimal::subtract($allocation, $carryover) : $allocation;
             if ($live instanceof Project || $live instanceof Contract || ($live->project_id === null && $live->contract_id === null)) {
                 $totalParts[] = $allocation;
             }
             $actions = $item->actions->sortBy('sequence')->map(fn ($action): array => [
                 'sequence' => $action->sequence, 'type' => $action->action_type->value, 'payload_version' => $action->payload_version,
-                'payload' => $action->payload, 'reason' => $action->reason,
+                'payload' => self::budgetActionPayload($action->action_type, $action->payload), 'reason' => $action->reason,
             ])->values()->all();
             $common = [
                 'schema_version' => 1,
@@ -67,7 +70,8 @@ final class BudgetSnapshotPayload
                 'supplier_id' => $live instanceof Project ? null : $live->supplier_id,
                 'supplier_label' => $live instanceof Project ? null : $live->supplier()->value('legal_name'),
                 'cost_center_id' => $costCenterId, 'cost_center_label' => self::costCenterLabel($costCenterId),
-                'approved_estimates' => $allocation, 'approved_carryover' => '0.00', 'carryover_state' => null,
+                'approved_estimates' => $estimates, 'approved_carryover' => $carryover,
+                'carryover_state' => Decimal::compare($carryover, '0.00') > 0 ? 'provisional' : null,
                 'approved_allocation' => $allocation,
                 'start_state' => self::state($live, $proposal->exercise->year.'-01-01'),
                 'end_state' => self::state($live, $proposal->exercise->year.'-12-31'),
@@ -113,7 +117,8 @@ final class BudgetSnapshotPayload
     /** @return array<string, mixed> */
     private static function projectDetail(Project $project, Proposal $proposal, ProposalItem $item): array
     {
-        $project->loadMissing(['transitions', 'expenses.lines', 'expenses.supplier', 'classifications.costCenter']);
+        $project->loadMissing(['transitions', 'expenses.lines', 'expenses.supplier', 'classifications.costCenter', 'deferrals']);
+        $deferral = $project->deferrals->firstWhere('destination_exercise_id', $proposal->exercise_id);
         $expenses = $project->expenses->where('exercise_id', $proposal->exercise_id)->sortBy('id')->map(fn (Expense $expense): array => [
             'expense_id' => $expense->id, 'description' => $expense->description,
             'supplier' => ['id' => $expense->supplier_id, 'label' => $expense->supplier?->legal_name],
@@ -133,9 +138,14 @@ final class BudgetSnapshotPayload
             'start_state' => self::state($project, $proposal->exercise->year.'-01-01'),
             'end_state' => self::state($project, $proposal->exercise->year.'-12-31'),
             'approved_transitions' => $transitionActions,
-            'deferral_mode' => 'none', 'approved_carryover' => '0.00', 'approved_reprogrammed_amount' => '0.00',
+            'deferral_mode' => $deferral?->mode->value ?? 'none',
+            'approved_carryover' => $deferral?->mode->value === 'carryover' ? (string) $deferral->carryover_amount : '0.00',
+            'carryover_state' => $deferral?->carryover_state,
+            'approved_reprogrammed_amount' => $deferral?->mode->value === 'reprogramming' ? (string) $deferral->reprogrammed_amount : '0.00',
+            'reprogramming_operation_id' => $deferral?->reprogramming_operation_id,
+            'reprogramming_effects' => $deferral?->reprogramming_effects,
             'cost_center' => ['id' => self::costCenterId($project, $proposal->exercise_id), 'label' => self::costCenterLabel(self::costCenterId($project, $proposal->exercise_id))],
-            'approved_estimate_total' => self::allocation($project, $proposal->exercise_id), 'expenses' => $expenses,
+            'approved_estimate_total' => Decimal::subtract(self::allocation($project, $proposal->exercise_id), self::carryover($project, $proposal->exercise_id)), 'expenses' => $expenses,
         ];
     }
 
@@ -218,6 +228,28 @@ final class BudgetSnapshotPayload
             $live instanceof Project => $live->annualTotals()[$exerciseId]['allocation'] ?? '0.00',
             $live instanceof Contract => $live->annualTotals()[$exerciseId]['allocation'] ?? '0.00',
         };
+    }
+
+    private static function carryover(Project $project, int $exerciseId): string
+    {
+        $deferral = $project->relationLoaded('deferrals')
+            ? $project->deferrals->firstWhere('destination_exercise_id', $exerciseId)
+            : ProjectDeferral::query()->where('project_id', $project->id)->where('destination_exercise_id', $exerciseId)->first();
+
+        return $deferral?->mode->value === 'carryover' ? (string) $deferral->carryover_amount : '0.00';
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private static function budgetActionPayload(ProposalActionType $type, array $payload): array
+    {
+        if ($type === ProposalActionType::PlanProjectDeferral) {
+            unset($payload['source_context']);
+        }
+
+        return $payload;
     }
 
     private static function costCenterId(Expense|Project|Contract $live, int $exerciseId): ?int
