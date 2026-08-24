@@ -19,6 +19,13 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::table('project_deferrals')
+            ->where('mode', 'carryover')
+            ->where('carryover_state', 'consolidated')
+            ->exists()) {
+            throw new RuntimeException('Cannot restore the previous constraint while consolidated Project Carryovers exist.');
+        }
+
         DB::statement('ALTER TABLE project_deferrals DROP CHECK project_deferrals_closed_values');
         DB::statement(
             'ALTER TABLE project_deferrals ADD CONSTRAINT project_deferrals_closed_values CHECK ('

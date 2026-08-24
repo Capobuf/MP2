@@ -11,6 +11,8 @@ use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
+use App\Models\Project;
+use App\Models\ProjectDeferral;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
@@ -138,4 +140,48 @@ it('keeps the reviewed fingerprint while acknowledging warnings and confirms Clo
     $component->call('closeExercise')->assertHasNoErrors();
     expect($exercise->refresh()->isOpen())->toBeFalse()
         ->and(ClosingSnapshot::query()->where('exercise_id', $exercise->id)->count())->toBe(1);
+});
+
+it('confirms a newly reviewed Closing-time Reprogramming without changing its fingerprint', function (): void {
+    CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
+    $company = Company::factory()->create();
+    $closer = s9UiUser($company, [Capability::View, Capability::CloseExercise]);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
+    $project = Project::factory()->for($company)->create([
+        'initial_state' => 'open',
+        'initial_effective_date' => '2025-01-01',
+    ]);
+    $expense = Expense::factory()->forExercise($exercise)->for($project)->create();
+    $estimate = ExpenseLine::factory()->for($expense)->create(['amount' => '100.00']);
+    ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '20.00']);
+    $this->actingAs($closer);
+    Filament::setTenant($company);
+
+    $component = Livewire::test(CloseExercisePage::class, ['record' => $exercise->id])
+        ->set('closing.management_continues', true)
+        ->set("closing.projects.{$project->id}.mode", 'reprogramming')
+        ->set("closing.projects.{$project->id}.reason", 'Riprogrammazione finale')
+        ->set("closing.projects.{$project->id}.reductions.{$estimate->id}.selected", true)
+        ->set("closing.projects.{$project->id}.reductions.{$estimate->id}.reduction_amount", '30.00')
+        ->set("closing.projects.{$project->id}.reductions.{$estimate->id}.destination_supplier_id", 'none')
+        ->call('reviewClosing')
+        ->assertHasNoErrors();
+    $fingerprint = $component->get('reviewFingerprint');
+
+    $component
+        ->set('closing.warnings_acknowledged', true)
+        ->set('closing.confirmed', true)
+        ->call('closeExercise')
+        ->assertHasNoErrors();
+
+    $destination = Exercise::query()
+        ->where('company_id', $company->id)
+        ->where('year', 2026)
+        ->sole();
+
+    expect($fingerprint)->toBeString()
+        ->and($estimate->refresh()->amount)->toBe('70.00')
+        ->and(ProjectDeferral::query()->where('project_id', $project->id)->sole()->reprogrammed_amount)->toBe('30.00')
+        ->and(Expense::query()->where('project_id', $project->id)->where('exercise_id', $destination->id)->sole()->allocation())->toBe('30.00')
+        ->and($exercise->refresh()->isOpen())->toBeFalse();
 });

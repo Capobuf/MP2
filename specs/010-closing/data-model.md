@@ -143,10 +143,12 @@ Materialize:
 - contractual start;
 - next expiry known at Closing;
 - automatic renewal/duration/notice facts;
-- active conditions whose interval overlaps the Exercise or that produce an
-  attribution date in the Exercise;
+- all conditions whose interval overlaps the Exercise or that produce an
+  attribution date in the Exercise, including their annulled state; only valid
+  conditions contribute to economic calculations;
 - annual Estimate composition with cycle start and attribution date;
-- lifecycle/renewal events effective in the Exercise;
+- lifecycle/renewal facts whose declared contractual, state-change or renewed-expiry
+  date falls in the Exercise;
 - final Estimate total;
 - Closing Actual;
 - operational variance;

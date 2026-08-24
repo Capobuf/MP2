@@ -177,17 +177,17 @@ class CloseExercise extends Page
     public function closeExercise(): void
     {
         $this->resetErrorBag();
-        if ($this->reviewFingerprint === null || $this->executionFingerprint === null) {
+        if ($this->preparedInput === null || $this->reviewFingerprint === null || $this->executionFingerprint === null) {
             $this->addError('closing', 'Ricalcolare il riepilogo prima di confermare la Chiusura.');
 
             return;
         }
 
         try {
-            $prepared = app(PrepareExerciseClosing::class)->execute(
+            $prepared = app(PrepareExerciseClosing::class)->executePrepared(
                 $this->actor(),
                 $this->exercise(),
-                $this->closingInput(),
+                $this->preparedInput,
             );
             if (! hash_equals($this->reviewFingerprint, $prepared['review']->fingerprint())) {
                 $this->review = null;

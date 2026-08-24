@@ -24,7 +24,17 @@ final class PrepareExerciseClosing
     public function execute(User $actor, Exercise $exercise, array $input): array
     {
         $normalized = $this->normalize->execute($exercise, $input);
-        $economicReview = $this->review->execute($actor, $exercise, $normalized);
+
+        return $this->executePrepared($actor, $exercise, $normalized);
+    }
+
+    /**
+     * @param  array<string, mixed>  $preparedInput
+     * @return array{input: array<string, mixed>, review: ClosingReview, execution_fingerprint: string}
+     */
+    public function executePrepared(User $actor, Exercise $exercise, array $preparedInput): array
+    {
+        $economicReview = $this->review->execute($actor, $exercise, $preparedInput);
         $executionFingerprint = $economicReview->fingerprint();
         $affectedExercises = $this->withNewExerciseContractImpact($exercise, $economicReview);
         $overspendBlocks = ClosingOverspendNotes::missingRequired($exercise->company, $exercise);
@@ -47,7 +57,7 @@ final class PrepareExerciseClosing
         );
 
         return [
-            'input' => $normalized,
+            'input' => $preparedInput,
             'review' => $review,
             'execution_fingerprint' => $executionFingerprint,
         ];

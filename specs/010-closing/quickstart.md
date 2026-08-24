@@ -315,6 +315,24 @@ git diff --check
 
 ## Evidence
 
+Convergence correction evidence recorded on 2026-08-24:
+
+- focused UI, Contract Snapshot and migration regressions: **9 tests, 58 assertions,
+  PASS**;
+- complete Closing group: **31 tests, 188 assertions, PASS**;
+- full Pest suite: **552 tests, 3956 assertions, PASS**;
+- Composer strict validation and locked audit: PASS, no advisories;
+- isolated MySQL testing migration: PASS;
+- frontend Vite build: PASS;
+- Pint test mode: PASS;
+- PHPStan without progress output: PASS;
+- the Closing-time Reprogramming Livewire journey now preserves the prepared plan
+  across review and confirmation;
+- Contract Snapshot regressions prove year-end expiry retention and historical
+  retention of overlapping annulled conditions without economic contribution;
+- the consolidated-Carryover corrective migration now rejects an incompatible
+  rollback before removing the current CHECK constraint.
+
 Independent review evidence recorded on 2026-08-23:
 
 - focused S9 plus touched S3-S8 regressions: **60 tests, 414 assertions, PASS**;

@@ -1,7 +1,7 @@
 # Implementation Plan: Closing
 
-**Branch**: `main`  
-**Feature**: `specs/010-closing`  
+**Branch**: `spec/s9-closing`
+**Feature**: `specs/010-closing`
 **Canonical authority**: `docs/domain/Specifica_Canonica_Semplificata_v4.md`
 
 ## Summary

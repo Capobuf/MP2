@@ -1,10 +1,10 @@
 # Feature Specification: Closing
 
-**Feature Branch**: `main`  
-**Roadmap ID**: S9  
-**Status**: Ready for implementation  
-**Canonical authority**: `docs/domain/Specifica_Canonica_Semplificata_v4.md`  
-**Canonical primary requirements**: FR-034–FR-041  
+**Feature Branch**: `spec/s9-closing`
+**Roadmap ID**: S9
+**Status**: Implemented — pending review
+**Canonical authority**: `docs/domain/Specifica_Canonica_Semplificata_v4.md`
+**Canonical primary requirements**: FR-034–FR-041
 **Canonical primary invariants**: 28.25–28.28, 28.49, 28.58
 
 ## Scope

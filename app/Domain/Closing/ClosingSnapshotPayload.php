@@ -189,8 +189,8 @@ final class ClosingSnapshotPayload
     {
         $totals = $contract->annualTotals()[$exercise->id] ?? ['allocation' => '0.00', 'actual' => '0.00', 'has_actuals' => false];
         $state = $contract->stateAtDate($yearEnd->toDateString());
-        $conditionInYear = $contract->conditions->contains(fn (ContractCondition $condition): bool => self::conditionOverlaps($condition, $yearStart, $yearEnd));
-        $eventInYear = $contract->lifecycleFacts->contains(fn (ContractLifecycleFact $fact): bool => self::lifecycleEffectiveDate($fact)->betweenIncluded($yearStart, $yearEnd));
+        $conditionInYear = $contract->conditions->contains(fn (ContractCondition $condition): bool => self::validConditionOverlaps($condition, $yearStart, $yearEnd));
+        $eventInYear = $contract->lifecycleFacts->contains(fn (ContractLifecycleFact $fact): bool => self::lifecycleOccursInExercise($fact, $yearStart, $yearEnd));
 
         return Decimal::compare((string) $totals['allocation'], '0.00') !== 0
             || (bool) $totals['has_actuals']
@@ -333,7 +333,7 @@ final class ClosingSnapshotPayload
         $costCenter = $classification === null ? null : $classification->costCenter;
         $compositionConditionIds = collect($annual->composition)->pluck('condition_id')->map(fn (mixed $id): int => (int) $id)->unique();
         $conditions = $contract->conditions
-            ->filter(fn (ContractCondition $condition): bool => self::conditionOverlaps($condition, $yearStart, $yearEnd)
+            ->filter(fn (ContractCondition $condition): bool => self::conditionIntervalOverlaps($condition, $yearStart, $yearEnd)
                 || $compositionConditionIds->contains($condition->id))
             ->sortBy('valid_from')
             ->map(fn (ContractCondition $condition): array => [
@@ -347,7 +347,7 @@ final class ClosingSnapshotPayload
                 'reason' => $condition->reason,
             ])->values()->all();
         $lifecycle = $contract->lifecycleFacts
-            ->filter(fn (ContractLifecycleFact $fact): bool => self::lifecycleEffectiveDate($fact)->betweenIncluded($yearStart, $yearEnd))
+            ->filter(fn (ContractLifecycleFact $fact): bool => self::lifecycleOccursInExercise($fact, $yearStart, $yearEnd))
             ->sortBy(fn (ContractLifecycleFact $fact): string => self::lifecycleEffectiveDate($fact)->toDateString())
             ->map(fn (ContractLifecycleFact $fact): array => [
                 'id' => $fact->id,
@@ -506,14 +506,34 @@ final class ClosingSnapshotPayload
         ])->values()->all();
     }
 
-    private static function conditionOverlaps(ContractCondition $condition, CarbonImmutable $yearStart, CarbonImmutable $yearEnd): bool
+    private static function validConditionOverlaps(ContractCondition $condition, CarbonImmutable $yearStart, CarbonImmutable $yearEnd): bool
     {
         if ($condition->isAnnulled()) {
             return false;
         }
 
-        return ! $condition->validFrom()->greaterThan($yearEnd)
-            && ($condition->validTo() === null || ! $condition->validTo()->lessThan($yearStart));
+        return self::conditionIntervalOverlaps($condition, $yearStart, $yearEnd);
+    }
+
+    private static function conditionIntervalOverlaps(ContractCondition $condition, CarbonImmutable $yearStart, CarbonImmutable $yearEnd): bool
+    {
+        $validFrom = $condition->validFrom()->toDateString();
+        $validTo = $condition->validTo()?->toDateString();
+
+        return $validFrom <= $yearEnd->toDateString()
+            && ($validTo === null || $validTo >= $yearStart->toDateString());
+    }
+
+    private static function lifecycleOccursInExercise(ContractLifecycleFact $fact, CarbonImmutable $yearStart, CarbonImmutable $yearEnd): bool
+    {
+        foreach ([$fact->declaredContractualDate(), $fact->stateChangeDate(), $fact->renewedExpiryDate()] as $date) {
+            $value = $date?->toDateString();
+            if ($value !== null && $value >= $yearStart->toDateString() && $value <= $yearEnd->toDateString()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function lifecycleEffectiveDate(ContractLifecycleFact $fact): CarbonImmutable
