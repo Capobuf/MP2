@@ -56,7 +56,7 @@ class RecalculateContractEstimates
         string $operationId,
         int &$sequence,
     ): array {
-        $contract->load(['conditions', 'lifecycleFacts']);
+        $contract->load(['conditions', 'lifecycleFacts', 'renewalConfigurations']);
         $impacts = [];
 
         foreach ($exercises as $exercise) {
@@ -71,6 +71,7 @@ class RecalculateContractEstimates
                     $contract->contractualStartDate()->toDateString(),
                     $contract->lifecycleFacts,
                     $date,
+                    $contract->renewalConfigurations,
                 ),
             );
             $expense = Expense::query()
@@ -101,8 +102,10 @@ class RecalculateContractEstimates
                 ]);
             } elseif ($expense !== null) {
                 $line = $expense->lines()->where('type', ExpenseLineType::Estimate->value)->lockForUpdate()->sole();
-                $line->update(['amount' => $allocation->amount]);
-                $expense->increment('revision');
+                if (Decimal::compare((string) $line->amount, $allocation->amount) !== 0) {
+                    $line->update(['amount' => $allocation->amount]);
+                    $expense->increment('revision');
+                }
             }
 
             $impacts[$exercise->id] = [

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Contracts\ContractClosedHistoryGuard;
 use Database\Factories\ContractRenewalConfigurationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,6 +22,16 @@ class ContractRenewalConfiguration extends Model
 
     protected static function booted(): void
     {
+        static::creating(function (self $configuration): void {
+            if (ContractClosedHistoryGuard::historicalRegistrationAllowed() || (int) $configuration->company_id < 1) {
+                return;
+            }
+            $effective = $configuration->getAttribute('effective_from');
+            if ($effective !== null) {
+                $date = $effective instanceof \DateTimeInterface ? $effective->format('Y-m-d') : (string) $effective;
+                ContractClosedHistoryGuard::assertEventDateIsMutable((int) $configuration->company_id, $date);
+            }
+        });
         static::updating(function (): never {
             throw new \LogicException('Contract renewal configurations are append-only.');
         });

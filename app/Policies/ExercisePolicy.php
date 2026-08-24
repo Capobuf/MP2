@@ -31,6 +31,11 @@ class ExercisePolicy
         return $user->hasCapability($exercise->company, Capability::ManageOperations);
     }
 
+    public function close(User $user, Exercise $exercise): bool
+    {
+        return $user->hasCapability($exercise->company, Capability::CloseExercise);
+    }
+
     public function delete(User $user, Exercise $exercise): bool
     {
         return false;

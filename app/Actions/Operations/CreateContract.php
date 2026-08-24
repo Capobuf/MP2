@@ -4,6 +4,7 @@ namespace App\Actions\Operations;
 
 use App\Domain\Company\AuditEventType;
 use App\Domain\Contracts\ContractAttributionMode;
+use App\Domain\Contracts\ContractClosedHistoryGuard;
 use App\Domain\Contracts\ContractCycleType;
 use App\Domain\Contracts\ContractRenewalSchedule;
 use App\Models\AuditEvent;
@@ -95,36 +96,42 @@ class CreateContract
                 'renewal_duration_months' => $validated['renewal_duration_months'],
                 'notice_days' => $validated['notice_days'],
             ]);
-            $configuration = ContractRenewalConfiguration::query()->create([
-                'company_id' => $lockedCompany->id,
-                'contract_id' => $contract->id,
-                'effective_from' => $validated['renewal_effective_from'],
-                'automatic_renewal' => $validated['automatic_renewal'],
-                'expiry_anchor_date' => $anchor,
-                'renewal_duration_months' => $validated['renewal_duration_months'],
-                'notice_days' => $validated['notice_days'],
-                'created_by_id' => $actor->id,
-            ]);
-            $activation = ContractLifecycleFact::query()->create([
-                'company_id' => $lockedCompany->id,
-                'contract_id' => $contract->id,
-                'type' => 'activation',
-                'declared_contractual_date' => $validated['contractual_start_date'],
-                'state_change_date' => $validated['contractual_start_date'],
-                'created_by_id' => $actor->id,
-            ]);
-            $conditions = collect($validated['conditions'])
-                ->sortBy('valid_from')
-                ->map(fn (array $condition): ContractCondition => ContractCondition::query()->create([
-                    'company_id' => $lockedCompany->id,
-                    'contract_id' => $contract->id,
-                    'cycle' => $condition['cycle'],
-                    'attribution_mode' => $condition['attribution_mode'],
-                    'amount' => $condition['amount'],
-                    'valid_from' => $condition['valid_from'],
-                    'valid_to' => $condition['valid_to'],
-                    'created_by_id' => $actor->id,
-                ]));
+            [$configuration, $activation, $conditions] = ContractClosedHistoryGuard::duringHistoricalRegistration(
+                function () use ($actor, $contract, $lockedCompany, $validated, $anchor): array {
+                    $configuration = ContractRenewalConfiguration::query()->create([
+                        'company_id' => $lockedCompany->id,
+                        'contract_id' => $contract->id,
+                        'effective_from' => $validated['renewal_effective_from'],
+                        'automatic_renewal' => $validated['automatic_renewal'],
+                        'expiry_anchor_date' => $anchor,
+                        'renewal_duration_months' => $validated['renewal_duration_months'],
+                        'notice_days' => $validated['notice_days'],
+                        'created_by_id' => $actor->id,
+                    ]);
+                    $activation = ContractLifecycleFact::query()->create([
+                        'company_id' => $lockedCompany->id,
+                        'contract_id' => $contract->id,
+                        'type' => 'activation',
+                        'declared_contractual_date' => $validated['contractual_start_date'],
+                        'state_change_date' => $validated['contractual_start_date'],
+                        'created_by_id' => $actor->id,
+                    ]);
+                    $conditions = collect($validated['conditions'])
+                        ->sortBy('valid_from')
+                        ->map(fn (array $condition): ContractCondition => ContractCondition::query()->create([
+                            'company_id' => $lockedCompany->id,
+                            'contract_id' => $contract->id,
+                            'cycle' => $condition['cycle'],
+                            'attribution_mode' => $condition['attribution_mode'],
+                            'amount' => $condition['amount'],
+                            'valid_from' => $condition['valid_from'],
+                            'valid_to' => $condition['valid_to'],
+                            'created_by_id' => $actor->id,
+                        ]));
+
+                    return [$configuration, $activation, $conditions];
+                },
+            );
 
             foreach ($exercises as $exercise) {
                 ContractExerciseClassification::query()->create([
@@ -164,15 +171,17 @@ class CreateContract
             if ($validated['automatic_renewal'] && $anchor !== null) {
                 $schedule = ContractRenewalSchedule::fromAnchor($anchor, (int) $validated['renewal_duration_months'], $today->toDateString());
                 foreach ($schedule->elapsed as $expiry) {
-                    $renewal = ContractLifecycleFact::query()->create([
-                        'company_id' => $lockedCompany->id,
-                        'contract_id' => $contract->id,
-                        'type' => 'renewal',
-                        'declared_contractual_date' => $expiry,
-                        'renewed_expiry_date' => $expiry,
-                        'renewal_configuration_id' => $configuration->id,
-                        'created_by_id' => $actor->id,
-                    ]);
+                    $renewal = ContractClosedHistoryGuard::duringAutomaticMaterialization(
+                        fn (): ContractLifecycleFact => ContractLifecycleFact::query()->create([
+                            'company_id' => $lockedCompany->id,
+                            'contract_id' => $contract->id,
+                            'type' => 'renewal',
+                            'declared_contractual_date' => $expiry,
+                            'renewed_expiry_date' => $expiry,
+                            'renewal_configuration_id' => $configuration->id,
+                            'created_by_id' => $actor->id,
+                        ]),
+                    );
                     $this->event($actor, $contract, $validated['operation_id'], $sequence++, AuditEventType::ContractRenewed, $affectedIds, [
                         'lifecycle_fact_id' => $renewal->id,
                         'renewed_expiry_date' => $expiry,

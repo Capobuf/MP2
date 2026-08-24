@@ -41,14 +41,14 @@ changing its traceability anchor.
 | FR-031 | Più Esercizi Aperti | §11.1 | S3 — Esercizi, Spese e Righe | verified |
 | FR-032 | Divieto di Effettivi in un anno futuro | §11.3 | S3 — Esercizi, Spese e Righe | verified |
 | FR-033 | Dichiarazione annuale autoritativa dell'Effettivo | §§6.4, 11.3 | S3 — Esercizi, Spese e Righe | verified |
-| FR-034 | Chiusura cronologica | §11.5 | S9 — Chiusura | planned |
-| FR-035 | Nessuna riapertura globale | §§11.6, 14.9 | S9 — Chiusura | planned |
-| FR-036 | Stato di Chiusura al 31 dicembre | §§9.2, 14.1 | S9 — Chiusura | planned |
-| FR-037 | Controlli bloccanti di Chiusura | §14.3 | S9 — Chiusura | planned |
-| FR-038 | Avviso generale Allocato positivo e assenza di Effettivi | §14.4 | S9 — Chiusura | planned |
-| FR-039 | Chiusura atomica | §14.7 | S9 — Chiusura | planned |
-| FR-040 | Creazione condizionale di N+1 | §§11.7, 14.7 | S9 — Chiusura | planned |
-| FR-041 | Chiusura senza Budget | §14.2 | S9 — Chiusura | planned |
+| FR-034 | Chiusura cronologica | §11.5 | S9 — Chiusura | implemented |
+| FR-035 | Nessuna riapertura globale | §§11.6, 14.9 | S9 — Chiusura | implemented |
+| FR-036 | Stato di Chiusura al 31 dicembre | §§9.2, 14.1 | S9 — Chiusura | implemented |
+| FR-037 | Controlli bloccanti di Chiusura | §14.3 | S9 — Chiusura | implemented |
+| FR-038 | Avviso generale Allocato positivo e assenza di Effettivi | §14.4 | S9 — Chiusura | implemented |
+| FR-039 | Chiusura atomica | §14.7 | S9 — Chiusura | implemented |
+| FR-040 | Creazione condizionale di N+1 | §§11.7, 14.7 | S9 — Chiusura | implemented |
+| FR-041 | Chiusura senza Budget | §14.2 | S9 — Chiusura | implemented |
 | FR-042 | Correzione tardiva append-only | §24 | S10 — Correzioni post-Chiusura | planned |
 | FR-043 | Distinzione Chiusura e Conoscenza Corrente | §§6.10–6.12, 24.11 | S11 — Reportistica ed esportazione | planned |
 | FR-044 | Nessuna riclassificazione economica storica | §§14.9, 24.10 | S10 — Correzioni post-Chiusura | planned |

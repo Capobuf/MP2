@@ -53,6 +53,18 @@ class ProjectDeferral extends Model
             if ($destination->year !== $source->year + 1) {
                 throw ValidationException::withMessages(['destination_exercise_id' => 'L’Esercizio destinazione deve essere immediatamente successivo.']);
             }
+            if (! $source->isOpen() && (! $deferral->exists || $deferral->isDirty([
+                'mode',
+                'carryover_amount',
+                'carryover_state',
+                'reprogrammed_amount',
+                'reprogramming_operation_id',
+                'reprogramming_effects',
+            ]))) {
+                throw ValidationException::withMessages([
+                    'deferral' => 'Il rinvio consolidato di un Esercizio Chiuso non può essere modificato.',
+                ]);
+            }
         });
 
         static::deleting(function (): never {

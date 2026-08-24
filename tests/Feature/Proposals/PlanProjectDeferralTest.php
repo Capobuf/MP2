@@ -184,7 +184,7 @@ it('rejects unauthorized, foreign and Closed Proposal deferral planning atomical
         'mode' => 'carryover', 'carryover_amount' => '10.00',
     ], 'Altro tenant', (string) Str::uuid(), 0))->toThrow(ValidationException::class);
 
-    $source->update(['status' => 'closed']);
+    closeExerciseFixture($source, $actor);
     expect(fn () => app(PlanProjectDeferral::class)->execute($actor, $proposal, $item, [
         'source_exercise_id' => $source->id, 'destination_exercise_id' => $destination->id,
         'mode' => 'carryover', 'carryover_amount' => '10.00',

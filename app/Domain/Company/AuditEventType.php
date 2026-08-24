@@ -19,6 +19,11 @@ enum AuditEventType: string
     case CostCenterArchived = 'cost_center_archived';
     case CostCenterRestored = 'cost_center_restored';
     case ExerciseCreated = 'exercise_created';
+    case ExerciseClosingStarted = 'exercise_closing_started';
+    case ExerciseClosingConfirmed = 'exercise_closing_confirmed';
+    case ExerciseClosed = 'exercise_closed';
+    case ExerciseClosingFailed = 'exercise_closing_failed';
+    case NextExerciseNotCreated = 'next_exercise_not_created';
     case ExpenseCreated = 'expense_created';
     case ExpenseUpdated = 'expense_updated';
     case ExpenseMovedOrReclassified = 'expense_moved_or_reclassified';
@@ -40,6 +45,9 @@ enum AuditEventType: string
     case ProjectArchived = 'project_archived';
     case ProjectRestored = 'project_restored';
     case ProjectDeferralChanged = 'project_deferral_changed';
+    case ProjectCarryoverConsolidated = 'project_carryover_consolidated';
+    case ProjectClosedWithSaving = 'project_closed_with_saving';
+    case ProjectCancelledWithUnusedAllocation = 'project_cancelled_with_unused_allocation';
     case ContractCreated = 'contract_created';
     case ContractCensused = 'contract_censused';
     case ContractUpdated = 'contract_updated';
@@ -102,6 +110,11 @@ enum AuditEventType: string
             self::CostCenterArchived => 'Centro di Costo archiviato',
             self::CostCenterRestored => 'Centro di Costo ripristinato',
             self::ExerciseCreated => 'Esercizio creato',
+            self::ExerciseClosingStarted => 'Chiusura Esercizio avviata',
+            self::ExerciseClosingConfirmed => 'Chiusura Esercizio confermata',
+            self::ExerciseClosed => 'Esercizio Chiuso',
+            self::ExerciseClosingFailed => 'Chiusura Esercizio fallita',
+            self::NextExerciseNotCreated => 'Esercizio successivo non creato',
             self::ExpenseCreated => 'Spesa creata',
             self::ExpenseUpdated => 'Spesa modificata',
             self::ExpenseMovedOrReclassified => 'Spesa spostata o riclassificata',
@@ -123,6 +136,9 @@ enum AuditEventType: string
             self::ProjectArchived => 'Progetto archiviato',
             self::ProjectRestored => 'Progetto ripristinato',
             self::ProjectDeferralChanged => 'Rinvio progetto modificato',
+            self::ProjectCarryoverConsolidated => 'Riporto progetto consolidato',
+            self::ProjectClosedWithSaving => 'Progetto Chiuso con Risparmio',
+            self::ProjectCancelledWithUnusedAllocation => 'Progetto Cancellato con Allocato non utilizzato',
             self::ContractCreated => 'Contratto creato',
             self::ContractCensused => 'Contratto censito tardivamente',
             self::ContractUpdated => 'Contratto modificato',
