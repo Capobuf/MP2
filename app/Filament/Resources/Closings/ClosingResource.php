@@ -68,7 +68,23 @@ class ClosingResource extends Resource
         $company = Filament::getTenant();
 
         return $company instanceof Company
-            ? parent::getEloquentQuery()->whereBelongsTo($company)->with(['exercise', 'closer', 'initialBudget', 'currentBudget', 'nextExercise', 'rows'])
+            ? parent::getEloquentQuery()->whereBelongsTo($company)->with([
+                'exercise',
+                'closer',
+                'initialBudget',
+                'currentBudget',
+                'nextExercise',
+                'rows',
+                'lateCorrections.company',
+                'lateCorrections.expense',
+                'lateCorrections.expenseLine',
+                'lateCorrections.originalExpenseLine',
+                'lateCorrections.recordedBy',
+                'lateCorrections.attachments',
+                'historicalErrorAnnotations.company',
+                'historicalErrorAnnotations.recordedBy',
+                'historicalErrorAnnotations.attachments',
+            ])
             : parent::getEloquentQuery()->whereRaw('1 = 0');
     }
 

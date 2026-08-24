@@ -73,7 +73,20 @@ class ExerciseResource extends Resource
         $company = Filament::getTenant();
 
         return $company instanceof Company
-            ? $query->whereBelongsTo($company, 'company')->with(['expenses.lines', 'closingSnapshot'])
+            ? $query->whereBelongsTo($company, 'company')->with([
+                'expenses.lines',
+                'closingSnapshot',
+                'lateCorrections.company',
+                'lateCorrections.expense',
+                'lateCorrections.expenseLine',
+                'lateCorrections.originalExpenseLine',
+                'lateCorrections.recordedBy',
+                'lateCorrections.attachments',
+                'historicalErrorAnnotations.company',
+                'historicalErrorAnnotations.closingSnapshot',
+                'historicalErrorAnnotations.recordedBy',
+                'historicalErrorAnnotations.attachments',
+            ])
             : $query->whereRaw('1 = 0');
     }
 

@@ -97,6 +97,22 @@ class Exercise extends Model
         return $this->hasOne(ClosingSnapshot::class);
     }
 
+    /** @return HasMany<LateCorrection, $this> */
+    public function lateCorrections(): HasMany
+    {
+        return $this->hasMany(LateCorrection::class)
+            ->latest('created_at')
+            ->latest('id');
+    }
+
+    /** @return HasMany<HistoricalErrorAnnotation, $this> */
+    public function historicalErrorAnnotations(): HasMany
+    {
+        return $this->hasMany(HistoricalErrorAnnotation::class)
+            ->latest('created_at')
+            ->latest('id');
+    }
+
     /** @param Builder<self> $query */
     public function scopeOpen(Builder $query): void
     {

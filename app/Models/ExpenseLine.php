@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'expense_id',
@@ -45,6 +46,12 @@ class ExpenseLine extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(Attachment::class);
+    }
+
+    /** @return HasOne<LateCorrection, $this> */
+    public function lateCorrection(): HasOne
+    {
+        return $this->hasOne(LateCorrection::class, 'expense_line_id');
     }
 
     /** @param Builder<self> $query */

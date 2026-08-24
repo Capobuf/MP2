@@ -36,6 +36,18 @@ class ExercisePolicy
         return $user->hasCapability($exercise->company, Capability::CloseExercise);
     }
 
+    public function correctClosed(User $user, Exercise $exercise): bool
+    {
+        return ! $exercise->isOpen()
+            && $user->hasCapability($exercise->company, Capability::CorrectClosedExercise);
+    }
+
+    public function annotateHistoricalError(User $user, Exercise $exercise): bool
+    {
+        return ! $exercise->isOpen()
+            && $user->hasCapability($exercise->company, Capability::CorrectClosedExercise);
+    }
+
     public function delete(User $user, Exercise $exercise): bool
     {
         return false;

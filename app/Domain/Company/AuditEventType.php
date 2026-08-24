@@ -91,6 +91,8 @@ enum AuditEventType: string
     case BudgetCreated = 'budget_created';
     case BudgetRevisionCreated = 'budget_revision_created';
     case HistoricalDivergenceRecorded = 'historical_divergence_recorded';
+    case LateCorrectionRecorded = 'late_correction_recorded';
+    case HistoricalErrorAnnotationRecorded = 'historical_error_annotation_recorded';
 
     public function label(): string
     {
@@ -182,6 +184,8 @@ enum AuditEventType: string
             self::BudgetCreated => 'Budget creato',
             self::BudgetRevisionCreated => 'Revisione Budget creata',
             self::HistoricalDivergenceRecorded => 'Divergenza storica registrata',
+            self::LateCorrectionRecorded => 'Correzione tardiva registrata',
+            self::HistoricalErrorAnnotationRecorded => 'Annotazione di errore storico registrata',
         };
     }
 }

@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\Contract;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
+use App\Models\HistoricalErrorAnnotation;
 use App\Models\Proposal;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -23,6 +24,7 @@ class AttachmentFactory extends Factory
             'contract_id' => fn (array $attributes): int => Contract::factory()->create(['company_id' => $attributes['company_id']])->id,
             'expense_id' => null,
             'expense_line_id' => null,
+            'historical_error_annotation_id' => null,
             'storage_disk' => 'local',
             'storage_path' => 'attachments/'.Str::uuid(),
             'original_name' => 'documento.pdf',
@@ -68,5 +70,17 @@ class AttachmentFactory extends Factory
     public function forProposal(Proposal $proposal): static
     {
         return $this->state(fn (): array => ['company_id' => $proposal->company_id, 'proposal_id' => $proposal->id, 'contract_id' => null, 'expense_id' => null, 'expense_line_id' => null]);
+    }
+
+    public function forHistoricalErrorAnnotation(HistoricalErrorAnnotation $annotation): static
+    {
+        return $this->state(fn (): array => [
+            'company_id' => $annotation->company_id,
+            'proposal_id' => null,
+            'contract_id' => null,
+            'expense_id' => null,
+            'expense_line_id' => null,
+            'historical_error_annotation_id' => $annotation->id,
+        ]);
     }
 }

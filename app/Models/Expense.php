@@ -92,6 +92,12 @@ class Expense extends Model
         return $this->hasMany(Attachment::class);
     }
 
+    /** @return HasMany<LateCorrection, $this> */
+    public function lateCorrections(): HasMany
+    {
+        return $this->hasMany(LateCorrection::class);
+    }
+
     /** @param Builder<self> $query */
     public function scopeActive(Builder $query): void
     {

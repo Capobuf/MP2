@@ -109,6 +109,22 @@ class ClosingSnapshot extends Model
         return $this->hasMany(ClosingSourceRow::class);
     }
 
+    /** @return HasMany<LateCorrection, $this> */
+    public function lateCorrections(): HasMany
+    {
+        return $this->hasMany(LateCorrection::class)
+            ->latest('created_at')
+            ->latest('id');
+    }
+
+    /** @return HasMany<HistoricalErrorAnnotation, $this> */
+    public function historicalErrorAnnotations(): HasMany
+    {
+        return $this->hasMany(HistoricalErrorAnnotation::class)
+            ->latest('created_at')
+            ->latest('id');
+    }
+
     private static function assertBudgetReferences(self $snapshot, Exercise $exercise): void
     {
         $budgets = BudgetSnapshot::query()

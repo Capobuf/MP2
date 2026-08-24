@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 #[Fillable([
-    'company_id', 'proposal_id', 'contract_id', 'expense_id', 'expense_line_id', 'storage_disk',
+    'company_id', 'proposal_id', 'contract_id', 'expense_id', 'expense_line_id', 'historical_error_annotation_id', 'storage_disk',
     'storage_path', 'original_name', 'media_type', 'size_bytes', 'sha256',
     'uploaded_by_id', 'detached_at', 'detached_by_id',
 ])]
@@ -22,6 +22,15 @@ class Attachment extends Model
 
     protected static function booted(): void
     {
+        static::updating(function (self $attachment): void {
+            if (($attachment->historical_error_annotation_id !== null
+                    || ($attachment->expense_line_id !== null
+                        && ExpenseLine::query()->whereKey($attachment->expense_line_id)->whereHas('lateCorrection')->exists()))
+                && ($attachment->isDirty('detached_at') || $attachment->isDirty('detached_by_id'))) {
+                throw new \LogicException('Evidence on a late correction or historical annotation cannot be detached.');
+            }
+        });
+
         static::deleting(function (): never {
             throw new \LogicException('Attachments cannot be deleted.');
         });
@@ -55,6 +64,12 @@ class Attachment extends Model
     public function expenseLine(): BelongsTo
     {
         return $this->belongsTo(ExpenseLine::class);
+    }
+
+    /** @return BelongsTo<HistoricalErrorAnnotation, $this> */
+    public function historicalErrorAnnotation(): BelongsTo
+    {
+        return $this->belongsTo(HistoricalErrorAnnotation::class, 'historical_error_annotation_id');
     }
 
     /** @return BelongsTo<User, $this> */

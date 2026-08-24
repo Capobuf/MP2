@@ -94,6 +94,18 @@ class Company extends Model implements HasName
         return $this->hasMany(ClosingSnapshot::class);
     }
 
+    /** @return HasMany<LateCorrection, $this> */
+    public function lateCorrections(): HasMany
+    {
+        return $this->hasMany(LateCorrection::class);
+    }
+
+    /** @return HasMany<HistoricalErrorAnnotation, $this> */
+    public function historicalErrorAnnotations(): HasMany
+    {
+        return $this->hasMany(HistoricalErrorAnnotation::class);
+    }
+
     public function getFilamentName(): string
     {
         return $this->name;
