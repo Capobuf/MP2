@@ -49,10 +49,10 @@ changing its traceability anchor.
 | FR-039 | Chiusura atomica | §14.7 | S9 — Chiusura | implemented |
 | FR-040 | Creazione condizionale di N+1 | §§11.7, 14.7 | S9 — Chiusura | implemented |
 | FR-041 | Chiusura senza Budget | §14.2 | S9 — Chiusura | implemented |
-| FR-042 | Correzione tardiva append-only | §24 | S10 — Correzioni post-Chiusura | planned |
+| FR-042 | Correzione tardiva append-only | §24 | S10 — Correzioni post-Chiusura | verified |
 | FR-043 | Distinzione Chiusura e Conoscenza Corrente | §§6.10–6.12, 24.11 | S11 — Reportistica ed esportazione | planned |
-| FR-044 | Nessuna riclassificazione economica storica | §§14.9, 24.10 | S10 — Correzioni post-Chiusura | planned |
-| FR-045 | Errori post-Chiusura annotati e corretti solo negli anni Aperti | §14.9 | S10 — Correzioni post-Chiusura | planned |
+| FR-044 | Nessuna riclassificazione economica storica | §§14.9, 24.10 | S10 — Correzioni post-Chiusura | verified |
+| FR-045 | Errori post-Chiusura annotati e corretti solo negli anni Aperti | §14.9 | S10 — Correzioni post-Chiusura | verified |
 | FR-046 | Struttura della Spesa | §15.1 | S5 — Contratti | verified |
 | FR-047 | Correlazione manuale della Spesa autonoma | §§15.2, 25.3 | S3 — Esercizi, Spese e Righe | verified |
 | FR-048 | Spese manuali di Contratto con soli Effettivi | §15.4 | S5 — Contratti | verified |
@@ -90,7 +90,7 @@ changing its traceability anchor.
 | FR-080 | Cambio Centro di Costo sull'intero Esercizio | §20.3 | S5 — Contratti | verified |
 | FR-081 | Ereditarietà del Centro di Costo | §20.5 | S5 — Contratti | verified |
 | FR-082 | Fornitore e Referenti | §21 | S2 — Anagrafiche | verified |
-| FR-083 | Fornitore Archiviato utilizzabile nello storico | §§21.4, 24.6 | S10 — Correzioni post-Chiusura | planned |
+| FR-083 | Fornitore Archiviato utilizzabile nello storico | §§21.4, 24.6 | S10 — Correzioni post-Chiusura | verified |
 | FR-084 | Timeline esplicativa append-only | §22 | S3 — Esercizi, Spese e Righe | verified |
 | FR-085 | Schemi separati delle Snapshot | §23 | S6 — Proposta e Budget iniziale | verified |
 | FR-086 | Snapshot autonome | §§23.2, 23.13 | S6 — Proposta e Budget iniziale | verified |

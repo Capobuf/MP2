@@ -67,6 +67,7 @@ it('persists the closed context, typed receipt and exact generated Actual line',
         ->and($correction->expenseLine->lineType()->value)->toBe('actual')
         ->and($correction->expenseLine->amount)->toBe('25.00')
         ->and($correction->belongs_to_closed_exercise)->toBeTrue()
+        ->and($correction->owner_context['schema_version'])->toBe(1)
         ->and(AuditEvent::query()->where('operation_id', $operationId)->sole()->eventType())
         ->toBe(AuditEventType::LateCorrectionRecorded);
 });
@@ -92,8 +93,24 @@ it('builds a valid immutable correction factory context with a Closing Snapshot'
         ->and($correction->closingSnapshot->exercise_id)->toBe($correction->exercise_id)
         ->and($correction->closingSnapshot->company_id)->toBe($correction->company_id)
         ->and($correction->expenseLine->expense_id)->toBe($correction->expense_id)
-        ->and($correction->expenseLine->lineType()->value)->toBe('actual');
+        ->and($correction->expenseLine->lineType()->value)->toBe('actual')
+        ->and($correction->owner_context['schema_version'])->toBe(1);
 });
+
+it('keeps implicit version one contexts from existing corrections readable', function (): void {
+    $correction = LateCorrection::factory()->create([
+        'owner_context' => ['container' => 'autonomous'],
+        'supplier_context' => ['id' => 42, 'label' => 'Fornitore storico', 'archived' => true],
+    ])->refresh();
+
+    expect($correction->owner_context)->toBe(['container' => 'autonomous'])
+        ->and($correction->supplier_context)->toBe([
+            'id' => 42,
+            'label' => 'Fornitore storico',
+            'archived' => true,
+        ]);
+});
+
 it('forExercise reuses the canonical Closing Snapshot', function (): void {
     $fixture = s10PersistenceFixture();
     $correction = LateCorrection::factory()->forExercise($fixture['exercise'])->create();

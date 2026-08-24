@@ -66,7 +66,9 @@ function appendLocalHistoryCorrection(array $fixture, string $amount, string $re
 it('loads separate local histories newest first with retained evidence and materialized archived-source context', function (): void {
     $fixture = localHistoryFixture();
     $supplier = Supplier::factory()->for($fixture['company'])->create(['legal_name' => 'Fornitore storico leggibile']);
-    $project = Project::factory()->for($fixture['company'])->create();
+    $project = Project::factory()->for($fixture['company'])->create([
+        'initial_effective_date' => '2025-01-01',
+    ]);
 
     CarbonImmutable::setTestNow('2026-08-24 09:00:00 Europe/Rome');
     $first = app(RecordLateCorrection::class)->execute($fixture['actor'], $fixture['exercise']->refresh(), [

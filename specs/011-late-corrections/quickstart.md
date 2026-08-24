@@ -85,15 +85,51 @@ locally through Sail where applicable:
 ./vendor/bin/sail composer audit --locked --no-interaction
 npm ci --no-audit --no-fund
 npm run build
-./vendor/bin/sail vendor/bin/pint --test
-./vendor/bin/sail vendor/bin/phpstan analyse --no-progress
-./vendor/bin/sail vendor/bin/pest
+./vendor/bin/sail composer format:test
+./vendor/bin/sail composer analyse
+./vendor/bin/sail test
 ./vendor/bin/sail artisan about --only=environment
 ```
 
 Expected: dependency validation/audit, locked frontend build, formatting, static
 analysis, complete isolated Pest suite and application boot all pass. Record actual
 evidence only after commands and authenticated journeys have run.
+
+## Verification evidence
+
+### Implementation review
+
+- Final cross-artifact and implementation review: **REVIEW_PASS**.
+- Every S10 task is complete after removing the non-canonical convergence false
+  positive. The review found no remaining requirement, invariant, rejection,
+  atomicity, idempotency or tenant-isolation gap.
+- Project and Contract correction sources are limited to the selected Closed
+  Exercise's historical context; immutable owner/Supplier contexts use schema version
+  1 while existing implicit-version-1 records remain readable.
+
+### Automated quality gate
+
+- `composer validate --strict`: passed.
+- `composer audit --locked --no-interaction`: passed with no vulnerability advisory.
+- `npm ci --no-audit --no-fund` and `npm run build`: passed with Vite 8.2.2.
+- `composer format:test`: passed.
+- `composer analyse`: passed with no errors.
+- Complete isolated suite: **607 passed, 4,325 assertions** in 128.87 seconds.
+- Laravel environment boot: passed.
+- `git diff --check`: passed.
+
+### Authenticated browser demonstration
+
+- Demonstrated the Closed Exercise 2024 in the dedicated `S10 Browser Verification
+  20260824` tenant with the deterministic development administrator.
+- Verified distinct `Registra correzione tardiva` and `Annota errore storico` actions,
+  append-only positive/negative correction history, original-line references,
+  Archived historical Supplier context, retained evidence, immutable Closing values
+  and the separate zero-economic-impact annotation history.
+- Persisted histories exposed no edit, delete, reclassify, reopen, report, export or
+  matching controls. Browser console errors and page errors were empty.
+- Automated accessibility inspection of the Exercise content reported 25 passes,
+  zero incomplete checks and zero violations.
 
 ## Persistence check
 

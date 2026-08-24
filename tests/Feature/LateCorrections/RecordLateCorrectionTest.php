@@ -162,7 +162,7 @@ it('rejects a false closed-year declaration before persistence', function (): vo
 
 it('creates a new same-context manual Expense for an incompatible selected Expense and retains an archived Supplier', function (): void {
     $fixture = makeLateCorrectionFixture();
-    $project = Project::factory()->for($fixture['company'])->create();
+    $project = Project::factory()->for($fixture['company'])->create(['initial_effective_date' => '2025-01-01']);
     $supplier = Supplier::factory()->for($fixture['company'])->archived()->create();
 
     $correction = app(RecordLateCorrection::class)->execute(
@@ -192,11 +192,13 @@ it('creates a new same-context manual Expense for an incompatible selected Expen
         ->and($correction->expense->origin)->toBe('manual')
         ->and($correction->expense->supplier_id)->toBe($supplier->id)
         ->and($correction->source_origin_key)->toBe($project->originKey())
-        ->and($correction->source_label)->toBe($project->title);
+        ->and($correction->source_label)->toBe($project->title)
+        ->and($correction->owner_context['schema_version'])->toBe(1)
+        ->and($correction->supplier_context['schema_version'])->toBe(1);
 });
 it('increments the affected Project and Contract source revisions and rejects old source tokens', function (): void {
     $fixture = makeLateCorrectionFixture();
-    $project = Project::factory()->for($fixture['company'])->create();
+    $project = Project::factory()->for($fixture['company'])->create(['initial_effective_date' => '2025-01-01']);
     $projectRevision = $project->revision;
 
     $projectCorrection = app(RecordLateCorrection::class)->execute(
@@ -218,7 +220,7 @@ it('increments the affected Project and Contract source revisions and rejects ol
     );
     $fixture['exercise']->refresh();
 
-    $contract = Contract::factory()->for($fixture['company'])->create();
+    $contract = Contract::factory()->for($fixture['company'])->create(['contractual_start_date' => '2025-01-01']);
     $contractRevision = $contract->revision;
     $contractCorrection = app(RecordLateCorrection::class)->execute(
         $fixture['actor'],
@@ -281,7 +283,7 @@ it('creates a new same-context autonomous Expense when no historical Expense is 
 
 it('rejects stale source and selected Expense revisions without persistence', function (): void {
     $fixture = makeLateCorrectionFixture();
-    $project = Project::factory()->for($fixture['company'])->create();
+    $project = Project::factory()->for($fixture['company'])->create(['initial_effective_date' => '2025-01-01']);
     $projectRevision = $project->revision;
     $selectedRevision = $fixture['expense']->revision;
     $project->increment('revision');
@@ -378,6 +380,36 @@ it('rejects foreign and absent historical sources without persistence', function
             (string) Str::uuid(),
         ))->toThrow(ValidationException::class)
         ->and(LateCorrection::query()->count())->toBe(0);
+});
+
+it('rejects same-company Project and Contract sources outside the Closed Exercise historical context', function (): void {
+    $fixture = makeLateCorrectionFixture();
+    $futureProject = Project::factory()->for($fixture['company'])->create(['initial_effective_date' => '2026-01-01']);
+    $futureContract = Contract::factory()->for($fixture['company'])->create(['contractual_start_date' => '2026-01-01']);
+
+    foreach ([
+        ['project', $futureProject],
+        ['contract', $futureContract],
+    ] as [$sourceType, $source]) {
+        expect(fn () => app(RecordLateCorrection::class)->execute(
+            $fixture['actor'],
+            $fixture['exercise']->refresh(),
+            [
+                'source_type' => $sourceType,
+                'source_origin_id' => $source->id,
+                'description' => 'Contesto futuro non ammesso',
+                'amount' => '5.00',
+                'reason' => 'La sorgente non appartiene allo storico',
+                'belongs_to_closed_exercise' => true,
+                'expected_exercise_revision' => $fixture['exercise']->revision,
+                'expected_source_revision' => $source->revision,
+            ],
+            (string) Str::uuid(),
+        ))->toThrow(ValidationException::class);
+    }
+
+    expect(LateCorrection::query()->count())->toBe(0)
+        ->and($fixture['expense']->lines()->count())->toBe(1);
 });
 
 it('rejects a current-year correction on an Open Exercise even with the capability', function (): void {

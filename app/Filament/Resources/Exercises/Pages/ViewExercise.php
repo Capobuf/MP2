@@ -7,6 +7,7 @@ use App\Actions\LateCorrections\RecordLateCorrection;
 use App\Actions\Operations\UploadAttachment;
 use App\Actions\Proposals\InitializeProposal;
 use App\Domain\Company\Capability;
+use App\Domain\LateCorrections\HistoricalCorrectionSource;
 use App\Domain\LateCorrections\HistoricalErrorKind;
 use App\Domain\LateCorrections\HistoricalExpenseCompatibility;
 use App\Filament\Resources\Budgets\BudgetResource;
@@ -503,8 +504,8 @@ class ViewExercise extends ViewRecord
         $companyId = $exercise->company_id;
 
         return match ($sourceType) {
-            'project' => Project::query()->where('company_id', $companyId)->orderBy('title')->pluck('title', 'id')->all(),
-            'contract' => Contract::query()->where('company_id', $companyId)->orderBy('title')->pluck('title', 'id')->all(),
+            'project' => app(HistoricalCorrectionSource::class)->projects($exercise)->orderBy('title')->pluck('title', 'id')->all(),
+            'contract' => app(HistoricalCorrectionSource::class)->contracts($exercise)->orderBy('title')->pluck('title', 'id')->all(),
             'expense' => Expense::query()
                 ->where('company_id', $companyId)
                 ->where('exercise_id', $exercise->id)

@@ -6,6 +6,7 @@ use App\Domain\Company\AuditEventType;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Expenses\ManualExpenseLine;
+use App\Domain\LateCorrections\HistoricalCorrectionSource;
 use App\Domain\LateCorrections\HistoricalExpenseCompatibility;
 use App\Models\AuditEvent;
 use App\Models\ClosingSnapshot;
@@ -29,7 +30,10 @@ final class RecordLateCorrection
 {
     private const SOURCE_TYPES = ['expense', 'project', 'contract'];
 
-    public function __construct(private readonly HistoricalExpenseCompatibility $compatibility) {}
+    public function __construct(
+        private readonly HistoricalExpenseCompatibility $compatibility,
+        private readonly HistoricalCorrectionSource $historicalSource,
+    ) {}
 
     /** @param array<string, mixed> $input */
     public function execute(User $actor, Exercise $exercise, array $input, string $operationId): LateCorrection
@@ -138,6 +142,9 @@ final class RecordLateCorrection
             }
 
             $source = $this->lockSource($validated, $company, $lockedExercise);
+            if (! $this->historicalSource->contains($source, $lockedExercise)) {
+                throw ValidationException::withMessages(['source_origin_id' => 'La sorgente selezionata non appartiene al contesto storico dell’Esercizio Chiuso.']);
+            }
             if ((int) $validated['expected_source_revision'] !== (int) $source->revision) {
                 throw ValidationException::withMessages(['source_origin_id' => 'La sorgente storica è cambiata: ricaricare il contesto prima di confermare.']);
             }
@@ -356,6 +363,7 @@ final class RecordLateCorrection
         $container = $expense->contract_id !== null ? 'contract' : ($expense->project_id !== null ? 'project' : 'autonomous');
 
         return [
+            'schema_version' => 1,
             'container' => $container,
             'project_id' => $expense->project_id,
             'project_label' => $expense->project?->title,
@@ -376,6 +384,7 @@ final class RecordLateCorrection
         }
 
         return [
+            'schema_version' => 1,
             'id' => $expense->supplier->id,
             'label' => $expense->supplier->legal_name,
             'archived' => $expense->supplier->isArchived(),

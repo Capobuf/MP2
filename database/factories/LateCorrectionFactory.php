@@ -67,7 +67,7 @@ class LateCorrectionFactory extends Factory
             'source_origin_id' => fn (array $attributes): int => $attributes['expense_id'],
             'source_origin_key' => fn (array $attributes): string => 'expense:'.$attributes['expense_id'],
             'source_label' => 'Spesa storica',
-            'owner_context' => ['container' => 'autonomous'],
+            'owner_context' => ['schema_version' => 1, 'container' => 'autonomous'],
             'supplier_context' => null,
         ];
     }

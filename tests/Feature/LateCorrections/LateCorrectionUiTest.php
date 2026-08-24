@@ -6,6 +6,7 @@ use App\Domain\Company\Capability;
 use App\Filament\Resources\Exercises\Pages\ViewExercise;
 use App\Models\Company;
 use App\Models\CompanyCapability;
+use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -13,6 +14,7 @@ use App\Models\LateCorrection;
 use App\Models\Project;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -101,7 +103,7 @@ it('shows generated Expense identity and description for a new late Expense', fu
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $selectedExpense = Expense::factory()->forExercise($exercise)->create();
     ExpenseLine::factory()->for($selectedExpense)->actual()->create(['amount' => '10.00']);
-    $project = Project::factory()->for($company)->create();
+    $project = Project::factory()->for($company)->create(['initial_effective_date' => '2025-01-01']);
     closeExerciseFixture($exercise, $actor);
 
     $this->actingAs($actor);
@@ -183,7 +185,7 @@ it('attaches stale Exercise, source and selected Expense errors to visible field
         ->assertHasErrors(['source_origin_id'])
         ->assertSchemaComponentStateSet('expected_source_revision', $expense->refresh()->revision);
 
-    $project = Project::factory()->for($company)->create();
+    $project = Project::factory()->for($company)->create(['initial_effective_date' => '2025-01-01']);
     $selectedRevision = $expense->refresh()->revision;
     $expense->increment('revision');
     Livewire::test(ViewExercise::class, ['record' => $exercise->id])
@@ -218,6 +220,42 @@ it('does not expose late correction to Open Exercises or viewers', function (): 
     Livewire::test(ViewExercise::class, ['record' => $exercise->id])
         ->assertSuccessful()
         ->assertActionHidden('lateCorrection');
+});
+
+it('offers only Project and Contract sources belonging to the Closed Exercise historical context', function (): void {
+    $company = Company::factory()->create();
+    $actor = User::factory()->create();
+    foreach ([Capability::View, Capability::CorrectClosedExercise] as $capability) {
+        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    }
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
+    $historicalProject = Project::factory()->for($company)->create(['initial_effective_date' => '2025-01-01']);
+    $futureProject = Project::factory()->for($company)->create(['initial_effective_date' => '2026-01-01']);
+    $historicalContract = Contract::factory()->for($company)->create(['contractual_start_date' => '2025-01-01']);
+    $futureContract = Contract::factory()->for($company)->create(['contractual_start_date' => '2026-01-01']);
+    closeExerciseFixture($exercise, $actor);
+
+    $this->actingAs($actor);
+    Filament::setCurrentPanel('admin');
+    Filament::setTenant($company);
+
+    Livewire::test(ViewExercise::class, ['record' => $exercise->id])
+        ->mountAction('lateCorrection')
+        ->fillForm(['source_type' => 'project'])
+        ->assertSchemaComponentExists('source_origin_id', checkComponentUsing: function (Select $component) use ($historicalProject, $futureProject): bool {
+            $options = $component->getOptions();
+
+            return isset($options[$historicalProject->id]) && ! isset($options[$futureProject->id]);
+        });
+
+    Livewire::test(ViewExercise::class, ['record' => $exercise->id])
+        ->mountAction('lateCorrection')
+        ->fillForm(['source_type' => 'contract'])
+        ->assertSchemaComponentExists('source_origin_id', checkComponentUsing: function (Select $component) use ($historicalContract, $futureContract): bool {
+            $options = $component->getOptions();
+
+            return isset($options[$historicalContract->id]) && ! isset($options[$futureContract->id]);
+        });
 });
 it('permits retained evidence only on a generated correction line', function (): void {
     Storage::fake('local');

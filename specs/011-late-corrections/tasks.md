@@ -139,3 +139,8 @@
 - No task adds a package, generic repository/service layer, alternate ledger, report engine, matching, fallback or compatibility path.
 - Canonical Spec Kit artifacts are updated by the Sol orchestrator, not by `implementer`.
 - Roadmap/traceability/invariant statuses change only after verified behavior and `implementation-reviewer` returns `REVIEW_PASS`.
+
+## Phase 5: Convergence
+
+- [X] T024 Restrict late-correction Project and Contract sources to the selected Closed Exercise's historical context in both Filament options and `RecordLateCorrection`, with direct Action and UI rejection tests for non-historical same-company sources per S10-FR-007, S10-FR-008 and the UI contract (partial).
+- [X] T025 Materialize and test schema version 1 for immutable `owner_context` and `supplier_context` JSON while preserving readability of existing implicit-v1 records per plan: data model (partial).

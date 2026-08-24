@@ -35,9 +35,9 @@ below. Later slices may add integration or regression coverage.
 | 28.26 | Nessuna riapertura | S9 — Chiusura | implemented |
 | 28.27 | Chiusura atomica | S9 — Chiusura | implemented |
 | 28.28 | Chiusura cronologica | S9 — Chiusura | implemented |
-| 28.29 | Correzioni tardive | S10 — Correzioni post-Chiusura | planned |
-| 28.30 | Nessuna riclassificazione storica | S10 — Correzioni post-Chiusura | planned |
-| 28.31 | Riporto storico invariato | S10 — Correzioni post-Chiusura | planned |
+| 28.29 | Correzioni tardive | S10 — Correzioni post-Chiusura | verified |
+| 28.30 | Nessuna riclassificazione storica | S10 — Correzioni post-Chiusura | verified |
+| 28.31 | Riporto storico invariato | S10 — Correzioni post-Chiusura | verified |
 | 28.32 | Durata e ciclo contrattuale distinti | S5 — Contratti | verified |
 | 28.33 | Rinnovo automatico | S5 — Contratti | verified |
 | 28.34 | Condizioni non sovrapposte | S5 — Contratti | verified |
