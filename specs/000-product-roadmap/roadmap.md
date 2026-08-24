@@ -44,7 +44,7 @@ cycle only when dependencies are ready.
 | S8 | `009-carryover-reprogramming` | Riporto e Riprogrammazione | S4,S7 | Choose one deferral mode and transfer valid amount without double application | verified |
 | S9 | `010-closing` | Chiusura | S5,S7,S8 | Close year with blocking checks, warnings and immutable closing snapshot | implemented |
 | S10 | `011-late-corrections` | Correzioni post-Chiusura | S9 | Append late actuals/annotations without reopening or reclassifying history | verified |
-| S11 | `012-reporting-exports` | Reportistica ed esportazione | S6,S9,S10 | Compare explicit references with deterministic categories, drill-down and exports | planned |
+| S11 | `012-reporting-exports` | Reportistica ed esportazione | S6,S9,S10 | Compare explicit references with deterministic categories, drill-down and exports | implemented |
 
 ## Implementation cadence
 

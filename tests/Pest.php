@@ -1,9 +1,12 @@
 <?php
 
+use App\Domain\Company\Capability;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExerciseStatus;
 use App\Models\BudgetSnapshot;
 use App\Models\ClosingSnapshot;
+use App\Models\Company;
+use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\ProjectDeferral;
 use App\Models\User;
@@ -11,6 +14,18 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class)->in('Feature');
+
+function s11ReportingViewer(Company $company): User
+{
+    $user = User::factory()->create();
+    CompanyCapability::query()->create([
+        'company_id' => $company->id,
+        'user_id' => $user->id,
+        'capability' => Capability::View,
+    ]);
+
+    return $user;
+}
 
 function closeExerciseFixture(Exercise $exercise, User $actor): ClosingSnapshot
 {

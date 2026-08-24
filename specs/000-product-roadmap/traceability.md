@@ -21,7 +21,7 @@ changing its traceability anchor.
 | FR-011 | Budget Approvato immutabile | §§1.2, 13 | S6 — Proposta e Budget iniziale | verified |
 | FR-012 | Versione iniziale v1 preservata | §13.4 | S6 — Proposta e Budget iniziale | verified |
 | FR-013 | Revisioni sempre disponibili in Esercizio Aperto | §§12.3, 13.4, 26.3 | S7 — Revisioni, riallineamento e impatto multi-Esercizio | implemented |
-| FR-014 | Versione Budget esplicita nei report | §§13.7, 25 | S11 — Reportistica ed esportazione | planned |
+| FR-014 | Versione Budget esplicita nei report | §§13.7, 25 | S11 — Reportistica ed esportazione | implemented |
 | FR-015 | Proposta isolata | §§1.3, 12.1 | S6 — Proposta e Budget iniziale | verified |
 | FR-016 | Una Proposta attiva per Esercizio | §12.2 | S6 — Proposta e Budget iniziale | verified |
 | FR-017 | Proposta limitata al piano | §12.6 | S6 — Proposta e Budget iniziale | verified |
@@ -50,7 +50,7 @@ changing its traceability anchor.
 | FR-040 | Creazione condizionale di N+1 | §§11.7, 14.7 | S9 — Chiusura | implemented |
 | FR-041 | Chiusura senza Budget | §14.2 | S9 — Chiusura | implemented |
 | FR-042 | Correzione tardiva append-only | §24 | S10 — Correzioni post-Chiusura | verified |
-| FR-043 | Distinzione Chiusura e Conoscenza Corrente | §§6.10–6.12, 24.11 | S11 — Reportistica ed esportazione | planned |
+| FR-043 | Distinzione Chiusura e Conoscenza Corrente | §§6.10–6.12, 24.11 | S11 — Reportistica ed esportazione | implemented |
 | FR-044 | Nessuna riclassificazione economica storica | §§14.9, 24.10 | S10 — Correzioni post-Chiusura | verified |
 | FR-045 | Errori post-Chiusura annotati e corretti solo negli anni Aperti | §14.9 | S10 — Correzioni post-Chiusura | verified |
 | FR-046 | Struttura della Spesa | §15.1 | S5 — Contratti | verified |
@@ -94,16 +94,16 @@ changing its traceability anchor.
 | FR-084 | Timeline esplicativa append-only | §22 | S3 — Esercizi, Spese e Righe | verified |
 | FR-085 | Schemi separati delle Snapshot | §23 | S6 — Proposta e Budget iniziale | verified |
 | FR-086 | Snapshot autonome | §§23.2, 23.13 | S6 — Proposta e Budget iniziale | verified |
-| FR-087 | Previsto e Non previsto solo al primo livello | §§25.3–25.4 | S11 — Reportistica ed esportazione | planned |
-| FR-088 | Categoria primaria e etichette sovrapponibili | §§25.5–25.7 | S11 — Reportistica ed esportazione | planned |
-| FR-089 | Report con riferimenti espliciti | §§25.1–25.2 | S11 — Reportistica ed esportazione | planned |
+| FR-087 | Previsto e Non previsto solo al primo livello | §§25.3–25.4 | S11 — Reportistica ed esportazione | implemented |
+| FR-088 | Categoria primaria e etichette sovrapponibili | §§25.5–25.7 | S11 — Reportistica ed esportazione | implemented |
+| FR-089 | Report con riferimenti espliciti | §§25.1–25.2 | S11 — Reportistica ed esportazione | implemented |
 | FR-090 | Scadenze informative dei Contratti | §19 | S5 — Contratti | verified |
 | FR-091 | Impostazioni minime per Azienda | §26 | S1 — Azienda, accesso e impostazioni | verified |
 | FR-092 | Permessi assegnati per Azienda | §§26.5–26.6 | S1 — Azienda, accesso e impostazioni | verified |
 | FR-093 | Audit di permessi e Impostazioni | §§26.8–26.10 | S1 — Azienda, accesso e impostazioni | verified |
 | FR-094 | Operazioni inter-Esercizio atomiche | §10 | S5 — Contratti | verified |
 | FR-095 | Relazioni informative senza effetto economico | §7.3 | S5 — Contratti | planned |
-| FR-096 | Report separato delle correzioni e annotazioni | §§24.11, 25.13 | S11 — Reportistica ed esportazione | planned |
+| FR-096 | Report separato delle correzioni e annotazioni | §§24.11, 25.13 | S11 — Reportistica ed esportazione | implemented |
 | FR-097 | Approvazione economica esterna ammessa | §26.11 | S6 — Proposta e Budget iniziale | verified |
 | FR-098 | EUR, netto IVA e anno solare | §4.3 | S3 — Esercizi, Spese e Righe | verified |
 | FR-099 | Evoluzione del dominio tramite categorie A–E | §3 | S0 — Foundation e ambiente di sviluppo live | verified |

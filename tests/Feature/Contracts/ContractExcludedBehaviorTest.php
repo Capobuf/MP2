@@ -61,7 +61,7 @@ it('has no suspended state or unsupported Contract workflow classes', function (
         ->and(class_exists('App\\Models\\ContractReplacement'))->toBeFalse();
 
     $surface = collect(Route::getRoutes())->map(fn ($route): string => strtolower(($route->getName() ?? '').' '.$route->uri()))->implode("\n");
-    foreach (['invoice', 'payment', 'reminder', 'report', 'sostituisce'] as $forbidden) {
+    foreach (['invoice', 'payment', 'reminder', 'sostituisce'] as $forbidden) {
         expect($surface)->not->toContain($forbidden);
     }
 });

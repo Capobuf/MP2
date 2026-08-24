@@ -56,8 +56,8 @@ below. Later slices may add integration or regression coverage.
 | 28.47 | Snapshot autonome | S6 — Proposta e Budget iniziale | verified |
 | 28.48 | Schema Budget | S6 — Proposta e Budget iniziale | verified |
 | 28.49 | Schema Chiusura | S9 — Chiusura | implemented |
-| 28.50 | Previsto e Non previsto | S11 — Reportistica ed esportazione | planned |
-| 28.51 | Categorie del confronto | S11 — Reportistica ed esportazione | planned |
+| 28.50 | Previsto e Non previsto | S11 — Reportistica ed esportazione | implemented |
+| 28.51 | Categorie del confronto | S11 — Reportistica ed esportazione | implemented |
 | 28.52 | Nessun doppio conteggio | S5 — Contratti | verified |
 | 28.53 | Valuta e IVA | S3 — Esercizi, Spese e Righe | verified |
 | 28.54 | Annualità dell'Effettivo | S3 — Esercizi, Spese e Righe | verified |

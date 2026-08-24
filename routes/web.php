@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AttachmentDownloadController;
 use App\Http\Controllers\BudgetEvidenceDownloadController;
+use App\Http\Controllers\ReportPdfController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -15,3 +16,7 @@ Route::get('/attachments/{attachment}/download', AttachmentDownloadController::c
 Route::get('/budget-evidence/{evidence}/download', BudgetEvidenceDownloadController::class)
     ->middleware('auth')
     ->name('budget-evidence.download');
+
+Route::get('/reports/pdf', ReportPdfController::class)
+    ->middleware('auth')
+    ->name('reports.pdf');
