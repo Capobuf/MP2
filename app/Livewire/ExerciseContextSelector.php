@@ -4,8 +4,11 @@ namespace App\Livewire;
 
 use App\Filament\Pages\CompanyAccess;
 use App\Filament\Pages\CompanySettings;
+use App\Filament\Resources\Exercises\ExerciseResource;
 use App\Models\Company;
+use App\Models\Exercise;
 use App\Models\User;
+use App\Support\BudgetContext;
 use App\Support\ExerciseContext;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
@@ -19,6 +22,8 @@ class ExerciseContextSelector extends Component
 
     public ?int $exerciseId = null;
 
+    public ?int $budgetId = null;
+
     #[Locked]
     public string $returnUrl = '';
 
@@ -31,7 +36,11 @@ class ExerciseContextSelector extends Component
         }
 
         $this->companyId = $company->id;
-        $this->exerciseId = app(ExerciseContext::class)->current($company)?->id;
+        $exercise = app(ExerciseContext::class)->current($company);
+        $this->exerciseId = $exercise?->id;
+        $this->budgetId = $exercise instanceof Exercise
+            ? app(BudgetContext::class)->current($company, $exercise)?->id
+            : null;
         $this->returnUrl = request()->fullUrl();
     }
 
@@ -47,6 +56,30 @@ class ExerciseContextSelector extends Component
 
         app(ExerciseContext::class)->select($company, $exerciseId);
         $this->exerciseId = $exerciseId;
+        $this->redirect($this->returnUrl, navigate: true);
+    }
+
+    public function selectBudget(int $budgetId): void
+    {
+        $company = Filament::getTenant();
+        abort_unless($company instanceof Company, 404);
+        $exercise = app(ExerciseContext::class)->current($company);
+        abort_unless($exercise instanceof Exercise, 404);
+
+        app(BudgetContext::class)->select($company, $exercise, $budgetId);
+        $this->budgetId = $budgetId;
+        $this->redirect($this->returnUrl, navigate: true);
+    }
+
+    public function clearBudget(): void
+    {
+        $company = Filament::getTenant();
+        abort_unless($company instanceof Company, 404);
+        $exercise = app(ExerciseContext::class)->current($company);
+        abort_unless($exercise instanceof Exercise, 404);
+
+        app(BudgetContext::class)->clear($company, $exercise);
+        $this->budgetId = null;
         $this->redirect($this->returnUrl, navigate: true);
     }
 
@@ -74,6 +107,9 @@ class ExerciseContextSelector extends Component
         $panel = Filament::getCurrentPanel();
         $currentCompany = $company instanceof Company ? $company : null;
         $currentUser = $user instanceof User ? $user : null;
+        $currentExercise = $currentCompany
+            ? app(ExerciseContext::class)->current($currentCompany)
+            : null;
 
         return view('livewire.exercise-context-selector', [
             'company' => $currentCompany,
@@ -81,6 +117,17 @@ class ExerciseContextSelector extends Component
             'exercises' => $currentCompany
                 ? $currentCompany->exercises()->orderByDesc('year')->get()
                 : collect(),
+            'budgets' => $currentCompany && $currentExercise
+                ? $currentExercise->budgets()->orderByDesc('version')->get()
+                : collect(),
+            'exerciseManagementUrl' => $currentUser && $currentCompany
+                && ExerciseResource::canAccess()
+                    ? ExerciseResource::getUrl('index', tenant: $currentCompany)
+                    : null,
+            'exerciseCreationUrl' => $currentUser && $currentCompany
+                && ExerciseResource::canCreate()
+                    ? ExerciseResource::getUrl('create', tenant: $currentCompany)
+                    : null,
             'companySettingsUrl' => $currentUser && $currentCompany
                 && Gate::forUser($currentUser)->allows('manageSettings', $currentCompany)
                     ? CompanySettings::getUrl(['tenant' => $currentCompany])

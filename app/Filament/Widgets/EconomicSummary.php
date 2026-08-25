@@ -1,0 +1,52 @@
+<?php
+
+namespace App\Filament\Widgets;
+
+use App\Domain\Company\Capability;
+use App\Models\Company;
+use App\Models\Exercise;
+use App\Models\User;
+use App\Support\BudgetContext;
+use App\Support\ExerciseContext;
+use App\Support\Reporting\EconomicDashboardReadModel;
+use Filament\Facades\Filament;
+use Filament\Widgets\Widget;
+
+class EconomicSummary extends Widget
+{
+    protected string $view = 'filament.widgets.economic-summary';
+
+    protected int|string|array $columnSpan = 'full';
+
+    protected static bool $isLazy = false;
+
+    public static function canView(): bool
+    {
+        $company = Filament::getTenant();
+        $user = auth()->user();
+
+        return $company instanceof Company && $user instanceof User
+            && $user->hasCapability($company, Capability::View);
+    }
+
+    /** @return array<string, mixed> */
+    protected function getViewData(): array
+    {
+        $company = Filament::getTenant();
+        $user = auth()->user();
+        if (! $company instanceof Company || ! $user instanceof User) {
+            return ['dashboard' => null];
+        }
+
+        $exercise = app(ExerciseContext::class)->current($company);
+        if (! $exercise instanceof Exercise) {
+            return ['dashboard' => null];
+        }
+
+        $budget = app(BudgetContext::class)->current($company, $exercise);
+
+        return [
+            'dashboard' => app(EconomicDashboardReadModel::class)->load($user, $company, $exercise, $budget),
+        ];
+    }
+}

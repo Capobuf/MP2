@@ -13,7 +13,7 @@ use App\Filament\Resources\Suppliers\SupplierResource;
 
 it('groups the product navigation by user intent', function () {
     expect(Dashboard::getNavigationGroup())->toBe('Panoramica')
-        ->and(ExerciseResource::getNavigationGroup())->toBe('Operatività')
+        ->and(ExerciseResource::shouldRegisterNavigation())->toBeFalse()
         ->and(ExpenseResource::getNavigationGroup())->toBe('Operatività')
         ->and(ProjectResource::getNavigationGroup())->toBe('Operatività')
         ->and(ContractResource::getNavigationGroup())->toBe('Operatività')

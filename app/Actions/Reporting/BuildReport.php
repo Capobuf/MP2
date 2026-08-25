@@ -5,6 +5,7 @@ namespace App\Actions\Reporting;
 use App\Domain\Company\Capability;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Projects\ProjectAnnualReferenceDate;
+use App\Domain\Projects\ProjectDeferralMode;
 use App\Domain\Reporting\ActualReference;
 use App\Domain\Reporting\ComparisonEngine;
 use App\Domain\Reporting\ReferenceType;
@@ -29,6 +30,7 @@ use App\Models\ExpenseLine;
 use App\Models\HistoricalErrorAnnotation;
 use App\Models\LateCorrection;
 use App\Models\Project;
+use App\Models\ProjectDeferral;
 use App\Models\Supplier;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -259,9 +261,17 @@ final class BuildReport
             ->with(['transitions', 'deferrals', 'classifications.costCenter', 'expenses' => fn ($query) => $query->where('exercise_id', $exercise->id)->with(['lines.attachments', 'supplier', 'directCostCenter'])])
             ->orderBy('id')->get();
         foreach ($projects as $project) {
-            $totals = $project->annualTotals()[$exercise->id] ?? ['allocation' => '0.00', 'actual' => '0.00', 'has_actuals' => false];
+            $totals = $this->loadedExpenseTotals($project->expenses);
+            $incomingCarryover = Decimal::sum($project->deferrals
+                ->filter(fn (ProjectDeferral $deferral): bool => (int) $deferral->destination_exercise_id === $exercise->id
+                    && $deferral->mode === ProjectDeferralMode::Carryover)
+                ->pluck('carryover_amount'));
+            $totals['allocation'] = Decimal::add($totals['allocation'], $incomingCarryover);
             $classification = $project->classifications->firstWhere('exercise_id', $exercise->id);
-            $carryover = Decimal::sum($project->deferrals->where('source_exercise_id', $exercise->id)->where('mode', 'carryover')->pluck('carryover_amount'));
+            $carryover = Decimal::sum($project->deferrals
+                ->filter(fn (ProjectDeferral $deferral): bool => (int) $deferral->source_exercise_id === $exercise->id
+                    && $deferral->mode === ProjectDeferralMode::Carryover)
+                ->pluck('carryover_amount'));
             $state = $project->stateAtDate($date->toDateString());
             if ($state === null
                 && Decimal::compare((string) $totals['allocation'], '0.00') === 0
@@ -297,7 +307,7 @@ final class BuildReport
             ->with(['supplier', 'conditions', 'lifecycleFacts', 'renewalConfigurations', 'classifications.costCenter', 'expenses' => fn ($query) => $query->where('exercise_id', $exercise->id)->with(['lines.attachments', 'supplier', 'directCostCenter'])])
             ->orderBy('id')->get();
         foreach ($contracts as $contract) {
-            $totals = $contract->annualTotals()[$exercise->id] ?? ['allocation' => '0.00', 'actual' => '0.00', 'has_actuals' => false];
+            $totals = $this->loadedExpenseTotals($contract->expenses);
             $classification = $contract->classifications->firstWhere('exercise_id', $exercise->id);
             $state = $contract->stateAtDate($date->toDateString());
             $sources[] = new ReportSource(
@@ -323,6 +333,19 @@ final class BuildReport
         }
 
         return $sources;
+    }
+
+    /**
+     * @param  Collection<int, Expense>  $expenses
+     * @return array{allocation: string, actual: string, has_actuals: bool}
+     */
+    private function loadedExpenseTotals(Collection $expenses): array
+    {
+        return [
+            'allocation' => Decimal::sum($expenses->map(fn (Expense $expense): string => $expense->allocation())),
+            'actual' => Decimal::sum($expenses->map(fn (Expense $expense): string => $expense->actual())),
+            'has_actuals' => $expenses->contains(fn (Expense $expense): bool => $expense->hasActuals()),
+        ];
     }
 
     private function expenseSource(Expense $expense): ReportSource

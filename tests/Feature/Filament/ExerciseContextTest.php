@@ -4,7 +4,8 @@ use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExerciseStatus;
 use App\Filament\Pages\CompanyAccess;
 use App\Filament\Pages\CompanySettings;
-use App\Filament\Widgets\OperationalOverview;
+use App\Filament\Resources\Exercises\ExerciseResource;
+use App\Filament\Widgets\EconomicSummary;
 use App\Livewire\ExerciseContextSelector;
 use App\Models\Company;
 use App\Models\CompanyCapability;
@@ -72,13 +73,40 @@ it('renders the Blade and Livewire global context for the current tenant', funct
         ->assertSet('exerciseId', $exercise->id)
         ->assertSee('Azienda Demo')
         ->assertSee('2026 · Aperto')
-        ->assertSeeHtml('aria-label="Esercizio globale"');
+        ->assertSeeHtml('aria-label="Apri selettore e azioni Esercizio"')
+        ->assertSee('Gestisci Esercizi')
+        ->assertDontSee('Crea Esercizio')
+        ->assertSeeHtml('href="'.ExerciseResource::getUrl('index', tenant: $company).'"');
 
-    Livewire::test(OperationalOverview::class)
-        ->assertSee('Sintesi economica')
-        ->assertSee('Stima')
+    Livewire::test(EconomicSummary::class)
+        ->assertSee('Quadro economico')
+        ->assertSee('Budget selezionato')
+        ->assertSee('Allocato Corrente')
         ->assertSee('Effettivo')
-        ->assertSee('Scostamento');
+        ->assertSee('Scostamento Operativo');
+});
+
+it('exposes authorized Exercise actions in the global context menu', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create(['name' => 'Azienda Demo']);
+
+    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
+        CompanyCapability::query()->create([
+            'company_id' => $company->id,
+            'user_id' => $manager->id,
+            'capability' => $capability,
+        ]);
+    }
+
+    $this->actingAs($manager);
+    Filament::setCurrentPanel('admin');
+    Filament::setTenant($company);
+
+    Livewire::test(ExerciseContextSelector::class)
+        ->assertSee('Gestisci Esercizi')
+        ->assertSee('Crea Esercizio')
+        ->assertSeeHtml('href="'.ExerciseResource::getUrl('index', tenant: $company).'"')
+        ->assertSeeHtml('href="'.ExerciseResource::getUrl('create', tenant: $company).'"');
 });
 
 it('exposes authorized Company actions in the global context menu', function () {

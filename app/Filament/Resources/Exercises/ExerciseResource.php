@@ -28,6 +28,8 @@ class ExerciseResource extends Resource
 {
     protected static ?string $model = Exercise::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCalendarDays;
 
     protected static ?string $navigationLabel = 'Esercizi';

@@ -7,7 +7,9 @@ use App\Models\ContractExerciseClassification;
 use App\Models\ContractLifecycleFact;
 use App\Models\ContractRenewalConfiguration;
 use App\Policies\ContractPolicy;
+use App\Support\BudgetContext;
 use App\Support\ExerciseContext;
+use App\Support\Reporting\EconomicDashboardReadModel;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\Gate;
@@ -21,6 +23,8 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->scoped(ExerciseContext::class);
+        $this->app->scoped(BudgetContext::class);
+        $this->app->scoped(EconomicDashboardReadModel::class);
     }
 
     /**
@@ -29,8 +33,13 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         DatePicker::configureUsing(fn (DatePicker $picker): DatePicker => $picker
-            ->native()
-            ->extraInputAttributes(['lang' => 'it']));
+            ->native(false)
+            ->locale('it')
+            ->displayFormat('d/m/Y')
+            ->placeholder('gg/mm/aaaa')
+            ->weekStartsOnMonday()
+            ->closeOnDateSelection()
+            ->extraTriggerAttributes(['data-mp2-date-picker-trigger' => true]));
 
         Select::configureUsing(fn (Select $select): Select => $select->native(false));
 

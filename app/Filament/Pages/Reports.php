@@ -23,6 +23,7 @@ use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Url;
 
 class Reports extends Page
 {
@@ -38,14 +39,18 @@ class Reports extends Page
 
     protected static ?int $navigationSort = 30;
 
+    #[Url]
     public ?int $exerciseId = null;
 
+    #[Url]
     public ?string $kind = null;
 
+    #[Url]
     public ?int $budgetId = null;
 
     public ?int $secondBudgetId = null;
 
+    #[Url]
     public ?string $actualReference = null;
 
     public ?int $comparisonExerciseId = null;
@@ -56,15 +61,23 @@ class Reports extends Page
 
     public ?string $dateTo = null;
 
+    #[Url]
     public ?int $costCenterId = null;
 
+    #[Url]
     public ?int $projectId = null;
 
+    #[Url]
     public ?int $contractId = null;
 
+    #[Url]
     public ?int $expenseId = null;
 
+    #[Url]
     public ?int $supplierId = null;
+
+    #[Url]
+    public bool $auto = false;
 
     /** @var array<string, mixed>|null */
     public ?array $report = null;
@@ -75,6 +88,10 @@ class Reports extends Page
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
+
+        if ($this->auto) {
+            $this->generate();
+        }
     }
 
     public function updated(string $property): void
