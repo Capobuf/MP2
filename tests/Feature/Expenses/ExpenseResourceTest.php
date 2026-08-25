@@ -10,6 +10,7 @@ use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\CompanyCapability;
 use App\Models\Contract;
+use App\Models\ContractLifecycleFact;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -18,6 +19,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Support\ExerciseContext;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -102,6 +104,91 @@ it('accepts an amount entered with the Italian decimal separator', function () {
     expect($line->amount)->toBe('100.50')
         ->and($line->quantity)->toBe('2.500000')
         ->and($line->unit_amount)->toBe('40.200000');
+});
+
+it('suggests the authoritative Total from unit amount and quantity without exposing a unit of measure', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+    app(ExerciseContext::class)->select($company, $exercise->id);
+
+    $component = Livewire::test(CreateExpense::class);
+    $lineKey = array_key_first((array) $component->get('data.lines'));
+
+    $component
+        ->assertFormFieldDoesNotExist("lines.{$lineKey}.unit_of_measure")
+        ->set("data.lines.{$lineKey}.unit_amount", '1200')
+        ->set("data.lines.{$lineKey}.quantity", '2')
+        ->assertSet("data.lines.{$lineKey}.amount", '2400.00')
+        ->assertSet("data.lines.{$lineKey}.suggested_amount", '2400.00')
+        ->set("data.lines.{$lineKey}.amount", '2500')
+        ->set("data.lines.{$lineKey}.quantity", '3')
+        ->assertSet("data.lines.{$lineKey}.amount", '2500')
+        ->assertSet("data.lines.{$lineKey}.suggested_amount", '3600.00');
+});
+
+it('allows only Actual lines when creating an Expense for a Contract', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
+    $contract = Contract::factory()->for($company)->create();
+    ContractLifecycleFact::factory()->forContract($contract)->create([
+        'declared_contractual_date' => "{$exercise->year}-01-01",
+        'state_change_date' => "{$exercise->year}-01-01",
+    ]);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+    app(ExerciseContext::class)->select($company, $exercise->id);
+
+    $component = Livewire::withQueryParams(['contract' => $contract->id])->test(CreateExpense::class);
+    $lineKey = array_key_first((array) $component->get('data.lines'));
+
+    $component
+        ->assertFormSet(['container' => 'contract', 'contract_id' => $contract->id])
+        ->assertSet("data.lines.{$lineKey}.type", 'actual')
+        ->assertFormFieldExists(
+            "lines.{$lineKey}.type",
+            fn (Select $field): bool => $field->getOptions() === ['actual' => 'Effettivo'],
+        )
+        ->fillForm(['description' => 'Giornata di consulenza'])
+        ->set("data.lines.{$lineKey}.amount", '1200')
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(Expense::query()->sole()->contract_id)->toBe($contract->id)
+        ->and(ExpenseLine::query()->sole()->lineType()->value)->toBe('actual');
+});
+
+it('changes existing line types to Actual when the Expense container becomes a Contract', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
+    $contract = Contract::factory()->for($company)->create();
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+    app(ExerciseContext::class)->select($company, $exercise->id);
+
+    $component = Livewire::test(CreateExpense::class);
+    $lineKey = array_key_first((array) $component->get('data.lines'));
+
+    $component
+        ->assertFormFieldExists(
+            "lines.{$lineKey}.type",
+            fn (Select $field): bool => $field->getOptions() === ['estimate' => 'Stima', 'actual' => 'Effettivo'],
+        )
+        ->set("data.lines.{$lineKey}.type", 'estimate')
+        ->set('data.container', 'contract')
+        ->set('data.contract_id', $contract->id)
+        ->assertSet("data.lines.{$lineKey}.type", 'actual')
+        ->assertFormFieldExists(
+            "lines.{$lineKey}.type",
+            fn (Select $field): bool => $field->getOptions() === ['actual' => 'Effettivo'],
+        );
 });
 
 it('overrides any browser Exercise state with the selected global Exercise', function () {

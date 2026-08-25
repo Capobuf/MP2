@@ -1,13 +1,16 @@
 <?php
 
 use App\Domain\Company\Capability;
+use App\Filament\Resources\Contracts\ContractResource;
 use App\Filament\Resources\Expenses\Pages\ListExpenses;
 use App\Filament\Resources\Expenses\Pages\ViewExpense;
 use App\Filament\Resources\Expenses\Widgets\ExpenseOverview;
+use App\Filament\Resources\Projects\ProjectResource;
 use App\Livewire\ExpenseDetail;
 use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\CompanyCapability;
+use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -108,6 +111,8 @@ it('toggles the sibling expense detail from the row without exposing a detail bu
     Livewire::test(ExpenseDetail::class, ['expenseId' => $expense->id, 'compact' => true])
         ->assertSee('Licenze infrastruttura')
         ->assertSee('Righe della Spesa')
+        ->assertSee('5')
+        ->assertDontSee('5.000000')
         ->assertSee('Timeline recente')
         ->assertSee('Riga creata')
         ->assertSee('Apri dettaglio completo');
@@ -118,6 +123,30 @@ it('toggles the sibling expense detail from the row without exposing a detail bu
         ->assertSeeHtml('data-object-icon="expense"')
         ->assertDontSee('Panoramica')
         ->assertDontSee('Timeline della Spesa');
+});
+
+it('shows only an existing Project or Contract reference in the expense header', function () {
+    $project = Project::factory()->for($this->company)->create(['title' => 'Migrazione ERP']);
+    $contract = Contract::factory()->for($this->company)->create(['title' => 'Servizi cloud']);
+    $projectExpense = Expense::factory()->forExercise($this->exercise)->for($project)->create();
+    $contractExpense = Expense::factory()->forExercise($this->exercise)->for($contract)->create();
+    $standaloneExpense = Expense::factory()->forExercise($this->exercise)->create();
+
+    Livewire::test(ViewExpense::class, ['record' => $projectExpense->getRouteKey()])
+        ->assertSee('Progetto di riferimento')
+        ->assertSee('Migrazione ERP')
+        ->assertSeeHtml('href="'.ProjectResource::getUrl('view', ['record' => $project], tenant: $this->company).'"')
+        ->assertDontSee('Contratto di riferimento');
+
+    Livewire::test(ViewExpense::class, ['record' => $contractExpense->getRouteKey()])
+        ->assertSee('Contratto di riferimento')
+        ->assertSee('Servizi cloud')
+        ->assertSeeHtml('href="'.ContractResource::getUrl('view', ['record' => $contract], tenant: $this->company).'"')
+        ->assertDontSee('Progetto di riferimento');
+
+    Livewire::test(ViewExpense::class, ['record' => $standaloneExpense->getRouteKey()])
+        ->assertDontSee('Progetto di riferimento')
+        ->assertDontSee('Contratto di riferimento');
 });
 
 it('adds a line from the shared detail component and refreshes its economic summary', function () {

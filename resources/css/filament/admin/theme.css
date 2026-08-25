@@ -154,6 +154,25 @@ html.fi {
     transform-origin: center;
 }
 
+.fi-simple-header .fi-logo {
+    height: 4rem !important;
+}
+
+.fi-simple-header .mp2-brand-logo {
+    width: 4rem;
+    height: 4rem;
+}
+
+.fi-simple-main {
+    border: 1px solid var(--border);
+    background: var(--surface) !important;
+    box-shadow: 0 24px 64px rgb(0 0 0 / 28%);
+}
+
+.fi-simple-main .fi-input-wrp {
+    background: var(--surface-muted);
+}
+
 .mp2-brand-logo-on-dark,
 .dark .mp2-brand-logo-on-light,
 .fi-sidebar .mp2-brand-logo-on-light {
@@ -418,14 +437,14 @@ html.fi {
     background: var(--primary-soft);
 }
 
-.mp2-economic-conditions.fi-fo-table-repeater > table {
+.fi-fo-table-repeater > table {
     border: 1px solid var(--border);
     border-radius: 12px;
     background: var(--surface);
     box-shadow: 0 1px 2px rgb(15 23 42 / 3%);
 }
 
-.mp2-economic-conditions.fi-fo-table-repeater > table > thead > tr > th {
+.fi-fo-table-repeater > table > thead > tr > th {
     border-color: var(--border) !important;
     background: var(--surface-muted) !important;
     color: var(--text-primary) !important;
@@ -433,22 +452,25 @@ html.fi {
     font-weight: 600;
 }
 
-.mp2-economic-conditions.fi-fo-table-repeater > table > tbody {
+.fi-fo-table-repeater > table > tbody {
     border-color: var(--border);
 }
 
-.mp2-economic-conditions.fi-fo-table-repeater > table > tbody > tr {
+.fi-fo-table-repeater > table > tbody > tr {
     border-color: var(--border);
     background: var(--surface);
     transition: background-color 100ms ease-out;
 }
 
-.mp2-economic-conditions.fi-fo-table-repeater > table > tbody > tr:hover {
+.fi-fo-table-repeater > table > tbody > tr:hover {
     background: var(--primary-soft);
 }
 
-.mp2-economic-conditions.fi-fo-table-repeater > table > tbody > tr > td {
+.fi-fo-table-repeater > table > tbody > tr > td {
     border-color: var(--border) !important;
+}
+
+.mp2-economic-conditions.fi-fo-table-repeater > table > tbody > tr > td {
     text-align: center;
 }
 
@@ -512,6 +534,7 @@ html.fi {
     justify-content: flex-end;
     gap: 8px;
     margin-inline-start: auto;
+    margin-inline-end: 8px;
 }
 
 .mp2-context-menu-group-divided {
@@ -1147,7 +1170,6 @@ html.fi {
     line-height: 1.5rem;
 }
 
-.mp2-economic-section-heading > p,
 .mp2-economic-empty p:last-child {
     color: var(--text-muted);
     font-size: 0.75rem;
@@ -1402,7 +1424,7 @@ html.fi {
 
 .mp2-object-header-main {
     position: relative;
-    z-index: 1;
+    z-index: 3;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -1442,6 +1464,65 @@ html.fi {
     height: 3px;
     border-radius: 999px;
     background: rgb(156 174 181 / 54%);
+}
+
+.mp2-expense-reference-link {
+    display: inline-flex;
+    min-width: 0;
+    max-width: min(100%, 30rem);
+    align-items: center;
+    gap: 7px;
+    border: 1px solid rgb(92 229 212 / 24%);
+    border-radius: 999px;
+    background: rgb(25 101 96 / 18%);
+    padding: 5px 9px 5px 8px;
+    color: #dff9f6;
+    text-decoration: none;
+    transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.mp2-expense-reference-link > svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    color: var(--mp2-object-accent-strong);
+}
+
+.mp2-expense-reference-copy {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 5px;
+}
+
+.mp2-expense-reference-copy > span {
+    flex: none;
+    color: #91aaa9;
+    font-size: 0.6875rem;
+    font-weight: 600;
+}
+
+.mp2-object-meta .mp2-expense-reference-copy > strong {
+    overflow: hidden;
+    color: #dff9f6;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mp2-expense-reference-link .mp2-expense-reference-arrow {
+    width: 13px;
+    height: 13px;
+    color: #80dcd2;
+}
+
+.mp2-expense-reference-link:hover {
+    border-color: rgb(92 229 212 / 48%);
+    background: rgb(25 126 117 / 26%);
+}
+
+.mp2-expense-reference-link:focus-visible {
+    outline: 2px solid var(--mp2-object-accent);
+    outline-offset: 2px;
 }
 
 .mp2-object-state-badge,

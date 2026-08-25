@@ -68,7 +68,7 @@ class ViewContract extends ViewRecord
             ])),
             EditAction::make()->label('Modifica')->icon('heroicon-m-pencil-square')->color('gray')->outlined()
                 ->visible(fn (): bool => ! $this->contract()->isArchived()),
-            Action::make('createContractActual')->label('Nuova Spesa Effettiva')->icon('heroicon-m-plus')
+            Action::make('createContractActual')->label('Nuova spesa')->icon('heroicon-m-plus')
                 ->extraAttributes(['class' => 'mp2-contract-primary-action'])
                 ->url(fn (): string => ExpenseResource::getUrl('create', ['contract' => $this->contract()->getKey()]))
                 ->visible(fn (): bool => $this->canCreateActual()),

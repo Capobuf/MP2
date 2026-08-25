@@ -22,7 +22,6 @@
                     <p class="mp2-economic-kicker">Esercizio {{ $dashboard['exercise_year'] }}</p>
                     <h2 id="economic-summary-title">Quadro economico</h2>
                 </div>
-                <p>{{ $dashboard['budget_label'] ?? 'Nessun Budget selezionato' }} · EUR · intero Esercizio</p>
             </div>
 
             <dl class="mp2-economic-summary-grid">

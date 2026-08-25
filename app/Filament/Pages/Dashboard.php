@@ -11,8 +11,6 @@ use App\Filament\Widgets\OperationalVarianceBySourceChart;
 use App\Filament\Widgets\SourceEconomicProfileChart;
 use App\Models\Company;
 use App\Models\User;
-use App\Support\BudgetContext;
-use App\Support\ExerciseContext;
 use Filament\Facades\Filament;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Widgets\Widget;
@@ -31,25 +29,6 @@ class Dashboard extends BaseDashboard
 
         return $company instanceof Company && $user instanceof User
             && $user->hasCapability($company, Capability::View);
-    }
-
-    public function getSubheading(): ?string
-    {
-        $company = Filament::getTenant();
-        $exercise = $company instanceof Company
-            ? app(ExerciseContext::class)->current($company)
-            : null;
-
-        if ($exercise === null) {
-            return 'Configura un Esercizio per visualizzare i valori economici.';
-        }
-
-        $budget = app(BudgetContext::class)->current($company, $exercise);
-        $budgetLabel = $budget === null
-            ? 'Budget non selezionato'
-            : "Budget v{$budget->version}";
-
-        return "Intero Esercizio {$exercise->year} · {$exercise->status()->label()} · {$budgetLabel}";
     }
 
     /** @return array<class-string<Widget>|WidgetConfiguration> */

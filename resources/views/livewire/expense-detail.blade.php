@@ -98,7 +98,7 @@
                             </td>
                             <td class="mp2-line-note">{{ $line->note ?: '—' }}</td>
                             <td class="mp2-line-secondary">
-                                {{ $line->quantity ?? '—' }}{{ $line->quantity !== null && $line->unit_of_measure ? ' '.$line->unit_of_measure : '' }}
+                                {{ $line->quantity === null ? '—' : $this->quantity((string) $line->quantity) }}{{ $line->quantity !== null && $line->unit_of_measure ? ' '.$line->unit_of_measure : '' }}
                             </td>
                             <td class="mp2-number mp2-line-secondary">
                                 {{ $line->unit_amount === null ? '—' : $this->money((string) $line->unit_amount) }}

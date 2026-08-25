@@ -66,10 +66,9 @@ class ExpenseLinesRelationManager extends RelationManager
                 TextColumn::make('type')->label('Tipo')->formatStateUsing(fn ($state): string => $state instanceof ExpenseLineType ? $state->label() : ExpenseLineType::from($state)->label())
                     ->badge()->color(fn ($state): string => ($state instanceof ExpenseLineType ? $state : ExpenseLineType::from($state)) === ExpenseLineType::Estimate ? 'primary' : 'success'),
                 TextColumn::make('note')->label('Nota')->placeholder('—')->wrap(),
-                TextColumn::make('quantity')->label('Quantità')->placeholder('—'),
                 TextColumn::make('unit_amount')->label('Importo unitario')->placeholder('—'),
-                TextColumn::make('unit_of_measure')->label('Unità di misura')->placeholder('—'),
-                TextColumn::make('amount')->label('Importo')->money('EUR', locale: 'it')->alignment(Alignment::End),
+                TextColumn::make('quantity')->label('Quantità')->placeholder('—'),
+                TextColumn::make('amount')->label('Totale')->money('EUR', locale: 'it')->alignment(Alignment::End),
                 TextColumn::make('state')->label('Stato')->state(fn (ExpenseLine $record): string => $record->isAnnulled() ? 'Annullata' : 'Attiva')
                     ->badge()->color(fn (string $state): string => $state === 'Attiva' ? 'success' : 'gray'),
                 TextColumn::make('updated_at')->label('Ultima modifica')->dateTime('d/m/Y H:i')
@@ -84,7 +83,7 @@ class ExpenseLinesRelationManager extends RelationManager
                 CreateAction::make()
                     ->label('Aggiungi riga')
                     ->modalHeading('Aggiungi riga')
-                    ->modalDescription('Aggiungi una Stima o un Effettivo alla Spesa. L’Importo resta autoritativo.')
+                    ->modalDescription('Aggiungi una Stima o un Effettivo alla Spesa. Il Totale resta l’Importo autoritativo.')
                     ->modalSubmitActionLabel('Aggiungi riga')
                     ->modalCancelActionLabel('Annulla')
                     ->slideOver()

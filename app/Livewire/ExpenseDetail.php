@@ -274,6 +274,11 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
         return Number::currency((float) $amount, in: 'EUR', locale: 'it');
     }
 
+    public function quantity(string $quantity): string
+    {
+        return (string) Number::format((float) $quantity, maxPrecision: 6, locale: 'it');
+    }
+
     public function fullDetailUrl(): string
     {
         return ExpenseResource::getUrl('view', ['record' => $this->expense()]);

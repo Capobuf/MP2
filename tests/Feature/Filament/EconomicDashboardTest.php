@@ -286,6 +286,10 @@ it('renders every chart and handles no Exercise no Budget and no sources', funct
 
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     app(ExerciseContext::class)->select($company, $exercise->id);
+    Livewire::test(EconomicSummary::class)
+        ->assertSuccessful()
+        ->assertDontSee('EUR · intero Esercizio');
+
     Livewire::test(SourceEconomicProfileChart::class)
         ->assertSuccessful()
         ->assertSee('Seleziona una versione di Budget');

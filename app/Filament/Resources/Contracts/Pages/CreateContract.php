@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Contracts\Pages;
 
 use App\Actions\Operations\CreateContract as CreateContractAction;
+use App\Actions\Operations\UploadAttachment;
 use App\Filament\Resources\Contracts\ContractResource;
 use App\Models\Company;
 use App\Models\Contract;
@@ -11,7 +12,10 @@ use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Ramsey\Uuid\Uuid;
 
 class CreateContract extends CreateRecord
 {
@@ -36,9 +40,29 @@ class CreateContract extends CreateRecord
         $company = Filament::getTenant();
         abort_unless($actor instanceof User && $company instanceof Company, 403);
 
-        $data['renewal_duration_months'] ??= null;
+        $attachments = $data['attachments'] ?? [];
+        unset($data['attachments']);
+        if (! is_array($attachments)) {
+            throw ValidationException::withMessages(['attachments' => 'Gli Allegati caricati non sono validi.']);
+        }
+        foreach ($attachments as $attachment) {
+            if (! $attachment instanceof UploadedFile) {
+                throw ValidationException::withMessages(['attachments' => 'Gli Allegati caricati non sono validi.']);
+            }
+        }
 
-        return app(CreateContractAction::class)->execute($actor, $company, $data, $this->operationId);
+        $data['renewal_duration_months'] ??= null;
+        $contract = app(CreateContractAction::class)->execute($actor, $company, $data, $this->operationId);
+        foreach (array_values($attachments) as $index => $attachment) {
+            app(UploadAttachment::class)->execute(
+                $actor,
+                $contract,
+                $attachment,
+                Uuid::uuid5($this->operationId, "attachment:{$index}")->toString(),
+            );
+        }
+
+        return $contract;
     }
 
     protected function getRedirectUrl(): string

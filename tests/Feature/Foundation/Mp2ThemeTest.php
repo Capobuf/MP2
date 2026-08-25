@@ -20,8 +20,15 @@ it('centralizes the dark-first MP2 palette without the legacy brand blue', funct
             '.fi-dropdown-panel',
             '.fi-pagination',
             '.fi-link:focus-visible',
+            '.fi-fo-table-repeater > table',
+            '.fi-simple-header .mp2-brand-logo',
+            '.fi-simple-main',
+            'background: var(--surface) !important;',
+            '.fi-simple-main .fi-input-wrp',
         )
         ->not->toContain('#0057f5', '#004bd6', '#0757d6', '#4f8cff', '#73a4ff');
+
+    expect($theme)->toMatch('/\.mp2-object-header-main\s*\{[^}]*z-index:\s*3;/s');
 
     expect($provider)
         ->toContain("->brandName('Master Plan IT')")

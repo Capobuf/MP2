@@ -24,6 +24,10 @@ it('groups the product navigation by user intent', function () {
         ->and(CompanySettings::getNavigationGroup())->toBe('Amministrazione');
 });
 
+it('keeps the Dashboard heading concise because context is already visible in the topbar', function () {
+    expect((new Dashboard)->getSubheading())->toBeNull();
+});
+
 it('provides an Italian assistive label for breadcrumbs', function () {
     app()->setLocale('it');
 

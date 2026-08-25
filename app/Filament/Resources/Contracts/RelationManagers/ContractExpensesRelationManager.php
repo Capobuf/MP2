@@ -41,7 +41,7 @@ class ContractExpensesRelationManager extends RelationManager
             TextColumn::make('allocation')->label('Allocato')->state(fn (Expense $record): string => $record->allocation())->money('EUR', locale: 'it'),
             TextColumn::make('actual')->label('Effettivo')->state(fn (Expense $record): string => $record->actual())->money('EUR', locale: 'it'),
         ])->headerActions([
-            Action::make('createContractActual')->label('Nuova Spesa Effettiva')
+            Action::make('createContractActual')->label('Nuova spesa')
                 ->url(fn (): string => ExpenseResource::getUrl('create', ['contract' => $this->getOwnerRecord()->getKey()]))
                 ->visible(fn (): bool => $this->canMutateOwner()),
         ])->recordActions([

@@ -132,6 +132,7 @@ it('registers classification link and private attachment governance surfaces wit
         ->assertTableActionExists('reclassify')
         ->mountTableAction('reclassify', record: $contract->classifications()->sole())
         ->assertSchemaComponentExists('cost_center_id')
+        ->assertFormComponentActionHidden('cost_center_id', 'createOption', formName: 'mountedActionSchema0')
         ->assertSchemaComponentExists('impact_preview')
         ->assertTableActionDoesNotExist('delete');
 
@@ -143,6 +144,35 @@ it('registers classification link and private attachment governance surfaces wit
     Livewire::test(ContractAttachmentsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
         ->assertTableActionExists('upload')
         ->assertTableActionDoesNotExist('delete');
+});
+
+it('creates and selects a Cost Center inline while reclassifying a Contract', function () {
+    ['user' => $user, 'company' => $company, 'defined' => $contract] = governanceUiContext();
+    CompanyCapability::query()->create([
+        'company_id' => $company->id,
+        'user_id' => $user->id,
+        'capability' => Capability::ManageMasterData,
+    ]);
+    $this->actingAs($user);
+    Filament::setTenant($company);
+
+    $component = Livewire::test(ContractClassificationsRelationManager::class, [
+        'ownerRecord' => $contract,
+        'pageClass' => ViewContract::class,
+    ])->mountTableAction('reclassify', record: $contract->classifications()->sole())
+        ->assertFormComponentActionVisible('cost_center_id', 'createOption', formName: 'mountedActionSchema0')
+        ->callFormComponentAction(
+            'cost_center_id',
+            'createOption',
+            ['name' => 'Centro creato in riclassifica'],
+            formName: 'mountedActionSchema0',
+        )
+        ->assertHasNoFormComponentActionErrors();
+
+    $costCenter = CostCenter::query()->where('company_id', $company->id)->where('name', 'Centro creato in riclassifica')->sole();
+
+    $component->assertSchemaStateSet(['cost_center_id' => $costCenter->id]);
+    expect(AuditEvent::query()->where('subject_type', CostCenter::class)->where('subject_id', $costCenter->id)->count())->toBe(1);
 });
 
 it('shows terminal Archive and ordered Contract Timeline detail while keeping viewer mode read only', function () {

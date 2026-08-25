@@ -59,13 +59,13 @@ class ExpenseInfolist
                 TextEntry::make('notes')->hiddenLabel(),
             ])->visible(fn (Expense $record): bool => filled($record->notes))->columnSpanFull(),
             Section::make('Righe della Spesa')
-                ->description('Le Stime e gli Effettivi restano separati e l’Importo della Riga è autoritativo.')
+                ->description('Le Stime e gli Effettivi restano separati e il Totale della Riga è l’Importo autoritativo.')
                 ->schema([
                     RepeatableEntry::make('lines')->hiddenLabel()->table([
                         TableColumn::make('Tipo'),
+                        TableColumn::make('Importo unitario')->alignment(Alignment::End),
                         TableColumn::make('Quantità'),
-                        TableColumn::make('Unitario')->alignment(Alignment::End),
-                        TableColumn::make('Importo')->alignment(Alignment::End),
+                        TableColumn::make('Totale')->alignment(Alignment::End),
                         TableColumn::make('Stato'),
                         TableColumn::make('Nota'),
                         TableColumn::make('Ultima modifica')->alignment(Alignment::End),
@@ -73,15 +73,11 @@ class ExpenseInfolist
                         TextEntry::make('type')->label('Tipo')->formatStateUsing(
                             fn (mixed $state): string => ($state instanceof ExpenseLineType ? $state : ExpenseLineType::from((string) $state))->label(),
                         )->badge()->color(fn (mixed $state): string => ($state instanceof ExpenseLineType ? $state : ExpenseLineType::from((string) $state)) === ExpenseLineType::Estimate ? 'primary' : 'success'),
-                        TextEntry::make('quantity')->label('Quantità')
-                            ->state(fn (ExpenseLine $record): ?string => $record->quantity === null
-                                ? null
-                                : $record->quantity.($record->unit_of_measure === null ? '' : ' '.$record->unit_of_measure))
-                            ->placeholder('—'),
                         TextEntry::make('unit_amount')->label('Importo unitario')
                             ->state(fn (ExpenseLine $record): ?string => self::formatUnitAmount($record))
                             ->placeholder('—'),
-                        TextEntry::make('amount')->label('Importo')->money('EUR', locale: 'it')->weight('semibold'),
+                        TextEntry::make('quantity')->label('Quantità')->placeholder('—'),
+                        TextEntry::make('amount')->label('Totale')->money('EUR', locale: 'it')->weight('semibold'),
                         TextEntry::make('line_state')->label('Stato')
                             ->state(fn (ExpenseLine $record): string => $record->isAnnulled() ? 'Annullata' : 'Attiva')
                             ->badge()->color(fn (string $state): string => $state === 'Attiva' ? 'success' : 'gray'),

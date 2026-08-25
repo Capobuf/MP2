@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources\Contracts\RelationManagers;
 
+use App\Actions\MasterData\CreateCostCenter;
 use App\Actions\Operations\UpdateContractClassification;
+use App\Domain\Company\Capability;
 use App\Models\Contract;
 use App\Models\ContractExerciseClassification;
 use App\Models\CostCenter;
@@ -12,6 +14,7 @@ use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Tables\Columns\TextColumn;
@@ -45,6 +48,25 @@ class ContractClassificationsRelationManager extends RelationManager
                 ->form([
                     Select::make('cost_center_id')->label('Nuovo Centro di Costo')->placeholder('Non classificato')
                         ->options(fn (): array => CostCenter::query()->where('company_id', $this->contract()->company_id)->active()->orderBy('name')->pluck('name', 'id')->all())
+                        ->searchable()
+                        ->createOptionForm([
+                            TextInput::make('name')->label('Nome')->required()->maxLength(255),
+                        ])
+                        ->createOptionUsing(function (array $data): int {
+                            $actor = auth()->user();
+                            abort_unless($actor instanceof User, 403);
+
+                            return app(CreateCostCenter::class)->execute(
+                                $actor,
+                                $this->contract()->company,
+                                $data,
+                                (string) Str::uuid(),
+                            )->id;
+                        })
+                        ->createOptionAction(fn (Action $action): Action => $action
+                            ->label('Crea centro di costo')
+                            ->modalHeading('Nuovo centro di costo')
+                            ->visible(fn (): bool => $this->canManageMasterData()))
                         ->live(),
                     Placeholder::make('impact_preview')->label('Anteprima esatta')->content(function (Get $get, ContractExerciseClassification $record): string {
                         $actor = auth()->user();
@@ -86,5 +108,13 @@ class ContractClassificationsRelationManager extends RelationManager
     private function canManage(): bool
     {
         return ! $this->contract()->isArchived() && auth()->user()?->can('update', $this->contract()) === true;
+    }
+
+    private function canManageMasterData(): bool
+    {
+        $actor = auth()->user();
+
+        return $actor instanceof User
+            && $actor->hasCapability($this->contract()->company, Capability::ManageMasterData);
     }
 }

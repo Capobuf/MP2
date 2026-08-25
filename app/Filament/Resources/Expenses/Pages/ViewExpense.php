@@ -8,7 +8,9 @@ use App\Domain\Expenses\ExpenseImpactPlan;
 use App\Domain\Projects\ProjectActualKind;
 use App\Domain\Projects\ProjectOverspend;
 use App\Domain\Projects\ProjectOverspendResult;
+use App\Filament\Resources\Contracts\ContractResource;
 use App\Filament\Resources\Expenses\ExpenseResource;
+use App\Filament\Resources\Projects\ProjectResource;
 use App\Filament\Support\ProjectOverspendNotifier;
 use App\Livewire\ExpenseDetail;
 use App\Models\Contract;
@@ -48,6 +50,19 @@ class ViewExpense extends ViewRecord
         return view('filament.resources.expenses.components.object-header', [
             'expense' => $expense,
             'expensesUrl' => ExpenseResource::getUrl('index', tenant: $expense->company),
+            'reference' => $expense->project !== null
+                ? [
+                    'label' => 'Progetto di riferimento',
+                    'title' => $expense->project->title,
+                    'url' => ProjectResource::getUrl('view', ['record' => $expense->project], tenant: $expense->company),
+                    'icon' => 'heroicon-m-briefcase',
+                ]
+                : ($expense->contract === null ? null : [
+                    'label' => 'Contratto di riferimento',
+                    'title' => $expense->contract->title,
+                    'url' => ContractResource::getUrl('view', ['record' => $expense->contract], tenant: $expense->company),
+                    'icon' => 'heroicon-m-document-text',
+                ]),
             'money' => [
                 'allocation' => Number::currency((float) $expense->allocation(), in: 'EUR', locale: 'it'),
                 'actual' => Number::currency((float) $expense->actual(), in: 'EUR', locale: 'it'),

@@ -13,6 +13,21 @@
         <span class="mp2-object-state-badge {{ $expense->isReversed() ? 'mp2-object-state-neutral' : 'mp2-object-state-success' }}">
             {{ $expense->isReversed() ? 'Stornata' : 'Attiva' }}
         </span>
+        @if ($reference !== null)
+            <span class="mp2-object-meta-separator" aria-hidden="true"></span>
+            <a
+                href="{{ $reference['url'] }}"
+                class="mp2-expense-reference-link"
+                aria-label="Apri {{ $reference['label'] }}: {{ $reference['title'] }}"
+            >
+                <x-filament::icon :icon="$reference['icon']" aria-hidden="true" />
+                <span class="mp2-expense-reference-copy">
+                    <span>{{ $reference['label'] }}</span>
+                    <strong>{{ $reference['title'] }}</strong>
+                </span>
+                <x-filament::icon icon="heroicon-m-arrow-up-right" class="mp2-expense-reference-arrow" aria-hidden="true" />
+            </a>
+        @endif
     </x-slot:meta>
 
     <x-slot:actions>

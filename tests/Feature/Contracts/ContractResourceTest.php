@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Company\AuditEventType;
 use App\Domain\Company\Capability;
 use App\Filament\Resources\Contracts\ContractResource;
 use App\Filament\Resources\Contracts\Pages\CreateContract;
@@ -13,6 +14,7 @@ use App\Filament\Resources\Contracts\RelationManagers\ContractExpensesRelationMa
 use App\Filament\Resources\Contracts\RelationManagers\ContractLifecycleRelationManager;
 use App\Filament\Resources\Contracts\RelationManagers\ContractRenewalsRelationManager;
 use App\Filament\Resources\Contracts\RelationManagers\ProjectContractLinksRelationManager;
+use App\Models\Attachment;
 use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\CompanyCapability;
@@ -28,7 +30,11 @@ use App\Support\ExerciseContext;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\TextInput;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -60,16 +66,24 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
     $supplier = Supplier::factory()->for($company)->create();
     $this->actingAs($manager);
     Filament::setTenant($company);
+    Storage::fake('local');
+
+    $firstAttachment = UploadedFile::fake()->createWithContent('contratto.pdf', 'primo allegato');
+    $secondAttachment = UploadedFile::fake()->createWithContent('condizioni.txt', 'secondo allegato');
 
     Livewire::test(CreateContract::class)
         ->assertSee('Le date di fattura e pagamento appartengono alle Spese.')
-        ->assertSee('non producono prorata')
+        ->assertSee('non sono calcolati prorata')
+        ->assertSee('non determina la scadenza del Contratto')
+        ->assertSee('Il Contratto ha una prossima scadenza?')
+        ->assertSee('Sì, la scadenza è definita')
         ->assertDontSee('Salva & nuovo')
         ->assertFormFieldExists('title')
         ->assertFormFieldExists('supplier_id')
+        ->assertFormFieldExists('attachments', fn ($field): bool => $field instanceof FileUpload && $field->isMultiple())
         ->assertFormComponentActionHidden('supplier_id', 'createOption')
         ->assertFormFieldExists('conditions')
-        ->assertFormFieldExists('contractual_start_date')
+        ->assertFormFieldExists('contractual_start_date', fn ($field): bool => $field instanceof TextInput && $field->getMask() === '99/99/9999')
         ->assertFormFieldExists('duration_type')
         ->assertFormFieldDoesNotExist('next_expiry_date')
         ->assertFormFieldDoesNotExist('automatic_renewal')
@@ -90,6 +104,12 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
         ->assertFormFieldDoesNotExist('next_expiry_date')
         ->assertFormFieldDoesNotExist('renewal_duration_months')
         ->assertFormFieldDoesNotExist('notice_days')
+        ->assertFormSet(['automatic_renewal' => false])
+        ->fillForm(['duration_type' => 'undefined'])
+        ->assertFormFieldDoesNotExist('next_expiry_date')
+        ->assertFormFieldDoesNotExist('renewal_duration_months')
+        ->assertFormFieldDoesNotExist('notice_days')
+        ->assertFormSet(['automatic_renewal' => true])
         ->fillForm(['duration_type' => 'fixed'])
         ->assertFormFieldExists('next_expiry_date')
         ->assertFormFieldExists('automatic_renewal')
@@ -101,15 +121,14 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
         ->fillForm([
             'title' => 'Contratto energia',
             'supplier_id' => $supplier->id,
-            'contractual_start_date' => '2026-01-01',
+            'contractual_start_date' => '01/01/2026',
             'duration_type' => 'indefinite',
-            'automatic_renewal' => true,
-            'renewal_duration_months' => null,
+            'attachments' => [$firstAttachment, $secondAttachment],
             'conditions' => [[
                 'amount' => '120,50',
                 'cycle' => 'monthly',
                 'attribution_mode' => 'cycle_start',
-                'valid_from' => '2026-01-01',
+                'valid_from' => '01/01/2026',
                 'valid_to' => null,
             ]],
             'classifications' => [[
@@ -117,13 +136,93 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
                 'cost_center_id' => null,
             ]],
         ])
-        ->assertFormSet(['renewal_effective_from' => '2026-01-01'])
+        ->assertFormSet([
+            'contractual_start_date' => '01/01/2026',
+            'renewal_effective_from' => '2026-01-01',
+            'automatic_renewal' => false,
+        ])
         ->call('create')
         ->assertHasNoFormErrors();
 
     expect(Contract::query()->count())->toBe(1)
         ->and(ContractCondition::query()->count())->toBe(1)
-        ->and(ContractCondition::query()->sole()->amount)->toBe('120.50');
+        ->and(ContractCondition::query()->sole()->amount)->toBe('120.50')
+        ->and(Contract::query()->sole()->contractualStartDate()->toDateString())->toBe('2026-01-01')
+        ->and(ContractCondition::query()->sole()->validFrom()->toDateString())->toBe('2026-01-01')
+        ->and(Contract::query()->sole()->automatic_renewal)->toBeFalse()
+        ->and(Attachment::query()->where('contract_id', Contract::query()->sole()->id)->orderBy('original_name')->pluck('original_name')->all())->toBe([
+            'condizioni.txt',
+            'contratto.pdf',
+        ])
+        ->and(AuditEvent::query()->where('event_type', AuditEventType::AttachmentUploaded)->count())->toBe(2);
+
+    Attachment::query()->each(fn (Attachment $attachment) => Storage::disk('local')->assertExists($attachment->storage_path));
+});
+
+it('suggests the contractual start from the earliest economic condition', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    grantContractResource($manager, $company);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+
+    $component = Livewire::test(CreateContract::class);
+    $conditionKey = array_key_first((array) $component->get('data.conditions'));
+
+    $component
+        ->set("data.conditions.{$conditionKey}.valid_from", '01/02/2026')
+        ->assertFormSet([
+            'contractual_start_date' => '01/02/2026',
+            'renewal_effective_from' => '2026-02-01',
+        ])
+        ->set("data.conditions.{$conditionKey}.valid_from", '01/03/2026')
+        ->assertFormSet([
+            'contractual_start_date' => '01/03/2026',
+            'renewal_effective_from' => '2026-03-01',
+        ])
+        ->set('data.conditions', [
+            'first' => ['valid_from' => '01/03/2026'],
+            'second' => ['valid_from' => '01/01/2026'],
+        ])
+        ->assertFormSet([
+            'contractual_start_date' => '01/01/2026',
+            'renewal_effective_from' => '2026-01-01',
+        ]);
+});
+
+it('suggests editable contractual terms from the latest bounded economic condition', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    grantContractResource($manager, $company);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+
+    $component = Livewire::test(CreateContract::class);
+
+    $component
+        ->set('data.conditions', [
+            'first' => ['valid_from' => '01/09/2025', 'valid_to' => '31/12/2025'],
+            'second' => ['valid_from' => '01/01/2026', 'valid_to' => '31/12/2026'],
+        ])
+        ->assertFormSet([
+            'duration_type' => 'fixed',
+            'next_expiry_date' => '31/12/2026',
+            'automatic_renewal' => true,
+            'renewal_duration_months' => 12,
+            'notice_days' => 30,
+        ])
+        ->set('data.next_expiry_date', '31/01/2027')
+        ->set('data.renewal_duration_months', 6)
+        ->set('data.notice_days', 60)
+        ->set('data.conditions', [
+            'first' => ['valid_from' => '01/09/2025', 'valid_to' => '31/12/2025'],
+            'second' => ['valid_from' => '01/01/2026', 'valid_to' => '31/12/2027'],
+        ])
+        ->assertFormSet([
+            'next_expiry_date' => '31/01/2027',
+            'renewal_duration_months' => 6,
+            'notice_days' => 60,
+        ]);
 });
 
 it('creates and selects a Supplier inline with a dedicated operation', function () {

@@ -7,6 +7,7 @@ use App\Actions\MasterData\CreateSupplier;
 use App\Domain\Company\Capability;
 use App\Domain\Contracts\ContractActualKind;
 use App\Domain\Contracts\ContractState;
+use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Expenses\ManualExpenseLine;
 use App\Domain\Projects\ProjectActualKind;
@@ -21,6 +22,7 @@ use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -49,7 +51,7 @@ class ExpenseForm
                     ->default(fn (): string => self::initialContainer())
                     ->native(false)
                     ->live()
-                    ->afterStateUpdated(function (Set $set, mixed $state): void {
+                    ->afterStateUpdated(function (Get $get, Set $set, mixed $state): void {
                         if ($state === 'autonomous') {
                             $set('project_id', null);
                             $set('contract_id', null);
@@ -59,6 +61,16 @@ class ExpenseForm
                         } elseif ($state === 'contract') {
                             $set('project_id', null);
                             $set('direct_cost_center_id', null);
+
+                            $lines = array_map(function (mixed $line): mixed {
+                                if (is_array($line)) {
+                                    $line['type'] = ExpenseLineType::Actual->value;
+                                }
+
+                                return $line;
+                            }, (array) $get('lines'));
+
+                            $set('lines', $lines);
                         }
                     })
                     ->required(),
@@ -135,7 +147,7 @@ class ExpenseForm
                 Textarea::make('notes')->label('Note')->columnSpanFull(),
             ])->columns(2)->columnSpanFull(),
             Section::make('Righe')
-                ->description('Il Tipo appartiene alla Riga. L’Importo è il valore autoritativo; quantità e prezzo unitario sono informazioni di supporto.')
+                ->description('Il Tipo appartiene alla Riga. Il Totale è l’Importo autoritativo; importo unitario e quantità propongono automaticamente il valore, che resta modificabile.')
                 ->schema([
                     Repeater::make('lines')
                         ->hiddenLabel()
@@ -160,22 +172,33 @@ class ExpenseForm
     {
         return [
             Select::make('type')->label('Tipo')
-                ->options(ExpenseLineType::options())
+                ->options(fn (Get $get): array => $get('../../container') === 'contract'
+                    ? [ExpenseLineType::Actual->value => ExpenseLineType::Actual->label()]
+                    : ExpenseLineType::options())
+                ->default(fn (): ?string => self::initialContainer() === 'contract'
+                    ? ExpenseLineType::Actual->value
+                    : null)
                 ->placeholder('Seleziona')
                 ->required()->native(false)->live()
                 ->columnSpan(['default' => 12, 'md' => 3, 'xl' => 2]),
             TextInput::make('note')->label('Nota')
                 ->columnSpan(['default' => 12, 'md' => 9, 'xl' => 4]),
-            DecimalInput::make('quantity', 14, 6)->label('Q.tà')->live()
+            Hidden::make('suggested_amount')->dehydrated(false),
+            DecimalInput::make('unit_amount', 14, 6)->label('Importo unitario')->suffix('EUR')->live()
+                ->afterStateUpdated(function (Get $get, Set $set): void {
+                    self::syncSuggestedAmount($get, $set);
+                })
+                ->columnSpan(['default' => 6, 'md' => 4, 'xl' => 2]),
+            DecimalInput::make('quantity', 14, 6)->label('Quantità')->live()
+                ->afterStateUpdated(function (Get $get, Set $set): void {
+                    self::syncSuggestedAmount($get, $set);
+                })
                 ->columnSpan(['default' => 6, 'md' => 3, 'xl' => 1]),
-            DecimalInput::make('unit_amount', 14, 6)->label('Prezzo unit.')->suffix('EUR')->live()
-                ->columnSpan(['default' => 6, 'md' => 3, 'xl' => 2]),
-            TextInput::make('unit_of_measure')->label('U.M.')->maxLength(64)
-                ->columnSpan(['default' => 6, 'md' => 3, 'xl' => 1]),
-            DecimalInput::make('amount')->label('Importo')->suffix('EUR')->required()->live()
-                ->columnSpan(['default' => 6, 'md' => 3, 'xl' => 2]),
+            DecimalInput::make('amount')->label('Totale')->helperText('Importo autoritativo in EUR, netto IVA.')
+                ->suffix('EUR')->required()->live()
+                ->columnSpan(['default' => 12, 'md' => 5, 'xl' => 3]),
             Checkbox::make('amount_warning_acknowledged')
-                ->label(fn (Get $get): string => self::amountMismatchMessage($get).' Confermo l’Importo indicato.')
+                ->label(fn (Get $get): string => self::amountMismatchMessage($get).' Confermo il Totale indicato.')
                 ->visible(fn (Get $get): bool => self::hasAmountMismatch($get))
                 ->columnSpanFull(),
         ];
@@ -236,7 +259,6 @@ class ExpenseForm
     {
         return [
             ...self::economicLineFields(),
-            ...self::descriptiveLineFields(),
             ...self::lineNoteFields(),
         ];
     }
@@ -245,10 +267,8 @@ class ExpenseForm
     public static function lineFormSections(bool $contractActualOnly = false): array
     {
         return [
-            Section::make('Valore economico')->description('Il Tipo appartiene alla Riga. L’Importo resta il valore autoritativo.')
-                ->schema(self::economicLineFields($contractActualOnly))->columns(2),
-            Section::make('Dettagli descrittivi')->description('Quantità e unitario aiutano la lettura ma non sostituiscono l’Importo.')
-                ->schema(self::descriptiveLineFields())->columns(3),
+            Section::make('Valore economico')->description('Il Totale è l’Importo autoritativo; importo unitario e quantità propongono automaticamente il valore, che resta modificabile.')
+                ->schema(self::economicLineFields($contractActualOnly))->columns(4),
             Section::make('Nota e verifica')->schema(self::lineNoteFields()),
         ];
     }
@@ -304,18 +324,17 @@ class ExpenseForm
                     : ExpenseLineType::options())
                 ->default($contractActualOnly ? ExpenseLineType::Actual->value : null)
                 ->required()->native(false)->live(),
-            DecimalInput::make('amount')->label('Importo')->helperText('Valore autoritativo in EUR, netto IVA.')
+            Hidden::make('suggested_amount')->dehydrated(false),
+            DecimalInput::make('unit_amount', 14, 6)->label('Importo unitario')->suffix('EUR')->live()
+                ->afterStateUpdated(function (Get $get, Set $set): void {
+                    self::syncSuggestedAmount($get, $set);
+                }),
+            DecimalInput::make('quantity', 14, 6)->label('Quantità')->live()
+                ->afterStateUpdated(function (Get $get, Set $set): void {
+                    self::syncSuggestedAmount($get, $set);
+                }),
+            DecimalInput::make('amount')->label('Totale')->helperText('Importo autoritativo in EUR, netto IVA.')
                 ->suffix('EUR')->required()->live(),
-        ];
-    }
-
-    /** @return array<int, mixed> */
-    private static function descriptiveLineFields(): array
-    {
-        return [
-            DecimalInput::make('quantity', 14, 6)->label('Quantità')->live(),
-            DecimalInput::make('unit_amount', 14, 6)->label('Importo unitario')->suffix('EUR')->live(),
-            TextInput::make('unit_of_measure')->label('Unità di misura')->maxLength(64),
         ];
     }
 
@@ -326,10 +345,59 @@ class ExpenseForm
             Textarea::make('note')->label('Nota')
                 ->helperText('Obbligatoria per un Effettivo negativo e normalmente richiesta per una nuova Riga a zero.'),
             Checkbox::make('amount_warning_acknowledged')
-                ->label('Salva comunque l’Importo indicato')
+                ->label('Salva comunque il Totale indicato')
                 ->helperText(fn (Get $get): string => self::amountMismatchMessage($get))
                 ->visible(fn (Get $get): bool => self::hasAmountMismatch($get)),
         ];
+    }
+
+    private static function syncSuggestedAmount(Get $get, Set $set): void
+    {
+        $quantity = self::decimalString($get('quantity'));
+        $unitAmount = self::decimalString($get('unit_amount'));
+        $previousSuggestion = self::decimalString($get('suggested_amount'));
+        $currentAmount = $get('amount');
+        $suggested = $quantity === null || $unitAmount === null
+            ? null
+            : ManualExpenseLine::suggestedAmount($quantity, $unitAmount);
+
+        if ($suggested === null) {
+            if (self::amountMatchesSuggestion($currentAmount, $previousSuggestion)) {
+                $set('amount', null);
+            }
+
+            $set('suggested_amount', null);
+
+            return;
+        }
+
+        if (blank($currentAmount) || self::amountMatchesSuggestion($currentAmount, $previousSuggestion)) {
+            $set('amount', $suggested);
+        }
+
+        $set('suggested_amount', $suggested);
+    }
+
+    private static function amountMatchesSuggestion(mixed $amount, ?string $suggestion): bool
+    {
+        $amount = self::decimalString($amount);
+
+        return $amount !== null
+            && $suggestion !== null
+            && Decimal::compare($amount, $suggestion, 2) === 0;
+    }
+
+    private static function decimalString(mixed $value): ?string
+    {
+        if (! is_string($value) && ! is_int($value) && ! is_float($value)) {
+            return null;
+        }
+
+        $normalized = Decimal::normalizeInput((string) $value);
+
+        return is_string($normalized) && preg_match('/^-?\d+(?:\.\d+)?$/', $normalized) === 1
+            ? $normalized
+            : null;
     }
 
     private static function hasAmountMismatch(Get $get): bool
