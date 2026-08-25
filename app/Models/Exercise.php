@@ -91,6 +91,11 @@ class Exercise extends Model
         return $this->hasOne(BudgetSnapshot::class)->ofMany('version', 'max');
     }
 
+    public function hasApprovedBudget(): bool
+    {
+        return $this->budgets()->exists();
+    }
+
     /** @return HasOne<ClosingSnapshot, $this> */
     public function closingSnapshot(): HasOne
     {

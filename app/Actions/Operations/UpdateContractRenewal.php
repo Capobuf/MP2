@@ -2,6 +2,7 @@
 
 namespace App\Actions\Operations;
 
+use App\Actions\Proposals\MarkProposalItemsToRealign;
 use App\Domain\Company\AuditEventType;
 use App\Models\AuditEvent;
 use App\Models\Company;
@@ -21,6 +22,7 @@ class UpdateContractRenewal
     public function __construct(
         private readonly ProcessContractRenewals $processRenewals,
         private readonly RecalculateContractEstimates $recalculate,
+        private readonly MarkProposalItemsToRealign $markToRealign,
     ) {}
 
     /** @param array<string, mixed> $input */
@@ -32,13 +34,19 @@ class UpdateContractRenewal
             'expiry_anchor_date' => ($input['expiry_anchor_date'] ?? null) ?: null,
             'renewal_duration_months' => ($input['renewal_duration_months'] ?? null) ?: null,
             'notice_days' => ($input['notice_days'] ?? null) === '' ? null : ($input['notice_days'] ?? null),
-            'expected_revision' => $input['expected_revision'] ?? null, 'operation_id' => $operationId,
+            'reason' => $this->nullableTrim($input['reason'] ?? null),
+            'impact_confirmed' => $input['impact_confirmed'] ?? false,
+            'expected_revision' => $input['expected_revision'] ?? null,
+            'operation_id' => $operationId,
         ];
         $data = Validator::make($normalized, [
             'effective_from' => ['required', 'date_format:Y-m-d'], 'automatic_renewal' => ['required', 'boolean'],
             'expiry_anchor_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:'.$contract->contractualStartDate()->toDateString()],
             'renewal_duration_months' => ['nullable', 'integer', 'min:1', Rule::requiredIf(($normalized['automatic_renewal'] ?? false) && $normalized['expiry_anchor_date'] !== null)],
-            'notice_days' => ['nullable', 'integer', 'min:0'], 'expected_revision' => ['required', 'integer', 'min:0'],
+            'notice_days' => ['nullable', 'integer', 'min:0'],
+            'reason' => ['nullable', 'string'],
+            'impact_confirmed' => ['accepted'],
+            'expected_revision' => ['required', 'integer', 'min:0'],
             'operation_id' => ['required', 'uuid'],
         ])->validate();
 
@@ -69,6 +77,12 @@ class UpdateContractRenewal
             if ($locked->revision !== (int) $data['expected_revision']) {
                 throw ValidationException::withMessages(['revision' => 'Il Contratto è cambiato dopo l’anteprima o l’elaborazione delle scadenze.']);
             }
+            if ($exercises->contains(fn (Exercise $exercise): bool => $exercise->hasApprovedBudget())
+                && $data['reason'] === null) {
+                throw ValidationException::withMessages([
+                    'reason' => 'La Nota è obbligatoria perché esiste un Budget approvato in un Esercizio Aperto.',
+                ]);
+            }
             $configuration = ContractRenewalConfiguration::query()->create([
                 'company_id' => $company->id, 'contract_id' => $locked->id, 'effective_from' => $data['effective_from'],
                 'automatic_renewal' => $data['automatic_renewal'], 'expiry_anchor_date' => $data['expiry_anchor_date'],
@@ -89,12 +103,25 @@ class UpdateContractRenewal
                 'previous_value' => $previous, 'new_value' => ['contract_id' => $locked->id, 'automatic_renewal' => $configuration->automatic_renewal, 'expiry_anchor_date' => $configuration->expiryAnchorDate()?->toDateString()],
                 'allocated_impact_by_exercise' => array_fill_keys(array_map('strval', $exerciseIds), '0.00'),
                 'actual_impact_by_exercise' => array_fill_keys(array_map('strval', $exerciseIds), '0.00'),
+                'reason' => $data['reason'],
                 'reference_type' => Contract::class, 'reference_id' => $locked->id,
             ]);
             $locked->unsetRelation('conditions')->unsetRelation('lifecycleFacts');
             $this->recalculate->recalculateWithinTransaction($actor, $locked, $exercises, $data['operation_id'], $sequence);
+            $this->markToRealign->execute($company->id, contractIds: [$locked->id]);
 
             return $configuration;
         });
+    }
+
+    private function nullableTrim(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value === '' ? null : $value;
     }
 }

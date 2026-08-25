@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Contracts\Pages;
 use App\Actions\Operations\CreateContract as CreateContractAction;
 use App\Actions\Operations\UploadAttachment;
 use App\Filament\Resources\Contracts\ContractResource;
+use App\Filament\Resources\Contracts\Schemas\ContractForm;
 use App\Models\Company;
 use App\Models\Contract;
 use App\Models\User;
@@ -31,6 +32,37 @@ class CreateContract extends CreateRecord
     {
         $this->operationId = (string) Str::uuid();
         parent::mount();
+    }
+
+    /** @param array<string, mixed> $data */
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        $defaultCostCenterId = $this->costCenterId($data['default_cost_center_id'] ?? null, allowNull: true);
+        $classifications = $data['classifications'] ?? [];
+        if (! is_array($classifications)) {
+            throw ValidationException::withMessages(['classifications' => 'Le classificazioni non sono valide.']);
+        }
+
+        $data['classifications'] = array_map(function (mixed $classification) use ($defaultCostCenterId): array {
+            if (! is_array($classification)) {
+                throw ValidationException::withMessages(['classifications' => 'Le classificazioni non sono valide.']);
+            }
+
+            $selection = $classification['cost_center_selection'] ?? null;
+            $costCenterId = match ($selection) {
+                ContractForm::USE_DEFAULT_COST_CENTER => $defaultCostCenterId,
+                ContractForm::NO_COST_CENTER => null,
+                default => $this->costCenterId($selection),
+            };
+
+            return [
+                'exercise_id' => $classification['exercise_id'] ?? null,
+                'cost_center_id' => $costCenterId,
+            ];
+        }, $classifications);
+        unset($data['default_cost_center_id']);
+
+        return $data;
     }
 
     /** @param array<string, mixed> $data */
@@ -76,5 +108,18 @@ class CreateContract extends CreateRecord
     protected function getCreateFormAction(): Action
     {
         return parent::getCreateFormAction()->label('Crea contratto');
+    }
+
+    private function costCenterId(mixed $value, bool $allowNull = false): ?int
+    {
+        if ($allowNull && ($value === null || $value === '')) {
+            return null;
+        }
+
+        if ((! is_int($value) && ! (is_string($value) && ctype_digit($value))) || (int) $value < 1) {
+            throw ValidationException::withMessages(['classifications' => 'Il Centro di Costo selezionato non è valido.']);
+        }
+
+        return (int) $value;
     }
 }

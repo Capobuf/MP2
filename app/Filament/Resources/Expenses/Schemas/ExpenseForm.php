@@ -11,14 +11,19 @@ use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Expenses\ManualExpenseLine;
 use App\Domain\Projects\ProjectActualKind;
+use App\Domain\Projects\ProjectExpenseActivity;
+use App\Domain\Projects\ProjectOverspend;
+use App\Domain\Projects\ProjectOverspendResult;
 use App\Domain\Projects\ProjectState;
 use App\Filament\Forms\DecimalInput;
 use App\Models\Company;
 use App\Models\Contract;
 use App\Models\CostCenter;
+use App\Models\Exercise;
 use App\Models\Project;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Support\ExerciseContext;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Checkbox;
@@ -145,6 +150,13 @@ class ExpenseForm
                     ->visible(fn (Get $get): bool => $get('container') === 'autonomous')
                     ->dehydrated(fn (Get $get): bool => $get('container') === 'autonomous'),
                 Textarea::make('notes')->label('Note')->columnSpanFull(),
+                Textarea::make('change_reason')
+                    ->label('Motivo della variazione rispetto al Budget')
+                    ->helperText('Richiesto perché l’Esercizio ha già un Budget approvato e la nuova Spesa ha un valore economico diverso da zero.')
+                    ->visible(fn (Get $get): bool => self::creationRequiresBudgetReason($get))
+                    ->required(fn (Get $get): bool => self::creationRequiresBudgetReason($get))
+                    ->dehydrated(fn (Get $get): bool => self::creationRequiresBudgetReason($get))
+                    ->columnSpanFull(),
             ])->columns(2)->columnSpanFull(),
             Section::make('Righe')
                 ->description('Il Tipo appartiene alla Riga. Il Totale è l’Importo autoritativo; importo unitario e quantità propongono automaticamente il valore, che resta modificabile.')
@@ -184,18 +196,18 @@ class ExpenseForm
             TextInput::make('note')->label('Nota')
                 ->columnSpan(['default' => 12, 'md' => 9, 'xl' => 4]),
             Hidden::make('suggested_amount')->dehydrated(false),
-            DecimalInput::make('unit_amount', 14, 6)->label('Importo unitario')->suffix('EUR')->live()
+            DecimalInput::make('unit_amount', 14, 6)->label('Importo unitario')->suffix('EUR')->live(onBlur: true)
                 ->afterStateUpdated(function (Get $get, Set $set): void {
                     self::syncSuggestedAmount($get, $set);
                 })
                 ->columnSpan(['default' => 6, 'md' => 4, 'xl' => 2]),
-            DecimalInput::make('quantity', 14, 6)->label('Quantità')->live()
+            DecimalInput::make('quantity', 14, 6)->label('Quantità')->live(onBlur: true)
                 ->afterStateUpdated(function (Get $get, Set $set): void {
                     self::syncSuggestedAmount($get, $set);
                 })
                 ->columnSpan(['default' => 6, 'md' => 3, 'xl' => 1]),
             DecimalInput::make('amount')->label('Totale')->helperText('Importo autoritativo in EUR, netto IVA.')
-                ->suffix('EUR')->required()->live()
+                ->suffix('EUR')->required()->live(onBlur: true)
                 ->columnSpan(['default' => 12, 'md' => 5, 'xl' => 3]),
             Checkbox::make('amount_warning_acknowledged')
                 ->label(fn (Get $get): string => self::amountMismatchMessage($get).' Confermo il Totale indicato.')
@@ -248,8 +260,9 @@ class ExpenseForm
             Textarea::make('overspend_note')
                 ->label('Nota di sovraspesa')
                 ->helperText('Richiesta dal dominio solo se questo Effettivo porta il Progetto oltre lo stanziamento annuale.')
-                ->visible(fn (Get $get): bool => $get('container') === 'project')
-                ->dehydrated(fn (Get $get): bool => $get('container') === 'project')
+                ->visible(fn (Get $get): bool => self::creationRequiresOverspendNote($get))
+                ->required(fn (Get $get): bool => self::creationRequiresOverspendNote($get))
+                ->dehydrated(fn (Get $get): bool => self::creationRequiresOverspendNote($get))
                 ->columnSpanFull(),
         ];
     }
@@ -264,12 +277,12 @@ class ExpenseForm
     }
 
     /** @return array<int, mixed> */
-    public static function lineFormSections(bool $contractActualOnly = false): array
+    public static function lineFormSections(bool $contractActualOnly = false, bool|\Closure $requiresBudgetReason = false): array
     {
         return [
             Section::make('Valore economico')->description('Il Totale è l’Importo autoritativo; importo unitario e quantità propongono automaticamente il valore, che resta modificabile.')
                 ->schema(self::economicLineFields($contractActualOnly))->columns(4),
-            Section::make('Nota e verifica')->schema(self::lineNoteFields()),
+            Section::make('Nota e verifica')->schema(self::lineNoteFields($requiresBudgetReason)),
         ];
     }
 
@@ -325,25 +338,31 @@ class ExpenseForm
                 ->default($contractActualOnly ? ExpenseLineType::Actual->value : null)
                 ->required()->native(false)->live(),
             Hidden::make('suggested_amount')->dehydrated(false),
-            DecimalInput::make('unit_amount', 14, 6)->label('Importo unitario')->suffix('EUR')->live()
+            DecimalInput::make('unit_amount', 14, 6)->label('Importo unitario')->suffix('EUR')->live(onBlur: true)
                 ->afterStateUpdated(function (Get $get, Set $set): void {
                     self::syncSuggestedAmount($get, $set);
                 }),
-            DecimalInput::make('quantity', 14, 6)->label('Quantità')->live()
+            DecimalInput::make('quantity', 14, 6)->label('Quantità')->live(onBlur: true)
                 ->afterStateUpdated(function (Get $get, Set $set): void {
                     self::syncSuggestedAmount($get, $set);
                 }),
             DecimalInput::make('amount')->label('Totale')->helperText('Importo autoritativo in EUR, netto IVA.')
-                ->suffix('EUR')->required()->live(),
+                ->suffix('EUR')->required()->live(onBlur: true),
         ];
     }
 
     /** @return array<int, mixed> */
-    private static function lineNoteFields(): array
+    private static function lineNoteFields(bool|\Closure $requiresBudgetReason = false): array
     {
         return [
-            Textarea::make('note')->label('Nota')
+            Textarea::make('note')->label('Nota')->live(onBlur: true)
                 ->helperText('Obbligatoria per un Effettivo negativo e normalmente richiesta per una nuova Riga a zero.'),
+            Textarea::make('change_reason')
+                ->label('Motivo della modifica della Stima')
+                ->helperText('Richiesto perché l’Esercizio ha già un Budget approvato.')
+                ->visible($requiresBudgetReason)
+                ->required($requiresBudgetReason)
+                ->dehydrated($requiresBudgetReason),
             Checkbox::make('amount_warning_acknowledged')
                 ->label('Salva comunque il Totale indicato')
                 ->helperText(fn (Get $get): string => self::amountMismatchMessage($get))
@@ -402,18 +421,25 @@ class ExpenseForm
 
     private static function hasAmountMismatch(Get $get): bool
     {
-        $quantity = is_string($get('quantity')) ? $get('quantity') : null;
-        $unitAmount = is_string($get('unit_amount')) ? $get('unit_amount') : null;
-        $amount = is_string($get('amount')) ? $get('amount') : null;
+        $quantity = self::decimalString($get('quantity'));
+        $unitAmount = self::decimalString($get('unit_amount'));
+        $amount = self::decimalString($get('amount'));
 
-        return $amount !== null && ManualExpenseLine::hasAmountMismatch($quantity, $unitAmount, $amount);
+        return $quantity !== null
+            && $unitAmount !== null
+            && $amount !== null
+            && ManualExpenseLine::hasAmountMismatch($quantity, $unitAmount, $amount);
     }
 
     private static function amountMismatchMessage(Get $get): string
     {
-        $quantity = is_string($get('quantity')) ? $get('quantity') : null;
-        $unitAmount = is_string($get('unit_amount')) ? $get('unit_amount') : null;
-        $amount = is_string($get('amount')) ? $get('amount') : null;
+        $quantity = self::decimalString($get('quantity'));
+        $unitAmount = self::decimalString($get('unit_amount'));
+        $amount = self::decimalString($get('amount'));
+        if ($quantity === null || $unitAmount === null || $amount === null) {
+            return '';
+        }
+
         $suggested = ManualExpenseLine::suggestedAmount($quantity, $unitAmount);
 
         return "Quantità × importo unitario suggerisce € {$suggested}; l’Importo autoritativo indicato è € {$amount}.";
@@ -441,6 +467,78 @@ class ExpenseForm
         }
 
         return false;
+    }
+
+    private static function creationRequiresBudgetReason(Get $get): bool
+    {
+        $exercise = self::currentExercise();
+        if (! $exercise?->hasApprovedBudget()) {
+            return false;
+        }
+
+        $totals = self::creationLineTotals($get);
+
+        return Decimal::compare($totals['estimate'], '0.00') !== 0
+            || Decimal::compare($totals['actual'], '0.00') !== 0;
+    }
+
+    private static function creationRequiresOverspendNote(Get $get): bool
+    {
+        $company = self::company();
+        $exercise = self::currentExercise();
+        if (! $company instanceof Company
+            || ! $company->overspend_note_required
+            || ! $exercise instanceof Exercise
+            || $get('container') !== 'project'
+            || blank($get('project_id'))) {
+            return false;
+        }
+
+        $project = Project::query()
+            ->whereBelongsTo($company, 'company')
+            ->active()
+            ->find((int) $get('project_id'));
+        if (! $project instanceof Project) {
+            return false;
+        }
+
+        $totals = self::creationLineTotals($get);
+        $before = ProjectExpenseActivity::annualVariance($project, $exercise);
+        $after = Decimal::add($before, Decimal::subtract($totals['actual'], $totals['estimate']));
+
+        return ProjectOverspend::detect($before, $after) !== ProjectOverspendResult::None;
+    }
+
+    /** @return array{estimate: string, actual: string} */
+    private static function creationLineTotals(Get $get): array
+    {
+        $estimates = [];
+        $actuals = [];
+        foreach ((array) $get('lines') as $line) {
+            if (! is_array($line)) {
+                continue;
+            }
+            $amount = self::decimalString($line['amount'] ?? null);
+            if ($amount === null) {
+                continue;
+            }
+            if (($line['type'] ?? null) === ExpenseLineType::Estimate->value) {
+                $estimates[] = $amount;
+            } elseif (($line['type'] ?? null) === ExpenseLineType::Actual->value) {
+                $actuals[] = $amount;
+            }
+        }
+
+        return ['estimate' => Decimal::sum($estimates), 'actual' => Decimal::sum($actuals)];
+    }
+
+    private static function currentExercise(): ?Exercise
+    {
+        $company = self::company();
+
+        return $company instanceof Company
+            ? app(ExerciseContext::class)->current($company)
+            : null;
     }
 
     private static function hasSelectedContainer(Get $get): bool

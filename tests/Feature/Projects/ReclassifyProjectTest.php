@@ -43,7 +43,9 @@ it('reclassifies one complete annual Project exactly and retries idempotently', 
     $preview = $action->preview($actor, $project, $exercise, $target->id);
     $operationId = (string) Str::uuid();
 
-    $updated = $action->confirm($actor, $project, $preview, $operationId);
+    expect(fn () => $action->confirm($actor, $project, $preview, (string) Str::uuid()))
+        ->toThrow(ValidationException::class);
+    $updated = $action->confirm($actor, $project, $preview, $operationId, 'Riclassificazione annuale');
     $retry = $action->confirm($actor, $project, $preview, $operationId);
     $event = AuditEvent::query()->sole();
 

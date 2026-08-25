@@ -38,6 +38,10 @@ use Illuminate\Support\Str;
 
 class ContractForm
 {
+    public const USE_DEFAULT_COST_CENTER = '__default__';
+
+    public const NO_COST_CENTER = '__unclassified__';
+
     public static function configure(Schema $schema): Schema
     {
         return $schema->components([
@@ -65,6 +69,10 @@ class ContractForm
                             ->modalHeading('Nuovo fornitore')
                             ->visible(fn (): bool => self::canManageMasterData()))
                         ->required(),
+                    self::costCenterSelect('default_cost_center_id')
+                        ->label('Centro di Costo')
+                        ->placeholder('Non classificato')
+                        ->helperText('Predefinito per tutti gli Esercizi Aperti. Le eventuali eccezioni si impostano in Avanzate.'),
                     Textarea::make('notes')->label('Note')->rows(3)->columnSpanFull(),
                     FileUpload::make('attachments')
                         ->label('Allegati')
@@ -72,7 +80,7 @@ class ContractForm
                         ->storeFiles(false)
                         ->helperText('Opzionali. Potrai aggiungerne altri dalla scheda del Contratto.')
                         ->columnSpanFull(),
-                ])->columns(2)->columnSpanFull(),
+                ])->columns(['default' => 1, 'md' => 2, 'xl' => 3])->columnSpanFull(),
             Section::make('Condizioni economiche')
                 ->description('Ogni riga definisce un importo ricorrente; non sono calcolati prorata. “Valida fino al” termina solo quella condizione economica: non determina la scadenza del Contratto.')
                 ->schema([
@@ -205,33 +213,21 @@ class ContractForm
                         ->visible(fn (Get $get): bool => $get('duration_type') === 'undefined')
                         ->columnSpanFull(),
                 ])->columnSpanFull(),
-            Section::make('Centri di Costo per Esercizio')
-                ->description('Opzionale. Assegna un Centro di Costo agli Esercizi Aperti; gli altri restano Non classificati.')
+            Section::make('Avanzate')
+                ->description('Personalizza il Centro di Costo solo negli Esercizi che fanno eccezione al valore predefinito.')
                 ->schema([
-                    Repeater::make('classifications')->hiddenLabel()->schema([
-                        Select::make('exercise_id')->label('Esercizio')->options(fn (): array => self::company() instanceof Company
-                            ? Exercise::query()->whereBelongsTo(self::company(), 'company')->open()->orderBy('year')->pluck('year', 'id')->all()
-                            : [])->required()->disabled()->dehydrated()->selectablePlaceholder(false),
-                        Select::make('cost_center_id')->label('Centro di Costo')->options(fn (): array => self::company() instanceof Company
-                            ? CostCenter::query()->whereBelongsTo(self::company(), 'company')->active()->orderBy('name')->pluck('name', 'id')->all()
-                            : [])
-                            ->placeholder('Non classificato')
-                            ->searchable()
-                            ->createOptionForm([
-                                TextInput::make('name')->label('Nome')->required()->maxLength(255),
-                            ])
-                            ->createOptionUsing(function (array $data): int {
-                                $actor = auth()->user();
-                                $company = self::company();
-                                abort_unless($actor instanceof User && $company instanceof Company, 403);
-
-                                return app(CreateCostCenter::class)->execute($actor, $company, $data, (string) Str::uuid())->id;
-                            })
-                            ->createOptionAction(fn (Action $action): Action => $action
-                                ->label('Crea centro di costo')
-                                ->modalHeading('Nuovo centro di costo')
-                                ->visible(fn (): bool => self::canManageMasterData())),
-                    ])->columns(2)
+                    Repeater::make('classifications')
+                        ->label('Centri di Costo per Esercizio')
+                        ->helperText('Ogni Esercizio usa il Centro di Costo predefinito, salvo una scelta diversa qui.')
+                        ->schema([
+                            Select::make('exercise_id')->label('Esercizio')->options(fn (): array => self::company() instanceof Company
+                                ? Exercise::query()->whereBelongsTo(self::company(), 'company')->open()->orderBy('year')->pluck('year', 'id')->all()
+                                : [])->required()->disabled()->dehydrated()->selectablePlaceholder(false),
+                            self::costCenterSelect('cost_center_selection', includeAnnualChoices: true)
+                                ->label('Centro di Costo')
+                                ->required()
+                                ->selectablePlaceholder(false),
+                        ])->columns(2)
                         ->table([
                             TableColumn::make('Esercizio')->markAsRequired(),
                             TableColumn::make('Centro di Costo'),
@@ -244,7 +240,7 @@ class ContractForm
                                 ->get()
                                 ->map(fn (Exercise $exercise): array => [
                                     'exercise_id' => $exercise->id,
-                                    'cost_center_id' => null,
+                                    'cost_center_selection' => self::USE_DEFAULT_COST_CENTER,
                                 ])
                                 ->all()
                             : [])
@@ -254,6 +250,30 @@ class ContractForm
                         ->columnSpanFull(),
                 ])->collapsible()->collapsed()->columnSpanFull(),
         ]);
+    }
+
+    private static function costCenterSelect(string $name, bool $includeAnnualChoices = false): Select
+    {
+        return Select::make($name)
+            ->options(fn (): array => ($includeAnnualChoices ? [
+                self::USE_DEFAULT_COST_CENTER => 'Usa il predefinito',
+                self::NO_COST_CENTER => 'Non classificato',
+            ] : []) + self::costCenterOptions())
+            ->searchable()
+            ->createOptionForm([
+                TextInput::make('name')->label('Nome')->required()->maxLength(255),
+            ])
+            ->createOptionUsing(function (array $data): int {
+                $actor = auth()->user();
+                $company = self::company();
+                abort_unless($actor instanceof User && $company instanceof Company, 403);
+
+                return app(CreateCostCenter::class)->execute($actor, $company, $data, (string) Str::uuid())->id;
+            })
+            ->createOptionAction(fn (Action $action): Action => $action
+                ->label('Crea centro di costo')
+                ->modalHeading('Nuovo centro di costo')
+                ->visible(fn (): bool => self::canManageMasterData()));
     }
 
     private static function canManageMasterData(): bool
@@ -426,6 +446,16 @@ class ContractForm
 
         return $company instanceof Company
             ? Supplier::query()->whereBelongsTo($company, 'company')->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all()
+            : [];
+    }
+
+    /** @return array<int, string> */
+    private static function costCenterOptions(): array
+    {
+        $company = self::company();
+
+        return $company instanceof Company
+            ? CostCenter::query()->whereBelongsTo($company, 'company')->active()->orderBy('name')->pluck('name', 'id')->all()
             : [];
     }
 }

@@ -160,6 +160,7 @@ it('creates and selects a Cost Center inline while reclassifying a Contract', fu
         'ownerRecord' => $contract,
         'pageClass' => ViewContract::class,
     ])->mountTableAction('reclassify', record: $contract->classifications()->sole())
+        ->assertSchemaComponentHidden('reason')
         ->assertFormComponentActionVisible('cost_center_id', 'createOption', formName: 'mountedActionSchema0')
         ->callFormComponentAction(
             'cost_center_id',
@@ -172,6 +173,10 @@ it('creates and selects a Cost Center inline while reclassifying a Contract', fu
     $costCenter = CostCenter::query()->where('company_id', $company->id)->where('name', 'Centro creato in riclassifica')->sole();
 
     $component->assertSchemaStateSet(['cost_center_id' => $costCenter->id]);
+
+    $expense = Expense::factory()->forExercise($contract->classifications()->sole()->exercise)->for($contract)->create();
+    ExpenseLine::factory()->actual()->for($expense)->create(['amount' => '10.00']);
+    $component->assertSchemaComponentVisible('reason');
     expect(AuditEvent::query()->where('subject_type', CostCenter::class)->where('subject_id', $costCenter->id)->count())->toBe(1);
 });
 

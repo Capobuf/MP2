@@ -25,6 +25,11 @@ it('centralizes the dark-first MP2 palette without the legacy brand blue', funct
             '.fi-simple-main',
             'background: var(--surface) !important;',
             '.fi-simple-main .fi-input-wrp',
+            '.fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-item-btn > .fi-icon',
+            '.mp2-context-control .mp2-context-copy',
+            '.mp2-context-control .mp2-context-label',
+            '.mp2-context-control .mp2-context-value',
+            '.mp2-impact-preview-changes',
         )
         ->not->toContain('#0057f5', '#004bd6', '#0757d6', '#4f8cff', '#73a4ff');
 

@@ -70,6 +70,14 @@ class SetExpenseLineActive
             if ($active === ! $lockedLine->isAnnulled()) {
                 return $lockedLine;
             }
+            $changeReason = $this->nullableTrim($context['change_reason'] ?? null);
+            if ($exercise->hasApprovedBudget()
+                && $lockedLine->lineType() === ExpenseLineType::Estimate
+                && $changeReason === null) {
+                throw ValidationException::withMessages([
+                    'change_reason' => 'Il motivo è obbligatorio per modificare una Stima dopo un Budget approvato.',
+                ]);
+            }
             if ($active) {
                 $validatedLine = ManualExpenseLine::validate([
                     'type' => $lockedLine->lineType()->value,
@@ -155,7 +163,8 @@ class SetExpenseLineActive
                 'new_value' => $newValue,
                 'allocated_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($expense->allocation(), $allocationBefore)),
                 'actual_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($expense->actual(), $actualBefore)),
-                'reason' => $contractContext !== null ? $contractContext['activity_note'] : ($projectContext === null ? $overspendNote : ($projectContext['activity_note'] ?? $projectContext['overspend_note'])),
+                'reason' => $changeReason
+                    ?? ($contractContext !== null ? $contractContext['activity_note'] : ($projectContext === null ? $overspendNote : ($projectContext['activity_note'] ?? $projectContext['overspend_note']))),
                 'reference_type' => $contract !== null ? Contract::class : ($project === null ? Expense::class : Project::class),
                 'reference_id' => $contract !== null ? $contract->id : ($project === null ? $expense->id : $project->id),
             ]);

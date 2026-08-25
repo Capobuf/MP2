@@ -45,7 +45,9 @@ it('reclassifies the full annual Contract after exact preview and retries idempo
     $preview = $action->preview($actor, $contract, $exercise, $target->id);
     $operationId = (string) Str::uuid();
 
-    $updated = $action->confirm($actor, $contract, $preview, $operationId);
+    expect(fn () => $action->confirm($actor, $contract, $preview, (string) Str::uuid()))
+        ->toThrow(ValidationException::class);
+    $updated = $action->confirm($actor, $contract, $preview, $operationId, 'Riclassificazione annuale');
     $retry = $action->confirm($actor, $contract, $preview, $operationId);
     $event = AuditEvent::query()->sole();
 

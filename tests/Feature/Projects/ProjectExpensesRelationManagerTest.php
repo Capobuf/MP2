@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Company\Capability;
+use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Resources\Expenses\Pages\CreateExpense;
 use App\Filament\Resources\Projects\Pages\ViewProject;
 use App\Filament\Resources\Projects\RelationManagers\ProjectExpensesRelationManager;
@@ -44,6 +45,12 @@ it('shows only child Expenses and links to prefilled creation without future own
         ->assertTableActionVisible('createProjectExpense')
         ->assertTableActionDoesNotExist('delete', record: $child);
 
+    Livewire::test(ViewProject::class, ['record' => $project->getRouteKey()])
+        ->assertActionVisible('createProjectExpense')
+        ->assertActionHasUrl('createProjectExpense', ExpenseResource::getUrl('create', [
+            'project' => $project->id,
+        ]));
+
     Livewire::withQueryParams(['project' => $project->id])->test(CreateExpense::class)
         ->assertFormSet(['container' => 'project', 'project_id' => $project->id])
         ->assertFormFieldDoesNotExist('exercise_id')
@@ -72,4 +79,7 @@ it('hides Project Expense creation from read-only viewers', function () {
         'ownerRecord' => $project,
         'pageClass' => ViewProject::class,
     ])->assertTableActionHidden('createProjectExpense');
+
+    Livewire::test(ViewProject::class, ['record' => $project->getRouteKey()])
+        ->assertActionHidden('createProjectExpense');
 });

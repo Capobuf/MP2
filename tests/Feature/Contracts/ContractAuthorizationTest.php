@@ -91,6 +91,7 @@ it('reauthorizes an idempotent renewal retry before returning its receipt', func
         'expiry_anchor_date' => '2026-12-31',
         'renewal_duration_months' => 12,
         'notice_days' => 30,
+        'impact_confirmed' => true,
         'expected_revision' => $contract->revision,
     ], $operationId))->toThrow(AuthorizationException::class);
 });

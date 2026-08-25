@@ -56,24 +56,63 @@ it('shows the S4 owner preview and moves the whole Expense without Contract cont
         ->and($line->refresh()->expense_id)->toBe($expense->id);
 });
 
-it('exposes declaration opening reason and overspend inputs in the move form', function () {
+it('hides unnecessary declarations and allows inline Supplier creation in the move form', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
+    foreach ([Capability::View, Capability::ManageOperations, Capability::ManageMasterData] as $capability) {
         CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $manager->id, 'capability' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create();
     $project = Project::factory()->for($company)->create(['initial_state' => ProjectState::Open]);
     ProjectExerciseClassification::factory()->forProjectAndExercise($project, $exercise)->create();
     $expense = Expense::factory()->forExercise($exercise)->for($project)->create(['direct_cost_center_id' => null]);
+    ExpenseLine::factory()->actual()->for($expense)->create();
     $this->actingAs($manager);
     Filament::setTenant($company);
 
     Livewire::test(ViewExpense::class, ['record' => $expense->getRouteKey()])
         ->mountAction('moveOrReclassify')
         ->assertSchemaComponentExists('reason')
-        ->assertSchemaComponentExists('actual_kind')
-        ->assertSchemaComponentExists('open_project')
-        ->assertSchemaComponentExists('overspend_note')
-        ->assertSchemaComponentExists('contract_id');
+        ->assertSchemaComponentHidden('actual_kind')
+        ->assertSchemaComponentHidden('open_project')
+        ->assertSchemaComponentHidden('activity_note')
+        ->assertSchemaComponentHidden('overspend_note')
+        ->assertFormComponentActionVisible('supplier_id', 'createOption', formName: 'mountedActionSchema0');
+});
+
+it('reveals only declarations required by the selected Project destination', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create(['overspend_note_required' => true]);
+    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
+        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $manager->id, 'capability' => $capability]);
+    }
+    $exercise = Exercise::factory()->for($company)->create();
+    $plannedProject = Project::factory()->for($company)->create(['initial_state' => ProjectState::Planned]);
+    $openProject = Project::factory()->for($company)->create(['initial_state' => ProjectState::Open]);
+    ProjectExerciseClassification::factory()->forProjectAndExercise($plannedProject, $exercise)->create();
+    ProjectExerciseClassification::factory()->forProjectAndExercise($openProject, $exercise)->create();
+    $expense = Expense::factory()->forExercise($exercise)->create();
+    ExpenseLine::factory()->for($expense)->create(['amount' => '10.00']);
+    ExpenseLine::factory()->actual()->for($expense)->create(['amount' => '20.00']);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+
+    $component = Livewire::test(ViewExpense::class, ['record' => $expense->getRouteKey()])
+        ->mountAction('moveOrReclassify')
+        ->fillForm(['project_id' => $plannedProject->id])
+        ->assertSchemaComponentVisible('actual_kind')
+        ->assertSchemaComponentVisible('open_project')
+        ->assertSchemaComponentHidden('activity_note')
+        ->assertSchemaComponentHidden('overspend_note');
+
+    $component
+        ->fillForm(['project_id' => $plannedProject->id, 'actual_kind' => 'late'])
+        ->assertSchemaComponentHidden('open_project')
+        ->assertSchemaComponentVisible('activity_note');
+
+    $component
+        ->fillForm(['project_id' => $openProject->id, 'actual_kind' => 'ordinary', 'reason' => 'Nuova attribuzione'])
+        ->assertSchemaComponentHidden('open_project')
+        ->assertSchemaComponentHidden('activity_note')
+        ->assertSchemaComponentVisible('overspend_note');
 });

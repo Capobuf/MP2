@@ -14,6 +14,7 @@ use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Utilities\Get;
@@ -83,6 +84,12 @@ class ContractClassificationsRelationManager extends RelationManager
                         return count($plan->expenseIds).' Spese conservano identità e importi; € '.$plan->allocation
                             .' di Allocato ed € '.$plan->actual.' di Effettivo cambiano insieme classificazione annuale.';
                     }),
+                    Textarea::make('reason')
+                        ->label('Nota della riclassificazione')
+                        ->helperText('Richiesta quando la riclassificazione interessa Effettivi o un Budget approvato.')
+                        ->visible(fn (ContractExerciseClassification $record): bool => $this->classificationReasonRequired($record))
+                        ->required(fn (ContractExerciseClassification $record): bool => $this->classificationReasonRequired($record))
+                        ->dehydrated(fn (ContractExerciseClassification $record): bool => $this->classificationReasonRequired($record)),
                     Checkbox::make('impact_confirmed')->label('Confermo l’anteprima corrente')->accepted()->required(),
                     Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
                 ])
@@ -92,7 +99,13 @@ class ContractClassificationsRelationManager extends RelationManager
                     $costCenterId = filled($data['cost_center_id'] ?? null) ? (int) $data['cost_center_id'] : null;
                     $action = app(UpdateContractClassification::class);
                     $plan = $action->preview($actor, $this->contract(), $record->exercise, $costCenterId);
-                    $action->confirm($actor, $this->contract(), $plan, (string) $data['operation_id']);
+                    $action->confirm(
+                        $actor,
+                        $this->contract(),
+                        $plan,
+                        (string) $data['operation_id'],
+                        isset($data['reason']) ? (string) $data['reason'] : null,
+                    );
                 }),
         ])->defaultSort('exercise.year');
     }
@@ -116,5 +129,18 @@ class ContractClassificationsRelationManager extends RelationManager
 
         return $actor instanceof User
             && $actor->hasCapability($this->contract()->company, Capability::ManageMasterData);
+    }
+
+    private function classificationReasonRequired(ContractExerciseClassification $classification): bool
+    {
+        return $classification->exercise->hasApprovedBudget()
+            || $this->contract()->expenses()
+                ->whereNull('reversed_at')
+                ->where('exercise_id', $classification->exercise_id)
+                ->whereHas('lines', fn ($query) => $query
+                    ->whereNull('annulled_at')
+                    ->where('type', 'actual')
+                    ->where('amount', '!=', '0.00'))
+                ->exists();
     }
 }

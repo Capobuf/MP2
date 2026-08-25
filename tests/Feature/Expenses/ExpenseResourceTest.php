@@ -7,6 +7,7 @@ use App\Filament\Resources\Expenses\Pages\CreateExpense;
 use App\Filament\Resources\Expenses\Pages\ListExpenses;
 use App\Filament\Resources\Expenses\Pages\ViewExpense;
 use App\Models\AuditEvent;
+use App\Models\BudgetSnapshot;
 use App\Models\Company;
 use App\Models\CompanyCapability;
 use App\Models\Contract;
@@ -15,6 +16,7 @@ use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
+use App\Models\Proposal;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Support\ExerciseContext;
@@ -78,6 +80,33 @@ it('creates an expense in the selected global Exercise without exposing a second
         ->and(ExpenseLine::query()->count())->toBe(1);
 });
 
+it('shows the creation reason only after a Budget and only for a non-zero Expense', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
+    $proposal = Proposal::factory()->for($company)->for($exercise)->create(['created_by_id' => $manager->id]);
+    BudgetSnapshot::factory()->for($proposal)->create([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'approved_by_id' => $manager->id,
+    ]);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+    app(ExerciseContext::class)->select($company, $exercise->id);
+
+    $component = Livewire::test(CreateExpense::class)
+        ->fillForm(['lines' => [['type' => 'estimate', 'amount' => '0.00', 'note' => 'Voce vuota']]])
+        ->assertFormFieldHidden('change_reason');
+
+    $component
+        ->fillForm(['lines' => [['type' => 'estimate', 'amount' => '10.00']]])
+        ->assertFormFieldVisible('change_reason')
+        ->fillForm(['description' => 'Nuova spesa', 'change_reason' => 'Aggiornamento del piano'])
+        ->call('create')
+        ->assertHasNoFormErrors();
+});
+
 it('accepts an amount entered with the Italian decimal separator', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
@@ -128,6 +157,27 @@ it('suggests the authoritative Total from unit amount and quantity without expos
         ->set("data.lines.{$lineKey}.quantity", '3')
         ->assertSet("data.lines.{$lineKey}.amount", '2500')
         ->assertSet("data.lines.{$lineKey}.suggested_amount", '3600.00');
+});
+
+it('tolerates incomplete decimal input while editing a suggested Total', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+    app(ExerciseContext::class)->select($company, $exercise->id);
+
+    $component = Livewire::test(CreateExpense::class);
+    $lineKey = array_key_first((array) $component->get('data.lines'));
+
+    $component
+        ->set("data.lines.{$lineKey}.unit_amount", '1200')
+        ->set("data.lines.{$lineKey}.quantity", '2')
+        ->set("data.lines.{$lineKey}.amount", '2500')
+        ->set("data.lines.{$lineKey}.unit_amount", '1200,')
+        ->assertSet("data.lines.{$lineKey}.amount", '2500')
+        ->assertSet("data.lines.{$lineKey}.suggested_amount", null);
 });
 
 it('allows only Actual lines when creating an Expense for a Contract', function () {

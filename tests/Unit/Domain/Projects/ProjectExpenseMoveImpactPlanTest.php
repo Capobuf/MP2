@@ -27,6 +27,8 @@ it('captures a whole same-year Project ownership move with exact deltas and stab
     $actual = ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '30.00']);
 
     $plan = ExpenseImpactPlan::build($expense, $exercise, $exercise, null, null, 'Correzione', $source, $target, 'ordinary');
+    $sourceImpact = $plan->projectImpacts[$source->id.':'.$exercise->id];
+    $targetImpact = $plan->projectImpacts[$target->id.':'.$exercise->id];
 
     expect($plan->sourceProjectId)->toBe($source->id)
         ->and($plan->targetProjectId)->toBe($target->id)
@@ -34,12 +36,34 @@ it('captures a whole same-year Project ownership move with exact deltas and stab
         ->and($plan->sourceCostCenterId)->toBe($sourceCenter->id)
         ->and($plan->targetCostCenterId)->toBe($targetCenter->id)
         ->and($plan->lineIds)->toBe([$estimate->id, $actual->id])
-        ->and($plan->projectImpacts[(string) $source->id]['allocation_delta'])->toBe('-100.00')
-        ->and($plan->projectImpacts[(string) $source->id]['actual_delta'])->toBe('-30.00')
-        ->and($plan->projectImpacts[(string) $target->id]['allocation_delta'])->toBe('100.00')
-        ->and($plan->projectImpacts[(string) $target->id]['actual_delta'])->toBe('30.00')
+        ->and($sourceImpact['allocation_delta'])->toBe('-100.00')
+        ->and($sourceImpact['actual_delta'])->toBe('-30.00')
+        ->and($targetImpact['allocation_delta'])->toBe('100.00')
+        ->and($targetImpact['actual_delta'])->toBe('30.00')
         ->and($plan->exerciseImpacts[(string) $exercise->id]['allocation_delta'])->toBe('0.00')
         ->and($plan->fingerprint())->toHaveLength(64);
+});
+
+it('captures both annual legs when the same Project Expense changes Exercise', function () {
+    $company = Company::factory()->create();
+    $source = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $target = Exercise::factory()->for($company)->create(['year' => 2025]);
+    $project = Project::factory()->for($company)->create();
+    $expense = Expense::factory()->forExercise($source)->for($project)->create(['direct_cost_center_id' => null]);
+    ExpenseLine::factory()->for($expense)->create(['amount' => '100.00']);
+    ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '30.00']);
+
+    $plan = ExpenseImpactPlan::build($expense, $source, $target, null, null, 'Correzione anno', $project, $project);
+
+    $sourceImpact = $plan->projectImpacts[$project->id.':'.$source->id];
+    $targetImpact = $plan->projectImpacts[$project->id.':'.$target->id];
+
+    expect($sourceImpact['allocation_delta'])->toBe('-100.00')
+        ->and($sourceImpact['actual_delta'])->toBe('-30.00')
+        ->and($sourceImpact['exercise_id'])->toBe($source->id)
+        ->and($targetImpact['allocation_delta'])->toBe('100.00')
+        ->and($targetImpact['actual_delta'])->toBe('30.00')
+        ->and($targetImpact['exercise_id'])->toBe($target->id);
 });
 
 it('captures entering and leaving a Project with direct and inherited classification', function () {

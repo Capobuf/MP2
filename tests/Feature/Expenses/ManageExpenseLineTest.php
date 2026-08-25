@@ -6,11 +6,13 @@ use App\Actions\Operations\UpdateExpenseLine;
 use App\Domain\Company\AuditEventType;
 use App\Domain\Company\Capability;
 use App\Models\AuditEvent;
+use App\Models\BudgetSnapshot;
 use App\Models\Company;
 use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
+use App\Models\Proposal;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -79,4 +81,49 @@ it('preserves offsetting actual presence independently from the net total', func
 
     expect($expense->refresh()->actual())->toBe('0.00')
         ->and($expense->hasActuals())->toBeTrue();
+});
+
+it('requires a reason only for Estimate changes after an approved Budget', function () {
+    [$actor, $company, $exercise, $expense] = lineContext();
+    $proposal = Proposal::factory()->for($company)->for($exercise)->create(['created_by_id' => $actor->id]);
+    BudgetSnapshot::factory()->for($proposal)->create([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'approved_by_id' => $actor->id,
+    ]);
+
+    expect(fn () => app(CreateExpenseLine::class)->execute($actor, $expense, [
+        'type' => 'estimate',
+        'amount' => '100.00',
+    ], (string) Str::uuid()))->toThrow(ValidationException::class);
+
+    $estimate = app(CreateExpenseLine::class)->execute($actor, $expense, [
+        'type' => 'estimate',
+        'amount' => '100.00',
+        'change_reason' => 'Aggiornamento del piano',
+    ], (string) Str::uuid());
+    app(CreateExpenseLine::class)->execute($actor, $expense, [
+        'type' => 'actual',
+        'amount' => '10.00',
+    ], (string) Str::uuid());
+
+    expect(fn () => app(UpdateExpenseLine::class)->execute($actor, $estimate, [
+        'type' => 'estimate',
+        'amount' => '120.00',
+    ], (string) Str::uuid()))->toThrow(ValidationException::class)
+        ->and(fn () => app(SetExpenseLineActive::class)->execute(
+            $actor,
+            $estimate,
+            false,
+            (string) Str::uuid(),
+        ))->toThrow(ValidationException::class);
+
+    app(SetExpenseLineActive::class)->execute($actor, $estimate, false, (string) Str::uuid(), [
+        'change_reason' => 'Stima non più necessaria',
+    ]);
+    app(SetExpenseLineActive::class)->execute($actor, $estimate, true, (string) Str::uuid(), [
+        'change_reason' => 'Stima ripristinata',
+    ]);
+
+    expect($estimate->refresh()->isAnnulled())->toBeFalse();
 });

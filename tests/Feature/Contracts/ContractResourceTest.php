@@ -20,7 +20,9 @@ use App\Models\Company;
 use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
+use App\Models\ContractExerciseClassification;
 use App\Models\ContractLifecycleFact;
+use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -80,6 +82,7 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
         ->assertDontSee('Salva & nuovo')
         ->assertFormFieldExists('title')
         ->assertFormFieldExists('supplier_id')
+        ->assertFormFieldExists('default_cost_center_id')
         ->assertFormFieldExists('attachments', fn ($field): bool => $field instanceof FileUpload && $field->isMultiple())
         ->assertFormComponentActionHidden('supplier_id', 'createOption')
         ->assertFormFieldExists('conditions')
@@ -95,7 +98,7 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
         ->assertFormSet(function (array $state) use ($exercise): array {
             expect(array_values($state['classifications']))->toBe([[
                 'exercise_id' => $exercise->id,
-                'cost_center_id' => null,
+                'cost_center_selection' => '__default__',
             ]]);
 
             return [];
@@ -133,7 +136,7 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
             ]],
             'classifications' => [[
                 'exercise_id' => $exercise->id,
-                'cost_center_id' => null,
+                'cost_center_selection' => '__default__',
             ]],
         ])
         ->assertFormSet([
@@ -157,6 +160,55 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
         ->and(AuditEvent::query()->where('event_type', AuditEventType::AttachmentUploaded)->count())->toBe(2);
 
     Attachment::query()->each(fn (Attachment $attachment) => Storage::disk('local')->assertExists($attachment->storage_path));
+});
+
+it('applies one default Cost Center while preserving annual exceptions', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    grantContractResource($manager, $company);
+    $exercises = collect([
+        Exercise::factory()->for($company)->create(['year' => 2026]),
+        Exercise::factory()->for($company)->create(['year' => 2027]),
+        Exercise::factory()->for($company)->create(['year' => 2028]),
+    ]);
+    $supplier = Supplier::factory()->for($company)->create();
+    $defaultCostCenter = CostCenter::factory()->for($company)->create(['name' => 'IT']);
+    $exceptionCostCenter = CostCenter::factory()->for($company)->create(['name' => 'Operations']);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+
+    Livewire::test(CreateContract::class)
+        ->assertSee('Predefinito per tutti gli Esercizi Aperti')
+        ->assertSee('Avanzate')
+        ->fillForm([
+            'title' => 'Contratto con classificazioni',
+            'supplier_id' => $supplier->id,
+            'default_cost_center_id' => $defaultCostCenter->id,
+            'contractual_start_date' => '01/01/2026',
+            'duration_type' => 'indefinite',
+            'conditions' => [[
+                'amount' => '100,00',
+                'cycle' => 'monthly',
+                'attribution_mode' => 'cycle_start',
+                'valid_from' => '01/01/2026',
+                'valid_to' => null,
+            ]],
+            'classifications' => [
+                ['exercise_id' => $exercises[0]->id, 'cost_center_selection' => '__default__'],
+                ['exercise_id' => $exercises[1]->id, 'cost_center_selection' => (string) $exceptionCostCenter->id],
+                ['exercise_id' => $exercises[2]->id, 'cost_center_selection' => '__unclassified__'],
+            ],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $classifications = ContractExerciseClassification::query()
+        ->orderBy('exercise_id')
+        ->pluck('cost_center_id', 'exercise_id');
+
+    expect($classifications[$exercises[0]->id])->toBe($defaultCostCenter->id)
+        ->and($classifications[$exercises[1]->id])->toBe($exceptionCostCenter->id)
+        ->and($classifications[$exercises[2]->id])->toBeNull();
 });
 
 it('suggests the contractual start from the earliest economic condition', function () {

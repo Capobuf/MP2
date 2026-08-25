@@ -23,14 +23,14 @@ use Illuminate\Validation\ValidationException;
 class SetExpenseReversed
 {
     /** @param array<string, mixed> $context */
-    public function execute(User $actor, Expense $expense, bool $reversed, string $reason, string $operationId, array $context = []): Expense
+    public function execute(User $actor, Expense $expense, bool $reversed, ?string $reason, string $operationId, array $context = []): Expense
     {
-        /** @var array{reason: string, operation_id: string} $validated */
+        /** @var array{reason: ?string, operation_id: string} $validated */
         $validated = Validator::make([
-            'reason' => trim($reason),
+            'reason' => $this->nullableTrim($reason),
             'operation_id' => $operationId,
         ], [
-            'reason' => ['required', 'string'],
+            'reason' => ['nullable', 'string'],
             'operation_id' => ['required', 'uuid'],
         ])->validate();
 
@@ -73,6 +73,13 @@ class SetExpenseReversed
             }
             if ($reversed && $lockedExpense->hasActuals()) {
                 throw ValidationException::withMessages(['expense' => 'La Spesa contiene Effettivi attivi non nulli e non può essere stornata.']);
+            }
+            if (($reversed || $exercise->hasApprovedBudget()) && $validated['reason'] === null) {
+                throw ValidationException::withMessages([
+                    'reason' => $reversed
+                        ? 'Il motivo è obbligatorio per stornare una Spesa.'
+                        : 'Il motivo è obbligatorio per ripristinare una Spesa dopo un Budget approvato.',
+                ]);
             }
 
             $allocationBefore = $lockedExpense->allocation();
@@ -156,7 +163,8 @@ class SetExpenseReversed
                 'new_value' => $newValue,
                 'allocated_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($allocationAfter, $allocationBefore)),
                 'actual_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($actualAfter, $actualBefore)),
-                'reason' => $validated['reason'],
+                'reason' => $validated['reason']
+                    ?? ($contractContext['activity_note'] ?? $projectContext['activity_note'] ?? $overspendNote),
                 'reference_type' => $contract !== null ? Contract::class : ($project === null ? null : Project::class),
                 'reference_id' => $contract !== null ? $contract->id : $project?->id,
             ]);

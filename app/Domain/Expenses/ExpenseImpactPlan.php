@@ -13,9 +13,9 @@ final readonly class ExpenseImpactPlan
      * @param  array<int, int>  $exerciseRevisions
      * @param  array<int, array<string, int|string>>  $exerciseImpacts
      * @param  array<int, int>  $projectRevisions
-     * @param  array<int, array<string, int|string>>  $projectImpacts
+     * @param  array<string, array<string, int|string>>  $projectImpacts
      * @param  array<int, int>  $contractRevisions
-     * @param  array<int, array<string, int|string>>  $contractImpacts
+     * @param  array<string, array<string, int|string>>  $contractImpacts
      * @param  list<int>  $lineIds
      */
     public function __construct(
@@ -84,63 +84,34 @@ final readonly class ExpenseImpactPlan
         ksort($impacts, SORT_NUMERIC);
         ksort($revisions, SORT_NUMERIC);
         $projectRevisions = [];
-        $projectImpacts = [];
         foreach (array_filter([$sourceProject, $targetProject]) as $project) {
             $projectRevisions[(string) $project->id] = $project->revision;
-            $totals = $project->annualTotals()[$target->id] ?? ['allocation' => '0.00', 'actual' => '0.00'];
-            $allocationDelta = '0.00';
-            $actualDelta = '0.00';
-            if ($sourceProject?->is($project) && ! $targetProject?->is($project)) {
-                $allocationDelta = Decimal::subtract('0.00', $allocation);
-                $actualDelta = Decimal::subtract('0.00', $actual);
-            } elseif ($targetProject?->is($project) && ! $sourceProject?->is($project)) {
-                $allocationDelta = $allocation;
-                $actualDelta = $actual;
-            }
-            $allocationAfter = Decimal::add($totals['allocation'], $allocationDelta);
-            $actualAfter = Decimal::add($totals['actual'], $actualDelta);
-            $projectImpacts[(string) $project->id] = [
-                'exercise_id' => $target->id,
-                'allocation_before' => $totals['allocation'],
-                'allocation_after' => $allocationAfter,
-                'allocation_delta' => Decimal::money($allocationDelta),
-                'actual_before' => $totals['actual'],
-                'actual_after' => $actualAfter,
-                'actual_delta' => Decimal::money($actualDelta),
-                'variance_before' => Decimal::subtract($totals['actual'], $totals['allocation']),
-                'variance_after' => Decimal::subtract($actualAfter, $allocationAfter),
-            ];
         }
+        $projectImpacts = self::annualOwnerImpacts(
+            sourceOwner: $sourceProject,
+            targetOwner: $targetProject,
+            source: $source,
+            target: $target,
+            allocation: $allocation,
+            actual: $actual,
+        );
         ksort($projectRevisions, SORT_NUMERIC);
-        ksort($projectImpacts, SORT_NUMERIC);
+        ksort($projectImpacts, SORT_NATURAL);
 
         $contractRevisions = [];
-        $contractImpacts = [];
         foreach (array_filter([$sourceContract, $targetContract]) as $contract) {
             $contractRevisions[(string) $contract->id] = $contract->revision;
-            $impactExercise = $sourceContract?->is($contract) && ! $targetContract?->is($contract) ? $source : $target;
-            $totals = $contract->annualTotals()[$impactExercise->id] ?? ['allocation' => '0.00', 'actual' => '0.00'];
-            $allocationDelta = '0.00';
-            $actualDelta = '0.00';
-            if ($sourceContract?->is($contract) && ! $targetContract?->is($contract)) {
-                $allocationDelta = Decimal::subtract('0.00', $allocation);
-                $actualDelta = Decimal::subtract('0.00', $actual);
-            } elseif ($targetContract?->is($contract) && ! $sourceContract?->is($contract)) {
-                $allocationDelta = $allocation;
-                $actualDelta = $actual;
-            }
-            $contractImpacts[(string) $contract->id] = [
-                'exercise_id' => $impactExercise->id,
-                'allocation_before' => $totals['allocation'],
-                'allocation_after' => Decimal::add($totals['allocation'], $allocationDelta),
-                'allocation_delta' => Decimal::money($allocationDelta),
-                'actual_before' => $totals['actual'],
-                'actual_after' => Decimal::add($totals['actual'], $actualDelta),
-                'actual_delta' => Decimal::money($actualDelta),
-            ];
         }
+        $contractImpacts = self::annualOwnerImpacts(
+            sourceOwner: $sourceContract,
+            targetOwner: $targetContract,
+            source: $source,
+            target: $target,
+            allocation: $allocation,
+            actual: $actual,
+        );
         ksort($contractRevisions, SORT_NUMERIC);
-        ksort($contractImpacts, SORT_NUMERIC);
+        ksort($contractImpacts, SORT_NATURAL);
 
         $sourceCostCenterId = $sourceProject !== null
             ? $sourceProject->classifications()->where('exercise_id', $source->id)->value('cost_center_id')
@@ -198,6 +169,75 @@ final readonly class ExpenseImpactPlan
     public function fingerprint(): string
     {
         return hash('sha256', json_encode($this->toArray(), JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * @return array<string, array<string, int|string>>
+     */
+    private static function annualOwnerImpacts(
+        Project|Contract|null $sourceOwner,
+        Project|Contract|null $targetOwner,
+        Exercise $source,
+        Exercise $target,
+        string $allocation,
+        string $actual,
+    ): array {
+        $contextChanges = ! $source->is($target) || ! $sourceOwner?->is($targetOwner);
+        if (! $contextChanges) {
+            return [self::ownerImpactKey($sourceOwner, $source) => self::ownerImpact(
+                $sourceOwner,
+                $source,
+                '0.00',
+                '0.00',
+            )];
+        }
+
+        $impacts = [];
+        if ($sourceOwner !== null) {
+            $impacts[self::ownerImpactKey($sourceOwner, $source)] = self::ownerImpact(
+                $sourceOwner,
+                $source,
+                Decimal::subtract('0.00', $allocation),
+                Decimal::subtract('0.00', $actual),
+            );
+        }
+        if ($targetOwner !== null) {
+            $impacts[self::ownerImpactKey($targetOwner, $target)] = self::ownerImpact(
+                $targetOwner,
+                $target,
+                $allocation,
+                $actual,
+            );
+        }
+
+        return $impacts;
+    }
+
+    private static function ownerImpactKey(Project|Contract $owner, Exercise $exercise): string
+    {
+        return $owner->id.':'.$exercise->id;
+    }
+
+    /** @return array<string, int|string> */
+    private static function ownerImpact(Project|Contract $owner, Exercise $exercise, string $allocationDelta, string $actualDelta): array
+    {
+        $totals = $owner->annualTotals()[$exercise->id] ?? ['allocation' => '0.00', 'actual' => '0.00'];
+        $allocationAfter = Decimal::add($totals['allocation'], $allocationDelta);
+        $actualAfter = Decimal::add($totals['actual'], $actualDelta);
+
+        return [
+            'owner_id' => $owner->id,
+            'exercise_id' => $exercise->id,
+            'year' => $exercise->year,
+            'allocation_before' => $totals['allocation'],
+            'allocation_after' => $allocationAfter,
+            'allocation_delta' => Decimal::money($allocationDelta),
+            'actual_before' => $totals['actual'],
+            'actual_after' => $actualAfter,
+            'actual_delta' => Decimal::money($actualDelta),
+            'variance_before' => Decimal::subtract($totals['actual'], $totals['allocation']),
+            'variance_after' => Decimal::subtract($actualAfter, $allocationAfter),
+        ];
     }
 
     /** @return array<string, mixed> */

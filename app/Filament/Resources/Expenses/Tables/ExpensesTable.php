@@ -36,7 +36,8 @@ class ExpensesTable
             })
             ->columns([
                 TextColumn::make('id')->label('ID')->formatStateUsing(fn (int $state): string => '#'.$state)->searchable()->sortable(),
-                TextColumn::make('description')->label('Descrizione')->searchable()->sortable()->wrap(),
+                TextColumn::make('description')->label('Descrizione')->searchable()->sortable()->wrap()
+                    ->url(fn (Expense $record): string => ExpenseResource::getUrl('view', ['record' => $record])),
                 TextColumn::make('container')->label('Contenitore')
                     ->state(fn (Expense $record): string => $record->containerLabel())
                     ->url(fn (Expense $record): ?string => match (true) {

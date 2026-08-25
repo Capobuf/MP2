@@ -4,7 +4,9 @@ namespace App\Actions\Operations;
 
 use App\Domain\Company\AuditEventType;
 use App\Domain\Contracts\ContractExpenseActivity;
+use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseAuditSnapshot;
+use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Expenses\ManualExpenseLine;
 use App\Domain\Projects\ProjectAuditSnapshot;
 use App\Domain\Projects\ProjectExpenseActivity;
@@ -41,11 +43,12 @@ class CreateExpense
             'activity_note' => $input['activity_note'] ?? null,
             'open_project' => $input['open_project'] ?? false,
             'overspend_note' => $input['overspend_note'] ?? null,
+            'change_reason' => $this->nullableTrim($input['change_reason'] ?? null),
             'description' => $this->trim($input['description'] ?? null),
             'notes' => $this->nullableTrim($input['notes'] ?? null),
             'operation_id' => $operationId,
         ];
-        /** @var array{exercise_id: int, supplier_id: ?int, direct_cost_center_id: ?int, project_id: ?int, contract_id: ?int, actual_kind: ?string, activity_note: ?string, open_project: bool, overspend_note: ?string, description: string, notes: ?string, lines: array<int, array<string, mixed>>, operation_id: string} $validated */
+        /** @var array{exercise_id: int, supplier_id: ?int, direct_cost_center_id: ?int, project_id: ?int, contract_id: ?int, actual_kind: ?string, activity_note: ?string, open_project: bool, overspend_note: ?string, change_reason: ?string, description: string, notes: ?string, lines: array<int, array<string, mixed>>, operation_id: string} $validated */
         $validated = Validator::make($normalized, [
             'exercise_id' => ['required', 'integer'],
             'supplier_id' => ['nullable', 'integer'],
@@ -56,6 +59,7 @@ class CreateExpense
             'activity_note' => ['nullable', 'string'],
             'open_project' => ['boolean'],
             'overspend_note' => ['nullable', 'string'],
+            'change_reason' => ['nullable', 'string'],
             'description' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
             'lines' => ['required', 'array', 'min:1'],
@@ -129,6 +133,21 @@ class CreateExpense
                 fn (array $line): array => ManualExpenseLine::validate($line, $lockedCompany, $exercise),
                 $validated['lines'],
             );
+            $allocation = Decimal::sum(array_map(
+                fn (array $line): string => $line['type'] === ExpenseLineType::Estimate->value ? (string) $line['amount'] : '0.00',
+                $lines,
+            ));
+            $actual = Decimal::sum(array_map(
+                fn (array $line): string => $line['type'] === ExpenseLineType::Actual->value ? (string) $line['amount'] : '0.00',
+                $lines,
+            ));
+            if ($exercise->hasApprovedBudget()
+                && (Decimal::compare($allocation, '0.00') !== 0 || Decimal::compare($actual, '0.00') !== 0)
+                && $validated['change_reason'] === null) {
+                throw ValidationException::withMessages([
+                    'change_reason' => 'Il motivo è obbligatorio perché l’Esercizio ha già un Budget approvato.',
+                ]);
+            }
 
             $openingTransition = null;
             if ($project !== null) {
@@ -197,7 +216,8 @@ class CreateExpense
                 'new_value' => $newValue,
                 'allocated_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, $expense->allocation()),
                 'actual_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, $expense->actual()),
-                'reason' => $contractContext !== null ? $contractContext['activity_note'] : ($projectContext === null ? null : ($projectContext['activity_note'] ?? $projectContext['overspend_note'])),
+                'reason' => $validated['change_reason']
+                    ?? ($contractContext !== null ? $contractContext['activity_note'] : ($projectContext === null ? null : ($projectContext['activity_note'] ?? $projectContext['overspend_note']))),
                 'reference_type' => $contract !== null ? Contract::class : ($project === null ? null : Project::class),
                 'reference_id' => $contract !== null ? $contract->id : $project?->id,
             ]);

@@ -4,6 +4,7 @@ namespace App\Actions\Operations;
 
 use App\Domain\Company\AuditEventType;
 use App\Domain\Expenses\ExpenseAuditSnapshot;
+use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Projects\ProjectAuditSnapshot;
 use App\Domain\Projects\ProjectClassificationImpactPlan;
 use App\Models\AuditEvent;
@@ -28,11 +29,18 @@ final class UpdateProjectClassification
         return ProjectClassificationImpactPlan::build($project, $exercise, $costCenterId);
     }
 
-    public function confirm(User $actor, Project $project, ProjectClassificationImpactPlan $preview, string $operationId): ProjectExerciseClassification
+    public function confirm(User $actor, Project $project, ProjectClassificationImpactPlan $preview, string $operationId, ?string $reason = null): ProjectExerciseClassification
     {
-        Validator::make(['operation_id' => $operationId], ['operation_id' => ['required', 'uuid']])->validate();
+        $reason = $this->nullableTrim($reason);
+        Validator::make([
+            'reason' => $reason,
+            'operation_id' => $operationId,
+        ], [
+            'reason' => ['nullable', 'string'],
+            'operation_id' => ['required', 'uuid'],
+        ])->validate();
 
-        return DB::transaction(function () use ($actor, $project, $preview, $operationId): ProjectExerciseClassification {
+        return DB::transaction(function () use ($actor, $project, $preview, $operationId, $reason): ProjectExerciseClassification {
             $company = Company::query()->lockForUpdate()->findOrFail($project->company_id);
             $exercise = Exercise::query()->lockForUpdate()->findOrFail($preview->exerciseId);
             $lockedProject = Project::query()->lockForUpdate()->findOrFail($project->id);
@@ -68,6 +76,11 @@ final class UpdateProjectClassification
             if ($classification !== null && $classification->cost_center_id === $preview->newCostCenterId) {
                 return $classification;
             }
+            if (($exercise->hasApprovedBudget() || $this->hasActuals($lockedProject, $exercise)) && $reason === null) {
+                throw ValidationException::withMessages([
+                    'reason' => 'La Nota è obbligatoria perché la riclassificazione interessa Effettivi o un Budget approvato.',
+                ]);
+            }
 
             $before = $classification === null ? null : ProjectAuditSnapshot::classification($classification);
             $classification ??= new ProjectExerciseClassification([
@@ -98,12 +111,36 @@ final class UpdateProjectClassification
                 ],
                 'allocated_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, '0.00'),
                 'actual_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, '0.00'),
+                'reason' => $reason,
                 'reference_type' => Project::class,
                 'reference_id' => $lockedProject->id,
             ]);
 
             return $classification;
         });
+    }
+
+    private function hasActuals(Project $project, Exercise $exercise): bool
+    {
+        return $project->expenses()
+            ->whereNull('reversed_at')
+            ->where('exercise_id', $exercise->id)
+            ->whereHas('lines', fn ($query) => $query
+                ->whereNull('annulled_at')
+                ->where('type', ExpenseLineType::Actual->value)
+                ->where('amount', '!=', '0.00'))
+            ->exists();
+    }
+
+    private function nullableTrim(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value === '' ? null : $value;
     }
 
     private function validateReferences(Project $project, Exercise $exercise, ?int $costCenterId, bool $lock = false, ?int $currentId = null): void

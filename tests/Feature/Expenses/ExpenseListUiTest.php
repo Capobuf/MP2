@@ -1,7 +1,9 @@
 <?php
 
 use App\Domain\Company\Capability;
+use App\Domain\Projects\ProjectState;
 use App\Filament\Resources\Contracts\ContractResource;
+use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Resources\Expenses\Pages\ListExpenses;
 use App\Filament\Resources\Expenses\Pages\ViewExpense;
 use App\Filament\Resources\Expenses\Widgets\ExpenseOverview;
@@ -90,6 +92,7 @@ it('toggles the sibling expense detail from the row without exposing a detail bu
 
     $list = Livewire::test(ListExpenses::class)
         ->assertSeeLivewire(ExpenseOverview::class)
+        ->assertSeeHtml('href="'.ExpenseResource::getUrl('view', ['record' => $expense], tenant: $this->company).'"')
         ->assertTableActionExists('selectExpense', record: $expense)
         ->assertTableActionDoesNotExist('view', record: $expense)
         ->assertTableActionDoesNotExist('delete', record: $expense)
@@ -174,4 +177,25 @@ it('adds a line from the shared detail component and refreshes its economic summ
     expect($expense->lines()->sole())
         ->type->value->toBe('estimate')
         ->amount->toBe('75.00');
+});
+
+it('shows the overspend note only when the entered Line creates or increases overspend', function () {
+    CompanyCapability::query()->create([
+        'company_id' => $this->company->id,
+        'user_id' => $this->user->id,
+        'capability' => Capability::ManageOperations,
+    ]);
+    $this->company->update(['overspend_note_required' => true]);
+    $project = Project::factory()->for($this->company)->create(['initial_state' => ProjectState::Open]);
+    $expense = Expense::factory()->forExercise($this->exercise)->for($project)->create(['direct_cost_center_id' => null]);
+    ExpenseLine::factory()->for($expense)->create(['type' => 'estimate', 'amount' => '100.00']);
+
+    $component = Livewire::test(ExpenseDetail::class, ['expenseId' => $expense->id, 'compact' => true])
+        ->mountAction('addLine')
+        ->fillForm(['type' => 'actual', 'amount' => '50.00'])
+        ->assertSchemaComponentHidden('overspend_note');
+
+    $component
+        ->fillForm(['type' => 'actual', 'amount' => '150.00'])
+        ->assertSchemaComponentVisible('overspend_note');
 });

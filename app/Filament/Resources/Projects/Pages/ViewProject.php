@@ -5,9 +5,11 @@ namespace App\Filament\Resources\Projects\Pages;
 use App\Actions\Operations\ChangeProjectDeferral;
 use App\Actions\Operations\SetProjectArchived;
 use App\Actions\Operations\UpdateProjectClassification;
+use App\Domain\Company\Capability;
 use App\Domain\Projects\ProjectDeferralMode;
 use App\Domain\Projects\ProjectState;
 use App\Filament\Pages\CompanyAudit;
+use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Resources\Projects\ProjectResource;
 use App\Models\CostCenter;
 use App\Models\Exercise;
@@ -91,10 +93,19 @@ class ViewProject extends ViewRecord
                     'project' => $record->id,
                 ])),
             EditAction::make()->label('Modifica')->icon('heroicon-m-pencil-square')->color('gray')->outlined(),
+            Action::make('createProjectExpense')
+                ->label('Nuova spesa')
+                ->icon('heroicon-m-plus')
+                ->extraAttributes(['class' => 'mp2-object-primary-action'])
+                ->url(fn (): string => ExpenseResource::getUrl('create', [
+                    'project' => $this->projectRecord()->getKey(),
+                ]))
+                ->visible(fn (): bool => $this->canCreateExpense()),
             Action::make('reclassify')
                 ->label('Riclassifica annualità')
                 ->icon('heroicon-m-arrows-right-left')
-                ->extraAttributes(['class' => 'mp2-object-primary-action'])
+                ->color('gray')
+                ->outlined()
                 ->modalHeading('Riclassifica il Progetto')
                 ->modalDescription('L’anteprima riclassifica tutte le Spese figlie dell’Esercizio senza modificarne identità o importi.')
                 ->modalSubmitActionLabel('Conferma riclassificazione')
@@ -140,6 +151,12 @@ class ViewProject extends ViewRecord
                                 .($expenses === '' ? '' : " ({$expenses})")
                                 .'; € '.$plan->allocation.' di Allocato ed € '.$plan->actual.' di Effettivo passano integralmente alla nuova classificazione annuale.';
                         }),
+                    Textarea::make('reason')
+                        ->label('Nota della riclassificazione')
+                        ->helperText('Richiesta quando la riclassificazione interessa Effettivi o un Budget approvato.')
+                        ->visible(fn (Get $get): bool => $this->reclassificationReasonRequired($get))
+                        ->required(fn (Get $get): bool => $this->reclassificationReasonRequired($get))
+                        ->dehydrated(fn (Get $get): bool => $this->reclassificationReasonRequired($get)),
                     Checkbox::make('impact_confirmed')->label('Confermo l’anteprima corrente')->accepted()->required(),
                     Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
                 ])
@@ -150,7 +167,13 @@ class ViewProject extends ViewRecord
                     $costCenterId = filled($data['cost_center_id'] ?? null) ? (int) $data['cost_center_id'] : null;
                     $action = app(UpdateProjectClassification::class);
                     $preview = $action->preview($actor, $this->record, $exercise, $costCenterId);
-                    $action->confirm($actor, $this->record, $preview, (string) $data['operation_id']);
+                    $action->confirm(
+                        $actor,
+                        $this->record,
+                        $preview,
+                        (string) $data['operation_id'],
+                        isset($data['reason']) ? (string) $data['reason'] : null,
+                    );
                     $this->record->refresh();
                 }),
             Action::make('manage_deferral')
@@ -309,6 +332,42 @@ class ViewProject extends ViewRecord
             && $actor->can('update', $project)
             && ! $project->isArchived()
             && in_array($project->stateAtDate($today), [ProjectState::Closed, ProjectState::Cancelled], true);
+    }
+
+    private function reclassificationReasonRequired(Get $get): bool
+    {
+        $exerciseId = filter_var($get('exercise_id'), FILTER_VALIDATE_INT);
+        if (! is_int($exerciseId)) {
+            return false;
+        }
+
+        $exercise = Exercise::query()
+            ->where('company_id', $this->projectRecord()->company_id)
+            ->open()
+            ->find($exerciseId);
+        if (! $exercise instanceof Exercise) {
+            return false;
+        }
+
+        return $exercise->hasApprovedBudget()
+            || $this->projectRecord()->expenses()
+                ->whereNull('reversed_at')
+                ->where('exercise_id', $exercise->id)
+                ->whereHas('lines', fn ($query) => $query
+                    ->whereNull('annulled_at')
+                    ->where('type', 'actual')
+                    ->where('amount', '!=', '0.00'))
+                ->exists();
+    }
+
+    private function canCreateExpense(): bool
+    {
+        $project = $this->projectRecord();
+        $actor = auth()->user();
+
+        return $actor instanceof User
+            && ! $project->isArchived()
+            && $actor->hasCapability($project->company, Capability::ManageOperations);
     }
 
     private function canManageDeferral(): bool

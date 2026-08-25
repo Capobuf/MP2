@@ -8,6 +8,7 @@ use App\Actions\Operations\ReplaceContractLifecycleFact;
 use App\Actions\Operations\UpdateContractRenewal;
 use App\Domain\Company\Capability;
 use App\Models\AuditEvent;
+use App\Models\BudgetSnapshot;
 use App\Models\Company;
 use App\Models\CompanyCapability;
 use App\Models\Contract;
@@ -15,6 +16,8 @@ use App\Models\ContractCondition;
 use App\Models\ContractLifecycleFact;
 use App\Models\ContractRenewalConfiguration;
 use App\Models\Exercise;
+use App\Models\Proposal;
+use App\Models\ProposalItem;
 use App\Models\Supplier;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -133,6 +136,7 @@ it('appends a complete renewal configuration and keeps retry idempotent', functi
         'expiry_anchor_date' => '2027-06-30',
         'renewal_duration_months' => 6,
         'notice_days' => 45,
+        'impact_confirmed' => true,
         'expected_revision' => $contract->revision,
     ];
 
@@ -144,4 +148,52 @@ it('appends a complete renewal configuration and keeps retry idempotent', functi
         ->and($contract->refresh()->next_expiry_date->toDateString())->toBe('2027-06-30')
         ->and($contract->renewal_duration_months)->toBe(6)
         ->and($contract->notice_days)->toBe(45);
+});
+
+it('requires renewal confirmation and a note after Budget and marks draft Proposals to realign', function () {
+    extract(lifecycleFixture());
+    $approvedProposal = Proposal::factory()->for($company)->for($exercise)->create([
+        'status' => 'approved',
+        'created_by_id' => $actor->id,
+        'approved_by_id' => $actor->id,
+        'approved_at' => now(),
+    ]);
+    BudgetSnapshot::factory()->for($approvedProposal)->create([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'approved_by_id' => $actor->id,
+    ]);
+    $draft = Proposal::factory()->for($company)->for($exercise)->create(['created_by_id' => $actor->id]);
+    $item = ProposalItem::factory()->for($draft)->create([
+        'company_id' => $company->id,
+        'source_type' => 'contract',
+        'contract_id' => $contract->id,
+        'baseline_revision' => $contract->revision,
+        'baseline_fingerprint' => hash('sha256', 'contract-baseline'),
+    ]);
+    $input = [
+        'effective_from' => '2026-09-01',
+        'automatic_renewal' => true,
+        'expiry_anchor_date' => '2027-06-30',
+        'renewal_duration_months' => 6,
+        'notice_days' => 45,
+        'impact_confirmed' => true,
+        'expected_revision' => $contract->revision,
+    ];
+
+    expect(fn () => app(UpdateContractRenewal::class)->execute(
+        $actor,
+        $contract,
+        $input,
+        (string) Str::uuid(),
+    ))->toThrow(ValidationException::class);
+
+    app(UpdateContractRenewal::class)->execute($actor, $contract, [
+        ...$input,
+        'reason' => 'Aggiornamento accordo di rinnovo',
+    ], (string) Str::uuid());
+
+    expect($item->refresh()->readiness_state->value)->toBe('to_realign')
+        ->and(AuditEvent::query()->where('event_type', 'contract_renewal_changed')->sole()->reason)
+        ->toBe('Aggiornamento accordo di rinnovo');
 });

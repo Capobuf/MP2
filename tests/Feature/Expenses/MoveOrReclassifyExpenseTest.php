@@ -4,6 +4,7 @@ use App\Actions\Operations\UpdateExpense;
 use App\Domain\Company\AuditEventType;
 use App\Domain\Company\Capability;
 use App\Models\AuditEvent;
+use App\Models\BudgetSnapshot;
 use App\Models\Company;
 use App\Models\CompanyCapability;
 use App\Models\Contract;
@@ -13,6 +14,7 @@ use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
+use App\Models\Proposal;
 use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -90,6 +92,34 @@ it('reclassifies only to active same-company references and audits descriptive e
     $other = Supplier::factory()->create();
     expect(fn () => app(UpdateExpense::class)->preview($actor, $expense, ['supplier_id' => $other->id]))
         ->toThrow(ValidationException::class);
+});
+
+it('requires a reason only when the Description changes after an approved Budget', function () {
+    [$actor, $company, $exercise, , $expense] = moveContext();
+    $proposal = Proposal::factory()->for($company)->for($exercise)->create(['created_by_id' => $actor->id]);
+    BudgetSnapshot::factory()->for($proposal)->create([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'approved_by_id' => $actor->id,
+    ]);
+
+    app(UpdateExpense::class)->updateDetails($actor, $expense, [
+        'description' => $expense->description,
+        'notes' => 'Nota aggiornata',
+    ], (string) Str::uuid());
+
+    expect(fn () => app(UpdateExpense::class)->updateDetails($actor, $expense->refresh(), [
+        'description' => 'Descrizione aggiornata',
+        'notes' => 'Nota aggiornata',
+    ], (string) Str::uuid()))->toThrow(ValidationException::class);
+
+    app(UpdateExpense::class)->updateDetails($actor, $expense->refresh(), [
+        'description' => 'Descrizione aggiornata',
+        'notes' => 'Nota aggiornata',
+        'change_reason' => 'Correzione descrittiva',
+    ], (string) Str::uuid());
+
+    expect($expense->refresh()->description)->toBe('Descrizione aggiornata');
 });
 
 it('moves one whole Actual Expense between autonomous and Contract ownership with stable identity and totals once', function () {

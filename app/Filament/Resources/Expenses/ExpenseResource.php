@@ -5,7 +5,14 @@ namespace App\Filament\Resources\Expenses;
 use App\Actions\Operations\SetExpenseReversed;
 use App\Domain\Company\Capability;
 use App\Domain\Contracts\ContractActualKind;
+use App\Domain\Contracts\ContractState;
+use App\Domain\Expenses\Decimal;
+use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Projects\ProjectActualKind;
+use App\Domain\Projects\ProjectExpenseActivity;
+use App\Domain\Projects\ProjectOverspend;
+use App\Domain\Projects\ProjectOverspendResult;
+use App\Domain\Projects\ProjectState;
 use App\Filament\Resources\Expenses\Pages\CreateExpense;
 use App\Filament\Resources\Expenses\Pages\EditExpense;
 use App\Filament\Resources\Expenses\Pages\ListExpenses;
@@ -146,7 +153,8 @@ class ExpenseResource extends Resource
             ->form([
                 Textarea::make('reason')->label('Motivo')->required(),
                 Textarea::make('overspend_note')->label('Nota di sovraspesa')
-                    ->visible(fn (Expense $record): bool => $record->project_id !== null),
+                    ->visible(fn (Expense $record): bool => self::reversalRequiresOverspendNote($record, true))
+                    ->required(fn (Expense $record): bool => self::reversalRequiresOverspendNote($record, true)),
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
             ])
             ->action(fn (Expense $record, array $data) => self::setReversed($record, true, $data));
@@ -162,16 +170,22 @@ class ExpenseResource extends Resource
             ->modalSubmitActionLabel('Ripristina')
             ->visible(fn (Expense $record): bool => $record->isReversed() && static::canEdit($record))
             ->form([
-                Textarea::make('reason')->label('Motivo')->required(),
-                Select::make('actual_kind')->label('Dichiarazione Effettivo')->placeholder('Ordinario')
-                    ->options(fn (Expense $record): array => $record->contract_id !== null ? ContractActualKind::options() : ProjectActualKind::options())
-                    ->visible(fn (Expense $record): bool => $record->project_id !== null || $record->contract_id !== null),
+                Textarea::make('reason')->label('Motivo del ripristino')
+                    ->visible(fn (Expense $record): bool => $record->exercise->hasApprovedBudget())
+                    ->required(fn (Expense $record): bool => $record->exercise->hasApprovedBudget()),
+                Select::make('actual_kind')->label('Tipo di Effettivo')
+                    ->options(fn (Expense $record): array => self::terminalActualOptions($record))
+                    ->visible(fn (Expense $record): bool => self::restoreRequiresTerminalDeclaration($record))
+                    ->required(fn (Expense $record): bool => self::restoreRequiresTerminalDeclaration($record)),
                 Checkbox::make('open_project')->label('Conferma apertura atomica se il Progetto è Pianificato')
-                    ->visible(fn (Expense $record): bool => $record->project_id !== null),
+                    ->visible(fn (Expense $record): bool => self::restoreRequiresProjectOpening($record))
+                    ->required(fn (Expense $record): bool => self::restoreRequiresProjectOpening($record)),
                 Textarea::make('activity_note')->label('Nota attività tardiva, rimborso o correzione')
-                    ->visible(fn (Expense $record): bool => $record->project_id !== null || $record->contract_id !== null),
+                    ->visible(fn (Expense $record): bool => self::restoreRequiresTerminalDeclaration($record))
+                    ->required(fn (Expense $record): bool => self::restoreRequiresTerminalDeclaration($record)),
                 Textarea::make('overspend_note')->label('Nota di sovraspesa')
-                    ->visible(fn (Expense $record): bool => $record->project_id !== null),
+                    ->visible(fn (Expense $record): bool => self::reversalRequiresOverspendNote($record, false))
+                    ->required(fn (Expense $record): bool => self::reversalRequiresOverspendNote($record, false)),
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
             ])
             ->action(fn (Expense $record, array $data) => self::setReversed($record, false, $data));
@@ -186,11 +200,64 @@ class ExpenseResource extends Resource
             $actor,
             $expense,
             $reversed,
-            (string) $data['reason'],
+            isset($data['reason']) ? (string) $data['reason'] : null,
             (string) $data['operation_id'],
             $data,
         );
         ProjectOverspendNotifier::sendForOperation((string) $data['operation_id']);
         $expense->refresh();
+    }
+
+    private static function reversalRequiresOverspendNote(Expense $expense, bool $reversed): bool
+    {
+        if (! $expense->company->overspend_note_required || $expense->project === null) {
+            return false;
+        }
+
+        $before = ProjectExpenseActivity::annualVariance($expense->project, $expense->exercise);
+        $allocation = Decimal::sum($expense->lines()
+            ->active()
+            ->where('type', ExpenseLineType::Estimate->value)
+            ->pluck('amount')
+            ->map(fn (mixed $amount): string => (string) $amount));
+        $actual = Decimal::sum($expense->lines()
+            ->active()
+            ->where('type', ExpenseLineType::Actual->value)
+            ->pluck('amount')
+            ->map(fn (mixed $amount): string => (string) $amount));
+        $contribution = Decimal::subtract($actual, $allocation);
+        $after = $reversed
+            ? Decimal::subtract($before, $contribution)
+            : Decimal::add($before, $contribution);
+
+        return ProjectOverspend::detect($before, $after) !== ProjectOverspendResult::None;
+    }
+
+    private static function restoreRequiresTerminalDeclaration(Expense $expense): bool
+    {
+        if (! $expense->hasActuals()) {
+            return false;
+        }
+
+        $today = now($expense->company->timezone)->toDateString();
+
+        return ($expense->project !== null && in_array($expense->project->stateAtDate($today), [ProjectState::Closed, ProjectState::Cancelled], true))
+            || ($expense->contract !== null && in_array($expense->contract->stateAtDate($today), [ContractState::Cessated, ContractState::Cancelled], true));
+    }
+
+    private static function restoreRequiresProjectOpening(Expense $expense): bool
+    {
+        return $expense->hasActuals()
+            && $expense->project !== null
+            && $expense->project->stateAtDate(now($expense->company->timezone)->toDateString()) === ProjectState::Planned;
+    }
+
+    /** @return array<string, string> */
+    private static function terminalActualOptions(Expense $expense): array
+    {
+        $options = $expense->contract_id !== null ? ContractActualKind::options() : ProjectActualKind::options();
+        unset($options[ProjectActualKind::Ordinary->value]);
+
+        return $options;
     }
 }

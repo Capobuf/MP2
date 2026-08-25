@@ -120,6 +120,7 @@ it('rejects renewal link-state and attachment-detachment activity while the Cont
         'expiry_anchor_date' => '2026-12-31',
         'renewal_duration_months' => 12,
         'notice_days' => 30,
+        'impact_confirmed' => true,
         'expected_revision' => $archived->revision,
     ], (string) Str::uuid()))->toThrow(ValidationException::class)
         ->and(fn () => app(SetProjectContractLinkArchived::class)->execute(

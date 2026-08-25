@@ -6,6 +6,7 @@ use App\Domain\Company\AuditEventType;
 use App\Domain\Contracts\ContractExpenseActivity;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseAuditSnapshot;
+use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Expenses\ManualExpenseLine;
 use App\Domain\Projects\ProjectAuditSnapshot;
 use App\Domain\Projects\ProjectExpenseActivity;
@@ -64,6 +65,14 @@ class CreateExpenseLine
             $allocationBefore = $lockedExpense->allocation();
             $actualBefore = $lockedExpense->actual();
             $validated = ManualExpenseLine::validate($input, $company, $exercise);
+            $changeReason = $this->nullableTrim($input['change_reason'] ?? null);
+            if ($exercise->hasApprovedBudget()
+                && $validated['type'] === ExpenseLineType::Estimate->value
+                && $changeReason === null) {
+                throw ValidationException::withMessages([
+                    'change_reason' => 'Il motivo è obbligatorio per modificare una Stima dopo un Budget approvato.',
+                ]);
+            }
             $projectContext = null;
             $contractContext = null;
             $varianceBefore = null;
@@ -120,7 +129,8 @@ class CreateExpenseLine
                 'new_value' => $newValue,
                 'allocated_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($lockedExpense->allocation(), $allocationBefore)),
                 'actual_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($lockedExpense->actual(), $actualBefore)),
-                'reason' => $contractContext !== null ? $contractContext['activity_note'] : ($projectContext === null ? null : ($projectContext['activity_note'] ?? $projectContext['overspend_note'])),
+                'reason' => $changeReason
+                    ?? ($contractContext !== null ? $contractContext['activity_note'] : ($projectContext === null ? null : ($projectContext['activity_note'] ?? $projectContext['overspend_note']))),
                 'reference_type' => $contract !== null ? Contract::class : ($project === null ? Expense::class : Project::class),
                 'reference_id' => $contract !== null ? $contract->id : ($project === null ? $lockedExpense->id : $project->id),
             ]);
@@ -137,5 +147,16 @@ class CreateExpenseLine
         if ($expense->isReversed()) {
             throw ValidationException::withMessages(['expense' => 'Ripristinare la Spesa prima di modificare le Righe.']);
         }
+    }
+
+    private function nullableTrim(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value === '' ? null : $value;
     }
 }

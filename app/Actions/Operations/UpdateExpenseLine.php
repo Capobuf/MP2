@@ -78,6 +78,15 @@ class UpdateExpenseLine
                 return $lockedLine;
             }
 
+            $changeReason = $this->nullableTrim($input['change_reason'] ?? null);
+            if ($exercise->hasApprovedBudget()
+                && ($wasEstimate || $lockedLine->lineType() === ExpenseLineType::Estimate)
+                && $changeReason === null) {
+                throw ValidationException::withMessages([
+                    'change_reason' => 'Il motivo è obbligatorio per modificare una Stima dopo un Budget approvato.',
+                ]);
+            }
+
             if ($project !== null && ($wasEstimate || $lockedLine->lineType() === ExpenseLineType::Estimate)) {
                 $lockedLine->revision++;
             }
@@ -147,12 +156,24 @@ class UpdateExpenseLine
                 'new_value' => $newValue,
                 'allocated_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($expense->allocation(), $allocationBefore)),
                 'actual_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, Decimal::subtract($expense->actual(), $actualBefore)),
-                'reason' => $contractContext !== null ? $contractContext['activity_note'] : ($projectContext === null ? null : ($projectContext['activity_note'] ?? $projectContext['overspend_note'])),
+                'reason' => $changeReason
+                    ?? ($contractContext !== null ? $contractContext['activity_note'] : ($projectContext === null ? null : ($projectContext['activity_note'] ?? $projectContext['overspend_note']))),
                 'reference_type' => $contract !== null ? Contract::class : ($project === null ? Expense::class : Project::class),
                 'reference_id' => $contract !== null ? $contract->id : ($project === null ? $expense->id : $project->id),
             ]);
 
             return $lockedLine;
         });
+    }
+
+    private function nullableTrim(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value === '' ? null : $value;
     }
 }

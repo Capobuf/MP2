@@ -6,6 +6,15 @@ use App\Actions\Operations\CreateExpenseLine;
 use App\Actions\Operations\SetExpenseLineActive;
 use App\Actions\Operations\UpdateExpenseLine;
 use App\Domain\Company\Capability;
+use App\Domain\Contracts\ContractActualKind;
+use App\Domain\Contracts\ContractState;
+use App\Domain\Expenses\Decimal;
+use App\Domain\Expenses\ExpenseLineType;
+use App\Domain\Projects\ProjectActualKind;
+use App\Domain\Projects\ProjectExpenseActivity;
+use App\Domain\Projects\ProjectOverspend;
+use App\Domain\Projects\ProjectOverspendResult;
+use App\Domain\Projects\ProjectState;
 use App\Filament\Pages\CompanyAudit;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Resources\Expenses\Schemas\ExpenseForm;
@@ -19,8 +28,13 @@ use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
 use Illuminate\Contracts\View\View;
@@ -110,8 +124,8 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
             ->modalSubmitActionLabel('Aggiungi riga')
             ->modalCancelActionLabel('Annulla')
             ->schema([
-                ...ExpenseForm::lineFormSections(),
-                ExpenseForm::projectActivitySection($this->expense()->project_id !== null),
+                ...ExpenseForm::lineFormSections(requiresBudgetReason: fn (Get $get): bool => $this->lineEstimateReasonRequired($get)),
+                $this->lineActivitySection(),
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
             ])
             ->visible(fn (): bool => $this->canMutate())
@@ -137,8 +151,9 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
             ->modalSubmitActionLabel('Salva modifica')
             ->modalCancelActionLabel('Annulla')
             ->schema([
-                ...ExpenseForm::lineFormSections(),
-                ExpenseForm::projectActivitySection($this->expense()->project_id !== null),
+                ...ExpenseForm::lineFormSections(requiresBudgetReason: fn (Get $get): bool => $this->lineEstimateReasonRequired($get)),
+                $this->lineActivitySection(),
+                Hidden::make('line_id')->dehydrated(false),
                 Hidden::make('operation_id'),
             ])
             ->fillForm(function (array $arguments): array {
@@ -151,6 +166,7 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
                     'unit_amount' => $line->getRawOriginal('unit_amount'),
                     'unit_of_measure' => $line->unit_of_measure,
                     'note' => $line->note,
+                    'line_id' => $line->id,
                     'operation_id' => (string) Str::uuid(),
                 ];
             })
@@ -182,10 +198,20 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
             ->modalDescription('La Riga sarà esclusa dai totali correnti, senza essere eliminata.')
             ->modalSubmitActionLabel('Annulla riga')
             ->schema([
-                ...ExpenseForm::projectActivityFields($this->expense()->project_id !== null),
+                Textarea::make('change_reason')
+                    ->label('Motivo della modifica della Stima')
+                    ->visible(fn (Get $get): bool => $this->lineEstimateReasonRequired($get))
+                    ->required(fn (Get $get): bool => $this->lineEstimateReasonRequired($get))
+                    ->dehydrated(fn (Get $get): bool => $this->lineEstimateReasonRequired($get)),
+                $this->lineActivitySection(),
+                Hidden::make('line_id')->dehydrated(false),
+                Hidden::make('type')->dehydrated(false),
+                Hidden::make('amount')->dehydrated(false),
+                Hidden::make('mutation_mode')->default('annul')->dehydrated(false),
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
             ])
             ->visible(fn (): bool => $this->canMutate())
+            ->fillForm(fn (array $arguments): array => $this->lineMutationState((int) $arguments['line'], 'annul'))
             ->action(fn (array $data, array $arguments) => $this->setLineActive($data, $arguments, false));
     }
 
@@ -200,10 +226,20 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
             ->modalDescription('La Riga tornerà a contribuire ai totali correnti.')
             ->modalSubmitActionLabel('Ripristina riga')
             ->schema([
-                ...ExpenseForm::projectActivityFields($this->expense()->project_id !== null),
+                Textarea::make('change_reason')
+                    ->label('Motivo della modifica della Stima')
+                    ->visible(fn (Get $get): bool => $this->lineEstimateReasonRequired($get))
+                    ->required(fn (Get $get): bool => $this->lineEstimateReasonRequired($get))
+                    ->dehydrated(fn (Get $get): bool => $this->lineEstimateReasonRequired($get)),
+                $this->lineActivitySection(),
+                Hidden::make('line_id')->dehydrated(false),
+                Hidden::make('type')->dehydrated(false),
+                Hidden::make('amount')->dehydrated(false),
+                Hidden::make('mutation_mode')->default('restore')->dehydrated(false),
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
             ])
             ->visible(fn (): bool => $this->canMutate())
+            ->fillForm(fn (array $arguments): array => $this->lineMutationState((int) $arguments['line'], 'restore'))
             ->action(fn (array $data, array $arguments) => $this->setLineActive($data, $arguments, true));
     }
 
@@ -329,6 +365,181 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
     private function line(int $lineId): ExpenseLine
     {
         return $this->expense()->lines()->findOrFail($lineId);
+    }
+
+    private function lineActivitySection(): Section
+    {
+        return Section::make('Dichiarazioni richieste')
+            ->description('Sono mostrate soltanto le dichiarazioni necessarie per la Riga corrente.')
+            ->schema([
+                Select::make('actual_kind')
+                    ->label('Tipo di Effettivo')
+                    ->options(fn (): array => $this->expense()->contract_id !== null
+                        ? $this->terminalOptions(ContractActualKind::options())
+                        : $this->terminalOptions(ProjectActualKind::options()))
+                    ->visible(fn (Get $get): bool => $this->lineRequiresTerminalDeclaration($get))
+                    ->required(fn (Get $get): bool => $this->lineRequiresTerminalDeclaration($get))
+                    ->dehydrated(fn (Get $get): bool => $this->lineRequiresTerminalDeclaration($get)),
+                Checkbox::make('open_project')
+                    ->label('Confermo l’apertura del Progetto')
+                    ->accepted()
+                    ->visible(fn (Get $get): bool => $this->lineRequiresProjectOpening($get))
+                    ->required(fn (Get $get): bool => $this->lineRequiresProjectOpening($get))
+                    ->dehydrated(fn (Get $get): bool => $this->lineRequiresProjectOpening($get)),
+                Textarea::make('activity_note')
+                    ->label('Motivo dell’attività tardiva o correttiva')
+                    ->visible(fn (Get $get): bool => $this->lineRequiresTerminalDeclaration($get))
+                    ->required(fn (Get $get): bool => $this->lineRequiresTerminalDeclaration($get))
+                    ->dehydrated(fn (Get $get): bool => $this->lineRequiresTerminalDeclaration($get)),
+                Textarea::make('overspend_note')
+                    ->label('Nota di sovraspesa')
+                    ->visible(fn (Get $get): bool => $this->lineRequiresOverspendNote($get))
+                    ->required(fn (Get $get): bool => $this->lineRequiresOverspendNote($get))
+                    ->dehydrated(fn (Get $get): bool => $this->lineRequiresOverspendNote($get)),
+            ])
+            ->columns(2)
+            ->visible(fn (Get $get): bool => $this->lineRequiresTerminalDeclaration($get)
+                || $this->lineRequiresProjectOpening($get)
+                || $this->lineRequiresOverspendNote($get));
+    }
+
+    private function lineEstimateReasonRequired(Get $get): bool
+    {
+        if (! $this->expense()->exercise->hasApprovedBudget()) {
+            return false;
+        }
+
+        $newType = ExpenseLineType::tryFrom((string) $get('type'));
+        $lineId = filter_var($get('line_id'), FILTER_VALIDATE_INT);
+        if (! is_int($lineId)) {
+            return $newType === ExpenseLineType::Estimate;
+        }
+
+        $current = $this->line($lineId);
+        $currentType = $current->lineType();
+        if (in_array($get('mutation_mode'), ['annul', 'restore'], true)) {
+            return $currentType === ExpenseLineType::Estimate;
+        }
+        if ($newType !== ExpenseLineType::Estimate && $currentType !== ExpenseLineType::Estimate) {
+            return false;
+        }
+
+        $amount = Decimal::normalizeInput($get('amount'));
+        $quantity = Decimal::normalizeInput($get('quantity'));
+        $unitAmount = Decimal::normalizeInput($get('unit_amount'));
+        $note = is_string($get('note')) && trim($get('note')) !== '' ? trim($get('note')) : null;
+
+        return $newType !== $currentType
+            || $this->decimalFieldChanged($amount, (string) $current->amount)
+            || $this->decimalFieldChanged($quantity, $current->getRawOriginal('quantity'))
+            || $this->decimalFieldChanged($unitAmount, $current->getRawOriginal('unit_amount'))
+            || $note !== $current->note;
+    }
+
+    private function decimalFieldChanged(mixed $newValue, mixed $currentValue): bool
+    {
+        if ($newValue === null || $newValue === '') {
+            return $currentValue !== null;
+        }
+        if ((! is_string($newValue) && ! is_int($newValue) && ! is_float($newValue))
+            || preg_match('/^-?\d+(?:\.\d+)?$/', (string) $newValue) !== 1) {
+            return false;
+        }
+        if ($currentValue === null) {
+            return true;
+        }
+
+        return Decimal::compare((string) $newValue, (string) $currentValue, 6) !== 0;
+    }
+
+    private function lineRequiresTerminalDeclaration(Get $get): bool
+    {
+        if ($get('mutation_mode') === 'annul'
+            || ExpenseLineType::tryFrom((string) $get('type')) !== ExpenseLineType::Actual) {
+            return false;
+        }
+
+        $expense = $this->expense();
+        $today = now($expense->company->timezone)->toDateString();
+
+        return ($expense->project !== null && in_array($expense->project->stateAtDate($today), [ProjectState::Closed, ProjectState::Cancelled], true))
+            || ($expense->contract !== null && in_array($expense->contract->stateAtDate($today), [ContractState::Cessated, ContractState::Cancelled], true));
+    }
+
+    private function lineRequiresProjectOpening(Get $get): bool
+    {
+        $expense = $this->expense();
+
+        return $get('mutation_mode') !== 'annul'
+            && ExpenseLineType::tryFrom((string) $get('type')) === ExpenseLineType::Actual
+            && $expense->project !== null
+            && $expense->project->stateAtDate(now($expense->company->timezone)->toDateString()) === ProjectState::Planned;
+    }
+
+    private function lineRequiresOverspendNote(Get $get): bool
+    {
+        $expense = $this->expense();
+        if (! $expense->company->overspend_note_required || $expense->project === null) {
+            return false;
+        }
+
+        $type = ExpenseLineType::tryFrom((string) $get('type'));
+        $amount = Decimal::normalizeInput($get('amount'));
+        $amount = is_int($amount) || is_float($amount) ? (string) $amount : $amount;
+        if (! $type instanceof ExpenseLineType
+            || ! is_string($amount)
+            || preg_match('/^-?\d+(?:\.\d+)?$/', $amount) !== 1) {
+            return false;
+        }
+
+        $before = ProjectExpenseActivity::annualVariance($expense->project, $expense->exercise);
+        $after = $before;
+        $lineId = filter_var($get('line_id'), FILTER_VALIDATE_INT);
+        $mode = (string) $get('mutation_mode');
+        if (is_int($lineId)) {
+            $current = $this->line($lineId);
+            if ($mode === 'annul' && ! $current->isAnnulled()) {
+                $after = Decimal::subtract($after, $this->varianceContribution($current->lineType(), (string) $current->amount));
+            } elseif ($mode === 'restore' && $current->isAnnulled()) {
+                $after = Decimal::add($after, $this->varianceContribution($current->lineType(), (string) $current->amount));
+            } elseif (! $current->isAnnulled()) {
+                $after = Decimal::subtract($after, $this->varianceContribution($current->lineType(), (string) $current->amount));
+                $after = Decimal::add($after, $this->varianceContribution($type, $amount));
+            }
+        } else {
+            $after = Decimal::add($after, $this->varianceContribution($type, $amount));
+        }
+
+        return ProjectOverspend::detect($before, $after) !== ProjectOverspendResult::None;
+    }
+
+    private function varianceContribution(ExpenseLineType $type, string $amount): string
+    {
+        return $type === ExpenseLineType::Actual ? Decimal::money($amount) : Decimal::subtract('0.00', $amount);
+    }
+
+    /** @return array{line_id: int, type: string, amount: string, mutation_mode: string, operation_id: string} */
+    private function lineMutationState(int $lineId, string $mode): array
+    {
+        $line = $this->line($lineId);
+
+        return [
+            'line_id' => $line->id,
+            'type' => $line->lineType()->value,
+            'amount' => (string) $line->amount,
+            'mutation_mode' => $mode,
+            'operation_id' => (string) Str::uuid(),
+        ];
+    }
+
+    /** @param array<string, string> $options
+     * @return array<string, string>
+     */
+    private function terminalOptions(array $options): array
+    {
+        unset($options[ProjectActualKind::Ordinary->value]);
+
+        return $options;
     }
 
     private function canMutate(): bool

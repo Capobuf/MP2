@@ -272,12 +272,14 @@ class UpdateExpense
         $normalized = [
             'description' => is_string($input['description'] ?? null) ? trim($input['description']) : ($input['description'] ?? null),
             'notes' => $this->nullableTrim($input['notes'] ?? null),
+            'change_reason' => $this->nullableTrim($input['change_reason'] ?? null),
             'operation_id' => $operationId,
         ];
-        /** @var array{description: string, notes: ?string, operation_id: string} $validated */
+        /** @var array{description: string, notes: ?string, change_reason: ?string, operation_id: string} $validated */
         $validated = Validator::make($normalized, [
             'description' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
+            'change_reason' => ['nullable', 'string'],
             'operation_id' => ['required', 'uuid'],
         ])->validate();
 
@@ -306,6 +308,13 @@ class UpdateExpense
             if (! $exercise->isOpen()) {
                 throw ValidationException::withMessages(['expense' => 'L’Esercizio deve essere Aperto.']);
             }
+            if ($exercise->hasApprovedBudget()
+                && $validated['description'] !== $lockedExpense->description
+                && $validated['change_reason'] === null) {
+                throw ValidationException::withMessages([
+                    'change_reason' => 'Il motivo è obbligatorio per modificare la Descrizione dopo un Budget approvato.',
+                ]);
+            }
             $before = ExpenseAuditSnapshot::expense($lockedExpense);
             $lockedExpense->fill(['description' => $validated['description'], 'notes' => $validated['notes']]);
             if (! $lockedExpense->isDirty()) {
@@ -329,6 +338,7 @@ class UpdateExpense
                 'new_value' => ExpenseAuditSnapshot::expense($lockedExpense),
                 'allocated_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, '0'),
                 'actual_impact_by_exercise' => ExpenseAuditSnapshot::impact($exercise->id, '0'),
+                'reason' => $validated['change_reason'],
                 'reference_type' => $contract !== null ? Contract::class : ($project === null ? null : Project::class),
                 'reference_id' => $contract !== null ? $contract->id : $project?->id,
             ]);
@@ -370,6 +380,10 @@ class UpdateExpense
             'direct_cost_center_supplied' => ['boolean'],
             'supplier_replacement_acknowledged' => ['boolean'],
         ])->validate();
+
+        foreach (['exercise_id', 'supplier_id', 'direct_cost_center_id', 'project_id', 'contract_id'] as $field) {
+            $validated[$field] = $validated[$field] === null ? null : (int) $validated[$field];
+        }
 
         return $validated;
     }
@@ -413,14 +427,28 @@ class UpdateExpense
         if ($targetProject !== null && $targetContract !== null) {
             throw ValidationException::withMessages(['contract_id' => 'Una Spesa non può appartenere contemporaneamente a un Progetto e a un Contratto.']);
         }
-        if (($sourceProject !== null || $sourceContract !== null) && ! $source->is($target)) {
-            throw ValidationException::withMessages(['exercise_id' => 'Una Spesa contenuta non cambia Esercizio tramite lo spostamento generico.']);
+        $exerciseChanges = ! $source->is($target);
+        if ($sourceProject !== null && $exerciseChanges && ! $expense->hasActuals() && $target->year > $source->year) {
+            throw ValidationException::withMessages([
+                'exercise_id' => 'Il piano di una Spesa di Progetto si trasferisce a un Esercizio successivo tramite la Riprogrammazione del Progetto.',
+            ]);
         }
         $ownerChanges = $sourceProject?->id !== $targetProject?->id || $sourceContract?->id !== $targetContract?->id;
+        $classificationChanges = $exerciseChanges
+            || $ownerChanges
+            || $input['supplier_id'] !== $expense->supplier_id
+            || $input['direct_cost_center_id'] !== $expense->direct_cost_center_id;
+        if ($classificationChanges
+            && ($source->hasApprovedBudget() || $target->hasApprovedBudget())
+            && $input['reason'] === null) {
+            throw ValidationException::withMessages([
+                'reason' => 'Il motivo è obbligatorio perché la modifica interessa un Esercizio con Budget approvato.',
+            ]);
+        }
         if ($ownerChanges && $expense->hasActuals() && $input['reason'] === null) {
             throw ValidationException::withMessages(['reason' => 'Il motivo è obbligatorio per spostare una Spesa con Effettivi.']);
         }
-        if (! $source->is($target) && $expense->hasActuals()) {
+        if ($exerciseChanges && $expense->hasActuals()) {
             if ($input['reason'] === null) {
                 throw ValidationException::withMessages(['reason' => 'Il motivo è obbligatorio per spostare una Spesa con Effettivi.']);
             }
@@ -439,11 +467,12 @@ class UpdateExpense
 
         $projectContext = null;
         $contractContext = null;
-        if ($ownerChanges && $targetProject !== null) {
+        $attributionChanges = $ownerChanges || $exerciseChanges;
+        if ($attributionChanges && $targetProject !== null) {
             $activeLines = $expense->lines()->active()->orderBy('id')->get()->map(fn ($line): array => ['type' => $line->lineType()]);
             $projectContext = ProjectExpenseActivity::validate($targetProject, $target, $expense->company, $activeLines, $input);
         }
-        if ($ownerChanges && $targetContract !== null) {
+        if ($attributionChanges && $targetContract !== null) {
             if ($expense->supplier_id !== $targetContract->supplier_id && ! $input['supplier_replacement_acknowledged']) {
                 throw ValidationException::withMessages(['supplier_replacement_acknowledged' => 'Confermare la sostituzione del Fornitore diretto con quello del Contratto.']);
             }

@@ -131,7 +131,10 @@ class AuditEvent extends Model
         if (is_array($projectImpacts)) {
             foreach ($projectImpacts as $projectId => $impact) {
                 if (is_array($impact) && is_array($impact['overspend'] ?? null)) {
-                    $occurrences[] = $this->normalizeOverspend($impact['overspend'], (int) $projectId);
+                    $occurrences[] = $this->normalizeOverspend(
+                        $impact['overspend'],
+                        isset($impact['owner_id']) ? (int) $impact['owner_id'] : (int) $projectId,
+                    );
                 }
             }
         }

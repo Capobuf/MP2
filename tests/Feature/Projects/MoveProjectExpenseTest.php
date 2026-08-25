@@ -108,6 +108,48 @@ it('moves an Expense with Actuals between open Projects with exact Project delta
         ->and($target->revision)->toBe(1);
 });
 
+it('moves a contained Expense to a previous open Exercise and keeps the same Project and line identities', function () {
+    [$actor, $company, $source, $project] = projectMoveContext();
+    $target = Exercise::factory()->for($company)->create(['year' => 2025]);
+    $project->update(['initial_effective_date' => '2025-01-01']);
+    ProjectExerciseClassification::factory()->forProjectAndExercise($project, $target)->create();
+    $expense = Expense::factory()->forExercise($source)->for($project)->create(['direct_cost_center_id' => null]);
+    $estimate = ExpenseLine::factory()->for($expense)->create(['amount' => '100.00']);
+    $actual = ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '30.00']);
+    $action = app(UpdateExpense::class);
+
+    $plan = $action->preview($actor, $expense, [
+        'exercise_id' => $target->id,
+        'reason' => 'Correzione dell’Esercizio',
+    ]);
+    $moved = $action->confirm($actor, $expense, $plan, (string) Str::uuid());
+
+    expect($moved->exercise_id)->toBe($target->id)
+        ->and($moved->project_id)->toBe($project->id)
+        ->and($estimate->refresh()->expense_id)->toBe($expense->id)
+        ->and($actual->refresh()->expense_id)->toBe($expense->id)
+        ->and($project->refresh()->annualTotals())->not->toHaveKey($source->id)
+        ->and($project->annualTotals()[$target->id]['allocation'])->toBe('100.00')
+        ->and($project->annualTotals()[$target->id]['actual'])->toBe('30.00')
+        ->and(AuditEvent::query()->sole()->affected_exercise_ids)->toBe([$source->id, $target->id]);
+});
+
+it('routes a future estimate-only Project move through Reprogramming', function () {
+    $actor = User::factory()->create();
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
+        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    }
+    $source = Exercise::factory()->for($company)->create(['year' => 2025]);
+    $target = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $project = Project::factory()->for($company)->create(['initial_state' => ProjectState::Open, 'initial_effective_date' => '2025-01-01']);
+    $expense = Expense::factory()->forExercise($source)->for($project)->create(['direct_cost_center_id' => null]);
+    ExpenseLine::factory()->for($expense)->create(['amount' => '100.00']);
+
+    expect(fn () => app(UpdateExpense::class)->preview($actor, $expense, ['exercise_id' => $target->id]))
+        ->toThrow(ValidationException::class, 'Riprogrammazione del Progetto');
+});
+
 it('supports atomic opening and declared late attribution while rejecting invalid targets', function () {
     [$actor, $company, $exercise, $planned] = projectMoveContext(ProjectState::Planned);
     $closed = Project::factory()->for($company)->create(['initial_state' => ProjectState::Closed]);
