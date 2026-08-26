@@ -51,8 +51,8 @@
                     <x-filament::icon icon="heroicon-o-chart-bar-square" />
                 </span>
                 <div>
-                    <p class="mp2-object-eyebrow">Contesto globale</p>
-                    <h2 id="project-current-exercise-title">Situazione Esercizio corrente</h2>
+                    <p class="mp2-object-eyebrow">Contesto Annuale</p>
+                    <h2 id="project-current-exercise-title">Situazione Esercizio Corrente</h2>
                 </div>
             </div>
 

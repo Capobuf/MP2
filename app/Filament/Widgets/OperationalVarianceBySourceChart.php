@@ -13,6 +13,11 @@ class OperationalVarianceBySourceChart extends EconomicChartWidget
 
     protected ?string $emptyStateHeading = 'Nessuno scostamento disponibile';
 
+    public function chartSurfaceClass(): string
+    {
+        return parent::chartSurfaceClass().' mp2-operational-variance-chart';
+    }
+
     protected function getType(): string
     {
         return 'bar';
@@ -67,7 +72,18 @@ class OperationalVarianceBySourceChart extends EconomicChartWidget
                 },
                 scales: {
                     x: { grid: { color: (context) => context.tick.value === 0 ? 'rgba(247, 251, 251, 0.55)' : 'rgba(145, 163, 168, 0.10)', lineWidth: (context) => context.tick.value === 0 ? 2 : 1 }, ticks: { callback: (value) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', notation: 'compact' }).format(value) } },
-                    y: { grid: { display: false } },
+                    y: {
+                        grid: { display: false },
+                        ticks: {
+                            autoSkip: false,
+                            callback: function (value) {
+                                const label = this.getLabelForValue(value);
+                                const maxLength = this.chart.width < 480 ? 24 : 42;
+
+                                return label.length > maxLength ? `${label.slice(0, maxLength - 1)}…` : label;
+                            },
+                        },
+                    },
                 },
                 onClick: (event, elements, chart) => {
                     if (! elements.length) return;

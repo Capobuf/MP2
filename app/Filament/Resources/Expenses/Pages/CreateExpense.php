@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Expenses\Pages;
 
 use App\Actions\Operations\CreateExpense as CreateExpenseAction;
+use App\Actions\Operations\UploadAttachment;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Support\ProjectOverspendNotifier;
 use App\Models\Company;
@@ -14,8 +15,10 @@ use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Ramsey\Uuid\Uuid;
 
 class CreateExpense extends CreateRecord
 {
@@ -49,6 +52,17 @@ class CreateExpense extends CreateRecord
         $company = Filament::getTenant();
         abort_unless($actor instanceof User && $company instanceof Company, 403);
 
+        $attachments = $data['attachments'] ?? [];
+        unset($data['attachments']);
+        if (! is_array($attachments)) {
+            throw ValidationException::withMessages(['attachments' => 'Gli Allegati caricati non sono validi.']);
+        }
+        foreach ($attachments as $attachment) {
+            if (! $attachment instanceof UploadedFile) {
+                throw ValidationException::withMessages(['attachments' => 'Gli Allegati caricati non sono validi.']);
+            }
+        }
+
         $exercise = app(ExerciseContext::class)->current($company);
         if (! $exercise instanceof Exercise) {
             throw ValidationException::withMessages([
@@ -78,6 +92,14 @@ class CreateExpense extends CreateRecord
         $data['exercise_id'] = $exercise->id;
 
         $expense = app(CreateExpenseAction::class)->execute($actor, $company, $data, $this->operationId);
+        foreach (array_values($attachments) as $index => $attachment) {
+            app(UploadAttachment::class)->execute(
+                $actor,
+                $expense,
+                $attachment,
+                Uuid::uuid5($this->operationId, "attachment:{$index}")->toString(),
+            );
+        }
         ProjectOverspendNotifier::sendForOperation($this->operationId);
 
         return $expense;

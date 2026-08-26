@@ -13,6 +13,7 @@ use App\Filament\Resources\Expenses\Pages\ViewExpense;
 use App\Filament\Resources\Expenses\RelationManagers\ExpenseAttachmentsRelationManager;
 use App\Filament\Resources\Expenses\RelationManagers\ExpenseLinesRelationManager;
 use App\Filament\Resources\Projects\ProjectResource;
+use App\Models\Attachment;
 use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\CompanyCapability;
@@ -230,11 +231,16 @@ it('exposes Expense and Line attachment controls to operators and keeps them rea
     ['user' => $manager, 'company' => $company, 'exercise' => $exercise] = governanceUiContext();
     $expense = Expense::factory()->forExercise($exercise)->create();
     $line = ExpenseLine::factory()->for($expense)->create();
+    $attachment = Attachment::factory()->forExpense($expense)->create([
+        'uploaded_by_id' => $manager->id,
+        'size_bytes' => 113621,
+    ]);
     $this->actingAs($manager);
     Filament::setTenant($company);
 
     Livewire::test(ExpenseAttachmentsRelationManager::class, ['ownerRecord' => $expense, 'pageClass' => ViewExpense::class])
         ->assertTableActionExists('upload')
+        ->assertTableColumnFormattedStateSet('size_bytes', '110,96 KB', $attachment)
         ->assertTableActionDoesNotExist('delete');
     Livewire::test(ExpenseLinesRelationManager::class, ['ownerRecord' => $expense, 'pageClass' => ViewExpense::class])
         ->assertTableActionVisible('uploadAttachment', record: $line)

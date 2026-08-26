@@ -2,9 +2,7 @@
 
 namespace App\Livewire;
 
-use App\Actions\Operations\CreateExpenseLine;
 use App\Actions\Operations\SetExpenseLineActive;
-use App\Actions\Operations\UpdateExpenseLine;
 use App\Domain\Company\Capability;
 use App\Domain\Contracts\ContractActualKind;
 use App\Domain\Contracts\ContractState;
@@ -17,7 +15,6 @@ use App\Domain\Projects\ProjectOverspendResult;
 use App\Domain\Projects\ProjectState;
 use App\Filament\Pages\CompanyAudit;
 use App\Filament\Resources\Expenses\ExpenseResource;
-use App\Filament\Resources\Expenses\Schemas\ExpenseForm;
 use App\Filament\Support\ProjectOverspendNotifier;
 use App\Models\AuditEvent;
 use App\Models\Company;
@@ -119,25 +116,11 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
             ->label('Aggiungi riga')
             ->icon('heroicon-m-plus')
             ->color('primary')
-            ->modalHeading('Aggiungi riga')
-            ->modalDescription('Aggiungi una Stima o un Effettivo. L’Importo resta il valore autoritativo.')
-            ->modalSubmitActionLabel('Aggiungi riga')
-            ->modalCancelActionLabel('Annulla')
-            ->schema([
-                ...ExpenseForm::lineFormSections(requiresBudgetReason: fn (Get $get): bool => $this->lineEstimateReasonRequired($get)),
-                $this->lineActivitySection(),
-                Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
-            ])
             ->visible(fn (): bool => $this->canMutate())
-            ->action(function (array $data): void {
-                $actor = $this->actor();
-                $operationId = (string) $data['operation_id'];
-                unset($data['operation_id']);
-
-                app(CreateExpenseLine::class)->execute($actor, $this->expense(), $data, $operationId);
-                ProjectOverspendNotifier::sendForOperation($operationId);
-                $this->afterMutation('Riga aggiunta.');
-            });
+            ->url(fn (): string => ExpenseResource::getUrl('edit', [
+                'record' => $this->expense(),
+                'addLine' => 1,
+            ]));
     }
 
     public function editLineAction(): Action
@@ -146,45 +129,8 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
             ->label('Modifica')
             ->icon('heroicon-m-pencil-square')
             ->color('gray')
-            ->modalHeading('Modifica riga')
-            ->modalDescription('La modifica conserva l’identità della Riga e viene registrata nella Timeline.')
-            ->modalSubmitActionLabel('Salva modifica')
-            ->modalCancelActionLabel('Annulla')
-            ->schema([
-                ...ExpenseForm::lineFormSections(requiresBudgetReason: fn (Get $get): bool => $this->lineEstimateReasonRequired($get)),
-                $this->lineActivitySection(),
-                Hidden::make('line_id')->dehydrated(false),
-                Hidden::make('operation_id'),
-            ])
-            ->fillForm(function (array $arguments): array {
-                $line = $this->line((int) $arguments['line']);
-
-                return [
-                    'type' => $line->lineType()->value,
-                    'amount' => (string) $line->amount,
-                    'quantity' => $line->getRawOriginal('quantity'),
-                    'unit_amount' => $line->getRawOriginal('unit_amount'),
-                    'unit_of_measure' => $line->unit_of_measure,
-                    'note' => $line->note,
-                    'line_id' => $line->id,
-                    'operation_id' => (string) Str::uuid(),
-                ];
-            })
             ->visible(fn (): bool => $this->canMutate())
-            ->action(function (array $data, array $arguments): void {
-                $actor = $this->actor();
-                $operationId = (string) $data['operation_id'];
-                unset($data['operation_id']);
-
-                app(UpdateExpenseLine::class)->execute(
-                    $actor,
-                    $this->line((int) $arguments['line']),
-                    $data,
-                    $operationId,
-                );
-                ProjectOverspendNotifier::sendForOperation($operationId);
-                $this->afterMutation('Riga aggiornata.');
-            });
+            ->url(fn (): string => ExpenseResource::getUrl('edit', ['record' => $this->expense()]));
     }
 
     public function annulLineAction(): Action

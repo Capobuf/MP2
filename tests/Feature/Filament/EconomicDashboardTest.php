@@ -258,6 +258,11 @@ it('provides correct scatter coordinates and positive negative and zero operatio
     ]);
     expect($values->all())->toMatchArray(['Positivo' => 20.0, 'Negativo' => -20.0, 'Zero' => 0.0])
         ->and($variance['datasets'][0]['label'])->toBe('Scostamento Operativo');
+
+    $varianceWidget = Livewire::test(OperationalVarianceBySourceChart::class)->assertSuccessful()->instance();
+    $options = new ReflectionMethod($varianceWidget, 'getOptions');
+    expect($options->invoke($varianceWidget)->toHtml())->toContain('autoSkip: false')
+        ->and($varianceWidget->chartSurfaceClass())->toContain('mp2-operational-variance-chart');
 });
 
 it('rejects foreign Budget context and foreign Dashboard data', function (): void {

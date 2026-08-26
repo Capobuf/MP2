@@ -1,11 +1,14 @@
 <?php
 
+use App\Domain\Company\AuditEventType;
 use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExerciseStatus;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Resources\Expenses\Pages\CreateExpense;
+use App\Filament\Resources\Expenses\Pages\EditExpense;
 use App\Filament\Resources\Expenses\Pages\ListExpenses;
 use App\Filament\Resources\Expenses\Pages\ViewExpense;
+use App\Models\Attachment;
 use App\Models\AuditEvent;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
@@ -21,8 +24,11 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Support\ExerciseContext;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -46,6 +52,10 @@ it('creates an expense in the selected global Exercise without exposing a second
     $this->actingAs($manager);
     Filament::setTenant($company);
     app(ExerciseContext::class)->select($company, $exercise->id);
+    Storage::fake('local');
+
+    $firstAttachment = UploadedFile::fake()->createWithContent('preventivo.pdf', 'primo allegato');
+    $secondAttachment = UploadedFile::fake()->createWithContent('dettaglio.txt', 'secondo allegato');
 
     Livewire::test(CreateExpense::class)
         ->assertFormFieldDoesNotExist('exercise_id')
@@ -54,6 +64,7 @@ it('creates an expense in the selected global Exercise without exposing a second
         ->assertFormComponentActionHidden('direct_cost_center_id', 'createOption')
         ->assertFormFieldExists('project_id')
         ->assertFormFieldExists('contract_id')
+        ->assertFormFieldExists('attachments', fn ($field): bool => $field instanceof FileUpload && $field->isMultiple())
         ->assertFormFieldDoesNotExist('actual_kind')
         ->assertFormFieldDoesNotExist('contract_owner_id')
         ->assertFormFieldDoesNotExist('budget_id')
@@ -71,13 +82,169 @@ it('creates an expense in the selected global Exercise without exposing a second
         ->assertFormFieldDoesNotExist('vat')
         ->fillForm([
             'description' => 'Licenze',
+            'attachments' => [$firstAttachment, $secondAttachment],
             'lines' => [['type' => 'estimate', 'amount' => '100.00']],
         ])
         ->call('create')
         ->assertHasNoFormErrors();
 
     expect(Expense::query()->sole()->exercise_id)->toBe($exercise->id)
-        ->and(ExpenseLine::query()->count())->toBe(1);
+        ->and(ExpenseLine::query()->count())->toBe(1)
+        ->and(Attachment::query()->where('expense_id', Expense::query()->sole()->id)->orderBy('original_name')->pluck('original_name')->all())->toBe([
+            'dettaglio.txt',
+            'preventivo.pdf',
+        ])
+        ->and(AuditEvent::query()->where('event_type', AuditEventType::AttachmentUploaded)->count())->toBe(2);
+
+    Attachment::query()->each(fn (Attachment $attachment) => Storage::disk('local')->assertExists($attachment->storage_path));
+});
+
+it('duplicates a line while creating an Expense', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+    app(ExerciseContext::class)->select($company, $exercise->id);
+
+    $component = Livewire::test(CreateExpense::class);
+    $lineKey = array_key_first((array) $component->get('data.lines'));
+
+    $component
+        ->set("data.lines.{$lineKey}.type", 'estimate')
+        ->set("data.lines.{$lineKey}.note", 'Canone mensile')
+        ->set("data.lines.{$lineKey}.unit_amount", '100')
+        ->set("data.lines.{$lineKey}.quantity", '2')
+        ->assertFormComponentActionVisible('lines', 'clone', ['item' => $lineKey])
+        ->callFormComponentAction('lines', 'clone', arguments: ['item' => $lineKey]);
+
+    $lines = array_values((array) $component->get('data.lines'));
+
+    expect($lines)->toHaveCount(2)
+        ->and($lines[1])->toMatchArray([
+            'type' => 'estimate',
+            'note' => 'Canone mensile',
+            'unit_amount' => '100',
+            'quantity' => '2',
+            'amount' => '200.00',
+        ]);
+});
+
+it('edits existing Lines and saves a duplicated Line with a new identity', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
+    $expense = Expense::factory()->forExercise($exercise)->create(['description' => 'Canoni']);
+    $estimate = ExpenseLine::factory()->for($expense)->create([
+        'type' => 'estimate',
+        'amount' => '100.00',
+        'note' => 'Stima iniziale',
+    ]);
+    $actual = ExpenseLine::factory()->actual()->for($expense)->create([
+        'amount' => '25.00',
+        'note' => 'Prima fattura',
+    ]);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+
+    $component = Livewire::test(EditExpense::class, ['record' => $expense->getRouteKey()]);
+    $lines = (array) $component->get('data.lines');
+    $estimateKey = (string) collect($lines)->search(fn (array $line): bool => $line['line_id'] === $estimate->id);
+    $actualKey = (string) collect($lines)->search(fn (array $line): bool => $line['line_id'] === $actual->id);
+
+    $component
+        ->assertFormComponentActionVisible('lines', 'clone', ['item' => $actualKey])
+        ->assertFormComponentActionHidden('lines', 'delete', ['item' => $actualKey])
+        ->set("data.lines.{$estimateKey}.amount", '120.00')
+        ->callFormComponentAction('lines', 'clone', arguments: ['item' => $actualKey]);
+
+    $clonedKey = array_values(array_diff(
+        array_keys((array) $component->get('data.lines')),
+        array_keys($lines),
+    ))[0];
+
+    $component
+        ->assertSet("data.lines.{$clonedKey}.line_id", null)
+        ->assertFormComponentActionVisible('lines', 'delete', ['item' => $clonedKey])
+        ->set("data.lines.{$clonedKey}.amount", '30.00')
+        ->set("data.lines.{$clonedKey}.note", 'Seconda fattura')
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $expense->refresh();
+    expect($expense->lines()->count())->toBe(3)
+        ->and($expense->lines()->findOrFail($estimate->id)->amount)->toBe('120.00')
+        ->and($expense->lines()->findOrFail($actual->id)->amount)->toBe('25.00')
+        ->and($expense->lines()->whereNotIn('id', [$estimate->id, $actual->id])->sole()->amount)->toBe('30.00')
+        ->and(AuditEvent::query()->where('event_type', AuditEventType::ExpenseLineUpdated)->where('subject_id', $estimate->id)->count())->toBe(1)
+        ->and(AuditEvent::query()->where('event_type', AuditEventType::ExpenseLineCreated)->count())->toBe(1);
+});
+
+it('rolls back every Line change when one row in the complete edit form is invalid', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
+    $expense = Expense::factory()->forExercise($exercise)->create();
+    $line = ExpenseLine::factory()->for($expense)->create(['amount' => '100.00']);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+
+    $component = Livewire::withQueryParams(['addLine' => 1])
+        ->test(EditExpense::class, ['record' => $expense->getRouteKey()]);
+    $keys = array_keys((array) $component->get('data.lines'));
+
+    $component
+        ->set("data.lines.{$keys[0]}.amount", '125.00')
+        ->set("data.lines.{$keys[1]}.type", 'actual')
+        ->set("data.lines.{$keys[1]}.amount", '0.00')
+        ->call('save')
+        ->assertHasErrors(['data.lines.1.note']);
+
+    expect($line->fresh()->amount)->toBe('100.00')
+        ->and($expense->lines()->count())->toBe(1)
+        ->and(AuditEvent::query()->whereIn('event_type', [
+            AuditEventType::ExpenseLineUpdated,
+            AuditEventType::ExpenseLineCreated,
+        ])->count())->toBe(0);
+});
+
+it('requires the canonical reason when an Estimate changes after Budget approval', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
+    $proposal = Proposal::factory()->for($company)->for($exercise)->create(['created_by_id' => $manager->id]);
+    BudgetSnapshot::factory()->for($proposal)->create([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'approved_by_id' => $manager->id,
+    ]);
+    $expense = Expense::factory()->forExercise($exercise)->create();
+    $line = ExpenseLine::factory()->for($expense)->create(['type' => 'estimate', 'amount' => '100.00']);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+
+    $component = Livewire::test(EditExpense::class, ['record' => $expense->getRouteKey()]);
+    $lineKey = array_key_first((array) $component->get('data.lines'));
+
+    $component
+        ->assertFormFieldHidden('change_reason')
+        ->set("data.lines.{$lineKey}.amount", '125.00')
+        ->assertFormFieldVisible('change_reason')
+        ->call('save')
+        ->assertHasFormErrors(['change_reason']);
+
+    expect($line->fresh()->amount)->toBe('100.00');
+
+    $component
+        ->set('data.change_reason', 'Aggiornamento della Stima')
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($line->fresh()->amount)->toBe('125.00');
 });
 
 it('shows the creation reason only after a Budget and only for a non-zero Expense', function () {
@@ -178,6 +345,28 @@ it('tolerates incomplete decimal input while editing a suggested Total', functio
         ->set("data.lines.{$lineKey}.unit_amount", '1200,')
         ->assertSet("data.lines.{$lineKey}.amount", '2500')
         ->assertSet("data.lines.{$lineKey}.suggested_amount", null);
+});
+
+it('shows persisted descriptive decimals without insignificant trailing zeroes', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
+    $expense = Expense::factory()->forExercise($exercise)->create();
+    ExpenseLine::factory()->for($expense)->create([
+        'amount' => '3000.00',
+        'quantity' => '1.000000',
+        'unit_amount' => '3000.000000',
+    ]);
+    $this->actingAs($manager);
+    Filament::setTenant($company);
+
+    $component = Livewire::test(EditExpense::class, ['record' => $expense->getRouteKey()]);
+    $lineKey = array_key_first((array) $component->get('data.lines'));
+
+    $component
+        ->assertSet("data.lines.{$lineKey}.quantity", '1')
+        ->assertSet("data.lines.{$lineKey}.unit_amount", '3000');
 });
 
 it('allows only Actual lines when creating an Expense for a Contract', function () {

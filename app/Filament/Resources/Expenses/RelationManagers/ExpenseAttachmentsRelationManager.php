@@ -16,6 +16,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 
 class ExpenseAttachmentsRelationManager extends RelationManager
@@ -34,7 +35,11 @@ class ExpenseAttachmentsRelationManager extends RelationManager
         return $table->modifyQueryUsing(fn (Builder $query): Builder => $query->whereNull('detached_at'))
             ->columns([
                 TextColumn::make('original_name')->label('File'),
-                TextColumn::make('size_bytes')->label('Dimensione')->numeric(),
+                TextColumn::make('size_bytes')->label('Dimensione')
+                    ->formatStateUsing(fn (mixed $state): string => Number::withLocale(
+                        'it',
+                        fn (): string => Number::fileSize((int) $state, maxPrecision: 2),
+                    )),
                 TextColumn::make('sha256')->label('SHA-256')->copyable()->limit(16),
                 TextColumn::make('uploader.name')->label('Caricato da'),
                 TextColumn::make('created_at')->label('Caricato il')->dateTime('d/m/Y H:i'),

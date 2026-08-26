@@ -17,7 +17,7 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-it('exposes separate descriptive edit and impact-confirmed classification action', function () {
+it('exposes the complete Line edit form separately from impact-confirmed classification', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
     foreach ([Capability::View, Capability::ManageOperations] as $capability) {
@@ -44,9 +44,12 @@ it('exposes separate descriptive edit and impact-confirmed classification action
     Livewire::test(EditExpense::class, ['record' => $expense->getRouteKey()])
         ->assertFormFieldExists('description')
         ->assertFormFieldExists('notes')
+        ->assertFormFieldExists('container')
+        ->assertFormFieldExists('supplier_id')
+        ->assertFormFieldExists('direct_cost_center_id')
+        ->assertFormFieldExists('lines')
         ->assertFormFieldDoesNotExist('exercise_id')
-        ->assertFormFieldDoesNotExist('supplier_id')
-        ->assertFormFieldDoesNotExist('direct_cost_center_id');
+        ->assertSee('Sposta o riclassifica');
 });
 
 it('hides every expense mutation from a read-only viewer', function () {

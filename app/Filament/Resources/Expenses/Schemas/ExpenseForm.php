@@ -27,6 +27,7 @@ use App\Support\ExerciseContext;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
@@ -150,6 +151,12 @@ class ExpenseForm
                     ->visible(fn (Get $get): bool => $get('container') === 'autonomous')
                     ->dehydrated(fn (Get $get): bool => $get('container') === 'autonomous'),
                 Textarea::make('notes')->label('Note')->columnSpanFull(),
+                FileUpload::make('attachments')
+                    ->label('Allegati')
+                    ->multiple()
+                    ->storeFiles(false)
+                    ->helperText('Opzionali. Potrai aggiungerne altri dalla scheda della Spesa.')
+                    ->columnSpanFull(),
                 Textarea::make('change_reason')
                     ->label('Motivo della variazione rispetto al Budget')
                     ->helperText('Richiesto perché l’Esercizio ha già un Budget approvato e la nuova Spesa ha un valore economico diverso da zero.')
@@ -163,8 +170,9 @@ class ExpenseForm
                 ->schema([
                     Repeater::make('lines')
                         ->hiddenLabel()
-                        ->schema(self::creationLineFields())
+                        ->schema(self::repeaterLineFields())
                         ->columns(12)
+                        ->cloneable()
                         ->reorderable(false)
                         ->minItems(1)
                         ->defaultItems(1)
@@ -180,14 +188,14 @@ class ExpenseForm
     }
 
     /** @return array<int, mixed> */
-    private static function creationLineFields(): array
+    public static function repeaterLineFields(bool $contractActualOnly = false, bool $preserveIdentity = false): array
     {
-        return [
+        $fields = [
             Select::make('type')->label('Tipo')
-                ->options(fn (Get $get): array => $get('../../container') === 'contract'
+                ->options(fn (Get $get): array => $contractActualOnly || $get('../../container') === 'contract'
                     ? [ExpenseLineType::Actual->value => ExpenseLineType::Actual->label()]
                     : ExpenseLineType::options())
-                ->default(fn (): ?string => self::initialContainer() === 'contract'
+                ->default(fn (): ?string => $contractActualOnly || self::initialContainer() === 'contract'
                     ? ExpenseLineType::Actual->value
                     : null)
                 ->placeholder('Seleziona')
@@ -213,6 +221,16 @@ class ExpenseForm
                 ->label(fn (Get $get): string => self::amountMismatchMessage($get).' Confermo il Totale indicato.')
                 ->visible(fn (Get $get): bool => self::hasAmountMismatch($get))
                 ->columnSpanFull(),
+        ];
+
+        if (! $preserveIdentity) {
+            return $fields;
+        }
+
+        return [
+            Hidden::make('line_id'),
+            Hidden::make('unit_of_measure'),
+            ...$fields,
         ];
     }
 

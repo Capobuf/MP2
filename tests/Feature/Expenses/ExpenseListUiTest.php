@@ -4,6 +4,7 @@ use App\Domain\Company\Capability;
 use App\Domain\Projects\ProjectState;
 use App\Filament\Resources\Contracts\ContractResource;
 use App\Filament\Resources\Expenses\ExpenseResource;
+use App\Filament\Resources\Expenses\Pages\EditExpense;
 use App\Filament\Resources\Expenses\Pages\ListExpenses;
 use App\Filament\Resources\Expenses\Pages\ViewExpense;
 use App\Filament\Resources\Expenses\Widgets\ExpenseOverview;
@@ -152,31 +153,35 @@ it('shows only an existing Project or Contract reference in the expense header',
         ->assertDontSee('Contratto di riferimento');
 });
 
-it('adds a line from the shared detail component and refreshes its economic summary', function () {
+it('opens the complete edit page from the add Line action', function () {
     CompanyCapability::query()->create([
         'company_id' => $this->company->id,
         'user_id' => $this->user->id,
         'capability' => Capability::ManageOperations,
     ]);
     $expense = Expense::factory()->forExercise($this->exercise)->create();
+    ExpenseLine::factory()->for($expense)->create();
+
+    $editUrl = ExpenseResource::getUrl('edit', [
+        'record' => $expense,
+        'addLine' => 1,
+    ]);
 
     Livewire::test(ExpenseDetail::class, ['expenseId' => $expense->id, 'compact' => true])
         ->assertActionVisible('addLine')
-        ->callAction('addLine', data: [
-            'type' => 'estimate',
-            'amount' => '75.00',
-            'quantity' => null,
-            'unit_amount' => null,
-            'unit_of_measure' => null,
-            'note' => 'Verifica pannello',
-            'amount_warning_acknowledged' => false,
-        ])
-        ->assertHasNoActionErrors()
-        ->assertSee('75,00');
+        ->assertActionHasUrl('addLine', $editUrl);
 
-    expect($expense->lines()->sole())
-        ->type->value->toBe('estimate')
-        ->amount->toBe('75.00');
+    $component = Livewire::withQueryParams(['addLine' => 1])
+        ->test(EditExpense::class, ['record' => $expense->getRouteKey()]);
+    $lineKeys = array_keys((array) $component->get('data.lines'));
+
+    $component
+        ->assertFormComponentActionHidden('lines', 'delete', ['item' => $lineKeys[0]])
+        ->assertFormComponentActionVisible('lines', 'delete', ['item' => $lineKeys[1]])
+        ->callFormComponentAction('lines', 'delete', arguments: ['item' => $lineKeys[1]]);
+
+    expect((array) $component->get('data.lines'))->toHaveCount(1)
+        ->and($expense->lines()->count())->toBe(1);
 });
 
 it('shows the overspend note only when the entered Line creates or increases overspend', function () {
@@ -190,12 +195,16 @@ it('shows the overspend note only when the entered Line creates or increases ove
     $expense = Expense::factory()->forExercise($this->exercise)->for($project)->create(['direct_cost_center_id' => null]);
     ExpenseLine::factory()->for($expense)->create(['type' => 'estimate', 'amount' => '100.00']);
 
-    $component = Livewire::test(ExpenseDetail::class, ['expenseId' => $expense->id, 'compact' => true])
-        ->mountAction('addLine')
-        ->fillForm(['type' => 'actual', 'amount' => '50.00'])
-        ->assertSchemaComponentHidden('overspend_note');
+    $component = Livewire::withQueryParams(['addLine' => 1])
+        ->test(EditExpense::class, ['record' => $expense->getRouteKey()]);
+    $lineKey = array_key_last((array) $component->get('data.lines'));
 
     $component
-        ->fillForm(['type' => 'actual', 'amount' => '150.00'])
-        ->assertSchemaComponentVisible('overspend_note');
+        ->set("data.lines.{$lineKey}.type", 'actual')
+        ->set("data.lines.{$lineKey}.amount", '50.00')
+        ->assertFormFieldHidden('overspend_note');
+
+    $component
+        ->set("data.lines.{$lineKey}.amount", '150.00')
+        ->assertFormFieldVisible('overspend_note');
 });
