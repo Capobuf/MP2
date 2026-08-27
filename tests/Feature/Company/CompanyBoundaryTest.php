@@ -42,8 +42,8 @@ it('never propagates a capability to another company', function () {
 
     expect($user->hasCapability($companyA, Capability::View))->toBeTrue()
         ->and($user->hasCapability($companyB, Capability::View))->toBeFalse()
-        ->and($user->canAccessTenant($companyA))->toBeTrue()
-        ->and($user->canAccessTenant($companyB))->toBeFalse()
+        ->and($user->canAccessTenant($companyA->tenantCompany))->toBeTrue()
+        ->and($user->canAccessTenant($companyB->tenantCompany))->toBeFalse()
         ->and($user->getTenants(Filament::getPanel('admin'))->modelKeys())
         ->toBe([$companyA->id]);
 });

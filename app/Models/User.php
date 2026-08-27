@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Domain\Company\Capability;
+use App\Domain\Company\TenantCompanyStatus;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
@@ -26,8 +27,18 @@ class User extends Authenticatable implements FilamentUser, HasTenants
 
     public function canAccessPanel(Panel $panel): bool
     {
+        if ($panel->getId() === 'platform') {
+            return $this->is_platform_admin;
+        }
+
+        if ($panel->getId() !== 'admin') {
+            return false;
+        }
+
         return $this->is_platform_admin || $this->capabilities()
             ->where('capability', Capability::View->value)
+            ->whereHas('company.tenantCompany', fn ($query) => $query
+                ->where('status', TenantCompanyStatus::Active->value))
             ->exists();
     }
 
@@ -79,29 +90,38 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         return $this->hasMany(BudgetSnapshot::class, 'approved_by_id');
     }
 
-    /** @return Collection<int, Company> */
+    /** @return Collection<int, TenantCompany> */
     public function getTenants(Panel $panel): Collection
     {
-        return Company::query()
-            ->whereHas('capabilities', fn ($query) => $query
+        return TenantCompany::query()
+            ->select('tenant_companies.*')
+            ->join('companies', 'companies.id', '=', 'tenant_companies.company_id')
+            ->where('tenant_companies.status', TenantCompanyStatus::Active->value)
+            ->whereHas('company.capabilities', fn ($query) => $query
                 ->where('user_id', $this->getKey())
                 ->where('capability', Capability::View->value))
-            ->orderBy('name')
+            ->with('company')
+            ->orderBy('companies.name')
             ->get();
     }
 
     public function canAccessTenant(Model $tenant): bool
     {
-        return $tenant instanceof Company
-            && $this->hasCapability($tenant, Capability::View);
+        return $tenant instanceof TenantCompany
+            && $tenant->status() === TenantCompanyStatus::Active
+            && $tenant->company instanceof Company
+            && $this->hasCapability($tenant->company, Capability::View);
     }
 
     public function hasCapability(Company $company, Capability $capability): bool
     {
-        return $this->capabilities()
-            ->where('company_id', $company->getKey())
-            ->where('capability', $capability->value)
-            ->exists();
+        return $company->tenantCompany()
+            ->where('status', TenantCompanyStatus::Active->value)
+            ->exists()
+            && $this->capabilities()
+                ->where('company_id', $company->getKey())
+                ->where('capability', $capability->value)
+                ->exists();
     }
 
     /**

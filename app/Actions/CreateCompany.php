@@ -5,9 +5,11 @@ namespace App\Actions;
 use App\Domain\Company\AuditEventType;
 use App\Domain\Company\Capability;
 use App\Domain\Company\ClosingUnclassifiedPolicy;
+use App\Domain\Company\TenantCompanyStatus;
 use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\CompanyCapability;
+use App\Models\TenantCompany;
 use App\Models\User;
 use DateTimeZone;
 use Illuminate\Support\Facades\DB;
@@ -41,6 +43,11 @@ class CreateCompany
                 'unclassified_closing_policy' => ClosingUnclassifiedPolicy::Warning,
             ]);
 
+            TenantCompany::query()->create([
+                'company_id' => $company->getKey(),
+                'status' => TenantCompanyStatus::Active,
+            ]);
+
             $this->recordCompanyCreated($company, $actor);
 
             foreach (Capability::cases() as $capability) {
@@ -53,7 +60,7 @@ class CreateCompany
                 $this->recordCapabilityAssigned($company, $actor, $capability);
             }
 
-            return $company->refresh();
+            return $company->refresh()->load('tenantCompany');
         });
     }
 

@@ -21,7 +21,7 @@ it('starts without implicit references and generates the annual report', functio
     ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '12.00']);
     $this->actingAs($viewer);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(Reports::class)
         ->assertSuccessful()
@@ -43,7 +43,7 @@ it('denies the report page without visualizza', function (): void {
     $user = User::factory()->create();
     $this->actingAs($user);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     expect(Reports::canAccess())->toBeFalse();
 });
@@ -60,7 +60,7 @@ it('offers tenant filters and applies the selected supplier explicitly', functio
     ExpenseLine::factory()->for($otherExpense)->actual()->create(['amount' => '20.00']);
     $this->actingAs($viewer);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(Reports::class)
         ->assertSee('Filtri applicabili')
@@ -82,7 +82,7 @@ it('declares closing as the baseline for closed current knowledge', function ():
     closeExerciseFixture($exercise, $viewer);
     $this->actingAs($viewer);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(Reports::class)
         ->set('exerciseId', $exercise->id)

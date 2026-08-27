@@ -5,6 +5,7 @@ namespace App\Actions\Operations;
 use App\Domain\Company\AuditEventType;
 use App\Domain\Contracts\ContractState;
 use App\Models\AuditEvent;
+use App\Models\Company;
 use App\Models\Contract;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,7 @@ final class SetContractArchived
         ])->validate();
 
         return DB::transaction(function () use ($actor, $contract, $archived, $operationId, $expectedRevision): Contract {
+            Company::query()->lockForUpdate()->findOrFail($contract->company_id);
             $locked = Contract::query()->lockForUpdate()->findOrFail($contract->id);
             $locked->setRelation('lifecycleFacts', $locked->lifecycleFacts()->orderBy('id')->lockForUpdate()->get());
             $locked->setRelation('renewalConfigurations', $locked->renewalConfigurations()->orderBy('id')->lockForUpdate()->get());

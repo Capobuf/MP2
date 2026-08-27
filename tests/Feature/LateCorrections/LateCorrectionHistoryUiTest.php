@@ -70,7 +70,7 @@ it('keeps Closing values distinct from both immutable local evidence collections
 
     $this->actingAs($actor);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewClosing::class, ['record' => $snapshot->id])
         ->assertSuccessful()

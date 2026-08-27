@@ -64,7 +64,7 @@ it('materializes Estimates and provisional Carryover separately without double c
         ->and(data_get($row->detail, 'project.approved_reprogrammed_amount'))->toBe('0.00');
 
     $this->actingAs($fixture['actor']);
-    Filament::setTenant($fixture['company']);
+    Filament::setTenant(($fixture['company'])->tenantCompany);
     Livewire::test(ViewBudget::class, ['record' => $fixture['budget']->id])
         ->assertSee('Stime approvate')
         ->assertSee('Riporto approvato')

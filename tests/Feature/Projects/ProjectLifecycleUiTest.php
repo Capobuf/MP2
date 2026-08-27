@@ -33,7 +33,7 @@ it('shows archive only for terminal active Projects and restore only for archive
     $closed = Project::factory()->for($company)->create(['initial_state' => ProjectState::Closed, 'initial_effective_date' => '2026-01-01']);
     $archived = Project::factory()->for($company)->archived()->create(['initial_state' => ProjectState::Cancelled, 'initial_effective_date' => '2026-01-01']);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewProject::class, ['record' => $open->getRouteKey()])
         ->assertActionHidden('archive')
@@ -66,7 +66,7 @@ it('keeps lifecycle actions hidden from a read-only viewer and exposes no delete
     CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $viewer->id, 'capability' => Capability::View]);
     $project = Project::factory()->for($company)->create(['initial_state' => ProjectState::Closed]);
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewProject::class, ['record' => $project->getRouteKey()])
         ->assertActionHidden('archive')

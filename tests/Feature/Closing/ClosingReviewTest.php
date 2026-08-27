@@ -59,12 +59,12 @@ it('requires the CloseExercise capability independently from ordinary operations
     $closingOnly = s9ClosingUser($company, [Capability::View, Capability::CloseExercise]);
     $otherExercise = Exercise::factory()->create(['year' => 2025]);
 
-    expect(fn () => app(PrepareExerciseClosing::class)->execute($operationsOnly, $exercise, ['management_continues' => false, 'projects' => []]))
+    expect(fn () => app(PrepareExerciseClosing::class)->execute($operationsOnly, $exercise, ['create_next_exercise' => false, 'projects' => []]))
         ->toThrow(AuthorizationException::class);
-    expect(fn () => app(PrepareExerciseClosing::class)->execute($closingOnly, $otherExercise, ['management_continues' => false, 'projects' => []]))
+    expect(fn () => app(PrepareExerciseClosing::class)->execute($closingOnly, $otherExercise, ['create_next_exercise' => false, 'projects' => []]))
         ->toThrow(AuthorizationException::class);
 
-    $prepared = app(PrepareExerciseClosing::class)->execute($closingOnly, $exercise, ['management_continues' => false, 'projects' => []]);
+    $prepared = app(PrepareExerciseClosing::class)->execute($closingOnly, $exercise, ['create_next_exercise' => false, 'projects' => []]);
 
     expect($prepared['review']->canClose())->toBeTrue();
 });
@@ -75,12 +75,12 @@ it('blocks Closing before the calendar year is over and when a previous Exercise
     $actor = s9ClosingUser($company, [Capability::View, Capability::CloseExercise]);
     $current = Exercise::factory()->for($company)->create(['year' => 2026]);
 
-    $currentReview = app(PrepareExerciseClosing::class)->execute($actor, $current, ['management_continues' => false, 'projects' => []])['review'];
+    $currentReview = app(PrepareExerciseClosing::class)->execute($actor, $current, ['create_next_exercise' => false, 'projects' => []])['review'];
     expect(collect($currentReview->blocks)->pluck('code'))->toContain('exercise_year_not_finished');
 
     $target = Exercise::factory()->for($company)->create(['year' => 2025]);
     Exercise::factory()->for($company)->create(['year' => 2024]);
-    $review = app(PrepareExerciseClosing::class)->execute($actor, $target, ['management_continues' => false, 'projects' => []])['review'];
+    $review = app(PrepareExerciseClosing::class)->execute($actor, $target, ['create_next_exercise' => false, 'projects' => []])['review'];
 
     expect(collect($review->blocks)->pluck('code'))->toContain('previous_exercise_open');
 });
@@ -97,7 +97,7 @@ it('blocks a same-year Draft but does not require an approved Budget', function 
         'status' => 'draft',
     ]);
 
-    $review = app(PrepareExerciseClosing::class)->execute($actor, $exercise, ['management_continues' => false, 'projects' => []])['review'];
+    $review = app(PrepareExerciseClosing::class)->execute($actor, $exercise, ['create_next_exercise' => false, 'projects' => []])['review'];
     expect(collect($review->blocks)->pluck('code'))->toContain('draft_proposal_open')
         ->and($review->budget['approved_budget_absent'])->toBeTrue();
 });
@@ -215,7 +215,7 @@ it('turns missing first-level classification into a block under Company policy',
     ExpenseLine::factory()->for($expense)->create(['amount' => '10.00']);
 
     $review = app(PrepareExerciseClosing::class)->execute($actor, $exercise, [
-        'management_continues' => false,
+        'create_next_exercise' => false,
         'projects' => [],
     ])['review'];
 

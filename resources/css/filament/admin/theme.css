@@ -2684,3 +2684,706 @@ html.fi {
         transition: none;
     }
 }
+
+/* Budget snapshot */
+.mp2-budget-overview-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 6fr);
+    gap: 16px;
+}
+
+.mp2-budget-total-panel,
+.mp2-budget-approval-panel {
+    min-height: 100%;
+}
+
+.mp2-budget-total {
+    margin-top: 22px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 20px;
+}
+
+.mp2-budget-total > span,
+.mp2-budget-affected-exercises > span {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+
+.mp2-budget-total > strong {
+    display: block;
+    margin-top: 5px;
+    color: var(--text-primary);
+    font-size: clamp(2rem, 3.4vw, 3.25rem);
+    line-height: 1;
+    font-weight: 720;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.045em;
+}
+
+.mp2-budget-total > p {
+    margin-top: 9px;
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+}
+
+.mp2-budget-version-facts,
+.mp2-budget-approval-facts,
+.mp2-budget-inline-facts,
+.mp2-budget-contract-facts {
+    display: grid;
+    gap: 14px 20px;
+}
+
+.mp2-budget-version-facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 18px;
+}
+
+.mp2-budget-approval-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 22px;
+}
+
+.mp2-budget-version-facts dt,
+.mp2-budget-approval-facts dt,
+.mp2-budget-inline-facts dt,
+.mp2-budget-contract-facts dt,
+.mp2-budget-source-facts dt,
+.mp2-budget-condition-list dt,
+.mp2-budget-traceability dt,
+.mp2-budget-evidence dt {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+
+.mp2-budget-version-facts dd,
+.mp2-budget-approval-facts dd,
+.mp2-budget-inline-facts dd,
+.mp2-budget-contract-facts dd,
+.mp2-budget-source-facts dd,
+.mp2-budget-condition-list dd,
+.mp2-budget-traceability dd,
+.mp2-budget-evidence dd {
+    margin-top: 4px;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    line-height: 1.3rem;
+    font-weight: 610;
+}
+
+.mp2-budget-version-facts dd {
+    font-size: 1rem;
+}
+
+.mp2-budget-affected-exercises {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 20px;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+}
+
+.mp2-budget-affected-exercises > div {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.mp2-budget-affected-exercises > div > span,
+.mp2-budget-source-type {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid color-mix(in srgb, var(--mp2-object-accent) 26%, var(--border));
+    border-radius: 999px;
+    background: var(--mp2-object-accent-soft);
+    padding: 3px 8px;
+    color: var(--mp2-object-accent-ink);
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    font-weight: 650;
+}
+
+.mp2-budget-sources-heading {
+    align-items: center;
+}
+
+.mp2-budget-source-counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    border-bottom: 1px solid var(--border);
+    padding: 12px 22px;
+    background: color-mix(in srgb, var(--surface-muted) 58%, transparent);
+}
+
+.mp2-budget-source-counts > div {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+}
+
+.mp2-budget-source-counts dt {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.mp2-budget-source-counts dd {
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.mp2-budget-source-list {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+}
+
+.mp2-budget-source {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--surface) 96%, var(--mp2-object-petrol));
+}
+
+.mp2-budget-source[open] {
+    border-color: color-mix(in srgb, var(--mp2-object-accent) 30%, var(--border));
+    box-shadow: 0 8px 24px rgb(3 15 24 / 7%);
+}
+
+.mp2-budget-source > summary {
+    display: grid;
+    grid-template-columns: 34px minmax(180px, 1fr) minmax(150px, auto) minmax(145px, auto) 18px;
+    align-items: center;
+    gap: 14px;
+    padding: 15px 16px;
+    cursor: pointer;
+    list-style: none;
+    transition: background-color 150ms ease;
+}
+
+.mp2-budget-source > summary::-webkit-details-marker {
+    display: none;
+}
+
+.mp2-budget-source > summary:hover {
+    background: color-mix(in srgb, var(--mp2-object-accent-soft) 48%, transparent);
+}
+
+.mp2-budget-source > summary:focus-visible {
+    outline: 2px solid var(--mp2-object-accent);
+    outline-offset: -2px;
+}
+
+.mp2-budget-source-icon {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border-radius: 9px;
+    background: var(--surface-muted);
+    color: var(--mp2-object-accent-ink);
+}
+
+.mp2-budget-source-icon > svg {
+    width: 18px;
+    height: 18px;
+}
+
+.mp2-budget-source-identity,
+.mp2-budget-source-state,
+.mp2-budget-source-amount {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+}
+
+.mp2-budget-source-title-line {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+}
+
+.mp2-budget-source-title-line > strong {
+    overflow: hidden;
+    color: var(--text-primary);
+    font-size: 0.9375rem;
+    line-height: 1.25rem;
+    font-weight: 660;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mp2-budget-source-context {
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mp2-budget-source-context code,
+.mp2-budget-traceability code,
+.mp2-budget-evidence code {
+    overflow-wrap: anywhere;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+}
+
+.mp2-budget-source-state small,
+.mp2-budget-source-amount small {
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+    line-height: 0.9rem;
+}
+
+.mp2-budget-source-state strong,
+.mp2-budget-source-amount strong {
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+    font-weight: 620;
+    white-space: nowrap;
+}
+
+.mp2-budget-source-amount {
+    text-align: right;
+}
+
+.mp2-budget-source-amount strong {
+    color: var(--text-primary);
+    font-size: 0.9375rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.mp2-budget-source-chevron {
+    color: var(--text-muted);
+    transition: transform 150ms ease;
+}
+
+.mp2-budget-source-chevron > svg {
+    width: 18px;
+    height: 18px;
+}
+
+.mp2-budget-source[open] .mp2-budget-source-chevron {
+    transform: rotate(180deg);
+}
+
+.mp2-budget-source-body {
+    border-top: 1px solid var(--border);
+    padding: 18px 20px 20px;
+}
+
+.mp2-budget-source-description {
+    max-width: 72rem;
+    margin-bottom: 16px;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    line-height: 1.45rem;
+    white-space: pre-line;
+}
+
+.mp2-budget-source-facts {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px 20px;
+}
+
+.mp2-budget-source-facts > div,
+.mp2-budget-inline-facts > div,
+.mp2-budget-contract-facts > div {
+    min-width: 0;
+}
+
+.mp2-budget-source-section {
+    margin-top: 20px;
+    border-top: 1px solid var(--border);
+    padding-top: 17px;
+}
+
+.mp2-budget-subheading,
+.mp2-budget-condition-heading,
+.mp2-budget-child-expenses article > div:first-child {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.mp2-budget-subheading h3,
+.mp2-budget-transition-list h4 {
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    line-height: 1.2rem;
+    font-weight: 660;
+}
+
+.mp2-budget-subheading > span {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.mp2-budget-inline-facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 14px;
+}
+
+.mp2-budget-contract-facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 14px;
+}
+
+.mp2-budget-table-wrap {
+    margin-top: 13px;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    outline: none;
+}
+
+.mp2-budget-table-wrap:focus-visible {
+    box-shadow: 0 0 0 2px var(--mp2-object-accent);
+}
+
+.mp2-budget-detail-table {
+    width: 100%;
+    min-width: 620px;
+    border-collapse: collapse;
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    line-height: 1.15rem;
+}
+
+.mp2-budget-detail-table th,
+.mp2-budget-detail-table td {
+    border-bottom: 1px solid var(--border);
+    padding: 9px 11px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.mp2-budget-detail-table th {
+    background: var(--surface-muted);
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+    line-height: 0.9rem;
+    font-weight: 650;
+    letter-spacing: 0.025em;
+}
+
+.mp2-budget-detail-table tr:last-child td {
+    border-bottom: 0;
+}
+
+.mp2-budget-transition-list,
+.mp2-budget-child-expenses,
+.mp2-budget-condition-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 15px;
+}
+
+.mp2-budget-transition-list > div,
+.mp2-budget-child-expenses > article,
+.mp2-budget-condition-list > article,
+.mp2-budget-action,
+.mp2-budget-relation,
+.mp2-budget-evidence-list > article {
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--surface-muted) 64%, transparent);
+    padding: 12px 14px;
+}
+
+.mp2-budget-transition-list > div {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 3px 12px;
+}
+
+.mp2-budget-transition-list > div > strong,
+.mp2-budget-child-expenses strong,
+.mp2-budget-condition-heading strong,
+.mp2-budget-action strong,
+.mp2-budget-relation strong,
+.mp2-budget-evidence-empty strong {
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+    line-height: 1.15rem;
+    font-weight: 640;
+}
+
+.mp2-budget-transition-list > div > span,
+.mp2-budget-child-expenses span,
+.mp2-budget-condition-heading span,
+.mp2-budget-action span,
+.mp2-budget-relation span {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+
+.mp2-budget-transition-list p,
+.mp2-budget-condition-list article > p,
+.mp2-budget-action > p,
+.mp2-budget-relation > p {
+    grid-column: 1 / -1;
+    margin-top: 5px;
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+}
+
+.mp2-budget-child-expenses > article > strong {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.mp2-budget-condition-heading > div,
+.mp2-budget-action > div,
+.mp2-budget-relation {
+    display: grid;
+    gap: 3px;
+}
+
+.mp2-budget-condition-heading > div > strong {
+    font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.mp2-budget-condition-list article > dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.mp2-budget-nested-details,
+.mp2-budget-traceability {
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+}
+
+.mp2-budget-nested-details > summary,
+.mp2-budget-traceability > summary {
+    padding: 9px 11px;
+    color: var(--mp2-object-accent-ink);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 620;
+    cursor: pointer;
+}
+
+.mp2-budget-nested-details > summary:focus-visible,
+.mp2-budget-traceability > summary:focus-visible {
+    outline: 2px solid var(--mp2-object-accent);
+    outline-offset: -2px;
+}
+
+.mp2-budget-nested-details .mp2-budget-table-wrap {
+    margin: 0;
+    border-width: 1px 0 0;
+    border-radius: 0;
+}
+
+.mp2-budget-nested-details pre {
+    max-height: 280px;
+    overflow: auto;
+    border-top: 1px solid var(--border);
+    padding: 11px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    line-height: 1.05rem;
+    white-space: pre-wrap;
+}
+
+.mp2-budget-secondary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.mp2-budget-traceability {
+    margin-top: 20px;
+}
+
+.mp2-budget-traceability > dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 20px;
+    border-top: 1px solid var(--border);
+    padding: 14px;
+}
+
+.mp2-budget-muted {
+    margin-top: 12px;
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    line-height: 1.2rem;
+}
+
+.mp2-budget-source-empty {
+    margin: 0;
+}
+
+.mp2-budget-evidence-empty {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 18px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 10px;
+    padding: 16px;
+}
+
+.mp2-budget-evidence-empty > svg {
+    width: 22px;
+    height: 22px;
+    flex: none;
+    color: var(--text-muted);
+}
+
+.mp2-budget-evidence-empty p {
+    margin-top: 3px;
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    line-height: 1.2rem;
+}
+
+.mp2-budget-evidence-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.mp2-budget-evidence-list article > dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 18px;
+}
+
+.mp2-budget-evidence-wide {
+    grid-column: 1 / -1;
+}
+
+.mp2-budget-evidence dd > a {
+    color: var(--mp2-object-accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.mp2-budget-evidence dd > small {
+    margin-left: 7px;
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+}
+
+@media (max-width: 1023px) {
+    .mp2-budget-overview-grid,
+    .mp2-budget-secondary-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .mp2-budget-source > summary {
+        grid-template-columns: 34px minmax(160px, 1fr) minmax(140px, auto) 18px;
+    }
+
+    .mp2-budget-source-state {
+        display: none;
+    }
+
+    .mp2-budget-source-facts {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 767px) {
+    .mp2-budget-version-facts,
+    .mp2-budget-approval-facts,
+    .mp2-budget-inline-facts,
+    .mp2-budget-contract-facts,
+    .mp2-budget-source-facts,
+    .mp2-budget-traceability > dl,
+    .mp2-budget-evidence-list,
+    .mp2-budget-evidence-list article > dl {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .mp2-budget-total > strong {
+        font-size: 2rem;
+    }
+
+    .mp2-budget-affected-exercises {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .mp2-budget-affected-exercises > div {
+        justify-content: flex-start;
+    }
+
+    .mp2-budget-source-list {
+        padding: 10px;
+    }
+
+    .mp2-budget-source > summary {
+        grid-template-columns: 32px minmax(0, 1fr) 18px;
+        gap: 10px;
+        padding: 13px 12px;
+    }
+
+    .mp2-budget-source-amount {
+        grid-column: 2;
+        text-align: left;
+    }
+
+    .mp2-budget-source-chevron {
+        grid-column: 3;
+        grid-row: 1 / span 2;
+    }
+
+    .mp2-budget-source-title-line {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .mp2-budget-source-title-line > strong,
+    .mp2-budget-source-context {
+        white-space: normal;
+    }
+
+    .mp2-budget-source-body {
+        padding: 16px 14px;
+    }
+
+    .mp2-budget-condition-list article > dl {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .mp2-budget-evidence-wide {
+        grid-column: auto;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mp2-budget-source > summary,
+    .mp2-budget-source-chevron {
+        transition: none;
+    }
+}

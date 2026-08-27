@@ -4,6 +4,7 @@ namespace App\Actions\MasterData;
 
 use App\Domain\Company\AuditEventType;
 use App\Models\AuditEvent;
+use App\Models\Company;
 use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,7 @@ class UpdateSupplier
         ])->validate();
 
         return DB::transaction(function () use ($actor, $supplier, $validated): Supplier {
+            Company::query()->lockForUpdate()->findOrFail($supplier->company_id);
             $lockedSupplier = Supplier::query()->with('company')->lockForUpdate()->findOrFail($supplier->id);
             Gate::forUser($actor)->authorize('update', $lockedSupplier);
 

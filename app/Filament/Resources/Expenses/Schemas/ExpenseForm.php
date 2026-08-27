@@ -22,6 +22,7 @@ use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Project;
 use App\Models\Supplier;
+use App\Models\TenantCompany;
 use App\Models\User;
 use App\Support\ExerciseContext;
 use Filament\Actions\Action;
@@ -625,7 +626,8 @@ class ExpenseForm
 
     private static function company(): ?Company
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $company instanceof Company ? $company : null;
     }

@@ -75,7 +75,7 @@ it('shows no prorata matching invoice reminder carryover reporting or Sostituisc
     $contract = Contract::factory()->for($company)->create();
     $condition = ContractCondition::factory()->forContract($contract)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $forbiddenActions = [
         'delete', 'prorate', 'matchActual', 'createInvoice', 'schedulePayment', 'sendReminder',

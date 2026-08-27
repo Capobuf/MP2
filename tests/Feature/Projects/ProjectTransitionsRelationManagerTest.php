@@ -44,7 +44,7 @@ it('manages transitions explicitly without edit or delete and only changes futur
         'initial_effective_date' => '2026-01-01',
     ]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(ProjectTransitionsRelationManager::class, [
         'ownerRecord' => $project,
@@ -77,7 +77,7 @@ it('hides mutation actions from viewers and for effective transitions', function
         'created_by_id' => $viewer->id,
     ]);
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ProjectTransitionsRelationManager::class, [
         'ownerRecord' => $project,

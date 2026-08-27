@@ -39,7 +39,7 @@ it('renders canonical annual deferral values, warning and authorized live action
         'carryover_state' => 'provisional',
     ]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $destination->id);
 
     Livewire::test(ViewProject::class, ['record' => $project->id])
@@ -76,7 +76,7 @@ it('hides direct deferral management from a read-only viewer', function (): void
     $viewer = User::factory()->create();
     CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $viewer->id, 'capability' => Capability::View]);
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewProject::class, ['record' => $project->id])
         ->assertActionHidden('manage_deferral');

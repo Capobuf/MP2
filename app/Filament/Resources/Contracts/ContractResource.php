@@ -19,6 +19,7 @@ use App\Filament\Resources\Contracts\Schemas\ContractInfolist;
 use App\Filament\Resources\Contracts\Tables\ContractsTable;
 use App\Models\Company;
 use App\Models\Contract;
+use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
 use Filament\Facades\Filament;
@@ -66,7 +67,8 @@ class ContractResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
             && $user->hasCapability($company, Capability::View);
@@ -75,7 +77,8 @@ class ContractResource extends Resource
     /** @return Builder<Contract> */
     public static function getEloquentQuery(): Builder
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         $query = parent::getEloquentQuery();
 
         return $company instanceof Company
@@ -89,7 +92,8 @@ class ContractResource extends Resource
     public static function canCreate(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
             && $user->hasCapability($company, Capability::ManageOperations);

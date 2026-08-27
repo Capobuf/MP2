@@ -27,7 +27,7 @@ it('initializes from the exercise and keeps proposal lists tenant scoped', funct
     $expense = Expense::factory()->forExercise($exercise)->create();
     ExpenseLine::factory()->for($expense)->create(['type' => 'actual', 'amount' => '7.00']);
     $this->actingAs($user);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewExercise::class, ['record' => $exercise->getRouteKey()])
         ->assertActionExists('initializeProposal')

@@ -4,7 +4,8 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\Tenancy\RegisterCompany;
-use App\Models\Company;
+use App\Http\Middleware\EnsureTenantCompanyIsActive;
+use App\Models\TenantCompany;
 use Filament\Enums\ThemeMode;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -37,9 +38,12 @@ class AdminPanelProvider extends PanelProvider
             ->brandLogoHeight('2.5rem')
             ->defaultThemeMode(ThemeMode::Dark)
             ->login()
-            ->tenant(Company::class)
+            ->tenant(TenantCompany::class, ownershipRelationship: 'tenantCompany')
             ->tenantRegistration(RegisterCompany::class)
             ->tenantMenu(false)
+            ->tenantMiddleware([
+                EnsureTenantCompanyIsActive::class,
+            ], isPersistent: true)
             ->colors([
                 'gray' => Color::hex('#91A3A8'),
                 'primary' => Color::hex('#39D5C4'),

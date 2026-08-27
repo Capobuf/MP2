@@ -7,6 +7,7 @@ use App\Domain\Expenses\ExpenseLineType;
 use App\Models\Company;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
+use App\Models\TenantCompany;
 use App\Support\ExerciseContext;
 use Filament\Facades\Filament;
 use Filament\Widgets\StatsOverviewWidget;
@@ -23,7 +24,8 @@ class ExpenseOverview extends StatsOverviewWidget
 
     protected function getStats(): array
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         $exercise = $company instanceof Company
             ? app(ExerciseContext::class)->current($company)
             : null;

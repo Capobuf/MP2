@@ -9,12 +9,19 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['name', 'timezone', 'overspend_note_required', 'unclassified_closing_policy'])]
 class Company extends Model implements HasName
 {
     /** @use HasFactory<CompanyFactory> */
     use HasFactory;
+
+    /** @return HasOne<TenantCompany, $this> */
+    public function tenantCompany(): HasOne
+    {
+        return $this->hasOne(TenantCompany::class, 'company_id');
+    }
 
     /** @return HasMany<CompanyCapability, $this> */
     public function capabilities(): HasMany

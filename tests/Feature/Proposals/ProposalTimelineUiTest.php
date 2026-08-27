@@ -77,7 +77,7 @@ it('links Proposal and Budget to their tenant-scoped immutable timeline', functi
     $budgetCreated = $budgetEvents->first(fn (AuditEvent $event): bool => $event->eventType()->value === 'budget_created');
 
     $this->actingAs($actor);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewProposal::class, ['record' => $proposal->getRouteKey()])
         ->assertActionHasUrl('timeline', CompanyAudit::getUrl([

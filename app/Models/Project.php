@@ -49,6 +49,12 @@ class Project extends Model
         return $this->belongsTo(Company::class);
     }
 
+    /** @return BelongsTo<TenantCompany, $this> */
+    public function tenantCompany(): BelongsTo
+    {
+        return $this->belongsTo(TenantCompany::class, 'company_id', 'company_id');
+    }
+
     /** @return HasMany<ProjectTransition, $this> */
     public function transitions(): HasMany
     {

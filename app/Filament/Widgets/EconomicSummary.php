@@ -5,6 +5,7 @@ namespace App\Filament\Widgets;
 use App\Domain\Company\Capability;
 use App\Models\Company;
 use App\Models\Exercise;
+use App\Models\TenantCompany;
 use App\Models\User;
 use App\Support\BudgetContext;
 use App\Support\ExerciseContext;
@@ -22,7 +23,8 @@ class EconomicSummary extends Widget
 
     public static function canView(): bool
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         $user = auth()->user();
 
         return $company instanceof Company && $user instanceof User
@@ -32,7 +34,8 @@ class EconomicSummary extends Widget
     /** @return array<string, mixed> */
     protected function getViewData(): array
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         $user = auth()->user();
         if (! $company instanceof Company || ! $user instanceof User) {
             return ['dashboard' => null];

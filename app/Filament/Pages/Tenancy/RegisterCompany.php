@@ -3,7 +3,7 @@
 namespace App\Filament\Pages\Tenancy;
 
 use App\Actions\CreateCompany;
-use App\Models\Company;
+use App\Models\TenantCompany;
 use App\Models\User;
 use DateTimeZone;
 use Filament\Forms\Components\Select;
@@ -43,11 +43,13 @@ class RegisterCompany extends RegisterTenant
         /** @var User $actor */
         $actor = auth()->user();
 
-        return app(CreateCompany::class)->execute($actor, $data);
+        $company = app(CreateCompany::class)->execute($actor, $data);
+
+        return $company->tenantCompany()->firstOrFail();
     }
 
     public function getModel(): string
     {
-        return Company::class;
+        return TenantCompany::class;
     }
 }

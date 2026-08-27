@@ -15,6 +15,7 @@ use App\Filament\Resources\Projects\Schemas\ProjectInfolist;
 use App\Filament\Resources\Projects\Tables\ProjectsTable;
 use App\Models\Company;
 use App\Models\Project;
+use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
 use Filament\Facades\Filament;
@@ -62,7 +63,8 @@ class ProjectResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
             && $user->hasCapability($company, Capability::View);
@@ -72,7 +74,8 @@ class ProjectResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $company instanceof Company
             ? $query->whereBelongsTo($company, 'company')->with([
@@ -86,7 +89,8 @@ class ProjectResource extends Resource
     public static function canCreate(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
             && $user->hasCapability($company, Capability::ManageOperations);

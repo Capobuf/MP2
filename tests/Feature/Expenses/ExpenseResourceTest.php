@@ -50,7 +50,7 @@ it('creates an expense in the selected global Exercise without exposing a second
     grantExpenseResource($manager, $company);
     $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
     Storage::fake('local');
 
@@ -105,7 +105,7 @@ it('duplicates a line while creating an Expense', function () {
     grantExpenseResource($manager, $company);
     $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
 
     $component = Livewire::test(CreateExpense::class);
@@ -147,7 +147,7 @@ it('edits existing Lines and saves a duplicated Line with a new identity', funct
         'note' => 'Prima fattura',
     ]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(EditExpense::class, ['record' => $expense->getRouteKey()]);
     $lines = (array) $component->get('data.lines');
@@ -190,7 +190,7 @@ it('rolls back every Line change when one row in the complete edit form is inval
     $expense = Expense::factory()->forExercise($exercise)->create();
     $line = ExpenseLine::factory()->for($expense)->create(['amount' => '100.00']);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::withQueryParams(['addLine' => 1])
         ->test(EditExpense::class, ['record' => $expense->getRouteKey()]);
@@ -225,7 +225,7 @@ it('requires the canonical reason when an Estimate changes after Budget approval
     $expense = Expense::factory()->forExercise($exercise)->create();
     $line = ExpenseLine::factory()->for($expense)->create(['type' => 'estimate', 'amount' => '100.00']);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(EditExpense::class, ['record' => $expense->getRouteKey()]);
     $lineKey = array_key_first((array) $component->get('data.lines'));
@@ -259,7 +259,7 @@ it('shows the creation reason only after a Budget and only for a non-zero Expens
         'approved_by_id' => $manager->id,
     ]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
 
     $component = Livewire::test(CreateExpense::class)
@@ -280,7 +280,7 @@ it('accepts an amount entered with the Italian decimal separator', function () {
     grantExpenseResource($manager, $company);
     $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
 
     Livewire::test(CreateExpense::class)
@@ -308,7 +308,7 @@ it('suggests the authoritative Total from unit amount and quantity without expos
     grantExpenseResource($manager, $company);
     $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
 
     $component = Livewire::test(CreateExpense::class);
@@ -332,7 +332,7 @@ it('tolerates incomplete decimal input while editing a suggested Total', functio
     grantExpenseResource($manager, $company);
     $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
 
     $component = Livewire::test(CreateExpense::class);
@@ -359,7 +359,7 @@ it('shows persisted descriptive decimals without insignificant trailing zeroes',
         'unit_amount' => '3000.000000',
     ]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(EditExpense::class, ['record' => $expense->getRouteKey()]);
     $lineKey = array_key_first((array) $component->get('data.lines'));
@@ -380,7 +380,7 @@ it('allows only Actual lines when creating an Expense for a Contract', function 
         'state_change_date' => "{$exercise->year}-01-01",
     ]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
 
     $component = Livewire::withQueryParams(['contract' => $contract->id])->test(CreateExpense::class);
@@ -409,7 +409,7 @@ it('changes existing line types to Actual when the Expense container becomes a C
     $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
     $contract = Contract::factory()->for($company)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
 
     $component = Livewire::test(CreateExpense::class);
@@ -437,7 +437,7 @@ it('overrides any browser Exercise state with the selected global Exercise', fun
     $selected = Exercise::factory()->for($company)->create(['year' => 2026]);
     $injected = Exercise::factory()->for($company)->create(['year' => 2027]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $selected->id);
 
     Livewire::test(CreateExpense::class)
@@ -461,7 +461,7 @@ it('does not create an expense when the selected global Exercise is closed', fun
         'status' => ExerciseStatus::Closed,
     ]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $closed->id);
 
     Livewire::test(ListExpenses::class)
@@ -489,7 +489,7 @@ it('creates and selects Supplier and Cost Center inline with distinct operations
     ]);
     $exercise = Exercise::factory()->for($company)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
 
     $component = Livewire::test(CreateExpense::class)
@@ -524,7 +524,7 @@ it('creates a distinct expense after save and create another', function () {
     grantExpenseResource($manager, $company);
     $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
 
     Livewire::test(CreateExpense::class)
@@ -556,7 +556,7 @@ it('lists and resolves expenses only inside the current tenant', function () {
     ExpenseLine::factory()->for($expenseA)->create();
     ExpenseLine::factory()->for($expenseB)->create();
     $this->actingAs($viewer);
-    Filament::setTenant($companyA);
+    Filament::setTenant(($companyA)->tenantCompany);
 
     Livewire::test(ListExpenses::class)
         ->assertCanSeeTableRecords([$expenseA])
@@ -575,7 +575,7 @@ it('shows a confirmed owner preview for Contract movement without future-slice c
     ExpenseLine::factory()->actual()->for($expense)->create();
     Contract::factory()->for($company)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewExpense::class, ['record' => $expense->getRouteKey()])
         ->mountAction('moveOrReclassify')

@@ -39,7 +39,7 @@ it('filters immutable Project history even after an Expense leaves the Project',
     $projectEvents = AuditEvent::query()->forProject($project)->orderByDesc('id')->get();
     $moveEvent = AuditEvent::query()->where('event_type', 'expense_moved_or_reclassified')->sole();
     $this->actingAs($actor);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewProject::class, ['record' => $project->getRouteKey()])
         ->assertActionHasUrl('timeline', CompanyAudit::getUrl([
@@ -70,7 +70,7 @@ it('shows Project values references overspend and operation identity in Italian'
     app(CreateExpenseLine::class)->execute($actor, $expense, ['type' => 'actual', 'amount' => '3.00'], (string) Str::uuid());
     $event = AuditEvent::query()->sole();
     $this->actingAs($actor);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::withQueryParams(['project' => $project->id])
         ->test(CompanyAudit::class)

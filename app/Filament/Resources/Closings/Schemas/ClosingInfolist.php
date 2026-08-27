@@ -35,7 +35,7 @@ final class ClosingInfolist
                     TextEntry::make('next_exercise_disposition')->label('N+1')->formatStateUsing(fn (mixed $state): string => match ((string) $state) {
                         'created' => 'Creato alla Chiusura',
                         'already_existed' => 'Già esistente',
-                        'not_created_management_terminated' => 'Non creato · gestione terminata',
+                        'not_created' => 'Non creato',
                         default => (string) $state,
                     }),
                     TextEntry::make('nextExercise.year')->label('Esercizio successivo')->placeholder('—'),

@@ -29,7 +29,7 @@ it('shows the Italian zero-impact annotation journey only for an authorized Clos
 
     $this->actingAs($actor);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewExercise::class, ['record' => $exercise->id])
         ->assertSuccessful()
@@ -59,7 +59,7 @@ it('records immutable annotation details and keeps the Closed Exercise controls 
     $exercise->refresh();
     $this->actingAs($actor);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     $operationId = (string) Str::uuid();
 
     $component = Livewire::test(ViewExercise::class, ['record' => $exercise->id]);
@@ -89,7 +89,7 @@ it('does not expose annotation action on an Open Exercise or to viewers without 
 
     $this->actingAs($viewer);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewExercise::class, ['record' => $exercise->id])
         ->assertSuccessful()

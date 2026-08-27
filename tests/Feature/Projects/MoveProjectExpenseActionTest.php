@@ -29,7 +29,7 @@ it('shows the S4 owner preview and moves the whole Expense without Contract cont
     $expense = Expense::factory()->forExercise($exercise)->create();
     $line = ExpenseLine::factory()->for($expense)->create(['amount' => '10.00']);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewExpense::class, ['record' => $expense->getRouteKey()])
         ->mountAction('moveOrReclassify')
@@ -68,7 +68,7 @@ it('hides unnecessary declarations and allows inline Supplier creation in the mo
     $expense = Expense::factory()->forExercise($exercise)->for($project)->create(['direct_cost_center_id' => null]);
     ExpenseLine::factory()->actual()->for($expense)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewExpense::class, ['record' => $expense->getRouteKey()])
         ->mountAction('moveOrReclassify')
@@ -95,7 +95,7 @@ it('reveals only declarations required by the selected Project destination', fun
     ExpenseLine::factory()->for($expense)->create(['amount' => '10.00']);
     ExpenseLine::factory()->actual()->for($expense)->create(['amount' => '20.00']);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(ViewExpense::class, ['record' => $expense->getRouteKey()])
         ->mountAction('moveOrReclassify')

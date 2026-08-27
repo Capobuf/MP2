@@ -28,6 +28,12 @@ class CostCenter extends Model
         return $this->belongsTo(Company::class);
     }
 
+    /** @return BelongsTo<TenantCompany, $this> */
+    public function tenantCompany(): BelongsTo
+    {
+        return $this->belongsTo(TenantCompany::class, 'company_id', 'company_id');
+    }
+
     /** @param Builder<self> $query */
     public function scopeActive(Builder $query): void
     {

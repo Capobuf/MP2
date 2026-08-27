@@ -22,7 +22,7 @@ it('shows all canonical readiness labels, impacts and S7 resolution controls', f
         ProposalItem::factory()->for($proposal)->create(['company_id' => $proposal->company_id, 'source_type' => 'expense', 'readiness_state' => $state]);
     }
     $this->actingAs($user);
-    Filament::setTenant($proposal->company);
+    Filament::setTenant(($proposal->company)->tenantCompany);
     Livewire::test(ViewProposal::class, ['record' => $proposal->id])
         ->assertActionExists('reviewReadiness')
         ->assertActionExists('reloadReality')

@@ -5,6 +5,7 @@ namespace App\Actions\Operations;
 use App\Domain\Company\AuditEventType;
 use App\Models\Attachment;
 use App\Models\AuditEvent;
+use App\Models\Company;
 use App\Models\Contract;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -21,6 +22,7 @@ final class DetachAttachment
         Validator::make(['operation_id' => $operationId], ['operation_id' => ['required', 'uuid']])->validate();
 
         return DB::transaction(function () use ($actor, $attachment, $operationId): Attachment {
+            Company::query()->lockForUpdate()->findOrFail($attachment->company_id);
             $locked = Attachment::query()->lockForUpdate()->findOrFail($attachment->id);
             Gate::forUser($actor)->authorize('update', $locked);
             $existing = AuditEvent::query()->where('operation_id', $operationId)->first();

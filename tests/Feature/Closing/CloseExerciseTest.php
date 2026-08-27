@@ -2,11 +2,13 @@
 
 use App\Actions\Closing\CloseExercise;
 use App\Actions\Closing\PrepareExerciseClosing;
+use App\Actions\Operations\CreateExercise as CreateExerciseAction;
 use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\InitializeProposal;
 use App\Actions\Proposals\PlanProjectDeferral;
 use App\Domain\Company\AuditEventType;
 use App\Domain\Company\Capability;
+use App\Domain\Company\TenantCompanyStatus;
 use App\Models\AuditEvent;
 use App\Models\BudgetSnapshot;
 use App\Models\BudgetSourceRow;
@@ -60,7 +62,7 @@ function s9CarryoverProject(Company $company, Exercise $exercise): Project
 function s9PreparedCarryover(User $actor, Exercise $exercise, Project $project): array
 {
     return app(PrepareExerciseClosing::class)->execute($actor, $exercise, [
-        'management_continues' => true,
+        'create_next_exercise' => true,
         'projects' => [$project->id => [
             'project_id' => $project->id,
             'final_state' => 'open',
@@ -105,12 +107,12 @@ it('closes without a Budget, creates N+1 and consolidates Carryover exactly once
         ->and(Exercise::query()->where('company_id', $company->id)->where('year', 2026)->count())->toBe(1);
 });
 
-it('records intentional non-creation of N+1 when management is terminated', function (): void {
+it('records the intentional non-creation of N+1 without changing the Tenant lifecycle', function (): void {
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
     $actor = s9CloseActor($company);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
-    $prepared = app(PrepareExerciseClosing::class)->execute($actor, $exercise, ['management_continues' => false, 'projects' => []]);
+    $prepared = app(PrepareExerciseClosing::class)->execute($actor, $exercise, ['create_next_exercise' => false, 'projects' => []]);
 
     $snapshot = app(CloseExercise::class)->execute($actor, $exercise, [
         ...$prepared['input'],
@@ -119,9 +121,27 @@ it('records intentional non-creation of N+1 when management is terminated', func
         'warnings_acknowledged' => false,
     ], (string) Str::uuid());
 
-    expect($snapshot->next_exercise_disposition)->toBe('not_created_management_terminated')
+    expect(Exercise::query()
+        ->where('company_id', $company->id)
+        ->where('year', 2026)
+        ->exists())->toBeFalse();
+
+    CompanyCapability::query()->create([
+        'company_id' => $company->id,
+        'user_id' => $actor->id,
+        'capability' => Capability::ManageOperations,
+    ]);
+    $laterExercise = app(CreateExerciseAction::class)->execute(
+        $actor,
+        $company,
+        ['year' => 2026],
+        (string) Str::uuid(),
+    );
+
+    expect($snapshot->next_exercise_disposition)->toBe('not_created')
         ->and($snapshot->next_exercise_id)->toBeNull()
-        ->and(Exercise::query()->where('company_id', $company->id)->where('year', 2026)->exists())->toBeFalse()
+        ->and($company->tenantCompany->status)->toBe(TenantCompanyStatus::Active)
+        ->and($laterExercise->year)->toBe(2026)
         ->and(AuditEvent::query()->where('event_type', AuditEventType::NextExerciseNotCreated->value)->exists())->toBeTrue();
 });
 
@@ -170,7 +190,7 @@ it('initializes a created N+1 with inherited classifications and Contract Estima
     ]);
 
     $prepared = app(PrepareExerciseClosing::class)->execute($actor, $source, [
-        'management_continues' => true,
+        'create_next_exercise' => true,
         'projects' => [$project->id => [
             'project_id' => $project->id,
             'final_state' => 'open',

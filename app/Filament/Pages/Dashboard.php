@@ -10,6 +10,7 @@ use App\Filament\Widgets\EconomicSummary;
 use App\Filament\Widgets\OperationalVarianceBySourceChart;
 use App\Filament\Widgets\SourceEconomicProfileChart;
 use App\Models\Company;
+use App\Models\TenantCompany;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Pages\Dashboard as BaseDashboard;
@@ -24,7 +25,8 @@ class Dashboard extends BaseDashboard
 
     public static function canAccess(): bool
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         $user = auth()->user();
 
         return $company instanceof Company && $user instanceof User

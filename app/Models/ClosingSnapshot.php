@@ -73,6 +73,12 @@ class ClosingSnapshot extends Model
         return $this->belongsTo(Company::class);
     }
 
+    /** @return BelongsTo<TenantCompany, $this> */
+    public function tenantCompany(): BelongsTo
+    {
+        return $this->belongsTo(TenantCompany::class, 'company_id', 'company_id');
+    }
+
     /** @return BelongsTo<Exercise, $this> */
     public function exercise(): BelongsTo
     {
@@ -144,11 +150,14 @@ class ClosingSnapshot extends Model
 
     private static function assertNextExerciseReference(self $snapshot, Exercise $exercise): void
     {
-        $disposition = (string) $snapshot->next_exercise_disposition;
-        if ($disposition === 'not_created_management_terminated') {
+        $disposition = $snapshot->getAttributes()['next_exercise_disposition'] ?? null;
+        if (! is_string($disposition)) {
+            throw new \UnexpectedValueException('Invalid persisted next Exercise disposition.');
+        }
+        if ($disposition === 'not_created') {
             if ($snapshot->next_exercise_id !== null) {
                 throw ValidationException::withMessages([
-                    'closing_snapshot' => 'La gestione terminata non può riferire un Esercizio successivo.',
+                    'closing_snapshot' => 'La non creazione di N+1 non può riferire un Esercizio successivo.',
                 ]);
             }
 

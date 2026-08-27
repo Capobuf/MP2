@@ -7,6 +7,7 @@ use App\Domain\Company\Capability;
 use App\Domain\Projects\ProjectState;
 use App\Models\Company;
 use App\Models\CostCenter;
+use App\Models\TenantCompany;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -79,7 +80,8 @@ class ProjectForm
 
     private static function company(): ?Company
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $company instanceof Company ? $company : null;
     }

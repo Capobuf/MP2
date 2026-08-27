@@ -113,7 +113,7 @@ it('does not expose carryover replacement closing forecast delete or export cont
     }
     $budget = BudgetSnapshot::factory()->for($proposal)->create();
     $this->actingAs($viewer);
-    Filament::setTenant($proposal->company);
+    Filament::setTenant(($proposal->company)->tenantCompany);
 
     $proposalPage = Livewire::test(ViewProposal::class, ['record' => $proposal->getRouteKey()]);
     foreach (['carryover', 'reprogramming', 'replace', 'closing', 'forecast', 'delete', 'export'] as $action) {

@@ -34,7 +34,7 @@ it('shows only child Expenses and links to prefilled creation without future own
     $child = Expense::factory()->forExercise($exercise)->for($project)->create(['direct_cost_center_id' => null]);
     $autonomous = Expense::factory()->forExercise($exercise)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
 
     Livewire::test(ProjectExpensesRelationManager::class, [
@@ -73,7 +73,7 @@ it('hides Project Expense creation from read-only viewers', function () {
     grantProjectExpenseResource($viewer, $company, false);
     $project = Project::factory()->for($company)->create();
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ProjectExpensesRelationManager::class, [
         'ownerRecord' => $project,

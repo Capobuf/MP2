@@ -52,7 +52,7 @@ it('creates a Project from the tenant UI without future-slice or destructive fie
     $exercise = Exercise::factory()->for($company)->create(['year' => 2027]);
     $costCenter = CostCenter::factory()->for($company)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
 
     Livewire::test(CreateProject::class)
@@ -104,7 +104,7 @@ it('overrides browser Exercise state and blocks creation for a closed global Exe
     $selected = Exercise::factory()->for($company)->create(['year' => 2026]);
     $injected = Exercise::factory()->for($company)->create(['year' => 2027]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $selected->id);
 
     Livewire::test(CreateProject::class)
@@ -149,7 +149,7 @@ it('creates and selects a Cost Center inline with a distinct operation', functio
     ]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
 
     $component = Livewire::test(CreateProject::class)
@@ -180,7 +180,7 @@ it('creates a distinct Project after save and create another', function () {
     grantProjectResource($manager, $company);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2027]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
 
     Livewire::test(CreateProject::class)
@@ -228,7 +228,7 @@ it('lists views and resolves Projects only inside the current tenant', function 
     ]);
     $projectB = Project::factory()->for($companyB)->create(['title' => 'Segreto']);
     $this->actingAs($viewer);
-    Filament::setTenant($companyA);
+    Filament::setTenant(($companyA)->tenantCompany);
 
     Livewire::test(ListProjects::class)
         ->assertCanSeeTableRecords([$projectA])
@@ -274,7 +274,7 @@ it('allows descriptive edit to an operator without exposing lifecycle fields', f
     grantProjectResource($manager, $company);
     $project = Project::factory()->for($company)->create(['title' => 'Prima']);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(EditProject::class, ['record' => $project->getRouteKey()])
         ->assertFormFieldExists('title')

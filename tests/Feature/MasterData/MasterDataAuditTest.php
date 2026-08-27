@@ -130,7 +130,7 @@ it('renders S2 history newest first in Italian and only for the current company'
     $eventsB = AuditEvent::query()->whereBelongsTo($companyB)->get();
     $created = $eventsA->last();
     $this->actingAs($actor);
-    Filament::setTenant($companyA);
+    Filament::setTenant(($companyA)->tenantCompany);
 
     Livewire::test(CompanyAudit::class)
         ->assertCanSeeTableRecords($eventsA, inOrder: true)

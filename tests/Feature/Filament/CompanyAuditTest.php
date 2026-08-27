@@ -44,7 +44,7 @@ it('renders S3 events newest first and filters an expense with its line events',
         'actual_impact_by_exercise' => [],
     ]));
     $this->actingAs($actor);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(CompanyAudit::class)
         ->set('expense', $expense->id)

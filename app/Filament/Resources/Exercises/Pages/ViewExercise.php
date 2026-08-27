@@ -27,6 +27,7 @@ use App\Models\Project;
 use App\Models\ProjectExerciseClassification;
 use App\Models\Proposal;
 use App\Models\Supplier;
+use App\Models\TenantCompany;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -77,7 +78,8 @@ class ViewExercise extends ViewRecord
                 ->form([Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid())])
                 ->action(function (array $data): void {
                     $actor = auth()->user();
-                    $company = Filament::getTenant();
+                    $tenant = Filament::getTenant();
+                    $company = $tenant instanceof TenantCompany ? $tenant->company : null;
                     abort_unless($actor instanceof User && $company instanceof Company, 403);
                     $proposal = app(InitializeProposal::class)->execute($actor, $company, $this->exerciseRecord(), (string) $data['operation_id']);
                     $this->redirect(ProposalResource::getUrl('view', ['record' => $proposal], tenant: $company));
@@ -171,7 +173,8 @@ class ViewExercise extends ViewRecord
                 ])
                 ->action(function (array $data): void {
                     $actor = auth()->user();
-                    $company = Filament::getTenant();
+                    $tenant = Filament::getTenant();
+                    $company = $tenant instanceof TenantCompany ? $tenant->company : null;
                     $exercise = $this->exerciseRecord()->fresh();
                     abort_unless($actor instanceof User && $company instanceof Company && $exercise->company_id === $company->id, 403);
 
@@ -241,7 +244,8 @@ class ViewExercise extends ViewRecord
                 ])
                 ->action(function (array $data): void {
                     $actor = auth()->user();
-                    $company = Filament::getTenant();
+                    $tenant = Filament::getTenant();
+                    $company = $tenant instanceof TenantCompany ? $tenant->company : null;
                     $exercise = $this->exerciseRecord()->fresh();
                     abort_unless($actor instanceof User && $company instanceof Company && $exercise->company_id === $company->id, 403);
 
@@ -292,7 +296,8 @@ class ViewExercise extends ViewRecord
     private function canManageProposals(): bool
     {
         $actor = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $actor instanceof User && $company instanceof Company && $actor->hasCapability($company, Capability::ManageProposals);
     }
@@ -300,7 +305,8 @@ class ViewExercise extends ViewRecord
     private function canCloseExercise(): bool
     {
         $actor = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $this->exerciseRecord()->isOpen()
             && $actor instanceof User
@@ -329,7 +335,8 @@ class ViewExercise extends ViewRecord
     private function canCorrectClosedExercise(): bool
     {
         $actor = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         $exercise = $this->exerciseRecord();
 
         return $actor instanceof User
@@ -341,7 +348,8 @@ class ViewExercise extends ViewRecord
     private function canAnnotateHistoricalError(): bool
     {
         $actor = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         $exercise = $this->exerciseRecord();
 
         return $actor instanceof User

@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Actions\SyncCompanyCapabilities;
 use App\Domain\Company\Capability;
 use App\Models\Company;
+use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -50,7 +51,8 @@ class CompanyAccess extends Page
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User
             && $company instanceof Company
@@ -75,7 +77,8 @@ class CompanyAccess extends Page
                     ->live()
                     ->afterStateUpdated(function (mixed $state): void {
                         $user = User::query()->find($state);
-                        $company = Filament::getTenant();
+                        $tenant = Filament::getTenant();
+                        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
                         $this->data['capabilities'] = ($user && $company instanceof Company)
                             ? $user->capabilities()
@@ -138,7 +141,8 @@ class CompanyAccess extends Page
 
     private function company(): Company
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         abort_unless($company instanceof Company, 404);
 
         return $company;

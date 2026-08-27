@@ -47,7 +47,7 @@ it('shows only current company events newest first with no mutation actions', fu
         ->where('setting', 'unclassified_closing_policy')
         ->sole();
     $this->actingAs($administrator);
-    Filament::setTenant($companyA);
+    Filament::setTenant(($companyA)->tenantCompany);
 
     Livewire::test(CompanyAudit::class)
         ->set('tableRecordsPerPage', 25)
@@ -81,7 +81,7 @@ it('exposes audit to a company viewer but not an unrelated user', function () {
     );
 
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     expect(CompanyAudit::canAccess())->toBeTrue();
 
     $this->actingAs($unrelated);

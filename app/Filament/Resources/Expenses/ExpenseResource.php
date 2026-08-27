@@ -25,6 +25,7 @@ use App\Filament\Resources\Expenses\Widgets\ExpenseOverview;
 use App\Filament\Support\ProjectOverspendNotifier;
 use App\Models\Company;
 use App\Models\Expense;
+use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -78,7 +79,8 @@ class ExpenseResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
             && $user->hasCapability($company, Capability::View);
@@ -88,7 +90,8 @@ class ExpenseResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $company instanceof Company
             ? $query->whereBelongsTo($company, 'company')->with([
@@ -101,7 +104,8 @@ class ExpenseResource extends Resource
     public static function canCreate(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
             && $user->hasCapability($company, Capability::ManageOperations);

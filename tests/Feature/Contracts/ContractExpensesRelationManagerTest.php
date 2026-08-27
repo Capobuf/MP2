@@ -34,7 +34,7 @@ it('shows Contract Actuals and creation only to operators while system Estimates
     $estimate = Expense::factory()->forExercise($exercise)->create(['contract_id' => $contract->id, 'supplier_id' => $contract->supplier_id, 'origin' => 'system']);
     ExpenseLine::factory()->for($estimate)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ContractExpensesRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
         ->assertCanSeeTableRecords([$actual, $estimate])
@@ -66,7 +66,7 @@ it('exposes Contract declarations on manual Lines and no mutation on generated E
     $estimate = Expense::factory()->forExercise($exercise)->create(['contract_id' => $contract->id, 'supplier_id' => $contract->supplier_id, 'origin' => 'system']);
     $estimateLine = ExpenseLine::factory()->for($estimate)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ExpenseLinesRelationManager::class, ['ownerRecord' => $actual, 'pageClass' => ViewExpense::class])
         ->mountTableAction('create')
@@ -86,7 +86,7 @@ it('hides Contract Actual creation from a read-only viewer', function () {
     CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $viewer->id, 'capability' => Capability::View]);
     $contract = Contract::factory()->for($company)->create();
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ContractExpensesRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
         ->assertTableActionHidden('createContractActual');

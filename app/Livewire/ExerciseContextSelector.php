@@ -7,6 +7,7 @@ use App\Filament\Pages\CompanySettings;
 use App\Filament\Resources\Exercises\ExerciseResource;
 use App\Models\Company;
 use App\Models\Exercise;
+use App\Models\TenantCompany;
 use App\Models\User;
 use App\Support\BudgetContext;
 use App\Support\ExerciseContext;
@@ -29,7 +30,8 @@ class ExerciseContextSelector extends Component
 
     public function mount(): void
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         if (! $company instanceof Company) {
             return;
@@ -51,7 +53,8 @@ class ExerciseContextSelector extends Component
 
     public function selectExercise(int $exerciseId): void
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         abort_unless($company instanceof Company, 404);
 
         app(ExerciseContext::class)->select($company, $exerciseId);
@@ -61,7 +64,8 @@ class ExerciseContextSelector extends Component
 
     public function selectBudget(int $budgetId): void
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         abort_unless($company instanceof Company, 404);
         $exercise = app(ExerciseContext::class)->current($company);
         abort_unless($exercise instanceof Exercise, 404);
@@ -73,7 +77,8 @@ class ExerciseContextSelector extends Component
 
     public function clearBudget(): void
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         abort_unless($company instanceof Company, 404);
         $exercise = app(ExerciseContext::class)->current($company);
         abort_unless($exercise instanceof Exercise, 404);
@@ -91,10 +96,10 @@ class ExerciseContextSelector extends Component
     public function selectCompany(int $companyId): void
     {
         $user = auth()->user();
-        $company = Company::query()->find($companyId);
-        abort_unless($user instanceof User && $company instanceof Company && $user->canAccessTenant($company), 403);
+        $tenant = TenantCompany::query()->with('company')->find($companyId);
+        abort_unless($user instanceof User && $tenant instanceof TenantCompany && $user->canAccessTenant($tenant), 403);
 
-        $url = Filament::getCurrentPanel()->getUrl($company);
+        $url = Filament::getCurrentPanel()->getUrl($tenant);
         abort_unless(is_string($url), 404);
 
         $this->redirect($url, navigate: true);
@@ -102,7 +107,8 @@ class ExerciseContextSelector extends Component
 
     public function render(): View
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         $user = auth()->user();
         $panel = Filament::getCurrentPanel();
         $currentCompany = $company instanceof Company ? $company : null;
@@ -122,22 +128,22 @@ class ExerciseContextSelector extends Component
                 : collect(),
             'exerciseManagementUrl' => $currentUser && $currentCompany
                 && ExerciseResource::canAccess()
-                    ? ExerciseResource::getUrl('index', tenant: $currentCompany)
+                    ? ExerciseResource::getUrl('index', tenant: $tenant)
                     : null,
             'exerciseCreationUrl' => $currentUser && $currentCompany
                 && ExerciseResource::canCreate()
-                    ? ExerciseResource::getUrl('create', tenant: $currentCompany)
+                    ? ExerciseResource::getUrl('create', tenant: $tenant)
                     : null,
             'companySettingsUrl' => $currentUser && $currentCompany
                 && Gate::forUser($currentUser)->allows('manageSettings', $currentCompany)
-                    ? CompanySettings::getUrl(['tenant' => $currentCompany])
+                    ? CompanySettings::getUrl(['tenant' => $tenant])
                     : null,
             'companyAccessUrl' => $currentUser && $currentCompany
                 && Gate::forUser($currentUser)->allows('managePermissions', $currentCompany)
-                    ? CompanyAccess::getUrl(['tenant' => $currentCompany])
+                    ? CompanyAccess::getUrl(['tenant' => $tenant])
                     : null,
             'companyRegistrationUrl' => $currentUser
-                && Gate::forUser($currentUser)->allows('create', Company::class)
+                && Gate::forUser($currentUser)->allows('create', TenantCompany::class)
                     ? $panel->getTenantRegistrationUrl()
                     : null,
         ]);

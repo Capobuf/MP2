@@ -122,7 +122,7 @@ beforeEach(function (): void {
 it('uses the selected Budget and counts every primary source exactly once', function (): void {
     $fixture = economicDashboardFixture();
     $this->actingAs($fixture['viewer']);
-    Filament::setTenant($fixture['company']);
+    Filament::setTenant(($fixture['company'])->tenantCompany);
     app(ExerciseContext::class)->select($fixture['company'], $fixture['exercise']->id);
     app(BudgetContext::class)->select($fixture['company'], $fixture['exercise'], $fixture['budget1']->id);
 
@@ -160,7 +160,7 @@ it('uses the selected Budget and counts every primary source exactly once', func
 it('changes the exact comparison version without a silent Budget fallback', function (): void {
     $fixture = economicDashboardFixture();
     $this->actingAs($fixture['viewer']);
-    Filament::setTenant($fixture['company']);
+    Filament::setTenant(($fixture['company'])->tenantCompany);
     $context = app(BudgetContext::class);
 
     expect($context->current($fixture['company'], $fixture['exercise']))->toBeNull();
@@ -210,7 +210,7 @@ it('uses ComparisonEngine primary categories and counts the union once', functio
         ]);
     }
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $dashboard = app(EconomicDashboardReadModel::class)->load($viewer, $company, $exercise, $budget);
 
@@ -243,7 +243,7 @@ it('provides correct scatter coordinates and positive negative and zero operatio
         ]);
     }
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
     app(BudgetContext::class)->select($company, $exercise, $budget->id);
 
@@ -283,7 +283,7 @@ it('renders every chart and handles no Exercise no Budget and no sources', funct
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
     $viewer = s11ReportingViewer($company);
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(EconomicSummary::class)
         ->assertSuccessful()
@@ -342,7 +342,7 @@ it('preserves every Cost Center when the Radar degrades for high cardinality', f
         ]);
     }
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
     app(BudgetContext::class)->select($company, $exercise, $budget->id);
 
@@ -378,13 +378,13 @@ it('keeps the Dashboard report query count stable as primary containers grow', f
     DB::enableQueryLog();
     DB::flushQueryLog();
     $this->actingAs($small['viewer']);
-    Filament::setTenant($small['company']);
+    Filament::setTenant(($small['company'])->tenantCompany);
     app(EconomicDashboardReadModel::class)->load($small['viewer'], $small['company'], $small['exercise'], null);
     $smallCount = count(DB::getQueryLog());
 
     DB::flushQueryLog();
     $this->actingAs($large['viewer']);
-    Filament::setTenant($large['company']);
+    Filament::setTenant(($large['company'])->tenantCompany);
     app(EconomicDashboardReadModel::class)->load($large['viewer'], $large['company'], $large['exercise'], null);
     $largeCount = count(DB::getQueryLog());
     DB::disableQueryLog();

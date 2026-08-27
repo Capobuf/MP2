@@ -13,6 +13,7 @@ use App\Filament\Resources\Exercises\Schemas\ExerciseInfolist;
 use App\Filament\Resources\Exercises\Tables\ExercisesTable;
 use App\Models\Company;
 use App\Models\Exercise;
+use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
 use Filament\Facades\Filament;
@@ -62,7 +63,8 @@ class ExerciseResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
             && $user->hasCapability($company, Capability::View);
@@ -72,7 +74,8 @@ class ExerciseResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $company instanceof Company
             ? $query->whereBelongsTo($company, 'company')->with([
@@ -95,7 +98,8 @@ class ExerciseResource extends Resource
     public static function canCreate(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
             && $user->hasCapability($company, Capability::ManageOperations);

@@ -123,32 +123,40 @@ final class UploadAttachment
     private function lockOwner(Contract|Expense|ExpenseLine|HistoricalErrorAnnotation|Proposal $owner): array
     {
         if ($owner instanceof Proposal) {
+            $company = Company::query()->lockForUpdate()->findOrFail($owner->company_id);
             $locked = Proposal::query()->lockForUpdate()->findOrFail($owner->id);
 
-            return [$locked, Company::query()->lockForUpdate()->findOrFail($locked->company_id), null];
+            return [$locked, $company, null];
         }
         if ($owner instanceof HistoricalErrorAnnotation) {
+            $company = Company::query()->lockForUpdate()->findOrFail($owner->company_id);
             $locked = HistoricalErrorAnnotation::query()->lockForUpdate()->findOrFail($owner->id);
 
-            return [$locked, Company::query()->lockForUpdate()->findOrFail($locked->company_id), null];
+            return [$locked, $company, null];
         }
         if ($owner instanceof Contract) {
+            $company = Company::query()->lockForUpdate()->findOrFail($owner->company_id);
             $locked = Contract::query()->lockForUpdate()->findOrFail($owner->id);
 
-            return [$locked, Company::query()->lockForUpdate()->findOrFail($locked->company_id), $locked];
+            return [$locked, $company, $locked];
         }
         if ($owner instanceof Expense) {
-            $locked = Expense::query()->lockForUpdate()->findOrFail($owner->id);
-            $contract = $locked->contract_id === null ? null : Contract::query()->lockForUpdate()->findOrFail($locked->contract_id);
+            $unlocked = Expense::query()->findOrFail($owner->id);
+            $company = Company::query()->lockForUpdate()->findOrFail($unlocked->company_id);
+            $contract = $unlocked->contract_id === null ? null : Contract::query()->lockForUpdate()->findOrFail($unlocked->contract_id);
+            $locked = Expense::query()->lockForUpdate()->findOrFail($unlocked->id);
 
-            return [$locked, Company::query()->lockForUpdate()->findOrFail($locked->company_id), $contract];
+            return [$locked, $company, $contract];
         }
 
-        $locked = ExpenseLine::query()->lockForUpdate()->findOrFail($owner->id);
-        $expense = Expense::query()->lockForUpdate()->findOrFail($locked->expense_id);
-        $contract = $expense->contract_id === null ? null : Contract::query()->lockForUpdate()->findOrFail($expense->contract_id);
+        $unlockedLine = ExpenseLine::query()->findOrFail($owner->id);
+        $unlockedExpense = Expense::query()->findOrFail($unlockedLine->expense_id);
+        $company = Company::query()->lockForUpdate()->findOrFail($unlockedExpense->company_id);
+        $contract = $unlockedExpense->contract_id === null ? null : Contract::query()->lockForUpdate()->findOrFail($unlockedExpense->contract_id);
+        $expense = Expense::query()->lockForUpdate()->findOrFail($unlockedExpense->id);
+        $locked = ExpenseLine::query()->lockForUpdate()->findOrFail($unlockedLine->id);
 
-        return [$locked, Company::query()->lockForUpdate()->findOrFail($expense->company_id), $contract];
+        return [$locked, $company, $contract];
     }
 
     /** @return array{proposal_id: int|null, contract_id: int|null, expense_id: int|null, expense_line_id: int|null, historical_error_annotation_id: int|null} */

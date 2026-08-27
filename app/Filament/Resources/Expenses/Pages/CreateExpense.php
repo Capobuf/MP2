@@ -9,6 +9,7 @@ use App\Filament\Support\ProjectOverspendNotifier;
 use App\Models\Company;
 use App\Models\Exercise;
 use App\Models\Expense;
+use App\Models\TenantCompany;
 use App\Models\User;
 use App\Support\ExerciseContext;
 use Filament\Actions\Action;
@@ -49,7 +50,8 @@ class CreateExpense extends CreateRecord
     protected function handleRecordCreation(array $data): Model
     {
         $actor = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         abort_unless($actor instanceof User && $company instanceof Company, 403);
 
         $attachments = $data['attachments'] ?? [];
@@ -138,7 +140,8 @@ class CreateExpense extends CreateRecord
 
     private function currentExercise(): ?Exercise
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $company instanceof Company
             ? app(ExerciseContext::class)->current($company)

@@ -29,7 +29,7 @@ it('shows next-version approval and required revision reason', function (): void
     $revision = app(InitializeProposal::class)->execute($actor, $company, $exercise, (string) Str::uuid());
     CompanyCapability::query()->firstOrCreate(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::View]);
     $this->actingAs($actor);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewProposal::class, ['record' => $revision->id])
         ->assertActionExists('approveBudget')

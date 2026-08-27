@@ -67,7 +67,7 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $supplier = Supplier::factory()->for($company)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     Storage::fake('local');
 
     $firstAttachment = UploadedFile::fake()->createWithContent('contratto.pdf', 'primo allegato');
@@ -175,7 +175,7 @@ it('applies one default Cost Center while preserving annual exceptions', functio
     $defaultCostCenter = CostCenter::factory()->for($company)->create(['name' => 'IT']);
     $exceptionCostCenter = CostCenter::factory()->for($company)->create(['name' => 'Operations']);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(CreateContract::class)
         ->assertSee('Predefinito per tutti gli Esercizi Aperti')
@@ -216,7 +216,7 @@ it('suggests the contractual start from the earliest economic condition', functi
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
     grantContractResource($manager, $company);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(CreateContract::class);
     $conditionKey = array_key_first((array) $component->get('data.conditions'));
@@ -247,7 +247,7 @@ it('suggests editable contractual terms from the latest bounded economic conditi
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
     grantContractResource($manager, $company);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(CreateContract::class);
 
@@ -287,7 +287,7 @@ it('creates and selects a Supplier inline with a dedicated operation', function 
         'capability' => Capability::ManageMasterData,
     ]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(CreateContract::class)
         ->assertFormComponentActionVisible('supplier_id', 'createOption')
@@ -319,7 +319,7 @@ it('lists and views tenant Contracts with undefined expiry and annual situations
     ContractLifecycleFact::factory()->forContract($contractA)->create();
     $contractB = Contract::factory()->for($companyB)->create(['title' => 'Segreto']);
     $this->actingAs($viewer);
-    Filament::setTenant($companyA);
+    Filament::setTenant(($companyA)->tenantCompany);
 
     Livewire::test(ListContracts::class)
         ->assertCanSeeTableRecords([$contractA])
@@ -409,7 +409,7 @@ it('renders the canonical current agreement and selected Exercise economics', fu
     ExpenseLine::factory()->actual()->for($expense)->create(['amount' => '250.00']);
 
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $selectedExercise->id);
 
     Livewire::test(ViewContract::class, ['record' => $contract->getRouteKey()])
@@ -451,7 +451,7 @@ it('previews a long annual allocation composition and exposes every cycle on dem
     ]);
 
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
 
     $component = Livewire::test(ViewContract::class, ['record' => $contract->getRouteKey()])
@@ -495,7 +495,7 @@ it('shows the complete allocation list without a fade when no cycles are hidden'
     ]);
 
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
 
     Livewire::test(ViewContract::class, ['record' => $contract->getRouteKey()])
@@ -519,7 +519,7 @@ it('keeps lifecycle state separate from archive status on the object page', func
         'state_change_date' => '2026-01-01',
     ]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewContract::class, ['record' => $contract->getRouteKey()])
         ->assertSuccessful()
@@ -537,7 +537,7 @@ it('allows descriptive and eligible Supplier edit while keeping contractual date
     $contract = Contract::factory()->for($company)->create(['title' => 'Prima']);
     $replacement = Supplier::factory()->for($company)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(EditContract::class, ['record' => $contract->getRouteKey()])
         ->assertFormFieldExists('title')

@@ -27,7 +27,7 @@ it('exposes the complete Line edit form separately from impact-confirmed classif
     $expense = Expense::factory()->forExercise($exercise)->create();
     ExpenseLine::factory()->for($expense)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewExpense::class, ['record' => $expense->getRouteKey()])
         ->assertSuccessful()
@@ -64,7 +64,7 @@ it('hides every expense mutation from a read-only viewer', function () {
     $expense = Expense::factory()->forExercise($exercise)->create();
     ExpenseLine::factory()->for($expense)->create();
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewExpense::class, ['record' => $expense->getRouteKey()])
         ->assertSuccessful()

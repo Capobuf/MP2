@@ -8,6 +8,7 @@ use App\Domain\Contracts\ContractStateTimeline;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Models\AuditEvent;
+use App\Models\Company;
 use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -23,6 +24,7 @@ class RecalculateContractEstimates
     public function execute(User $actor, Contract $contract, iterable $exercises, string $operationId): Contract
     {
         return DB::transaction(function () use ($actor, $contract, $exercises, $operationId): Contract {
+            Company::query()->lockForUpdate()->findOrFail($contract->company_id);
             $locked = Contract::query()->lockForUpdate()->findOrFail($contract->id);
             Gate::forUser($actor)->authorize('update', $locked);
 

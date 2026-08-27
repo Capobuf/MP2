@@ -4,6 +4,8 @@ namespace App\Actions\MasterData;
 
 use App\Domain\Company\AuditEventType;
 use App\Models\AuditEvent;
+use App\Models\Company;
+use App\Models\Supplier;
 use App\Models\SupplierContact;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +32,10 @@ class UpdateSupplierContact
         ])->validate();
 
         return DB::transaction(function () use ($actor, $contact, $validated): SupplierContact {
+            $unlockedContact = SupplierContact::query()->findOrFail($contact->id);
+            $unlockedSupplier = Supplier::query()->findOrFail($unlockedContact->supplier_id);
+            Company::query()->lockForUpdate()->findOrFail($unlockedSupplier->company_id);
+            Supplier::query()->lockForUpdate()->findOrFail($unlockedSupplier->id);
             $lockedContact = SupplierContact::query()
                 ->with('supplier.company')
                 ->lockForUpdate()

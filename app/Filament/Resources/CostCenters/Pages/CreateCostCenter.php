@@ -6,6 +6,7 @@ use App\Actions\MasterData\CreateCostCenter as CreateCostCenterAction;
 use App\Filament\Resources\CostCenters\CostCenterResource;
 use App\Models\Company;
 use App\Models\CostCenter;
+use App\Models\TenantCompany;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\CreateRecord;
@@ -28,7 +29,8 @@ class CreateCostCenter extends CreateRecord
     protected function handleRecordCreation(array $data): Model
     {
         $actor = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         abort_unless($actor instanceof User && $company instanceof Company, 403);
 
         return app(CreateCostCenterAction::class)->execute($actor, $company, $data, $this->operationId);

@@ -18,6 +18,6 @@ it('offers only the canonical project contract link', function (): void {
         CompanyCapability::query()->create(['company_id' => $proposal->company_id, 'user_id' => $user->id, 'capability' => $capability]);
     }
     $this->actingAs($user);
-    Filament::setTenant($proposal->company);
+    Filament::setTenant(($proposal->company)->tenantCompany);
     Livewire::test(ViewProposal::class, ['record' => $proposal->id])->assertActionExists('linkProjectContract')->assertActionDoesNotExist('replaceRelation')->assertDontSee('Sostituisce');
 });

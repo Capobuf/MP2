@@ -94,9 +94,9 @@ final class ReviewExerciseClosing
             ->where('company_id', $company->id)
             ->where('year', $exercise->year + 1)
             ->first();
-        $managementContinues = $this->nullableBool($input['management_continues'] ?? null);
-        if ($nextExercise === null && $managementContinues === null) {
-            $blocks[] = $this->issue('next_exercise_decision_required', 'Indicare se la gestione continua nell’anno successivo.', 'exercise', $exercise->id);
+        $createNextExercise = $this->nullableBool($input['create_next_exercise'] ?? null);
+        if ($nextExercise === null && $createNextExercise === null) {
+            $blocks[] = $this->issue('next_exercise_decision_required', 'Indicare se creare l’Esercizio N+1.', 'exercise', $exercise->id);
         }
 
         $openExercises = Exercise::query()
@@ -130,7 +130,7 @@ final class ReviewExerciseClosing
                 $yearEnd,
                 $submittedDecisions[$project->id] ?? null,
                 $nextExercise,
-                $managementContinues,
+                $createNextExercise,
                 $blocks,
             );
             $projectRows[] = $row;
@@ -210,8 +210,8 @@ final class ReviewExerciseClosing
 
         $this->addProjectWarnings($projects, $projectRows, $budgetOriginKeys, $company, $exercise, $nextExercise, $blocks, $warnings);
 
-        if ($nextExercise === null && $managementContinues === false && Decimal::compare($plannedNextExerciseDelta, '0.00') !== 0) {
-            $blocks[] = $this->issue('management_termination_has_transfer', 'La gestione terminata richiede Riporti e trasferimenti pari a zero.', 'exercise', $exercise->id);
+        if ($nextExercise === null && $createNextExercise === false && Decimal::compare($plannedNextExerciseDelta, '0.00') !== 0) {
+            $blocks[] = $this->issue('next_exercise_not_requested_has_transfer', 'La non creazione di N+1 richiede Riporti e trasferimenti pari a zero.', 'exercise', $exercise->id);
         }
 
         $currentAllocation = $exercise->allocation();
@@ -236,7 +236,7 @@ final class ReviewExerciseClosing
                 'state_changed' => isset($stateChangedExerciseIds[$openExercise->id]),
             ];
         }
-        if ($nextExercise === null && $managementContinues === true) {
+        if ($nextExercise === null && $createNextExercise === true) {
             $affectedExercises[] = [
                 'exercise_id' => null,
                 'year' => $exercise->year + 1,
@@ -271,10 +271,10 @@ final class ReviewExerciseClosing
                 'year' => $exercise->year + 1,
                 'exists' => $nextExercise !== null,
                 'status' => $nextExercise?->status()->value,
-                'management_continues' => $managementContinues,
+                'create_next_exercise' => $createNextExercise,
                 'disposition' => $nextExercise !== null
                     ? 'already_existed'
-                    : ($managementContinues === false ? 'not_created_management_terminated' : 'created'),
+                    : ($createNextExercise === false ? 'not_created' : 'created'),
                 'project_transfer_delta' => $nextExercise === null ? $plannedNextExerciseDelta : ($exerciseDeltas[(string) $nextExercise->id] ?? '0.00'),
             ],
             appliedSettings: [
@@ -291,7 +291,7 @@ final class ReviewExerciseClosing
                 $budgets,
                 $nextExercise,
                 $submittedDecisions,
-                $managementContinues,
+                $createNextExercise,
                 $contractProjections,
             ),
         );
@@ -309,7 +309,7 @@ final class ReviewExerciseClosing
         CarbonImmutable $yearEnd,
         ?array $decision,
         ?Exercise $nextExercise,
-        ?bool $managementContinues,
+        ?bool $createNextExercise,
         array &$blocks,
     ): array {
         $currentState = $project->stateAtDate($yearEnd->toDateString());
@@ -454,8 +454,8 @@ final class ReviewExerciseClosing
         };
         $destinationDelta = Decimal::subtract($finalTransferAmount, $currentTransferAmount);
 
-        if ($nextExercise === null && $managementContinues === false && Decimal::compare($finalTransferAmount, '0.00') !== 0) {
-            $blocks[] = $this->issue('project_transfer_requires_next_exercise', 'Un rinvio non è compatibile con Gestione terminata.', 'project', $project->id);
+        if ($nextExercise === null && $createNextExercise === false && Decimal::compare($finalTransferAmount, '0.00') !== 0) {
+            $blocks[] = $this->issue('project_transfer_requires_next_exercise', 'Un rinvio richiede la creazione di N+1.', 'project', $project->id);
         }
 
         $finalAllocation = Decimal::add($allocationBefore, $sourceDelta);
@@ -883,7 +883,7 @@ final class ReviewExerciseClosing
      * @param  array<int, array<string, mixed>>  $contractProjections
      * @return array<string, mixed>
      */
-    private function sourceState(Exercise $exercise, Collection $projects, Collection $contracts, Collection $expenses, Collection $drafts, Collection $budgets, ?Exercise $nextExercise, array $submittedDecisions, ?bool $managementContinues, array $contractProjections): array
+    private function sourceState(Exercise $exercise, Collection $projects, Collection $contracts, Collection $expenses, Collection $drafts, Collection $budgets, ?Exercise $nextExercise, array $submittedDecisions, ?bool $createNextExercise, array $contractProjections): array
     {
         return [
             'exercise_revision' => $exercise->revision,
@@ -923,7 +923,7 @@ final class ReviewExerciseClosing
             'draft_proposals' => $drafts->map(fn (Proposal $proposal): array => ['id' => $proposal->id, 'revision' => $proposal->revision])->all(),
             'budgets' => $budgets->map(fn (BudgetSnapshot $budget): array => ['id' => $budget->id, 'version' => $budget->version])->all(),
             'submitted_project_decisions' => $submittedDecisions,
-            'management_continues' => $managementContinues,
+            'create_next_exercise' => $createNextExercise,
         ];
     }
 }

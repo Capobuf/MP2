@@ -48,6 +48,9 @@ final class ApplyContractPlan
             ContractCondition::query()->create(['company_id' => $item->company_id, 'contract_id' => $contract->id, 'cycle' => $change['cycle'], 'attribution_mode' => $change['attribution_mode'], 'amount' => $change['amount'], 'valid_from' => $change['effective_date'], 'valid_to' => $originalValidTo, 'reason' => $change['reason'] ?? null, 'created_by_id' => $actor->id]);
         }
         foreach ($result['renewal_configurations'] ?? [] as $renewal) {
+            if (array_key_exists('id', $renewal)) {
+                continue;
+            }
             ContractRenewalConfiguration::query()->create(['company_id' => $item->company_id, 'contract_id' => $contract->id, 'effective_from' => $renewal['effective_from'], 'expiry_anchor_date' => $renewal['expiry_anchor_date'] ?? null, 'automatic_renewal' => $renewal['automatic_renewal'], 'renewal_duration_months' => $renewal['renewal_duration_months'] ?? null, 'notice_days' => $renewal['notice_days'] ?? null, 'created_by_id' => $actor->id]);
             $contract->update(['automatic_renewal' => $renewal['automatic_renewal'], 'next_expiry_date' => $renewal['expiry_anchor_date'] ?? null, 'renewal_anchor_date' => $renewal['expiry_anchor_date'] ?? null, 'renewal_duration_months' => $renewal['renewal_duration_months'] ?? null, 'notice_days' => $renewal['notice_days'] ?? null]);
         }

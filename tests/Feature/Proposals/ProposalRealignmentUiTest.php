@@ -29,7 +29,7 @@ it('shows exactly the three realignment controls and action history for a stale 
     $proposal = app(ReviewProposalReadiness::class)->execute($actor, $proposal->refresh(), (string) Str::uuid());
     CompanyCapability::query()->firstOrCreate(['company_id' => $proposal->company_id, 'user_id' => $actor->id, 'capability' => Capability::View]);
     $this->actingAs($actor);
-    Filament::setTenant($proposal->company);
+    Filament::setTenant(($proposal->company)->tenantCompany);
 
     Livewire::test(ViewProposal::class, ['record' => $proposal->getRouteKey()])
         ->assertActionExists('reloadReality')

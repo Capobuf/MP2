@@ -11,6 +11,7 @@ use App\Models\Contract;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Supplier;
+use App\Models\TenantCompany;
 use App\Support\ExerciseContext;
 use Carbon\CarbonImmutable;
 use Filament\Actions\EditAction;
@@ -67,19 +68,28 @@ class ContractsTable
         ])->filters([
             SelectFilter::make('supplier')->label('Fornitore')
                 ->native(false)
-                ->options(fn (): array => Filament::getTenant() instanceof Company
-                    ? Supplier::query()->whereBelongsTo(Filament::getTenant(), 'company')->orderBy('legal_name')->pluck('legal_name', 'id')->all()
-                    : [])
+                ->options(function (): array {
+                    $tenant = Filament::getTenant();
+
+                    return $tenant instanceof TenantCompany
+                        ? Supplier::query()->whereBelongsTo($tenant->company, 'company')->orderBy('legal_name')->pluck('legal_name', 'id')->all()
+                        : [];
+                })
                 ->query(fn (Builder $query, array $data): Builder => blank($data['value'] ?? null)
                     ? $query
                     : $query->where('supplier_id', $data['value'])),
             SelectFilter::make('cost_center')->label('Centro di Costo')
                 ->native(false)
-                ->options(fn (): array => Filament::getTenant() instanceof Company
-                    ? CostCenter::query()->whereBelongsTo(Filament::getTenant(), 'company')->orderBy('name')->pluck('name', 'id')->all()
-                    : [])
+                ->options(function (): array {
+                    $tenant = Filament::getTenant();
+
+                    return $tenant instanceof TenantCompany
+                        ? CostCenter::query()->whereBelongsTo($tenant->company, 'company')->orderBy('name')->pluck('name', 'id')->all()
+                        : [];
+                })
                 ->query(function (Builder $query, array $data): Builder {
-                    $company = Filament::getTenant();
+                    $tenant = Filament::getTenant();
+                    $company = $tenant instanceof TenantCompany ? $tenant->company : null;
                     $costCenterId = $data['value'] ?? null;
                     $exercise = $company instanceof Company ? app(ExerciseContext::class)->current($company) : null;
 

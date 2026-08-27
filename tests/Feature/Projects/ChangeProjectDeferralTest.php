@@ -119,7 +119,7 @@ it('supports carryover to none idempotently and marks affected Drafts to realign
         ->and($event->reason)->toBe('Cambio operativo motivato');
 
     $this->actingAs($fixture['actor']);
-    Filament::setTenant($fixture['company']);
+    Filament::setTenant(($fixture['company'])->tenantCompany);
     Livewire::withQueryParams(['project' => $fixture['project']->id])
         ->test(CompanyAudit::class)
         ->assertSee('Rinvio progetto modificato')

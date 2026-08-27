@@ -9,6 +9,7 @@ use App\Filament\Resources\Proposals\Schemas\ProposalInfolist;
 use App\Filament\Resources\Proposals\Tables\ProposalsTable;
 use App\Models\Company;
 use App\Models\Proposal;
+use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
 use Filament\Facades\Filament;
@@ -49,7 +50,8 @@ class ProposalResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company && $user->hasCapability($company, Capability::View);
     }
@@ -77,7 +79,8 @@ class ProposalResource extends Resource
     /** @return Builder<Proposal> */
     public static function getEloquentQuery(): Builder
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $company instanceof Company ? parent::getEloquentQuery()->whereBelongsTo($company)->with(['exercise', 'creator', 'referenceBudget', 'items', 'actions', 'actionHistory.withdrawer']) : parent::getEloquentQuery()->whereRaw('1 = 0');
     }

@@ -137,7 +137,7 @@ it('requires a note when annulling an Estimate creates overspend and rolls back 
 it('notifies the operator when a Line creates Project overspend', function () {
     [$actor, $company, , , $expense] = overspendContext();
     $this->actingAs($actor);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(ExpenseLinesRelationManager::class, [
         'ownerRecord' => $expense,

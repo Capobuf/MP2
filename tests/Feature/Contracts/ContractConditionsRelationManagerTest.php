@@ -32,7 +32,7 @@ it('creates and annuls conditions explicitly without raw edit or delete', functi
     $contract = Contract::factory()->for($company)->for($supplier)->create(['next_expiry_date' => null, 'renewal_anchor_date' => null]);
     ContractLifecycleFact::factory()->forContract($contract)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(ContractConditionsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
         ->callTableAction('createCondition', data: [
@@ -59,7 +59,7 @@ it('hides condition mutations from viewers', function () {
         'valid_from' => '2026-01-01', 'created_by_id' => $viewer->id,
     ]);
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ContractConditionsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
         ->assertTableActionHidden('createCondition')
@@ -79,7 +79,7 @@ it('exposes separate confirmed previews for agreement changes and material corre
     ContractLifecycleFact::factory()->forContract($contract)->create();
     $condition = ContractCondition::factory()->forContract($contract)->create(['valid_from' => '2026-01-01']);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ContractConditionsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
         ->assertTableActionExists('changeAgreement', record: $condition)

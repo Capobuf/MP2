@@ -40,7 +40,7 @@ it('shows only contacts of the tenant supplier to read-only viewers', function (
     $contact = SupplierContact::factory()->for($supplier)->create();
     $otherContact = SupplierContact::factory()->create();
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ContactsRelationManager::class, [
         'ownerRecord' => $supplier,
@@ -59,7 +59,7 @@ it('creates and edits contacts for managers without lifecycle controls', functio
     grantContactResourceCapabilities($manager, $company);
     $supplier = Supplier::factory()->for($company)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(ContactsRelationManager::class, [
         'ownerRecord' => $supplier,

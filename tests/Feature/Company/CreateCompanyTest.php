@@ -4,9 +4,11 @@ use App\Actions\CreateCompany;
 use App\Domain\Company\AuditEventType;
 use App\Domain\Company\Capability;
 use App\Domain\Company\ClosingUnclassifiedPolicy;
+use App\Domain\Company\TenantCompanyStatus;
 use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\CompanyCapability;
+use App\Models\TenantCompany;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -26,6 +28,9 @@ it('creates a company with canonical defaults capabilities and audit atomically'
         ->and($company->timezone)->toBe('Europe/Rome')
         ->and($company->overspend_note_required)->toBeFalse()
         ->and($company->unclassified_closing_policy)->toBe(ClosingUnclassifiedPolicy::Warning)
+        ->and($company->tenantCompany)->not->toBeNull()
+        ->and($company->tenantCompany->company_id)->toBe($company->id)
+        ->and($company->tenantCompany->status)->toBe(TenantCompanyStatus::Active)
         ->and($company->capabilities()->count())->toBe(count(Capability::cases()))
         ->and($company->auditEvents()->count())->toBe(10);
 
@@ -81,6 +86,7 @@ it('rolls back the company initial assignments and audit on failure', function (
     ]))->toThrow(RuntimeException::class, 'Forced audit failure');
 
     expect(Company::query()->count())->toBe(0)
+        ->and(TenantCompany::query()->count())->toBe(0)
         ->and(CompanyCapability::query()->count())->toBe(0)
         ->and(AuditEvent::query()->count())->toBe(0);
 

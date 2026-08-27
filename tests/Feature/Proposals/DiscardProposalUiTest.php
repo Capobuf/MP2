@@ -23,7 +23,7 @@ it('discards from the proposal page and leaves terminal history readable', funct
     }
     $proposal = app(InitializeProposal::class)->execute($actor, $company, $exercise, (string) Str::uuid());
     $this->actingAs($actor);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewProposal::class, ['record' => $proposal->id])
         ->assertActionExists('discardProposal')

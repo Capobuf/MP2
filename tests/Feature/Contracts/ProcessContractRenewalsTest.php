@@ -1,6 +1,8 @@
 <?php
 
 use App\Actions\Operations\ProcessContractRenewals;
+use App\Actions\Tenancy\ArchiveTenantCompany;
+use App\Actions\Tenancy\RestoreTenantCompany;
 use App\Domain\Company\AuditEventType;
 use App\Domain\Company\Capability;
 use App\Models\AuditEvent;
@@ -93,4 +95,42 @@ it('runs from the command without opening a page and isolates a broken contract 
 
     expect($contract->refresh()->next_expiry_date->toDateString())->toBe('2026-12-31')
         ->and($broken->refresh()->next_expiry_date->toDateString())->toBe('2025-12-31');
+});
+
+it('skips archived Tenants and catches up from real dates after Restore', function (): void {
+    $platformAdmin = User::factory()->platformAdmin()->create();
+    $archivedFixture = renewalFixture();
+    $activeFixture = renewalFixture();
+    $archivedContract = $archivedFixture['contract'];
+    $activeContract = $activeFixture['contract'];
+
+    app(ArchiveTenantCompany::class)->execute(
+        $platformAdmin,
+        $archivedFixture['company']->tenantCompany,
+    );
+
+    $this->artisan('contracts:process-renewals')->assertSuccessful();
+
+    expect($archivedContract->refresh()->next_expiry_date->toDateString())->toBe('2024-12-31')
+        ->and($archivedContract->lifecycleFacts()->where('type', 'renewal')->count())->toBe(0)
+        ->and(AuditEvent::query()
+            ->where('company_id', $archivedFixture['company']->id)
+            ->where('event_type', AuditEventType::ContractRenewed->value)
+            ->count())->toBe(0)
+        ->and($activeContract->refresh()->next_expiry_date->toDateString())->toBe('2026-12-31');
+
+    app(RestoreTenantCompany::class)->execute(
+        $platformAdmin,
+        $archivedFixture['company']->tenantCompany,
+    );
+
+    $this->artisan('contracts:process-renewals')->assertSuccessful();
+    $this->artisan('contracts:process-renewals')->assertSuccessful();
+
+    expect($archivedContract->refresh()->next_expiry_date->toDateString())->toBe('2026-12-31')
+        ->and($archivedContract->lifecycleFacts()->where('type', 'renewal')->count())->toBe(2)
+        ->and(AuditEvent::query()
+            ->where('company_id', $archivedFixture['company']->id)
+            ->where('event_type', AuditEventType::ContractRenewed->value)
+            ->count())->toBe(2);
 });

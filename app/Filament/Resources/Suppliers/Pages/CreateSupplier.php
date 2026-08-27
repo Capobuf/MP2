@@ -6,6 +6,7 @@ use App\Actions\MasterData\CreateSupplier as CreateSupplierAction;
 use App\Filament\Resources\Suppliers\SupplierResource;
 use App\Models\Company;
 use App\Models\Supplier;
+use App\Models\TenantCompany;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\CreateRecord;
@@ -28,7 +29,8 @@ class CreateSupplier extends CreateRecord
     protected function handleRecordCreation(array $data): Model
     {
         $actor = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         abort_unless($actor instanceof User && $company instanceof Company, 403);
 
         return app(CreateSupplierAction::class)->execute($actor, $company, $data, $this->operationId);

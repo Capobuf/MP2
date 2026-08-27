@@ -40,7 +40,7 @@ it('lists and views only suppliers from the current tenant', function () {
     $supplierA = Supplier::factory()->for($companyA)->create();
     $supplierB = Supplier::factory()->for($companyB)->create();
     $this->actingAs($viewer);
-    Filament::setTenant($companyA);
+    Filament::setTenant(($companyA)->tenantCompany);
 
     Livewire::test(ListSuppliers::class)
         ->assertCanSeeTableRecords([$supplierA])
@@ -58,7 +58,7 @@ it('creates suppliers from the tenant resource only for a master data manager', 
     $company = Company::factory()->create();
     grantSupplierResourceCapabilities($manager, $company);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(CreateSupplier::class)
         ->fillForm([
@@ -74,7 +74,7 @@ it('creates suppliers from the tenant resource only for a master data manager', 
     $viewer = User::factory()->create();
     grantSupplierResourceCapabilities($viewer, $company, manage: false);
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $this->get(SupplierResource::getUrl('create', tenant: $company))->assertForbidden();
 });
@@ -84,7 +84,7 @@ it('creates a distinct supplier after save and create another', function () {
     $company = Company::factory()->create();
     grantSupplierResourceCapabilities($manager, $company);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(CreateSupplier::class)
         ->fillForm([
@@ -113,7 +113,7 @@ it('defaults to active suppliers and exposes archived and all filters without de
     $active = Supplier::factory()->for($company)->create();
     $archived = Supplier::factory()->for($company)->archived()->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(ListSuppliers::class)
         ->assertCanSeeTableRecords([$active])

@@ -4,6 +4,7 @@ namespace App\Actions\MasterData;
 
 use App\Domain\Company\AuditEventType;
 use App\Models\AuditEvent;
+use App\Models\Company;
 use App\Models\Supplier;
 use App\Models\SupplierContact;
 use App\Models\User;
@@ -31,6 +32,7 @@ class CreateSupplierContact
         ])->validate();
 
         return DB::transaction(function () use ($actor, $supplier, $validated): SupplierContact {
+            Company::query()->lockForUpdate()->findOrFail($supplier->company_id);
             $lockedSupplier = Supplier::query()->with('company')->lockForUpdate()->findOrFail($supplier->id);
             Gate::forUser($actor)->authorize('create', [SupplierContact::class, $lockedSupplier]);
 

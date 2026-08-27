@@ -28,6 +28,7 @@ use App\Models\ProjectTransition;
 use App\Models\Proposal;
 use App\Models\Supplier;
 use App\Models\SupplierContact;
+use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
 use Carbon\CarbonImmutable;
@@ -102,7 +103,8 @@ class CompanyAudit extends Page implements HasTable
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User
             && $company instanceof Company
@@ -485,7 +487,8 @@ class CompanyAudit extends Page implements HasTable
 
     private function company(): Company
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         abort_unless($company instanceof Company, 404);
 
         return $company;

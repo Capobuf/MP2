@@ -4,6 +4,7 @@ namespace App\Actions\Operations;
 
 use App\Domain\Company\AuditEventType;
 use App\Models\AuditEvent;
+use App\Models\Company;
 use App\Models\Contract;
 use App\Models\ProjectContractLink;
 use App\Models\User;
@@ -26,6 +27,7 @@ final class SetProjectContractLinkArchived
 
         return DB::transaction(function () use ($actor, $link, $archived, $operationId, $expectedRevision): ProjectContractLink {
             $unlocked = ProjectContractLink::query()->findOrFail($link->id);
+            Company::query()->lockForUpdate()->findOrFail($unlocked->company_id);
             $contract = Contract::query()->lockForUpdate()->findOrFail($unlocked->contract_id);
             $locked = ProjectContractLink::query()->lockForUpdate()->findOrFail($link->id);
             Gate::forUser($actor)->authorize('update', $locked);

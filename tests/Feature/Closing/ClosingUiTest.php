@@ -40,7 +40,7 @@ it('shows the Closing action only to an authorized user and renders the transien
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $closer = s9UiUser($company, [Capability::View, Capability::CloseExercise]);
     $this->actingAs($closer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewExercise::class, ['record' => $exercise->id])
         ->assertSuccessful()
@@ -50,7 +50,9 @@ it('shows the Closing action only to an authorized user and renders the transien
         ->assertSuccessful()
         ->assertSee('Chiusura Esercizio 2025')
         ->assertSee('L’Esercizio non potrà essere riaperto')
-        ->set('closing.management_continues', false)
+        ->assertSee('Crea N+1')
+        ->assertSee('Non creare N+1')
+        ->set('closing.create_next_exercise', false)
         ->call('reviewClosing')
         ->assertSee('Valori che verranno congelati')
         ->assertSee('Allocato')
@@ -63,7 +65,7 @@ it('hides Closing mutation from a user who only manages ordinary operations', fu
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $operator = s9UiUser($company, [Capability::View, Capability::ManageOperations]);
     $this->actingAs($operator);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewExercise::class, ['record' => $exercise->id])
         ->assertActionHidden('closeExercise');
@@ -93,13 +95,13 @@ it('shows the immutable Closing Snapshot entry point on a Closed Exercise', func
             'overspend_note_required' => false,
             'unclassified_closing_policy' => $company->closingUnclassifiedPolicy()->value,
         ],
-        'next_exercise_disposition' => 'not_created_management_terminated',
+        'next_exercise_disposition' => 'not_created',
         'next_exercise_id' => null,
         'operation_id' => (string) Str::uuid(),
     ]);
     $exercise->update(['status' => 'closed']);
     $this->actingAs($closer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewExercise::class, ['record' => $exercise->id])
         ->assertSuccessful()
@@ -125,10 +127,10 @@ it('keeps the reviewed fingerprint while acknowledging warnings and confirms Clo
     $expense = Expense::factory()->forExercise($exercise)->create(['direct_cost_center_id' => $costCenter->id]);
     ExpenseLine::factory()->for($expense)->create(['amount' => '10.00']);
     $this->actingAs($closer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(CloseExercisePage::class, ['record' => $exercise->id])
-        ->set('closing.management_continues', false)
+        ->set('closing.create_next_exercise', false)
         ->call('reviewClosing');
     $fingerprint = $component->get('reviewFingerprint');
 
@@ -155,10 +157,10 @@ it('confirms a newly reviewed Closing-time Reprogramming without changing its fi
     $estimate = ExpenseLine::factory()->for($expense)->create(['amount' => '100.00']);
     ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '20.00']);
     $this->actingAs($closer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(CloseExercisePage::class, ['record' => $exercise->id])
-        ->set('closing.management_continues', true)
+        ->set('closing.create_next_exercise', true)
         ->set("closing.projects.{$project->id}.mode", 'reprogramming')
         ->set("closing.projects.{$project->id}.reason", 'Riprogrammazione finale')
         ->set("closing.projects.{$project->id}.reductions.{$estimate->id}.selected", true)

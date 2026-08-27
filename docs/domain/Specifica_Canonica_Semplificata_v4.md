@@ -6213,3 +6213,805 @@ La formulazione corretta è:
 > Non risultano casi appartenenti al perimetro dichiarato privi di comportamento deterministico o lasciati alla scelta dell'implementatore. I casi ulteriori devono essere classificati secondo il §3 prima di modificare il dominio.
 
 La specifica non afferma che nessun nuovo requisito o processo esterno potrà emergere.
+
+
+# 31. Tenant Azienda e separazione dal dominio Azienda
+
+## 31.0 Natura normativa e prevalenza
+
+Questa sezione è **normativa**.
+
+Ai fini della gerarchia del §0.1, la presente §31 deve essere considerata parte delle sezioni normative.
+
+In caso di contrasto con formulazioni precedenti, la presente sezione prevale esclusivamente per quanto riguarda:
+
+* distinzione fra `Tenant Azienda` e `Azienda`;
+* accesso e isolamento del Tenant;
+* Archivio e ripristino del Tenant;
+* eliminazione definitiva del Tenant;
+* ruolo del Super Admin;
+* sospensione dei processi durante l'Archivio;
+* rapporto fra ciclo di vita del Tenant e ciclo di vita degli Esercizi.
+
+Le restanti regole economiche e funzionali della specifica restano invariate.
+
+---
+
+## 31.1 Separazione dei concetti
+
+Il sistema **MUST** distinguere:
+
+### Tenant Azienda
+
+Il `Tenant Azienda` è il contenitore di piattaforma che governa:
+
+* isolamento dei dati;
+* disponibilità e accessibilità dell'ambiente;
+* associazioni di accesso degli utenti;
+* ciclo di vita del Tenant;
+* Archivio;
+* ripristino;
+* eliminazione definitiva.
+
+Il Tenant Azienda **non è una sorgente economica** e non possiede un ciclo di vita economico.
+
+### Azienda
+
+L'`Azienda` è la radice del dominio funzionale MP2.
+
+Contiene o governa almeno:
+
+* denominazione;
+* fuso orario IANA;
+* Impostazioni di dominio;
+* Esercizi;
+* Spese e Righe;
+* Progetti;
+* Contratti;
+* Fornitori e Referenti;
+* Centri di Costo;
+* Proposte;
+* Budget Approvati;
+* Snapshot di Chiusura;
+* Riporti e Riprogrammazioni;
+* classificazioni;
+* relazioni informative;
+* Timeline;
+* Annotazioni di errore storico;
+* allegati ed evidenze del dominio.
+
+Il ciclo di vita dell'Azienda **MUST NOT** essere usato per rappresentare disponibilità, sospensione, Archivio o eliminazione del Tenant.
+
+---
+
+## 31.2 Relazione fra Tenant Azienda e Azienda
+
+Ogni `Tenant Azienda` contiene una sola `Azienda`.
+
+Ogni `Azienda` appartiene a un solo `Tenant Azienda`.
+
+Deve valere:
+
+```text
+TenantAzienda 1 ── 1 Azienda
+```
+
+La separazione è concettuale e funzionale.
+
+La specifica **MUST NOT** imporre che Tenant Azienda e Azienda corrispondano a specifiche tabelle, database o strutture fisiche.
+
+L'implementazione tecnica resta libera secondo il §30.1.
+
+---
+
+## 31.3 Creazione
+
+Durante la creazione iniziale, prima che il Tenant Azienda e la relativa Azienda siano stati persistiti, l'utente può usare `Annulla`.
+
+`Annulla`:
+
+* interrompe la creazione;
+* non crea il Tenant Azienda;
+* non crea l'Azienda;
+* non crea dati di dominio da conservare;
+* non costituisce eliminazione.
+
+Una volta completata la creazione persistente, il Tenant Azienda entra nello stato:
+
+```text
+Attivo
+```
+
+Da quel momento non si applica più l'abbandono della creazione.
+
+---
+
+## 31.4 Stati del Tenant Azienda
+
+Il Tenant Azienda possiede esclusivamente gli stati:
+
+* `Attivo`;
+* `Archiviato`.
+
+Deve valere:
+
+```text
+StatoTenant ∈ {Attivo, Archiviato}
+```
+
+`Eliminato` **MUST NOT** essere uno stato.
+
+L'eliminazione definitiva comporta la cessazione dell'esistenza del Tenant Azienda.
+
+Non sono previsti stati:
+
+* Sospeso;
+* Terminato;
+* Disabilitato;
+* In chiusura;
+* Eliminato.
+
+---
+
+## 31.5 Tenant Azienda Attivo
+
+Quando il Tenant Azienda è `Attivo`:
+
+* l'Azienda può essere utilizzata dagli utenti autorizzati;
+* si applicano normalmente le capacità previste dal §26;
+* le operazioni manuali possono essere eseguite secondo le regole del dominio;
+* i processi automatici previsti dalla specifica possono essere eseguiti;
+* Esercizi, Contratti, Progetti e altri oggetti seguono autonomamente i propri cicli di vita.
+
+Lo stato `Attivo` del Tenant **MUST NOT** implicare uno specifico stato di Esercizi, Progetti o Contratti.
+
+---
+
+## 31.6 Archivio del Tenant Azienda
+
+Soltanto il `Super Admin` della piattaforma può Archiviare un Tenant Azienda.
+
+L'Archivio del Tenant Azienda:
+
+* porta il Tenant da `Attivo` ad `Archiviato`;
+* conserva integralmente l'Azienda e tutti i relativi dati;
+* non modifica alcun dato economico;
+* non modifica Esercizi;
+* non chiude Esercizi Aperti;
+* non modifica Budget o Snapshot;
+* non modifica Proposte;
+* non modifica Spese, Progetti o Contratti;
+* non cambia stati o transizioni;
+* non modifica classificazioni;
+* non modifica Riporti o Riprogrammazioni;
+* non archivia automaticamente gli oggetti interni;
+* non revoca le associazioni di accesso;
+* non sposta o modifica date economiche o contrattuali.
+
+L'Archivio del Tenant è quindi una proprietà di **disponibilità della piattaforma**, non una modifica della realtà economica.
+
+---
+
+## 31.7 Inaccessibilità del Tenant Archiviato
+
+Un Tenant Azienda `Archiviato` **MUST NOT** essere accessibile tramite l'operatività ordinaria.
+
+Durante l'Archivio:
+
+* gli utenti del Tenant non possono accedere all'Azienda;
+* le capacità assegnate per l'Azienda non conferiscono accesso;
+* non possono essere eseguite operazioni manuali;
+* non possono essere consultati dati, report, Timeline o Snapshot attraverso il normale accesso al Tenant;
+* non possono essere eseguiti comandi applicativi sul dominio;
+* API o percorsi diretti **MUST NOT** aggirare l'Archivio.
+
+Il Super Admin può identificare il Tenant nell'amministrazione della piattaforma esclusivamente per eseguire le operazioni di ciclo di vita previste dalla presente sezione.
+
+La possibilità di identificare un Tenant Archiviato nell'amministrazione della piattaforma **MUST NOT** essere interpretata come accesso operativo ai suoi dati di dominio.
+
+---
+
+## 31.8 Sospensione dei processi automatici
+
+Quando il Tenant Azienda è `Archiviato`, i processi automatici relativi al Tenant **MUST NOT** modificare il dominio.
+
+Durante l'Archivio:
+
+```text
+OperazioniManuali = sospese
+ProcessiAutomatici = sospesi
+DatiDominio = invariati
+```
+
+La sospensione riguarda l'elaborazione applicativa.
+
+L'Archivio **MUST NOT** essere interpretato come sospensione del tempo reale o economico.
+
+In particolare, l'Archivio:
+
+* non sposta scadenze;
+* non prolunga Contratti;
+* non cambia date di efficacia;
+* non modifica gli anni degli Esercizi;
+* non trasla condizioni economiche;
+* non crea un calendario alternativo del Tenant.
+
+---
+
+## 31.9 Ripristino del Tenant Azienda
+
+Soltanto il `Super Admin` della piattaforma può ripristinare un Tenant Azienda Archiviato.
+
+Il ripristino:
+
+```text
+Archiviato → Attivo
+```
+
+Il ripristino:
+
+* rende nuovamente accessibile il Tenant secondo le normali autorizzazioni;
+* non ricrea dati perché i dati non sono stati eliminati;
+* non modifica stati o valori economici;
+* non sposta date;
+* non riapre Esercizi Chiusi;
+* non modifica Budget o Snapshot;
+* non ricostruisce una realtà alternativa al periodo di Archivio.
+
+Le associazioni di accesso conservate tornano ad avere effetto secondo le normali regole di autorizzazione.
+
+### Ripresa dei processi automatici
+
+Dopo il ripristino, i processi automatici riprendono usando le **date reali** e le normali regole del dominio.
+
+Se durante l'Archivio sono trascorse date che avrebbero richiesto elaborazioni automatiche, il sistema le valuta al ripristino secondo le regole già previste per il relativo processo.
+
+L'Archivio **MUST NOT** causare lo spostamento in avanti degli eventi semplicemente perché il Tenant non era attivo.
+
+Esempio:
+
+```text
+Contratto:
+Prossima scadenza: 31/12/2026
+Rinnovo automatico: Sì
+
+Tenant Archiviato: 01/10/2026
+Tenant Ripristinato: 10/02/2027
+```
+
+Durante l'Archivio il rinnovo non viene materializzato.
+
+Dopo il ripristino, il sistema applica le normali regole del rinnovo automatico, incluse quelle relative a scadenze trascorse e idempotenza.
+
+---
+
+## 31.10 Eliminazione definitiva del Tenant Azienda
+
+Il Tenant Azienda può essere eliminato definitivamente.
+
+L'eliminazione è un'operazione di **amministrazione della piattaforma**, non una normale cancellazione di un oggetto del dominio Azienda.
+
+### Autorizzazione
+
+Soltanto il `Super Admin` della piattaforma può eliminare definitivamente un Tenant Azienda.
+
+Nessuna capacità assegnata per Azienda può autorizzare questa operazione.
+
+In particolare, non la consentono:
+
+* `gestisce_permessi`;
+* `gestisce_impostazioni`;
+* `chiude_esercizio`;
+* `gestisce_anagrafiche`;
+* qualsiasi combinazione delle capacità del §26.
+
+### Stato di partenza
+
+L'eliminazione può essere eseguita sia da:
+
+```text
+Attivo
+```
+
+sia da:
+
+```text
+Archiviato
+```
+
+Non è obbligatorio Archiviare prima il Tenant.
+
+### Nessuna precondizione economica
+
+L'eliminazione definitiva **MUST NOT** dipendere dalla presenza o assenza di:
+
+* Esercizi Aperti;
+* Esercizi Chiusi;
+* Proposte in Bozza;
+* Budget Approvati;
+* Snapshot di Chiusura;
+* Spese;
+* Effettivi;
+* Progetti;
+* Contratti;
+* Riporti;
+* Riprogrammazioni;
+* Fornitori;
+* Centri di Costo;
+* dati storici.
+
+L'eliminazione del Tenant prevale sul ciclo di vita dei dati contenuti.
+
+---
+
+## 31.11 Doppia conferma dell'eliminazione
+
+L'eliminazione definitiva richiede **due conferme intenzionali distinte**.
+
+### Prima conferma
+
+Deve comunicare almeno che:
+
+* verrà eliminato il Tenant Azienda;
+* verrà eliminata l'Azienda;
+* verranno eliminati tutti i dati appartenenti al Tenant.
+
+### Seconda conferma
+
+Deve comunicare almeno che:
+
+* l'operazione è definitiva;
+* i dati non saranno più disponibili nell'applicazione;
+* il Tenant non potrà essere ripristinato.
+
+Le due conferme **MUST** essere due azioni distinte.
+
+Un singolo click, anche ripetuto accidentalmente, **MUST NOT** soddisfare entrambe le conferme.
+
+La specifica non impone:
+
+* digitazione della denominazione;
+* OTP;
+* password aggiuntiva;
+* codice di conferma;
+* altra procedura specifica.
+
+Tali meccanismi possono essere scelti a livello di interfaccia o sicurezza purché non modifichino la regola delle due conferme distinte.
+
+---
+
+## 31.12 Portata dell'eliminazione totale
+
+L'eliminazione definitiva del Tenant Azienda comporta l'eliminazione di:
+
+```text
+Tenant Azienda
++
+Azienda
++
+ogni dato applicativo posseduto direttamente o indirettamente dal Tenant
+```
+
+La regola è basata sull'**appartenenza al Tenant**, non su un elenco chiuso di tipi tecnici.
+
+Sono quindi eliminati, quando appartenenti al Tenant, anche:
+
+* Esercizi;
+* Spese e Righe;
+* Progetti e transizioni;
+* Contratti, condizioni, scadenze ed eventi;
+* Fornitori e Referenti;
+* Centri di Costo;
+* Proposte ed Elementi di Proposta;
+* Budget Approvati;
+* Snapshot di Chiusura;
+* Riporti e Riprogrammazioni;
+* classificazioni;
+* relazioni informative;
+* Timeline;
+* Annotazioni di errore storico;
+* Impostazioni;
+* associazioni e autorizzazioni relative al Tenant;
+* audit appartenente al Tenant;
+* allegati ed evidenze appartenenti al Tenant;
+* dati derivati o ausiliari appartenenti esclusivamente al Tenant.
+
+L'eliminazione **MUST NOT**:
+
+* conservare una copia applicativa ripristinabile del Tenant;
+* trasformare il Tenant in Archiviato;
+* creare uno stato Eliminato;
+* lasciare parti del dominio accessibili;
+* lasciare oggetti orfani appartenenti al Tenant.
+
+Il ciclo di vita degli eventuali account utente globali della piattaforma non è definito da questa sezione.
+
+L'eliminazione delle associazioni fra tali account e il Tenant eliminato è invece obbligatoria.
+
+---
+
+## 31.13 Atomicità dell'eliminazione
+
+L'eliminazione definitiva **MUST** essere atomica dal punto di vista del comportamento osservabile dell'applicazione.
+
+Deve valere:
+
+```text
+o il Tenant esiste integralmente
+o il Tenant non esiste più
+```
+
+Il sistema **MUST NOT** lasciare uno stato osservabile nel quale:
+
+* l'Azienda esiste ma parte dei dati è stata eliminata;
+* il Tenant è stato eliminato ma alcuni suoi oggetti restano accessibili;
+* nuove operazioni possano creare dati nel Tenant durante l'eliminazione.
+
+La strategia tecnica necessaria a ottenere questa proprietà è libera.
+
+---
+
+## 31.14 Distinzione dall'Archivio degli oggetti di dominio
+
+L'Archivio del Tenant Azienda **MUST NOT** essere confuso con l'Archivio degli oggetti interni previsto dai §§5.8 e 24.3.
+
+### Archivio di un oggetto interno
+
+Per Progetti, Contratti, Fornitori e Centri di Costo:
+
+* modifica visibilità o selezionabilità;
+* conserva l'accessibilità storica prevista dalla specifica;
+* non rimuove valori;
+* non modifica Snapshot.
+
+### Archivio del Tenant Azienda
+
+Per il Tenant:
+
+* rende indisponibile l'intero ambiente;
+* impedisce l'accesso al dominio;
+* sospende operazioni manuali;
+* sospende processi automatici;
+* conserva integralmente i dati;
+* è reversibile esclusivamente dal Super Admin.
+
+Le due operazioni condividono il termine `Archivio`, ma hanno ambito e comportamento differenti.
+
+---
+
+## 31.15 Regola di non cancellazione fisica degli oggetti interni
+
+Le regole dei §§5.7 e 24.1 e l'Invariante §28.45 continuano ad applicarsi agli oggetti persistiti **all'interno di un Tenant esistente**.
+
+Pertanto, durante la normale vita di un Tenant:
+
+* una Spesa non viene eliminata fisicamente;
+* un Progetto non viene eliminato fisicamente;
+* un Contratto non viene eliminato fisicamente;
+* un Fornitore non viene eliminato fisicamente;
+* un Centro di Costo non viene eliminato fisicamente;
+* Budget e Snapshot restano immutabili;
+* Timeline e audit restano append-only secondo le rispettive regole.
+
+L'eliminazione definitiva del Tenant Azienda **non costituisce una cancellazione ordinaria di questi singoli oggetti**.
+
+Costituisce la distruzione del contenitore di piattaforma al quale appartiene l'intero dominio.
+
+Di conseguenza, le regole di immutabilità e conservazione degli oggetti interni valgono fintanto che il Tenant Azienda esiste.
+
+---
+
+## 31.16 Super Admin e capacità per Azienda
+
+Il `Super Admin` è un ruolo di amministrazione della piattaforma.
+
+Il Super Admin **MUST NOT** essere rappresentato come una combinazione delle capacità per Azienda del §26.
+
+Le operazioni riservate al Super Admin definite da questa sezione sono:
+
+* Archivio del Tenant Azienda;
+* ripristino del Tenant Azienda;
+* eliminazione definitiva del Tenant Azienda.
+
+Le capacità del §26 continuano a governare esclusivamente le operazioni all'interno di un Tenant Azienda Attivo.
+
+---
+
+## 31.17 Separazione dal ciclo di vita dell'Esercizio
+
+Il ciclo di vita del Tenant Azienda e il ciclo di vita degli Esercizi sono indipendenti.
+
+Archiviare un Tenant **MUST NOT**:
+
+* Chiudere un Esercizio;
+* creare un Esercizio;
+* eliminare un Esercizio;
+* modificare un Budget;
+* consolidare un Riporto;
+* applicare una Riprogrammazione.
+
+Analogamente, la Chiusura di un Esercizio **MUST NOT**:
+
+* Archiviare il Tenant;
+* ripristinare il Tenant;
+* eliminare il Tenant;
+* dichiarare implicitamente conclusa la gestione del cliente.
+
+---
+
+## 31.18 Semplificazione della creazione di `N+1`
+
+Il concetto `Gestione terminata` del §11.7 viene sostituito dalla sola decisione relativa alla creazione dell'Esercizio successivo.
+
+Alla Chiusura di `N`, se `N+1` non esiste, l'utente deve scegliere esclusivamente fra:
+
+* `Crea N+1`;
+* `Non creare N+1`.
+
+### Crea N+1
+
+Il sistema crea `N+1` Aperto secondo le normali regole di inizializzazione del §11.8.
+
+### Non creare N+1
+
+Il sistema non crea `N+1`.
+
+Devono essere zero tutti i Riporti che richiederebbero `N+1` come Esercizio destinazione.
+
+La scelta `Non creare N+1`:
+
+* non Archivia il Tenant;
+* non modifica lo stato del Tenant;
+* non costituisce offboarding;
+* non impedisce una successiva creazione manuale di `N+1` se il Tenant resta Attivo.
+
+Se `N+1` esiste già, la Chiusura di `N` non lo elimina e non richiede alcuna regola speciale di offboarding.
+
+---
+
+## 31.19 Offboarding
+
+La cessazione della gestione di un cliente **MUST NOT** essere rappresentata tramite:
+
+* uno stato speciale dell'Azienda;
+* uno stato speciale dell'Esercizio;
+* la mancata creazione di `N+1`;
+* la Chiusura di tutti gli Esercizi;
+* la cessazione automatica di Progetti o Contratti.
+
+Quando si vuole rendere non più operativo il cliente nella piattaforma, il Super Admin Archivia il relativo Tenant Azienda.
+
+L'Archivio del Tenant costituisce quindi il meccanismo canonico di offboarding della piattaforma.
+
+L'eventuale successivo ritorno del cliente viene rappresentato mediante il ripristino dello stesso Tenant Azienda.
+
+---
+
+## 31.20 Casistiche deterministiche
+
+### Azienda creata per errore
+
+Dopo la creazione persistente il Super Admin può:
+
+* Archiviare il Tenant;
+* oppure eliminarlo definitivamente con doppia conferma.
+
+Non esiste una regola diversa basata sulla quantità di dati presenti.
+
+### Tenant con Esercizi Aperti
+
+Può essere Archiviato.
+
+Gli Esercizi restano Aperti ma non sono elaborabili durante l'Archivio.
+
+Al ripristino restano negli stessi stati.
+
+### Tenant con Proposta in Bozza
+
+Può essere Archiviato.
+
+La Proposta resta in Bozza e invariata.
+
+Al ripristino si applicano le normali regole di riallineamento già previste dalla specifica.
+
+### Tenant con Budget e Snapshot
+
+Può essere Archiviato.
+
+Budget e Snapshot vengono conservati ma non sono accessibili durante l'Archivio.
+
+Può inoltre essere eliminato definitivamente dal Super Admin; in tal caso Budget e Snapshot vengono eliminati insieme al Tenant.
+
+### Contratto con rinnovo durante l'Archivio
+
+Il rinnovo non viene elaborato mentre il Tenant è Archiviato.
+
+Al ripristino vengono applicate le normali regole temporali e di recupero dei rinnovi trascorsi.
+
+### Tenant con `N+1` già esistente al momento dell'offboarding
+
+Non richiede alcun trattamento speciale.
+
+Il Super Admin Archivia il Tenant e `N+1` resta conservato insieme agli altri dati.
+
+### Ripristino dopo più anni
+
+Il ripristino non sposta gli anni né le date.
+
+Gli Esercizi mantengono i propri stati.
+
+I processi automatici riprendono valutando le date reali secondo le proprie regole.
+
+Il sistema **MUST NOT** fingere che il periodo di Archivio non sia trascorso.
+
+---
+
+## 31.21 Invarianti del Tenant Azienda
+
+### Separazione
+
+```text
+TenantAzienda != Azienda
+```
+
+### Cardinalità
+
+```text
+TenantAzienda 1 ── 1 Azienda
+```
+
+### Stati
+
+```text
+StatoTenant ∈ {Attivo, Archiviato}
+```
+
+### Archivio
+
+```text
+StatoTenant = Archiviato
+→ AccessoOrdinario = false
+→ OperazioniManuali = sospese
+→ ProcessiAutomatici = sospesi
+→ DatiDominio = invariati
+```
+
+### Ripristino
+
+```text
+Archiviato → Attivo
+solo Super Admin
+```
+
+Il ripristino non modifica il calendario del dominio.
+
+### Eliminazione
+
+```text
+EliminaTenant
+→ solo Super Admin
+→ doppia conferma
+→ eliminazione totale dei dati appartenenti al Tenant
+→ nessun ripristino applicativo
+```
+
+### Ciclo di vita indipendente
+
+```text
+StatoTenant
+!=
+StatoEsercizio
+!=
+StatoProgetto
+!=
+StatoContratto
+```
+
+### Nessun offboarding implicito
+
+```text
+NonCreare(N+1)
+!→ ArchivioTenant
+```
+
+e:
+
+```text
+ChiusuraEsercizio
+!→ ArchivioTenant
+```
+
+---
+
+## 31.22 Adeguamento delle regole precedenti
+
+Ai fini della coerenza dell'intera specifica, le seguenti formulazioni devono essere lette secondo la presente sezione.
+
+### §§5.7, 24.1, 26.4, 28.45, FR-009 e §30.15
+
+Il divieto di cancellazione fisica ordinaria riguarda gli oggetti persistiti **interni a un Tenant esistente**.
+
+Non vieta l'eliminazione definitiva del Tenant Azienda da parte del Super Admin.
+
+### §§5.8, 24.3 e 28.44
+
+La semantica generale dell'Archivio descritta in tali sezioni riguarda gli oggetti interni del dominio.
+
+L'Archivio del Tenant Azienda segue esclusivamente la presente §31.
+
+### §7.4
+
+Le appartenenze economiche restano riferite all'Azienda.
+
+Le associazioni di accesso e il ciclo di vita della disponibilità appartengono invece al Tenant Azienda.
+
+### §11.7
+
+Le formulazioni `Gestione continuata` e `Gestione terminata` sono sostituite dalla decisione `Crea N+1` / `Non creare N+1` descritta al §31.18.
+
+### §23.2 e storico dopo Archivio
+
+La leggibilità delle Snapshot dopo Archivio continua a valere quando viene Archiviato un oggetto interno.
+
+Quando viene Archiviato l'intero Tenant Azienda, le Snapshot vengono conservate ma non sono accessibili fino al ripristino del Tenant.
+
+### §26
+
+Le capacità per Azienda non governano Archivio, ripristino o eliminazione del Tenant.
+
+Queste operazioni appartengono esclusivamente al Super Admin.
+
+### §27.40 e §30.16
+
+Il caso precedentemente descritto come terminazione del rapporto con il cliente viene rappresentato tramite Archivio del Tenant Azienda.
+
+L'esistenza di un Esercizio futuro non costituisce più un caso speciale di offboarding.
+
+### Appendici
+
+Ogni formulazione esplicativa delle Appendici relativa a:
+
+* impossibilità assoluta di eliminazione;
+* `Gestione terminata`;
+* offboarding tramite Chiusura;
+* accessibilità dopo Archivio;
+
+deve essere interpretata secondo le regole normative della presente §31.
+
+---
+
+## 31.23 Decisione consolidata
+
+Il modello canonico è:
+
+```text
+PIATTAFORMA
+
+Tenant Azienda
+├── Stato: Attivo | Archiviato
+├── Accessi
+├── Ciclo di vita del Tenant
+│   ├── Archivio
+│   ├── Ripristino
+│   └── Eliminazione definitiva
+│
+└── Azienda
+    ├── Impostazioni di dominio
+    ├── Esercizi
+    ├── Spese
+    ├── Progetti
+    ├── Contratti
+    ├── Fornitori
+    ├── Centri di Costo
+    ├── Proposte
+    ├── Budget
+    ├── Snapshot
+    ├── Timeline
+    └── restante dominio MP2
+```
+
+Il `Tenant Azienda` governa **se il dominio esiste ed è utilizzabile nella piattaforma**.
+
+L'`Azienda` governa **il dominio funzionale ed economico di MP2**.
+
+I due concetti **MUST NOT** essere nuovamente sovrapposti.

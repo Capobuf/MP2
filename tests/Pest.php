@@ -66,7 +66,7 @@ function closeExerciseFixture(Exercise $exercise, User $actor): ClosingSnapshot
             'unclassified_closing_policy' => $exercise->company->closingUnclassifiedPolicy()->value,
         ],
         'next_exercise_disposition' => $nextExercise === null
-            ? 'not_created_management_terminated'
+            ? 'not_created'
             : 'already_existed',
         'next_exercise_id' => $nextExercise?->id,
         'operation_id' => (string) Str::uuid(),

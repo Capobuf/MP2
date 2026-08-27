@@ -34,7 +34,7 @@ it('lists and resolves cost centers only inside the current tenant', function ()
     $costCenterA = CostCenter::factory()->for($companyA)->create();
     $costCenterB = CostCenter::factory()->for($companyB)->create();
     $this->actingAs($viewer);
-    Filament::setTenant($companyA);
+    Filament::setTenant(($companyA)->tenantCompany);
 
     Livewire::test(ListCostCenters::class)
         ->assertCanSeeTableRecords([$costCenterA])
@@ -52,7 +52,7 @@ it('creates cost centers for managers without exposing later-slice fields', func
     $company = Company::factory()->create();
     grantCostCenterResourceCapabilities($manager, $company);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(CreateCostCenter::class)
         ->assertFormFieldDoesNotExist('exercise_id')
@@ -69,7 +69,7 @@ it('creates cost centers for managers without exposing later-slice fields', func
     $viewer = User::factory()->create();
     grantCostCenterResourceCapabilities($viewer, $company, manage: false);
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $this->get(CostCenterResource::getUrl('create', tenant: $company))->assertForbidden();
 });
@@ -79,7 +79,7 @@ it('creates a distinct cost center after save and create another', function () {
     $company = Company::factory()->create();
     grantCostCenterResourceCapabilities($manager, $company);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(CreateCostCenter::class)
         ->fillForm(['name' => 'Operations'])
@@ -100,7 +100,7 @@ it('defaults to active cost centers and exposes archived and all filters without
     $active = CostCenter::factory()->for($company)->create();
     $archived = CostCenter::factory()->for($company)->archived()->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(ListCostCenters::class)
         ->assertCanSeeTableRecords([$active])

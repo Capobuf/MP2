@@ -8,6 +8,7 @@ use App\Filament\Resources\Contracts\ContractResource;
 use App\Filament\Resources\Contracts\Schemas\ContractForm;
 use App\Models\Company;
 use App\Models\Contract;
+use App\Models\TenantCompany;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -69,7 +70,8 @@ class CreateContract extends CreateRecord
     protected function handleRecordCreation(array $data): Model
     {
         $actor = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         abort_unless($actor instanceof User && $company instanceof Company, 403);
 
         $attachments = $data['attachments'] ?? [];

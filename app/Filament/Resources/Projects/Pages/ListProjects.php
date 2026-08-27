@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Projects\Pages;
 use App\Filament\Resources\Projects\ProjectResource;
 use App\Models\Company;
 use App\Models\Exercise;
+use App\Models\TenantCompany;
 use App\Support\ExerciseContext;
 use Filament\Actions\CreateAction;
 use Filament\Facades\Filament;
@@ -31,7 +32,8 @@ class ListProjects extends ListRecords
 
     private function createDisabledReason(): ?string
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         $exercise = $company instanceof Company
             ? app(ExerciseContext::class)->current($company)
             : null;

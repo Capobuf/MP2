@@ -65,7 +65,7 @@ it('loads Contract list annual data in bounded set queries', function () {
     }
 
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     DB::flushQueryLog();
     DB::enableQueryLog();
 
@@ -95,7 +95,7 @@ it('renders all annual situations with bounded relation loads independent of Exe
         return $exercise;
     });
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     DB::flushQueryLog();
     DB::enableQueryLog();
 
@@ -123,7 +123,7 @@ it('renders and filters many deadline rows without per-Contract domain queries',
         ContractExerciseClassification::factory()->forContractAndExercise($contract, $exercise)->create();
     }
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     DB::flushQueryLog();
     DB::enableQueryLog();
 

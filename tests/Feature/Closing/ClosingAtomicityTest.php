@@ -38,7 +38,7 @@ it('rolls back all economic effects if Snapshot materialization fails', function
     ExpenseLine::factory()->for($expense)->create(['amount' => '100.00']);
     ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '20.00']);
     $prepared = app(PrepareExerciseClosing::class)->execute($actor, $exercise, [
-        'management_continues' => true,
+        'create_next_exercise' => true,
         'projects' => [$project->id => [
             'project_id' => $project->id,
             'final_state' => 'open',

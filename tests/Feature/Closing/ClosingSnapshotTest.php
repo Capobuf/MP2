@@ -13,7 +13,9 @@ use App\Models\ExpenseLine;
 use App\Models\Supplier;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -38,7 +40,7 @@ it('materializes zero-net Actual presence autonomously and keeps Snapshot rows i
     ]);
     ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '100.00']);
     ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '-100.00', 'note' => 'Rimborso di compensazione']);
-    $prepared = app(PrepareExerciseClosing::class)->execute($actor, $exercise, ['management_continues' => false, 'projects' => []]);
+    $prepared = app(PrepareExerciseClosing::class)->execute($actor, $exercise, ['create_next_exercise' => false, 'projects' => []]);
 
     expect($prepared['review']->warnings)->toBe([]);
 
@@ -107,8 +109,29 @@ it('rejects incoherent tenant Exercise and N+1 Snapshot references', function ()
         ]))->toThrow(ValidationException::class)
         ->and(fn () => ClosingSnapshot::query()->create([
             ...$attributes,
-            'next_exercise_disposition' => 'not_created_management_terminated',
+            'next_exercise_disposition' => 'not_created',
             'operation_id' => (string) Str::uuid(),
         ]))->toThrow(ValidationException::class)
         ->and(ClosingSnapshot::query()->count())->toBe(0);
+});
+
+it('maps the historical non-creation disposition forward and back without weakening its shape check', function (): void {
+    $company = Company::factory()->create();
+    $actor = User::factory()->create();
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
+    $snapshot = closeExerciseFixture($exercise, $actor);
+    $migration = require database_path('migrations/2026_08_26_000400_rename_next_exercise_disposition.php');
+    $legacyDisposition = implode('_', ['not', 'created', 'management', 'terminated']);
+
+    $migration->down();
+    expect(DB::table('closing_snapshots')->where('id', $snapshot->id)->value('next_exercise_disposition'))
+        ->toBe($legacyDisposition);
+
+    $migration->up();
+    expect(DB::table('closing_snapshots')->where('id', $snapshot->id)->value('next_exercise_disposition'))
+        ->toBe('not_created');
+
+    expect(fn () => DB::table('closing_snapshots')->where('id', $snapshot->id)->update([
+        'next_exercise_id' => $exercise->id,
+    ]))->toThrow(QueryException::class);
 });

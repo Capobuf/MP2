@@ -50,7 +50,7 @@ it('lists and views only immutable Budgets belonging to the active tenant', func
     $hiddenBudget = BudgetSnapshot::factory()->for($otherProposal)->create();
 
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ListBudgets::class)
         ->assertCanSeeTableRecords([$budget])
@@ -61,8 +61,12 @@ it('lists and views only immutable Budgets belonging to the active tenant', func
     Livewire::test(ViewBudget::class, ['record' => $budget->getRouteKey()])
         ->assertSuccessful()
         ->assertSee('Budget immutabile')
+        ->assertSee('Budget '.$exercise->year.' · v1')
+        ->assertSee('Versione approvata')
+        ->assertSee('sorgente inclusa')
         ->assertSee('Dettaglio Spesa')
         ->assertSee('Azioni e motivazioni approvate')
+        ->assertSee('Riferimenti e tracciabilità tecnica')
         ->assertSee($row->label)
         ->assertSee('Direzione')
         ->assertSee('Verbale approvato')
@@ -71,7 +75,8 @@ it('lists and views only immutable Budgets belonging to the active tenant', func
         ->assertDontSee('Effettivo')
         ->assertDontSee('Forecast')
         ->assertDontSee('Closing')
-        ->assertDontSee('Residuo');
+        ->assertDontSee('Residuo')
+        ->assertDontSee('approved_estimate_total');
 
     $this->get(BudgetResource::getUrl('view', ['record' => $hiddenBudget], tenant: $company))
         ->assertNotFound();

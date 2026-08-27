@@ -27,7 +27,7 @@ final class NormalizeClosingInput
             ->where('company_id', $exercise->company_id)
             ->where('year', $exercise->year + 1)
             ->first();
-        if ($nextExercise === null && filter_var($input['management_continues'] ?? false, FILTER_VALIDATE_BOOL)) {
+        if ($nextExercise === null && filter_var($input['create_next_exercise'] ?? false, FILTER_VALIDATE_BOOL)) {
             $nextExercise = new Exercise([
                 'company_id' => $exercise->company_id,
                 'year' => $exercise->year + 1,
@@ -60,7 +60,7 @@ final class NormalizeClosingInput
             }
             if (! $nextExercise instanceof Exercise) {
                 throw ValidationException::withMessages([
-                    'management_continues' => 'La Riprogrammazione richiede l’Esercizio successivo.',
+                    'create_next_exercise' => 'La Riprogrammazione richiede l’Esercizio successivo.',
                 ]);
             }
 

@@ -20,20 +20,20 @@
 
         @if (! $nextExerciseExists)
             <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-900">
-                <h3 class="text-base font-semibold text-gray-950 dark:text-white">Continuità della gestione</h3>
+                <h3 class="text-base font-semibold text-gray-950 dark:text-white">Esercizio successivo</h3>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">La scelta determina soltanto se creare N+1. Non crea Budget o copie di Effettivi.</p>
                 <div class="mt-4 grid gap-3 sm:grid-cols-2">
                     <label class="flex cursor-pointer gap-3 rounded-xl border border-gray-200 p-4 dark:border-white/10">
-                        <input type="radio" wire:model.live="closing.management_continues" value="1" class="mt-1">
+                        <input type="radio" wire:model.live="closing.create_next_exercise" value="1" class="mt-1">
                         <span>
-                            <span class="block font-medium text-gray-950 dark:text-white">Gestione continuata</span>
+                            <span class="block font-medium text-gray-950 dark:text-white">Crea N+1</span>
                             <span class="mt-1 block text-sm text-gray-500 dark:text-gray-400">N+1 verrà creato Aperto secondo le regole canoniche.</span>
                         </span>
                     </label>
                     <label class="flex cursor-pointer gap-3 rounded-xl border border-gray-200 p-4 dark:border-white/10">
-                        <input type="radio" wire:model.live="closing.management_continues" value="0" class="mt-1">
+                        <input type="radio" wire:model.live="closing.create_next_exercise" value="0" class="mt-1">
                         <span>
-                            <span class="block font-medium text-gray-950 dark:text-white">Gestione terminata</span>
+                            <span class="block font-medium text-gray-950 dark:text-white">Non creare N+1</span>
                             <span class="mt-1 block text-sm text-gray-500 dark:text-gray-400">N+1 non viene creato e ogni trasferimento deve essere zero.</span>
                         </span>
                     </label>

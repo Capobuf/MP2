@@ -28,7 +28,7 @@ it('confirms an annual classification through the Project preview action', funct
     $classification = ProjectExerciseClassification::factory()->forProjectAndExercise($project, $exercise)->create();
     $target = CostCenter::factory()->for($company)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewProject::class, ['record' => $project->getRouteKey()])
         ->assertActionVisible('reclassify')
@@ -48,7 +48,7 @@ it('shows the reclassification note only when Actuals are affected', function ()
     $project = Project::factory()->for($company)->create();
     ProjectExerciseClassification::factory()->forProjectAndExercise($project, $exercise)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(ViewProject::class, ['record' => $project->getRouteKey()])
         ->mountAction('reclassify')

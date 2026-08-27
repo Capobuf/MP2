@@ -66,7 +66,7 @@ final class PrepareExerciseClosing
     /** @return list<array<string, mixed>> */
     private function withNewExerciseContractImpact(Exercise $exercise, ClosingReview $review): array
     {
-        if (($review->nextExercise['exists'] ?? false) || ($review->nextExercise['management_continues'] ?? null) !== true) {
+        if (($review->nextExercise['exists'] ?? false) || ($review->nextExercise['create_next_exercise'] ?? null) !== true) {
             return $review->affectedExercises;
         }
 

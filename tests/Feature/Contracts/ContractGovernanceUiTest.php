@@ -66,7 +66,7 @@ function governanceUiContext(bool $manager = true): array
 it('renders every canonical deadline field and filters defined versus undefined expiry without reminder controls', function () {
     extract(governanceUiContext());
     $this->actingAs($user);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     expect(Contract::query()->where('company_id', $company->id)->active()->count())->toBe(2);
 
@@ -119,7 +119,7 @@ it('renders every canonical deadline field and filters defined versus undefined 
 it('registers classification link and private attachment governance surfaces without Sostituisce or delete', function () {
     ['user' => $user, 'company' => $company, 'defined' => $contract] = governanceUiContext();
     $this->actingAs($user);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $contractRelations = collect(ContractResource::getRelations());
     expect($contractRelations)->toContain(ContractAttachmentsRelationManager::class)
@@ -155,7 +155,7 @@ it('creates and selects a Cost Center inline while reclassifying a Contract', fu
         'capability' => Capability::ManageMasterData,
     ]);
     $this->actingAs($user);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(ContractClassificationsRelationManager::class, [
         'ownerRecord' => $contract,
@@ -200,7 +200,7 @@ it('shows terminal Archive and ordered Contract Timeline detail while keeping vi
         'actual_impact_by_exercise' => [],
     ])))->sortByDesc('id')->values();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewContract::class, ['record' => $contract->id])
         ->assertActionVisible('archive')
@@ -236,7 +236,7 @@ it('exposes Expense and Line attachment controls to operators and keeps them rea
         'size_bytes' => 113621,
     ]);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ExpenseAttachmentsRelationManager::class, ['ownerRecord' => $expense, 'pageClass' => ViewExpense::class])
         ->assertTableActionExists('upload')

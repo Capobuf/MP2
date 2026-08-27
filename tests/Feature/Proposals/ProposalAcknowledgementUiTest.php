@@ -29,7 +29,7 @@ it('shows explicit acknowledgement and exact new-source guidance', function (): 
     ExpenseLine::factory()->for($expense)->create(['type' => 'actual', 'amount' => '2.00']);
     $proposal = app(ReviewProposalReadiness::class)->execute($actor, $proposal->refresh(), (string) Str::uuid());
     $this->actingAs($actor);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewProposal::class, ['record' => $proposal->getRouteKey()])
         ->assertActionExists('acknowledgeSource')

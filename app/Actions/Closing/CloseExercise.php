@@ -173,7 +173,7 @@ final class CloseExercise
                     ->lockForUpdate()
                     ->first();
                 $createdNextExercise = false;
-                if ($nextExercise === null && ($authoritativeReview->nextExercise['management_continues'] ?? null) === true) {
+                if ($nextExercise === null && ($authoritativeReview->nextExercise['create_next_exercise'] ?? null) === true) {
                     $nextExercise = $this->createExercise->createWithinTransaction(
                         actor: $actor,
                         company: $company,
@@ -194,7 +194,7 @@ final class CloseExercise
                         effectiveFrom: $lockedExercise->year.'-12-31',
                         newValue: [
                             'year' => $lockedExercise->year + 1,
-                            'reason' => 'management_terminated',
+                            'reason' => 'next_exercise_not_requested',
                         ],
                     );
                 }
@@ -280,7 +280,7 @@ final class CloseExercise
                 $initialBudget = $budgets->first();
                 $currentBudget = $budgets->last();
                 $nextDisposition = $nextExercise === null
-                    ? 'not_created_management_terminated'
+                    ? 'not_created'
                     : ($createdNextExercise ? 'created' : 'already_existed');
                 $snapshot = ClosingSnapshot::query()->create([
                     'company_id' => $company->id,

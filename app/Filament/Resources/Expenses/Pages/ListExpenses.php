@@ -7,6 +7,7 @@ use App\Filament\Resources\Expenses\Widgets\ExpenseOverview;
 use App\Livewire\ExpenseDetail;
 use App\Models\Company;
 use App\Models\Exercise;
+use App\Models\TenantCompany;
 use App\Support\ExerciseContext;
 use Filament\Actions\CreateAction;
 use Filament\Facades\Filament;
@@ -113,7 +114,8 @@ class ListExpenses extends ListRecords
 
     private function createDisabledReason(): ?string
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         $exercise = $company instanceof Company
             ? app(ExerciseContext::class)->current($company)
             : null;

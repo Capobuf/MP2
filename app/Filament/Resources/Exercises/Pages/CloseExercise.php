@@ -12,6 +12,7 @@ use App\Models\Exercise;
 use App\Models\Project;
 use App\Models\ProjectDeferral;
 use App\Models\Supplier;
+use App\Models\TenantCompany;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
@@ -132,7 +133,7 @@ class CloseExercise extends Page
         }
 
         $this->closing = [
-            'management_continues' => $this->nextExerciseExists ? true : null,
+            'create_next_exercise' => $this->nextExerciseExists ? true : null,
             'projects' => $projectState,
             'warnings_acknowledged' => false,
             'confirmed' => false,
@@ -222,8 +223,9 @@ class CloseExercise extends Page
                 ->title('Esercizio Chiuso')
                 ->body('La Snapshot di Chiusura è stata materializzata e non può essere modificata.')
                 ->send();
-            $company = Filament::getTenant();
-            $this->redirect(ClosingResource::getUrl('view', ['record' => $snapshot], tenant: $company));
+            $tenant = Filament::getTenant();
+            abort_unless($tenant instanceof TenantCompany, 404);
+            $this->redirect(ClosingResource::getUrl('view', ['record' => $snapshot], tenant: $tenant));
         } catch (ValidationException $exception) {
             $this->validationErrors($exception);
         }
@@ -271,9 +273,9 @@ class CloseExercise extends Page
         }
 
         return [
-            'management_continues' => $this->nextExerciseExists
+            'create_next_exercise' => $this->nextExerciseExists
                 ? true
-                : ($this->closing['management_continues'] ?? null),
+                : ($this->closing['create_next_exercise'] ?? null),
             'projects' => $projects,
         ];
     }

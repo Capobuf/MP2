@@ -13,6 +13,7 @@ use App\Models\Company;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Supplier;
+use App\Models\TenantCompany;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
@@ -434,7 +435,8 @@ class ContractForm
 
     private static function company(): ?Company
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $company instanceof Company ? $company : null;
     }

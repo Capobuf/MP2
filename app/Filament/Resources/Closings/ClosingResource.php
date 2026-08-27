@@ -8,6 +8,7 @@ use App\Filament\Resources\Closings\Schemas\ClosingInfolist;
 use App\Filament\Resources\Exercises\ExerciseResource;
 use App\Models\ClosingSnapshot;
 use App\Models\Company;
+use App\Models\TenantCompany;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Resources\Resource;
@@ -34,7 +35,8 @@ class ClosingResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
             && $user->hasCapability($company, Capability::View);
@@ -65,7 +67,8 @@ class ClosingResource extends Resource
     /** @return Builder<ClosingSnapshot> */
     public static function getEloquentQuery(): Builder
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $company instanceof Company
             ? parent::getEloquentQuery()->whereBelongsTo($company)->with([

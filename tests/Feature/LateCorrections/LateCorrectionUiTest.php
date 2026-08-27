@@ -38,7 +38,7 @@ it('shows the Italian late-correction action only on an authorized Closed Exerci
 
     $this->actingAs($actor);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewExercise::class, ['record' => $exercise->id])
         ->assertSuccessful()
@@ -64,7 +64,7 @@ it('submits the correction journey and retains uploaded evidence on the generate
 
     $this->actingAs($actor);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     $operationId = (string) Str::uuid();
     $evidenceOperationId = (string) Str::uuid();
     $data = [
@@ -108,7 +108,7 @@ it('shows generated Expense identity and description for a new late Expense', fu
 
     $this->actingAs($actor);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(ViewExercise::class, ['record' => $exercise->id])
         ->callAction('lateCorrection', data: [
@@ -147,7 +147,7 @@ it('attaches stale Exercise, source and selected Expense errors to visible field
 
     $this->actingAs($actor);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $exerciseRevision = $exercise->refresh()->revision;
     $exercise->increment('revision');
@@ -216,7 +216,7 @@ it('does not expose late correction to Open Exercises or viewers', function (): 
 
     $this->actingAs($actor);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     Livewire::test(ViewExercise::class, ['record' => $exercise->id])
         ->assertSuccessful()
         ->assertActionHidden('lateCorrection');
@@ -237,7 +237,7 @@ it('offers only Project and Contract sources belonging to the Closed Exercise hi
 
     $this->actingAs($actor);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewExercise::class, ['record' => $exercise->id])
         ->mountAction('lateCorrection')

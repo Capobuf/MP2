@@ -23,13 +23,13 @@
 
                 @if ($canSwitchCompany)
                     <x-filament::dropdown.list>
-                        @foreach ($companies as $availableCompany)
+                        @foreach ($companies as $availableTenant)
                             <x-filament::dropdown.list.item
-                                wire:click="selectCompany({{ $availableCompany->id }})"
-                                :icon="$availableCompany->is($company) ? 'heroicon-m-check' : null"
-                                :color="$availableCompany->is($company) ? 'primary' : 'gray'"
+                                wire:click="selectCompany({{ $availableTenant->company_id }})"
+                                :icon="$availableTenant->company_id === $company->id ? 'heroicon-m-check' : null"
+                                :color="$availableTenant->company_id === $company->id ? 'primary' : 'gray'"
                             >
-                                {{ $availableCompany->name }}
+                                {{ $availableTenant->company->name }}
                             </x-filament::dropdown.list.item>
                         @endforeach
                     </x-filament::dropdown.list>

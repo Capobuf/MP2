@@ -12,6 +12,7 @@ use App\Filament\Resources\CostCenters\Schemas\CostCenterForm;
 use App\Filament\Resources\CostCenters\Tables\CostCentersTable;
 use App\Models\Company;
 use App\Models\CostCenter;
+use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -66,7 +67,8 @@ class CostCenterResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User
             && $company instanceof Company
@@ -77,7 +79,8 @@ class CostCenterResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         if (! $company instanceof Company) {
             return $query->whereRaw('1 = 0');
@@ -89,7 +92,8 @@ class CostCenterResource extends Resource
     public static function canCreate(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User
             && $company instanceof Company

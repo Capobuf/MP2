@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Actions\UpdateCompanySettings;
 use App\Domain\Company\ClosingUnclassifiedPolicy;
 use App\Models\Company;
+use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
 use DateTimeZone;
@@ -50,7 +51,8 @@ class CompanySettings extends Page
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User
             && $company instanceof Company
@@ -166,7 +168,8 @@ class CompanySettings extends Page
 
     private function company(): Company
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         abort_unless($company instanceof Company, 404);
 
         return $company;

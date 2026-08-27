@@ -17,6 +17,7 @@ use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\Project;
 use App\Models\Supplier;
+use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
 use Filament\Facades\Filament;
@@ -110,7 +111,8 @@ class Reports extends Page
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
             && $user->hasCapability($company, Capability::View);
@@ -325,7 +327,8 @@ class Reports extends Page
 
     private function company(): Company
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         abort_unless($company instanceof Company, 404);
 
         return $company;

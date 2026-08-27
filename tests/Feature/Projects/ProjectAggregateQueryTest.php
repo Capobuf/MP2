@@ -68,7 +68,7 @@ it('loads the Project list relationships in sets and annual totals in the list q
     }
 
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     DB::flushQueryLog();
     DB::enableQueryLog();
 
@@ -104,7 +104,7 @@ it('builds every annual Project situation with one aggregate Line query', functi
     }
 
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     DB::flushQueryLog();
     DB::enableQueryLog();
 
@@ -151,7 +151,7 @@ it('renders Exercise aggregates with one Line load and counts Project children e
         ->and($target->actual())->toBe('50.00');
 
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     DB::flushQueryLog();
     DB::enableQueryLog();
 

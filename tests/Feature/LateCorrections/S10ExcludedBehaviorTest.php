@@ -99,7 +99,7 @@ it('does not expose matching, reports, exports or other S11 controls in S10', fu
     $fixture = s10ExcludedFixture();
     $this->actingAs($fixture['actor']);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($fixture['company']);
+    Filament::setTenant(($fixture['company'])->tenantCompany);
 
     Livewire::test(ViewExercise::class, ['record' => $fixture['exercise']->id])
         ->assertSuccessful()

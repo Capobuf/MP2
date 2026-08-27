@@ -33,7 +33,7 @@ it('creates a revision from an open exercise and shows live versus budget contex
     }
     uiApprovedBudget($company, $exercise, $user);
     $this->actingAs($user);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewExercise::class, ['record' => $exercise->getRouteKey()])
         ->assertActionExists('initializeProposal')
@@ -58,7 +58,7 @@ it('disables revision creation for a closed exercise or occupied draft', functio
     }
     uiApprovedBudget($company, $closed, $user);
     $this->actingAs($user);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewExercise::class, ['record' => $closed->getRouteKey()])
         ->assertActionDisabled('initializeProposal');

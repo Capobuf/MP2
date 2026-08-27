@@ -31,7 +31,7 @@ it('shows exact annual composition without generated estimate mutation controls'
     ContractCondition::factory()->forContract($contract)->create(['amount' => '12.34', 'valid_from' => '2026-01-01', 'valid_to' => '2026-02-01']);
     ContractExerciseClassification::factory()->forContractAndExercise($contract, $exercise)->create();
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ContractAnnualSituationsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
         ->assertCanSeeTableRecords([$exercise])

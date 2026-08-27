@@ -12,6 +12,7 @@ use App\Models\Company;
 use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
+use App\Models\ContractRenewalConfiguration;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -37,6 +38,47 @@ it('creates and plans a contract without any live write', function (): void {
     $created = app(PlanContract::class)->create($user, $proposal, ['title' => 'Contratto futuro', 'notes' => null, 'supplier_id' => $supplier->id, 'contractual_start_date' => '2026-01-01', 'next_expiry_date' => '2026-12-31', 'automatic_renewal' => false, 'renewal_duration_months' => null, 'notice_days' => 30, 'exercise_id' => $proposal->exercise_id, 'cost_center_id' => null], (string) Str::uuid(), 0);
     app(PlanContract::class)->execute($user, $proposal->refresh(), $created->item, ProposalActionType::AddContractCondition, ['cycle' => 'annual', 'attribution_mode' => 'cycle_start', 'amount' => '100.00', 'valid_from' => '2026-01-01', 'valid_to' => null, 'reason' => null], null, (string) Str::uuid(), 1);
     expect($created->item->refresh()->contract_id)->toBeNull()->and($created->item->result['planned_conditions'])->toHaveCount(1)->and(Contract::query()->count())->toBe(0);
+});
+
+it('inserts only planned renewal configurations during approval', function (): void {
+    $company = Company::factory()->create();
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $user = User::factory()->create();
+    foreach ([Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
+        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $user->id, 'capability' => $capability]);
+    }
+    $contract = Contract::factory()->for($company)->create([
+        'contractual_start_date' => '2026-01-01',
+        'next_expiry_date' => null,
+        'renewal_anchor_date' => null,
+        'automatic_renewal' => false,
+        'renewal_duration_months' => null,
+        'notice_days' => null,
+    ]);
+    ContractCondition::factory()->forContract($contract)->create(['valid_from' => '2026-01-01', 'valid_to' => null]);
+    $configuration = ContractRenewalConfiguration::factory()->forContract($contract)->create([
+        'effective_from' => '2026-01-01',
+        'expiry_anchor_date' => null,
+        'automatic_renewal' => false,
+        'renewal_duration_months' => null,
+        'notice_days' => null,
+    ]);
+    $proposal = app(InitializeProposal::class)->execute($user, $company, $exercise, (string) Str::uuid());
+    $item = $proposal->items()->where('contract_id', $contract->id)->sole();
+    app(PlanContract::class)->execute($user, $proposal, $item, ProposalActionType::SetContractRenewal, [
+        'effective_from' => '2026-09-01',
+        'expiry_anchor_date' => '2026-12-31',
+        'automatic_renewal' => true,
+        'renewal_duration_months' => 12,
+        'notice_days' => 60,
+    ], null, (string) Str::uuid(), 0);
+
+    app(ApproveProposal::class)->execute($user, $proposal->refresh(), (string) Str::uuid());
+
+    $configurations = ContractRenewalConfiguration::query()->where('contract_id', $contract->id)->orderBy('effective_from')->get();
+    expect($configurations)->toHaveCount(2)
+        ->and($configurations->first()->id)->toBe($configuration->id)
+        ->and($configurations->last()->effectiveFrom()->toDateString())->toBe('2026-09-01');
 });
 
 it('derives and requires the canonical no-prorata Contract economic boundary', function (): void {

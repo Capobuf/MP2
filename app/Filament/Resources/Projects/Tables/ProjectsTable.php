@@ -10,6 +10,7 @@ use App\Models\Company;
 use App\Models\Exercise;
 use App\Models\ExpenseLine;
 use App\Models\Project;
+use App\Models\TenantCompany;
 use App\Support\ExerciseContext;
 use Carbon\CarbonImmutable;
 use Filament\Actions\EditAction;
@@ -39,7 +40,8 @@ class ProjectsTable
 
         return $table
             ->modifyQueryUsing(function (Builder $query): Builder {
-                $company = Filament::getTenant();
+                $tenant = Filament::getTenant();
+                $company = $tenant instanceof TenantCompany ? $tenant->company : null;
                 $exercise = $company instanceof Company
                     ? app(ExerciseContext::class)->current($company)
                     : null;

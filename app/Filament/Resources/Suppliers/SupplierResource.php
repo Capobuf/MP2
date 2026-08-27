@@ -13,6 +13,7 @@ use App\Filament\Resources\Suppliers\Schemas\SupplierForm;
 use App\Filament\Resources\Suppliers\Tables\SuppliersTable;
 use App\Models\Company;
 use App\Models\Supplier;
+use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -57,7 +58,8 @@ class SupplierResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User
             && $company instanceof Company
@@ -68,7 +70,8 @@ class SupplierResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         if (! $company instanceof Company) {
             return $query->whereRaw('1 = 0');
@@ -80,7 +83,8 @@ class SupplierResource extends Resource
     public static function canCreate(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User
             && $company instanceof Company

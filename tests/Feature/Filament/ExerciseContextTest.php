@@ -66,7 +66,7 @@ it('renders the Blade and Livewire global context for the current tenant', funct
     ]);
     $this->actingAs($user);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ExerciseContextSelector::class)
         ->assertSet('companyId', $company->id)
@@ -100,7 +100,7 @@ it('exposes authorized Exercise actions in the global context menu', function ()
 
     $this->actingAs($manager);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ExerciseContextSelector::class)
         ->assertSee('Gestisci Esercizi')
@@ -123,7 +123,7 @@ it('exposes authorized Company actions in the global context menu', function () 
 
     $this->actingAs($administrator);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ExerciseContextSelector::class)
         ->assertSee('Impostazioni Azienda')
@@ -145,7 +145,7 @@ it('does not expose unauthorized Company actions', function () {
 
     $this->actingAs($user);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ExerciseContextSelector::class)
         ->assertSeeHtml('aria-label="Azienda corrente"')

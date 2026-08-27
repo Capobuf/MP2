@@ -6,6 +6,7 @@ use App\Actions\Operations\CreateExercise as CreateExerciseAction;
 use App\Filament\Resources\Exercises\ExerciseResource;
 use App\Models\Company;
 use App\Models\Exercise;
+use App\Models\TenantCompany;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\CreateRecord;
@@ -30,7 +31,8 @@ class CreateExercise extends CreateRecord
     protected function handleRecordCreation(array $data): Model
     {
         $actor = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         abort_unless($actor instanceof User && $company instanceof Company, 403);
 
         return app(CreateExerciseAction::class)->execute($actor, $company, $data, $this->operationId);

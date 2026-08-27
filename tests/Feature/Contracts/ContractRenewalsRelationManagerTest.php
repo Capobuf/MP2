@@ -29,7 +29,7 @@ it('shows only the renewal fields required by the current choices and Budget sta
     $exercise = Exercise::factory()->for($company)->create();
     $contract = Contract::factory()->for($company)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ContractRenewalsRelationManager::class, [
         'ownerRecord' => $contract,

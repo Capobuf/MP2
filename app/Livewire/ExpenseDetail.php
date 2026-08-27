@@ -20,6 +20,7 @@ use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
+use App\Models\TenantCompany;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
@@ -90,7 +91,8 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
     #[Computed]
     public function expense(): Expense
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         abort_unless($company instanceof Company && $this->expenseId !== null, 404);
 
         $expense = Expense::query()

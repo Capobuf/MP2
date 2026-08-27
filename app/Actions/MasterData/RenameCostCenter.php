@@ -4,6 +4,7 @@ namespace App\Actions\MasterData;
 
 use App\Domain\Company\AuditEventType;
 use App\Models\AuditEvent;
+use App\Models\Company;
 use App\Models\CostCenter;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,7 @@ class RenameCostCenter
         ])->validate();
 
         return DB::transaction(function () use ($actor, $costCenter, $validated): CostCenter {
+            Company::query()->lockForUpdate()->findOrFail($costCenter->company_id);
             $lockedCostCenter = CostCenter::query()->with('company')->lockForUpdate()->findOrFail($costCenter->id);
             Gate::forUser($actor)->authorize('update', $lockedCostCenter);
 

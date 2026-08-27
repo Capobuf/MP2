@@ -9,6 +9,7 @@ use App\Filament\Resources\Budgets\Schemas\BudgetInfolist;
 use App\Filament\Resources\Budgets\Tables\BudgetsTable;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
+use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
 use Filament\Facades\Filament;
@@ -49,7 +50,8 @@ class BudgetResource extends Resource
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company && $user->hasCapability($company, Capability::View);
     }
@@ -77,7 +79,8 @@ class BudgetResource extends Resource
     /** @return Builder<BudgetSnapshot> */
     public static function getEloquentQuery(): Builder
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $company instanceof Company ? parent::getEloquentQuery()->whereBelongsTo($company)->with(['exercise', 'approver', 'proposal', 'rows', 'evidence']) : parent::getEloquentQuery()->whereRaw('1 = 0');
     }

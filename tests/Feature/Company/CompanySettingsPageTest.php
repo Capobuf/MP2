@@ -17,7 +17,7 @@ it('requires and uses a timezone preview from the settings page', function () {
         'timezone' => 'Europe/Rome',
     ]);
     $this->actingAs($administrator);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $page = Livewire::test(CompanySettings::class)
         ->fillForm([
@@ -52,7 +52,7 @@ it('does not expose fixed domain behavior as settings', function () {
         'timezone' => 'Europe/Rome',
     ]);
     $this->actingAs($administrator);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(CompanySettings::class)
         ->assertFormFieldExists('overspend_note_required')

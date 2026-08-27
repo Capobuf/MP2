@@ -34,7 +34,7 @@ it('lists and resolves exercises only inside the current tenant', function () {
     $exerciseA = Exercise::factory()->for($companyA)->create();
     $exerciseB = Exercise::factory()->for($companyB)->create();
     $this->actingAs($viewer);
-    Filament::setTenant($companyA);
+    Filament::setTenant(($companyA)->tenantCompany);
 
     Livewire::test(ListExercises::class)
         ->assertCanSeeTableRecords([$exerciseA])
@@ -51,7 +51,7 @@ it('creates only a year and exposes no later-slice fields or edit route', functi
     $company = Company::factory()->create();
     grantExerciseResource($manager, $company);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(CreateExercise::class)
         ->assertFormFieldExists('year')
@@ -75,7 +75,7 @@ it('creates a distinct exercise after save and create another', function () {
     $company = Company::factory()->create();
     grantExerciseResource($manager, $company);
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(CreateExercise::class)
         ->fillForm(['year' => 2032])

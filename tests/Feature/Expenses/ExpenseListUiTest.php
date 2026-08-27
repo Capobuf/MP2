@@ -38,7 +38,7 @@ beforeEach(function () {
     ]);
     $this->exercise = Exercise::factory()->for($this->company)->create(['year' => 2026]);
     $this->actingAs($this->user);
-    Filament::setTenant($this->company);
+    Filament::setTenant(($this->company)->tenantCompany);
     app(ExerciseContext::class)->select($this->company, $this->exercise->id);
 });
 

@@ -131,7 +131,7 @@ it('shows distinct empty histories and rejects direct cross-company reading', fu
 
     $this->actingAs($fixture['actor']);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant($fixture['company']);
+    Filament::setTenant(($fixture['company'])->tenantCompany);
 
     Livewire::test(ViewExercise::class, ['record' => $fixture['exercise']->id])
         ->assertSuccessful()

@@ -18,6 +18,6 @@ it('exposes typed contract planning and no manual estimate or prorata control', 
         CompanyCapability::query()->create(['company_id' => $proposal->company_id, 'user_id' => $user->id, 'capability' => $capability]);
     }
     $this->actingAs($user);
-    Filament::setTenant($proposal->company);
+    Filament::setTenant(($proposal->company)->tenantCompany);
     Livewire::test(ViewProposal::class, ['record' => $proposal->id])->assertActionExists('includeTerminatedContract')->assertActionExists('createPlannedContract')->assertActionExists('addContractCondition')->assertActionExists('changeContractEconomics')->assertActionExists('planContractLifecycle')->assertActionExists('planContractRenewal')->assertActionExists('planContractCostCenter')->assertActionDoesNotExist('manualContractEstimate')->assertActionDoesNotExist('prorata')->assertActionDoesNotExist('changeUsedSupplier');
 });

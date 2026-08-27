@@ -29,7 +29,7 @@ it('shows mutually exclusive lifecycle actions and disables storno with actuals'
     ExpenseLine::factory()->for($reversed)->create();
     ExpenseLine::factory()->for($withActual)->actual()->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ListExpenses::class)
         ->assertTableActionVisible('reverse', record: $active)

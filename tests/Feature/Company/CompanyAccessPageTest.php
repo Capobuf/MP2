@@ -19,7 +19,7 @@ it('synchronizes beneficiary capabilities from the company access page', functio
         'timezone' => 'Europe/Rome',
     ]);
     $this->actingAs($administrator);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(CompanyAccess::class)
         ->fillForm([
@@ -51,7 +51,7 @@ it('does not expose the access page without manage permissions', function () {
         'capability' => Capability::View,
     ]);
     $this->actingAs($viewer);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     expect(CompanyAccess::canAccess())->toBeFalse();
 

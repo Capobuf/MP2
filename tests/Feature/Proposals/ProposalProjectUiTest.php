@@ -19,7 +19,7 @@ it('exposes Project planning, Rinvio and independent new allocation controls', f
         CompanyCapability::query()->create(['company_id' => $proposal->company_id, 'user_id' => $user->id, 'capability' => $capability]);
     }
     $this->actingAs($user);
-    Filament::setTenant($proposal->company);
+    Filament::setTenant(($proposal->company)->tenantCompany);
     Livewire::test(ViewProposal::class, ['record' => $proposal->id])
         ->assertActionExists('includeClosedProject')->assertActionExists('createPlannedProject')->assertActionExists('planProjectTransition')
         ->assertActionExists('planProjectDeferral')->assertActionExists('createProjectAllocation')->assertActionExists('createPlannedExpense')

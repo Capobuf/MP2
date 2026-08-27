@@ -54,7 +54,7 @@ it('reprograms selected source Estimates exactly once at Closing without copying
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $fixture = s9ReprogrammingFixture();
     $prepared = app(PrepareExerciseClosing::class)->execute($fixture['actor'], $fixture['source'], [
-        'management_continues' => true,
+        'create_next_exercise' => true,
         'projects' => [$fixture['project']->id => [
             'project_id' => $fixture['project']->id,
             'final_state' => 'open',

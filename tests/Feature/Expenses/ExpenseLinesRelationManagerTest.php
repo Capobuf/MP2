@@ -24,7 +24,7 @@ it('manages lines explicitly without delete or destructive bulk actions', functi
     $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
     $expense = Expense::factory()->forExercise($exercise)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(ExpenseLinesRelationManager::class, [
         'ownerRecord' => $expense,
@@ -58,7 +58,7 @@ it('hides all line mutations for a reversed expense', function () {
     $expense = Expense::factory()->forExercise($exercise)->reversed()->create();
     $line = ExpenseLine::factory()->for($expense)->create();
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ExpenseLinesRelationManager::class, ['ownerRecord' => $expense, 'pageClass' => ViewExpense::class])
         ->assertTableActionHidden('create')

@@ -40,7 +40,7 @@ class HistoricalErrorAnnotationFactory extends Factory
                     'total_consolidated_carryover' => '0.00',
                     'accepted_warnings' => [],
                     'applied_settings' => [],
-                    'next_exercise_disposition' => 'not_created_management_terminated',
+                    'next_exercise_disposition' => 'not_created',
                     'next_exercise_id' => null,
                     'operation_id' => (string) Str::uuid(),
                 ],

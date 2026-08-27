@@ -30,7 +30,7 @@ it('approves an aligned proposal with new evidence and redirects to budget', fun
     Expense::factory()->forExercise($exercise)->create();
     $proposal = app(InitializeProposal::class)->execute($user, $company, $exercise, (string) Str::uuid());
     $this->actingAs($user);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     $component = Livewire::test(ViewProposal::class, ['record' => $proposal->id])
         ->assertActionExists('approveBudget')->assertSee('Allocato base')->assertSee('Allocato risultante')->assertSee('Sorgenti interessate')->assertSee('Budget che restano invariati');
     $approvalOperationId = $component->get('approvalOperationId');
@@ -51,7 +51,7 @@ it('hides approval without capability and disables it when readiness is stale', 
     } $expense = Expense::factory()->forExercise($exercise)->create();
     $proposal = app(InitializeProposal::class)->execute($manager, $company, $exercise, (string) Str::uuid());
     $this->actingAs($manager);
-    Filament::setTenant($company);
+    Filament::setTenant(($company)->tenantCompany);
     Livewire::test(ViewProposal::class, ['record' => $proposal->id])->assertActionHidden('approveBudget');
     CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $manager->id, 'capability' => Capability::ApproveBudget]);
     $expense->increment('revision');

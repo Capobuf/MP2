@@ -7,6 +7,7 @@ use App\Filament\Resources\Projects\ProjectResource;
 use App\Models\Company;
 use App\Models\Exercise;
 use App\Models\Project;
+use App\Models\TenantCompany;
 use App\Models\User;
 use App\Support\ExerciseContext;
 use Filament\Actions\Action;
@@ -45,7 +46,8 @@ class CreateProject extends CreateRecord
     protected function handleRecordCreation(array $data): Model
     {
         $actor = auth()->user();
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         abort_unless($actor instanceof User && $company instanceof Company, 403);
 
         $exercise = app(ExerciseContext::class)->current($company);
@@ -93,7 +95,8 @@ class CreateProject extends CreateRecord
 
     private function currentExercise(): ?Exercise
     {
-        $company = Filament::getTenant();
+        $tenant = Filament::getTenant();
+        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $company instanceof Company
             ? app(ExerciseContext::class)->current($company)
