@@ -1,16 +1,118 @@
-name: Hosting Release
+name: CI
 
 on:
-  workflow_run:
-    workflows: ['Quality']
-    types: [completed]
+  push:
+    branches: ['**']
+  pull_request:
 
 permissions:
   contents: read
 
 jobs:
-  release:
-    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: testing
+          MYSQL_USER: sail
+          MYSQL_PASSWORD: password
+          MYSQL_ROOT_PASSWORD: password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --host=127.0.0.1 --user=sail --password=password --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=12
+
+    env:
+      APP_ENV: testing
+      APP_DEBUG: false
+      APP_KEY: base64:JXwSFFMnJZQMZGLjjArLbCWZjajLd3C/aRwEpPN0JbM=
+      APP_URL: http://127.0.0.1:9000
+      CACHE_STORE: array
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: testing
+      DB_USERNAME: sail
+      DB_PASSWORD: password
+      INSTALLER_TEST_DATABASE: testing_installer
+      DEV_ADMIN_NAME: Administrator
+      DEV_ADMIN_EMAIL: admin@mp2.local
+      DEV_ADMIN_PASSWORD: admin@mp2.local
+      MAIL_MAILER: array
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: array
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath, intl, mbstring, pdo_mysql
+          coverage: none
+          tools: composer:v2
+
+      - name: Validate Composer metadata
+        run: composer validate --no-check-publish
+
+      - name: Install locked dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Provision installer test database
+        run: |
+          mysql --host=127.0.0.1 --user=root --password=password --execute="CREATE DATABASE IF NOT EXISTS \`${INSTALLER_TEST_DATABASE}\`; GRANT ALL PRIVILEGES ON \`${INSTALLER_TEST_DATABASE}\`.* TO 'sail'@'%'; FLUSH PRIVILEGES;"
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked frontend dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Audit locked dependencies
+        run: composer audit --locked --no-interaction
+
+      - name: Migrate isolated test database
+        run: php artisan migrate --force --no-interaction
+
+      - name: Check formatting
+        run: vendor/bin/pint --test
+
+      - name: Run static analysis
+        run: vendor/bin/phpstan analyse --no-progress
+
+      - name: Run Pest
+        run: vendor/bin/pest
+
+      - name: Smoke test application
+        run: |
+          php artisan serve --host=127.0.0.1 --port=9000 > storage/logs/ci-server.log 2>&1 &
+          for attempt in {1..15}; do
+            if curl --fail --silent --output /dev/null http://127.0.0.1:9000/admin/login; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat storage/logs/ci-server.log
+          exit 1
+
+  hosting-release:
+    needs: quality
+    if: ${{ github.event_name == 'push' && needs.quality.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -31,8 +133,8 @@ jobs:
           --health-retries=12
 
     env:
-      SOURCE_BRANCH: ${{ github.event.workflow_run.head_branch }}
-      SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+      SOURCE_BRANCH: ${{ github.ref_name }}
+      SOURCE_SHA: ${{ github.sha }}
       APP_ENV: testing
       APP_DEBUG: false
       APP_KEY: base64:JXwSFFMnJZQMZGLjjArLbCWZjajLd3C/aRwEpPN0JbM=
@@ -53,7 +155,7 @@ jobs:
       - name: Checkout validated commit
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
 
       - name: Set up PHP 8.3
         uses: shivammathur/setup-php@v2
@@ -80,6 +182,9 @@ jobs:
 
       - name: Publish installer assets
         run: php artisan vendor:publish --tag=installer-assets --force --no-interaction
+
+      - name: Publish Livewire assets
+        run: php artisan livewire:publish --assets --no-interaction
 
       - name: Prepare release metadata
         run: |
@@ -148,6 +253,8 @@ jobs:
             public/.htaccess
             public/build/manifest.json
             public/installer/installer.css
+            public/vendor/livewire/manifest.json
+            public/vendor/livewire/livewire.min.js
           )
           for path in "${required_files[@]}"; do
             test -f "$RELEASE_STAGE/$path" || { echo "Missing required release file: $path"; exit 1; }
@@ -162,6 +269,7 @@ jobs:
             lang
             public/build
             public/installer
+            public/vendor/livewire
             resources
             routes
             storage/app/private
@@ -232,6 +340,8 @@ jobs:
           unzip -q "$RELEASE_ZIP" -d "$RELEASE_EXTRACT"
           test -f "$RELEASE_EXTRACT/.env"
           test -f "$RELEASE_EXTRACT/public/.htaccess"
+          test -f "$RELEASE_EXTRACT/public/vendor/livewire/manifest.json"
+          test -f "$RELEASE_EXTRACT/public/vendor/livewire/livewire.min.js"
           if find "$RELEASE_EXTRACT" -type l -print -quit | grep -q .; then
             echo 'Symlink found after release extraction.'
             exit 1
@@ -280,6 +390,39 @@ jobs:
             fi
             sleep 1
           done
+
+          install_html=$(curl --fail --silent --show-error http://127.0.0.1:9010/install)
+          if ! grep -Fq '/vendor/livewire/livewire.min.js' <<< "$install_html"; then
+            echo 'Installer HTML does not reference the published Livewire asset.'
+            exit 1
+          fi
+          if grep -Eq '/livewire-[^"[:space:]]+/livewire\.min\.js' <<< "$install_html"; then
+            echo 'Installer HTML references the dynamic Livewire script route.'
+            exit 1
+          fi
+
+          livewire_asset_path=$(grep -oE '/vendor/livewire/livewire\.min\.js(\?[^"[:space:]]*)?' <<< "$install_html" | sed -n '1p')
+          if [ -z "$livewire_asset_path" ]; then
+            echo 'Unable to read the published Livewire asset URL from installer HTML.'
+            exit 1
+          fi
+          livewire_asset_url="http://127.0.0.1:9010${livewire_asset_path}"
+
+          livewire_asset_body=$(mktemp)
+          read -r livewire_asset_status livewire_asset_content_type < <(
+            curl --silent --show-error --output "$livewire_asset_body" --write-out '%{http_code} %{content_type}\n' "$livewire_asset_url"
+          )
+          if [ "$livewire_asset_status" != 200 ]; then
+            echo "Published Livewire asset returned HTTP $livewire_asset_status."
+            exit 1
+          fi
+          case "$livewire_asset_content_type" in
+            text/html*|application/xhtml+xml*)
+              echo "Published Livewire asset returned HTML content type: $livewire_asset_content_type"
+              exit 1
+              ;;
+          esac
+          test -s "$livewire_asset_body"
 
           touch storage/installed
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:9010/admin/login)" = 200
