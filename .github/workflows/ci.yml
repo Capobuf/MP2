@@ -436,3 +436,41 @@ jobs:
           path: ${{ env.RELEASE_ZIP }}
           archive: false
           if-no-files-found: error
+
+  production-deploy:
+    needs: hosting-release
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.hosting-release.result == 'success' }}
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+
+    steps:
+      - name: Configure production SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy production
+        env:
+          SSH_HOST: ${{ vars.PROD_SSH_HOST }}
+          SSH_PORT: ${{ vars.PROD_SSH_PORT }}
+          SSH_USER: ${{ vars.PROD_SSH_USER }}
+        run: |
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            -p "$SSH_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$SSH_USER@$SSH_HOST" \
+            '/usr/local/bin/dploy deploy main --no-interaction --no-ansi'
