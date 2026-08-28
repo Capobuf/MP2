@@ -35,13 +35,14 @@ it('keeps the installer in runtime dependencies and Tinker in development depend
 });
 
 it('codifies staging validation and smoke testing of the extracted ZIP', function () {
-    $qualityWorkflow = file_get_contents(base_path('.github/workflows/quality.yml'));
-    $releaseWorkflow = file_get_contents(base_path('.github/workflows/hosting-release.yml'));
+    $workflow = file_get_contents(base_path('.github/workflows/ci.yml'));
 
     foreach ([
         'public/.htaccess',
         'public/build/manifest.json',
         'public/installer/installer.css',
+        'public/vendor/livewire/manifest.json',
+        'public/vendor/livewire/livewire.min.js',
         'vendor/autoload.php',
         'storage/installed',
         'storage/framework/installer-progress.json',
@@ -52,25 +53,29 @@ it('codifies staging validation and smoke testing of the extracted ZIP', functio
         'unzip',
         'REVISION',
     ] as $contractEntry) {
-        expect($releaseWorkflow)->toContain($contractEntry);
+        expect($workflow)->toContain($contractEntry);
     }
 
-    expect($qualityWorkflow)
+    expect($workflow)
+        ->toContain('name: CI')
         ->toContain("branches: ['**']")
-        ->not->toContain('Create release ZIP')
-        ->not->toContain('actions/upload-artifact')
-        ->not->toContain('testing_installer_smoke')
-        ->and($releaseWorkflow)
-        ->toContain('name: Hosting Release')
-        ->toContain("workflows: ['Quality']")
-        ->toContain("github.event.workflow_run.conclusion == 'success'")
-        ->toContain("github.event.workflow_run.event == 'push'")
-        ->toContain('github.event.workflow_run.head_sha')
+        ->toContain('hosting-release:')
+        ->toContain('needs: quality')
+        ->toContain("if: \${{ github.event_name == 'push' && needs.quality.result == 'success' }}")
+        ->toContain('ref: ${{ github.sha }}')
+        ->not->toContain('workflow_run')
         ->toContain('composer install --no-dev')
+        ->toContain('php artisan livewire:publish --assets --no-interaction')
         ->toContain('-u DB_DATABASE')
         ->toContain('if [ "$status" = 200 ]')
+        ->toContain("grep -Fq '/vendor/livewire/livewire.min.js'")
+        ->toContain("grep -Eq '/livewire-")
+        ->toContain('text/html*|application/xhtml+xml*')
         ->toContain('actions/upload-artifact@v7')
         ->toContain('archive: false');
+
+    expect(file_exists(base_path('.github/workflows/quality.yml')))->toBeFalse()
+        ->and(file_exists(base_path('.github/workflows/hosting-release.yml')))->toBeFalse();
 });
 
 it('contains no upstream branding or external confetti dependency in installer overrides', function () {
