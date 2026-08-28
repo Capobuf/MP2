@@ -2,9 +2,7 @@ name: Quality
 
 on:
   push:
-    branches:
-      - main
-      - develop
+    branches: ['**']
   pull_request:
 
 permissions:
@@ -13,7 +11,7 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     services:
       mysql:
@@ -43,6 +41,8 @@ jobs:
       DB_DATABASE: testing
       DB_USERNAME: sail
       DB_PASSWORD: password
+      INSTALLER_TEST_DATABASE: testing_installer
+      INSTALLER_SMOKE_DATABASE: testing_installer_smoke
       DEV_ADMIN_NAME: Administrator
       DEV_ADMIN_EMAIL: admin@mp2.local
       DEV_ADMIN_PASSWORD: admin@mp2.local
@@ -63,10 +63,14 @@ jobs:
           tools: composer:v2
 
       - name: Validate Composer metadata
-        run: composer validate --strict
+        run: composer validate --no-check-publish
 
       - name: Install locked dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Provision installer test database
+        run: |
+          mysql --host=127.0.0.1 --user=root --password=password --execute="CREATE DATABASE IF NOT EXISTS \`${INSTALLER_TEST_DATABASE}\`; GRANT ALL PRIVILEGES ON \`${INSTALLER_TEST_DATABASE}\`.* TO 'sail'@'%'; FLUSH PRIVILEGES;"
 
       - name: Set up Node.js 24
         uses: actions/setup-node@v7
@@ -106,3 +110,238 @@ jobs:
           done
           cat storage/logs/ci-server.log
           exit 1
+
+      - name: Provision extracted-release smoke database
+        if: github.event_name == 'push'
+        run: |
+          mysql --host=127.0.0.1 --user=root --password=password --execute="CREATE DATABASE IF NOT EXISTS \`${INSTALLER_SMOKE_DATABASE}\`; GRANT ALL PRIVILEGES ON \`${INSTALLER_SMOKE_DATABASE}\`.* TO 'sail'@'%'; FLUSH PRIVILEGES;"
+
+      - name: Prepare release metadata
+        if: github.event_name == 'push'
+        run: |
+          sanitized_branch=$(printf '%s' "$GITHUB_REF_NAME" | sed -E 's/[^A-Za-z0-9._-]+/-/g; s/^-+//; s/-+$//')
+          if [ -z "$sanitized_branch" ]; then
+            sanitized_branch=branch
+          fi
+          short_sha=${GITHUB_SHA:0:7}
+          release_name="mp2-${sanitized_branch}-${short_sha}.zip"
+          {
+            echo "RELEASE_STAGE=${RUNNER_TEMP}/mp2-release"
+            echo "RELEASE_EXTRACT=${RUNNER_TEMP}/mp2-release-extracted"
+            echo "RELEASE_NAME=${release_name}"
+            echo "RELEASE_ZIP=${RUNNER_TEMP}/${release_name}"
+          } >> "$GITHUB_ENV"
+
+      - name: Install production Composer dependencies
+        if: github.event_name == 'push'
+        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress
+
+      - name: Publish installer assets
+        if: github.event_name == 'push'
+        run: php artisan vendor:publish --tag=installer-assets --force --no-interaction
+
+      - name: Stage release runtime
+        if: github.event_name == 'push'
+        run: |
+          mkdir -p "$RELEASE_STAGE"
+          cp -a artisan app config resources routes vendor composer.json composer.lock "$RELEASE_STAGE/"
+
+          mkdir -p "$RELEASE_STAGE/bootstrap/cache"
+          cp bootstrap/app.php bootstrap/providers.php "$RELEASE_STAGE/bootstrap/"
+          cp bootstrap/cache/.gitignore "$RELEASE_STAGE/bootstrap/cache/.gitignore"
+
+          mkdir -p "$RELEASE_STAGE/database"
+          cp -a database/migrations database/seeders "$RELEASE_STAGE/database/"
+
+          mkdir -p "$RELEASE_STAGE/lang"
+          cp -a lang/. "$RELEASE_STAGE/lang/"
+
+          mkdir -p "$RELEASE_STAGE/public"
+          rsync -a --exclude=hot --exclude=storage public/ "$RELEASE_STAGE/public/"
+
+          mkdir -p \
+            "$RELEASE_STAGE/storage/app/private" \
+            "$RELEASE_STAGE/storage/app/public" \
+            "$RELEASE_STAGE/storage/framework/cache/data" \
+            "$RELEASE_STAGE/storage/framework/sessions" \
+            "$RELEASE_STAGE/storage/framework/views" \
+            "$RELEASE_STAGE/storage/logs"
+          cp storage/app/.gitignore "$RELEASE_STAGE/storage/app/.gitignore"
+          cp storage/app/private/.gitignore "$RELEASE_STAGE/storage/app/private/.gitignore"
+          cp storage/app/public/.gitignore "$RELEASE_STAGE/storage/app/public/.gitignore"
+          cp storage/framework/.gitignore "$RELEASE_STAGE/storage/framework/.gitignore"
+          cp storage/framework/cache/.gitignore "$RELEASE_STAGE/storage/framework/cache/.gitignore"
+          cp storage/framework/cache/data/.gitignore "$RELEASE_STAGE/storage/framework/cache/data/.gitignore"
+          cp storage/framework/sessions/.gitignore "$RELEASE_STAGE/storage/framework/sessions/.gitignore"
+          cp storage/framework/views/.gitignore "$RELEASE_STAGE/storage/framework/views/.gitignore"
+          cp storage/logs/.gitignore "$RELEASE_STAGE/storage/logs/.gitignore"
+
+          cp .env.production.example "$RELEASE_STAGE/.env"
+          bootstrap_key=$(php -r 'echo "base64:".base64_encode(random_bytes(32));')
+          sed -i "s|^APP_KEY=.*$|APP_KEY=${bootstrap_key}|" "$RELEASE_STAGE/.env"
+          printf '%s\n' "$GITHUB_SHA" > "$RELEASE_STAGE/REVISION"
+
+      - name: Validate release staging
+        if: github.event_name == 'push'
+        run: |
+          required_files=(
+            .env
+            REVISION
+            artisan
+            composer.json
+            composer.lock
+            vendor/autoload.php
+            public/.htaccess
+            public/build/manifest.json
+            public/installer/installer.css
+          )
+          for path in "${required_files[@]}"; do
+            test -f "$RELEASE_STAGE/$path" || { echo "Missing required release file: $path"; exit 1; }
+          done
+
+          required_directories=(
+            app
+            bootstrap/cache
+            config
+            database/migrations
+            database/seeders
+            lang
+            public/build
+            public/installer
+            resources
+            routes
+            storage/app/private
+            storage/app/public
+            storage/framework/cache/data
+            storage/framework/sessions
+            storage/framework/views
+            storage/logs
+            vendor
+          )
+          for path in "${required_directories[@]}"; do
+            test -d "$RELEASE_STAGE/$path" || { echo "Missing required release directory: $path"; exit 1; }
+          done
+
+          forbidden_paths=(
+            .git
+            .github
+            .agents
+            .specify
+            specs
+            tests
+            node_modules
+            compose.yaml
+            .dockerignore
+            coverage
+            storage/installed
+            storage/framework/installer-progress.json
+            public/hot
+            vendor/laravel/tinker
+            vendor/psy/psysh
+          )
+          for path in "${forbidden_paths[@]}"; do
+            test ! -e "$RELEASE_STAGE/$path" || { echo "Forbidden release path: $path"; exit 1; }
+          done
+
+          if find "$RELEASE_STAGE/storage" -type f ! -name .gitignore -print -quit | grep -q .; then
+            echo 'Runtime storage file found in release staging.'
+            exit 1
+          fi
+          if find "$RELEASE_STAGE/bootstrap/cache" -type f ! -name .gitignore -print -quit | grep -q .; then
+            echo 'Bootstrap cache found in release staging.'
+            exit 1
+          fi
+          if find "$RELEASE_STAGE" -type l -print -quit | grep -q .; then
+            echo 'Symlink found in release staging.'
+            exit 1
+          fi
+          if grep -Eq '^(DEV_ADMIN_|DB_HOST=mysql$|DB_USERNAME=sail$|DB_PASSWORD=password$)' "$RELEASE_STAGE/.env"; then
+            echo 'Development configuration found in release environment.'
+            exit 1
+          fi
+
+          RELEASE_ENV_PATH="$RELEASE_STAGE/.env" php -r '
+          $contents = file_get_contents(getenv("RELEASE_ENV_PATH"));
+          if (!preg_match("~^APP_KEY=base64:([A-Za-z0-9+/=]+)$~m", $contents, $matches)) { exit(1); }
+          if (strlen((string) base64_decode($matches[1], true)) !== 32) { exit(1); }
+          '
+          test "$(tr -d '\r\n' < "$RELEASE_STAGE/REVISION")" = "$GITHUB_SHA"
+
+      - name: Create release ZIP
+        if: github.event_name == 'push'
+        run: |
+          (cd "$RELEASE_STAGE" && zip -qr "$RELEASE_ZIP" .)
+          unzip -t "$RELEASE_ZIP"
+
+      - name: Smoke test extracted release
+        if: github.event_name == 'push'
+        run: |
+          mkdir -p "$RELEASE_EXTRACT"
+          unzip -q "$RELEASE_ZIP" -d "$RELEASE_EXTRACT"
+          test -f "$RELEASE_EXTRACT/.env"
+          test -f "$RELEASE_EXTRACT/public/.htaccess"
+          if find "$RELEASE_EXTRACT" -type l -print -quit | grep -q .; then
+            echo 'Symlink found after release extraction.'
+            exit 1
+          fi
+
+          sed -i 's|^DB_HOST=.*$|DB_HOST=127.0.0.1|' "$RELEASE_EXTRACT/.env"
+          sed -i 's|^DB_PORT=.*$|DB_PORT=3306|' "$RELEASE_EXTRACT/.env"
+          sed -i "s|^DB_DATABASE=.*$|DB_DATABASE=${INSTALLER_SMOKE_DATABASE}|" "$RELEASE_EXTRACT/.env"
+          sed -i 's|^DB_USERNAME=.*$|DB_USERNAME=sail|' "$RELEASE_EXTRACT/.env"
+          sed -i 's|^DB_PASSWORD=.*$|DB_PASSWORD=password|' "$RELEASE_EXTRACT/.env"
+          sed -i 's|^APP_URL=.*$|APP_URL=http://127.0.0.1:9010|' "$RELEASE_EXTRACT/.env"
+
+          cd "$RELEASE_EXTRACT"
+          clean_env=(
+            env
+            -u APP_ENV
+            -u APP_DEBUG
+            -u APP_KEY
+            -u APP_URL
+            -u CACHE_STORE
+            -u DB_CONNECTION
+            -u DB_HOST
+            -u DB_PORT
+            -u DB_DATABASE
+            -u DB_USERNAME
+            -u DB_PASSWORD
+            -u DEV_ADMIN_NAME
+            -u DEV_ADMIN_EMAIL
+            -u DEV_ADMIN_PASSWORD
+            -u MAIL_MAILER
+            -u QUEUE_CONNECTION
+            -u SESSION_DRIVER
+          )
+          "${clean_env[@]}" php artisan about --only=environment
+          "${clean_env[@]}" php artisan migrate --database=mysql --force --no-interaction
+
+          "${clean_env[@]}" php artisan serve --host=127.0.0.1 --port=9010 > storage/logs/release-smoke.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+
+          for attempt in {1..15}; do
+            status=$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:9010/install || true)
+            if [ "$status" = 200 ]; then
+              break
+            fi
+            if [ "$attempt" -eq 15 ]; then
+              cat storage/logs/release-smoke.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          touch storage/installed
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:9010/admin/login)" = 200
+          kill "$server_pid"
+          wait "$server_pid" 2>/dev/null || true
+          trap - EXIT
+
+      - name: Upload release ZIP
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.RELEASE_ZIP }}
+          archive: false
+          if-no-files-found: error

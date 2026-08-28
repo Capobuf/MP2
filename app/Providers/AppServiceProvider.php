@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Installer\Http\Livewire\Installer as Mp2Installer;
+use App\Installer\Support\Mp2InstallationStateManager;
 use App\Models\ContractCondition;
 use App\Models\ContractExerciseClassification;
 use App\Models\ContractLifecycleFact;
@@ -12,8 +14,12 @@ use App\Support\ExerciseContext;
 use App\Support\Reporting\EconomicDashboardReadModel;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
+use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
+use RelayerCore\LaravelInstaller\Contracts\InstallationStateManager;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,6 +28,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(InstallationStateManager::class, Mp2InstallationStateManager::class);
+
         $this->app->scoped(ExerciseContext::class);
         $this->app->scoped(BudgetContext::class);
         $this->app->scoped(EconomicDashboardReadModel::class);
@@ -32,6 +40,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Livewire::component('installer', Mp2Installer::class);
+        Route::get('/install', Mp2Installer::class)
+            ->middleware('web')
+            ->name('installer.index');
+
+        Route::matched(function (RouteMatched $event): void {
+            if ($event->route->getName() === 'installer.progress') {
+                $event->route->middleware('web');
+            }
+        });
+
+        if ($this->app->environment('production')) {
+            config(['app.debug' => false]);
+        }
+
         DatePicker::configureUsing(fn (DatePicker $picker): DatePicker => $picker
             ->native(false)
             ->locale('it')

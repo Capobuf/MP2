@@ -30,6 +30,7 @@
         <env name="DB_PORT" value="3306"/>
         <env name="DB_USERNAME" value="sail"/>
         <env name="DB_URL" value=""/>
+        <env name="INSTALLER_TEST_DATABASE" value="testing_installer"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
