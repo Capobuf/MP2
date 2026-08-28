@@ -6,7 +6,7 @@
 
 ## Summary
 
-Integrare `relayercore/laravel-installer` `1.5.0` come wizard di prima installazione production-only, sostituendo esclusivamente gli step generici incompatibili con MP2: requisito memoria illimitata, configurazione MySQL senza auto-create, preparazione/reset esplicito del database, migrazioni senza cleanup automatico e configurazione scheduler. Conservare lo step admin nativo con callback `is_platform_admin`, proteggere il callback finale dalla chiamata Livewire diretta, localizzare le view necessarie e produrre a ogni push un ZIP runtime autosufficiente dalla CI esistente. L'artefatto include una `.env` di bootstrap generata per build e un file `REVISION`, ma esclude stato runtime, cache bootstrap, Tinker e materiale di sviluppo; la struttura è intenzionalmente compatibile con una futura CI di update, che resta fuori scope.
+Integrare `relayercore/laravel-installer` `1.5.0` come wizard di prima installazione production-only, sostituendo esclusivamente gli step generici incompatibili con MP2: requisito memoria illimitata, configurazione MySQL senza auto-create, preparazione/reset esplicito del database, migrazioni senza cleanup automatico e configurazione scheduler. Conservare lo step admin nativo con callback `is_platform_admin`, proteggere il callback finale dalla chiamata Livewire diretta, localizzare le view necessarie e produrre a ogni push un ZIP runtime autosufficiente tramite una CI di release separata, avviata solo dopo il successo del quality gate. L'artefatto include una `.env` di bootstrap generata per build e un file `REVISION`, ma esclude stato runtime, cache bootstrap, Tinker e materiale di sviluppo; la struttura è intenzionalmente compatibile con una futura CI di update, che resta fuori scope.
 
 ## Technical Context
 
@@ -166,6 +166,7 @@ tests/
 
 .env.production.example
 .github/workflows/quality.yml
+.github/workflows/hosting-release.yml
 composer.json
 composer.lock
 ```
@@ -222,10 +223,11 @@ typed DB name confirmation?
 
 ### Release build
 
-La CI usa un staging directory e costruisce uno ZIP esplicito. Non si carica direttamente l'intero checkout come artifact.
+Il workflow separato `Hosting Release` usa una staging directory e costruisce uno ZIP esplicito dopo il successo di `Quality`. Non si carica direttamente l'intero checkout come artifact.
 
 ```text
-quality passed
+Quality workflow passed on push
+→ Hosting Release checks out the exact validated SHA
 → install production Composer set
 → ensure Vite build exists
 → publish installer public asset

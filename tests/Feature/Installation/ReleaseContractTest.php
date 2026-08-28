@@ -35,7 +35,8 @@ it('keeps the installer in runtime dependencies and Tinker in development depend
 });
 
 it('codifies staging validation and smoke testing of the extracted ZIP', function () {
-    $workflow = file_get_contents(base_path('.github/workflows/quality.yml'));
+    $qualityWorkflow = file_get_contents(base_path('.github/workflows/quality.yml'));
+    $releaseWorkflow = file_get_contents(base_path('.github/workflows/hosting-release.yml'));
 
     foreach ([
         'public/.htaccess',
@@ -51,11 +52,20 @@ it('codifies staging validation and smoke testing of the extracted ZIP', functio
         'unzip',
         'REVISION',
     ] as $contractEntry) {
-        expect($workflow)->toContain($contractEntry);
+        expect($releaseWorkflow)->toContain($contractEntry);
     }
 
-    expect($workflow)
+    expect($qualityWorkflow)
         ->toContain("branches: ['**']")
+        ->not->toContain('Create release ZIP')
+        ->not->toContain('actions/upload-artifact')
+        ->not->toContain('testing_installer_smoke')
+        ->and($releaseWorkflow)
+        ->toContain('name: Hosting Release')
+        ->toContain("workflows: ['Quality']")
+        ->toContain("github.event.workflow_run.conclusion == 'success'")
+        ->toContain("github.event.workflow_run.event == 'push'")
+        ->toContain('github.event.workflow_run.head_sha')
         ->toContain('composer install --no-dev')
         ->toContain('-u DB_DATABASE')
         ->toContain('if [ "$status" = 200 ]')

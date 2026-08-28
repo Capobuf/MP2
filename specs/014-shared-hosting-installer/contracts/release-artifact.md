@@ -148,7 +148,9 @@ La copia applicativa nello staging usa una allowlist di root: `artisan`, `app`, 
 
 ## Artifact validation
 
-Prima dell'upload la CI deve:
+Il workflow `Quality` non contiene step di packaging. Il workflow separato `Hosting Release` viene avviato solo dopo un `Quality` concluso con successo per un push ed esegue checkout dello SHA validato.
+
+Prima dell'upload `Hosting Release` deve:
 
 1. controllare i required paths;
 2. controllare gli excluded paths;

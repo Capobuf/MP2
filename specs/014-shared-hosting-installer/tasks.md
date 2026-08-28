@@ -126,11 +126,11 @@ description: "Implementation tasks for shared-hosting installer and release ZIP"
 ### Implementation for User Story 4
 
 - [X] T031 [US4] Update `.github/workflows/quality.yml` so branch `push` uses `branches: ['**']` while existing pull-request quality and the earlier `testing_installer` provisioning remain intact.
-- [X] T032 [US4] Add push-only release staging steps to `.github/workflows/quality.yml`: convert Composer install to production runtime set after tests, ensure Vite build exists, publish installer public assets, copy the exact root allowlist from the artifact contract, and create fresh `bootstrap/cache` plus `storage` skeletons instead of copying runtime trees.
-- [X] T033 [US4] Add release metadata generation to `.github/workflows/quality.yml`: copy `.env.production.example` to staging `.env`, inject a cryptographically random Laravel APP_KEY, write full SHA to `REVISION`, and derive a sanitized `mp2-<branch>-<short-sha>.zip` name.
-- [X] T034 [US4] Add required/forbidden path validation and ZIP creation to `.github/workflows/quality.yml`, explicitly preserving `.env` and `public/.htaccess` while excluding Tinker, `public/hot`, `bootstrap/cache/*.php`, `storage/installed`, installer progress and all runtime/dev state.
-- [X] T035 [US4] Add a clean-extraction smoke in `.github/workflows/quality.yml` that provisions `testing_installer_smoke`, changes only the extracted copy's `.env`, and proves Artisan bootstrap, migrations and HTTP installer/login availability with production dependencies and no checkout paths.
-- [X] T036 [US4] Upload the already-created ZIP as the GitHub Actions artifact only after the release validations and extracted smoke succeed.
+- [X] T032 [US4] Add `.github/workflows/hosting-release.yml`, triggered only after a successful push `Quality` run, to check out the validated SHA, install production dependencies, build Vite assets, publish installer assets, copy the exact root allowlist, and create fresh `bootstrap/cache` plus `storage` skeletons instead of copying runtime trees.
+- [X] T033 [US4] Add release metadata generation to `.github/workflows/hosting-release.yml`: copy `.env.production.example` to staging `.env`, inject a cryptographically random Laravel APP_KEY, write the validated full SHA to `REVISION`, and derive a sanitized `mp2-<branch>-<short-sha>.zip` name.
+- [X] T034 [US4] Add required/forbidden path validation and ZIP creation to `.github/workflows/hosting-release.yml`, explicitly preserving `.env` and `public/.htaccess` while excluding Tinker, `public/hot`, `bootstrap/cache/*.php`, `storage/installed`, installer progress and all runtime/dev state.
+- [X] T035 [US4] Add a clean-extraction smoke in `.github/workflows/hosting-release.yml` that uses `testing_installer_smoke`, changes only the extracted copy's `.env`, and proves Artisan bootstrap, migrations and HTTP installer/login availability with production dependencies and no checkout paths.
+- [X] T036 [US4] Upload the already-created ZIP from `Hosting Release` only after the release validations and extracted smoke succeed.
 
 **Checkpoint**: Every valid push produces one tested deployment archive.
 

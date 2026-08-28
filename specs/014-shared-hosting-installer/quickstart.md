@@ -138,9 +138,10 @@ Eseguire un push su un branch.
 
 Expected:
 
-- quality gate eseguito;
-- se passa, artifact con file `mp2-<branch>-<sha>.zip`;
-- se fallisce, nessuna release valida.
+- workflow `Quality` eseguito senza step di packaging;
+- se passa, avvio del workflow separato `Hosting Release` sullo stesso commit;
+- `Hosting Release` produce l'artifact `mp2-<branch>-<sha>.zip`;
+- se `Quality` fallisce, `Hosting Release` non produce alcuna release valida.
 
 Scaricare lo ZIP prodotto.
 

@@ -266,19 +266,19 @@ Per MP2 l'operatore crea già il database nel pannello hosting. Ridurre l'interf
 
 **Package defect handled**: `CheckRequirements::memoryInBytes('-1')` restituisce `-1`, quindi l'implementazione nativa blocca erroneamente un limite illimitato. La sottoclasse MP2 tratta `-1` come illimitato e delega tutto il resto al package.
 
-## Decisione 15 - Una sola CI con release dopo il quality gate
+## Decisione 15 - Workflow Hosting Release separato dopo il quality gate
 
-**Decision**: estendere l'attuale `.github/workflows/quality.yml` anziché introdurre una seconda pipeline duplicata.
+**Decision**: mantenere `.github/workflows/quality.yml` dedicato esclusivamente al quality gate e costruire lo ZIP in `.github/workflows/hosting-release.yml`.
 
 **Behavior**:
 
-- `push`: tutti i branch;
-- `pull_request`: mantiene quality gate, senza obbligo di pubblicare release;
-- dopo i test, solo per evento `push`, prepara dipendenze production, staging, ZIP, smoke e artifact.
+- `Quality` continua a eseguire push su tutti i branch e pull request;
+- `Hosting Release` parte tramite `workflow_run` solo quando `Quality` termina con successo per un evento `push`;
+- il workflow release esegue checkout dello SHA esatto validato e prepara autonomamente dipendenze production, asset, staging, ZIP, smoke e artifact.
 
-**Rationale**: riusa install/build già eseguiti nello stesso job e limita il costo CI.
+**Rationale**: separa chiaramente verifica del codice e produzione dell'artefatto, impedendo che lo ZIP venga costruito quando il quality gate fallisce.
 
-**Trade-off**: il job di push avrà alcuni step aggiuntivi dopo il quality gate. Se supera stabilmente i target CI esistenti, il packaging potrà essere separato in un job successivo senza cambiare il contratto della feature.
+**Trade-off**: il workflow release ripete l'installazione delle dipendenze e la build frontend, necessarie per essere autonomo e non dipendere dal workspace effimero del quality gate.
 
 ## Decisione 16 - Contratto dell'archivio
 
@@ -348,7 +348,7 @@ Lo staging crea `bootstrap/cache` e l'albero `storage` da zero e copia solo i pl
 
 **Rationale**: protegge i rischi unici della feature senza testare framework behavior banale.
 
-**Database test isolation**: i test distruttivi dell'installer usano `INSTALLER_TEST_DATABASE=testing_installer`, distinto dal database suite `testing`. Il default dell'applicazione resta `testing`, così `TestEnvironmentGuard` continua a fallire closed; la CI crea lo schema e concede a `sail` privilegi soltanto su `testing_installer.*` prima di Pest. I test verificano ambiente `testing`, nome esatto con prefisso `testing_` e connessione separata prima di qualsiasi wipe. Lo smoke ZIP usa `testing_installer_smoke`, creato/concesso separatamente nel solo ramo push, e non riusa né il database della suite né dati di sviluppo.
+**Database test isolation**: i test distruttivi dell'installer usano `INSTALLER_TEST_DATABASE=testing_installer`, distinto dal database suite `testing`. Il default dell'applicazione resta `testing`, così `TestEnvironmentGuard` continua a fallire closed; `Quality` crea lo schema e concede a `sail` privilegi soltanto su `testing_installer.*` prima di Pest. Lo smoke ZIP del workflow `Hosting Release` usa il proprio schema `testing_installer_smoke` e non riusa né il database della suite né dati di sviluppo.
 
 ## Decisione finale
 
