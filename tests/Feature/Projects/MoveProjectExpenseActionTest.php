@@ -86,7 +86,7 @@ it('reveals only declarations required by the selected Project destination', fun
     foreach ([Capability::View, Capability::ManageOperations] as $capability) {
         CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $manager->id, 'capability' => $capability]);
     }
-    $exercise = Exercise::factory()->for($company)->create();
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
     $plannedProject = Project::factory()->for($company)->create(['initial_state' => ProjectState::Planned]);
     $openProject = Project::factory()->for($company)->create(['initial_state' => ProjectState::Open]);
     ProjectExerciseClassification::factory()->forProjectAndExercise($plannedProject, $exercise)->create();
