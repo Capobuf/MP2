@@ -94,12 +94,14 @@ it('streams a PDF inline only after authenticated same-company authorization', f
     );
 
     $this->get(route('attachments.preview', $attachment))->assertRedirect();
-    $this->actingAs($actor)->get(route('attachments.preview', $attachment))
+    $response = $this->actingAs($actor)->get(route('attachments.preview', $attachment));
+    $response
         ->assertOk()
         ->assertHeader('content-type', 'application/pdf')
-        ->assertHeader('cache-control', 'private, no-store')
         ->assertHeader('x-content-type-options', 'nosniff')
         ->assertHeader('content-disposition', 'inline; filename=evidenza.pdf');
+    expect($response->headers->hasCacheControlDirective('private'))->toBeTrue()
+        ->and($response->headers->hasCacheControlDirective('no-store'))->toBeTrue();
 
     $other = User::factory()->create();
     $this->actingAs($other)->get(route('attachments.preview', $attachment))->assertNotFound();
