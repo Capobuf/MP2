@@ -31,4 +31,4 @@
 
 ## Notes
 
-- Iteration 1: content and scope checks pass. FR-S11-031 was clarified as an immediate single-PDF download. FR-S11-015 was clarified as an explicit S11 exclusion: `Sostituito` is neither assigned nor exposed, while FR-095/INV-28.60 remain `planned` pending a future canonical decision.
+- Iteration 1: content and scope checks pass. FR-S11-031 was clarified as an immediate single-PDF download. FR-S11-015 records the permanent canonical rule: `Sostituito` is neither assigned nor exposed. FR-095/INV-28.60 are verified in S5 for `Collegato a`.

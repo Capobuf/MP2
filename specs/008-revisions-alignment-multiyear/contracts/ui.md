@@ -87,7 +87,7 @@ same operation returns the same Discarded Proposal.
 ## Explicitly unavailable controls
 
 No S7 page exposes Carryover, Reprogramming, Closing, late correction, historical
-annotation, full comparison/export, Forecast, directed `Sostituisce`, parallel Draft,
+annotation, full comparison/export, Forecast, structured source replacement, parallel Draft,
 physical delete, or arbitrary as-of controls.
 
 ## Empty, error and accessibility behavior

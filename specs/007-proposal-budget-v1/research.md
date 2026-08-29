@@ -170,12 +170,12 @@ plugin is disproportionate.
 
 **Decision:** S6 detects stale/new/inconsistent sources but offers no reload/keep/
 manual realignment; creates only v1; exposes no carryover, reprogramming, Closing,
-late correction, full comparison/export, Forecast, `Sostituisce`, alternate Draft,
+late correction, full comparison/export, Forecast, structured source replacement, alternate Draft,
 or arbitrary as-of controls.
 
-**Rationale:** These exclusions are explicit roadmap boundaries, not missing S6
-implementations. Rejected requests receive a domain message rather than a partial
-record.
+**Rationale:** The S7+ exclusions are explicit roadmap boundaries, not missing S6
+implementations; structured source replacement is instead permanently absent under
+canonical §32. Rejected requests receive a domain message rather than a partial record.
 
 **Alternatives considered:** Placeholder actions or inactive fields would falsely
 suggest supported behavior and invite early implementation.

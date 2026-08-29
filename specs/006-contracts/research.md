@@ -159,17 +159,14 @@ values are canonically excluded.
 
 **Decision:** Persist `Collegato a` in a dedicated `project_contract_links` table
 with normalized Project and Contract endpoints, one company, active uniqueness,
-Archive/restore, note, revision, and audit. Do not add a generic relation union or any
-`Sostituisce` input in this plan.
+Archive/restore, note, revision, and audit. Do not add a generic relation union.
 
-**Rationale:** The Project-Contract link is deterministic and useful now. A dedicated
-table retains composite same-company foreign keys and is smaller than a generic
-source relation. Directed replacement remains blocked by the explicit category-E
-ownership-movement gap.
+**Rationale:** The Project-Contract link is the only canonical informative relation.
+A dedicated table retains composite same-company foreign keys and is smaller than a
+generic source relation.
 
-**Alternatives considered:** Guessing a movement rule violates domain authority;
-building a generic relation table now would implement the blocked future case; silently
-dropping FR-095 status would misstate coverage.
+**Alternatives considered:** A generic relation table would add non-canonical
+semantics and unnecessary polymorphism.
 
 ## Decision 11 — Use native private storage for immutable attachment versions
 

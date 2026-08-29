@@ -52,7 +52,8 @@ date must be explicitly reconfirmed. Economically used Supplier change and manua
 Contract Estimate are unavailable.
 
 `Collega Progetto e Contratto` accepts live OriginKeys or same-Proposal Project and
-Contract ProposalItemIDs. `Sostituisce` is not displayed or accepted.
+Contract ProposalItemIDs. Structured source replacement is not displayed or accepted,
+as required by canonical §32.
 
 Every successful planning command refreshes Item result/readiness and appends one
 typed event. Input changes invalidate any displayed preview.

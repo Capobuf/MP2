@@ -459,7 +459,7 @@ archive/restore terminal Contracts, and inspect the immutable company-scoped his
   physically deleted through ordinary operations.
 - **S5-FR-051**: S5 MUST NOT implement Proposals, Budgets, Revisions, carryover,
   reprogramming, Closing, late closed-year correction, Forecast, invoicing, payment
-  schedules, reminders, full reporting, or directed `Sostituisce` relations.
+  schedules, reminders, full reporting, or non-canonical informative relations.
 - **S5-FR-052**: Contracts, Expenses, and Lines MUST support optional attachments
   owned by the same company as the attached object. Attachments used as evidence for
   a later approval, Revision, Closing, late correction, or historical-error
@@ -528,7 +528,7 @@ archive/restore terminal Contracts, and inspect the immutable company-scoped his
   deletion, and stale confirmation is rejected with zero partial economic effect.
 - **SC-009**: The complete S5 demonstration exposes no Proposal, Budget, carryover,
   reprogramming, Closing, closed-year correction, Forecast, invoice, payment
-  schedule, reminder, full-reporting control, or directed `Sostituisce` relation.
+  schedule, reminder, full-reporting control, or non-canonical informative relation.
 - **SC-010**: Every tested Contract, Expense, and Line attachment is readable only
   within its company; any attachment retained as historical decision evidence is
   immutable or versioned and survives removal from the live object.
@@ -565,12 +565,12 @@ archive/restore terminal Contracts, and inspect the immutable company-scoped his
   evidence rules in §§23.12 and 30.9.
 - Canonical FR-062–FR-078 for Contract data, lifecycle, renewals, conditions,
   recurrence, attribution, no prorata, and manual Actuals.
-- Canonical FR-090 and the Project-Contract `Collegato a` portion of FR-095 for
-  informative deadlines and non-economic navigation. Full FR-095 remains planned.
+- Canonical FR-090 and FR-095 for informative deadlines and non-economic
+  Project-Contract `Collegato a` navigation.
 - Contract completion of canonical FR-005–FR-007, FR-051–FR-052, FR-079–FR-081 and
   invariants 28.4, 28.5, 28.42, 28.43 and 28.52 across every first-level source.
-- Canonical invariants 28.9, 28.32–28.41 and 28.56; S5 exercises the non-economic
-  `Collegato a` portion of 28.60 without claiming the full invariant.
+- Canonical invariants 28.9, 28.32–28.41, 28.56 and 28.60; S5 exercises the complete
+  residual informative-relation invariant through `Collegato a`.
 - First complete verification of canonical FR-094 for atomic operations across
   multiple open Exercises.
 - Cross-cutting reuse of canonical FR-084 and invariants 28.24, 28.44–28.46, and
@@ -591,11 +591,9 @@ archive/restore terminal Contracts, and inspect the immutable company-scoped his
   reporting are canonical but assigned to later roadmap slices; S5 does not
   approximate them. S5 supplies only their shared attachment prerequisite, without
   introducing those later workflows.
-- Directed `Sostituisce` relations are excluded from the bounded plan because the
-  canon does not define what happens when an autonomous Expense used as an active
-  endpoint is moved into a Project or Contract. This category-E gap blocks only
-  `Sostituisce`; no automatic archive, movement block, or historical endpoint rule
-  is inferred.
+- Canonical §32 permanently excludes structured source-replacement relations. No
+  automatic relation archive, movement block, or historical endpoint rule is
+  introduced when an autonomous Expense changes owner.
 - Contract state at date, renewal, recurrence, annual attribution, economic-change
   boundary, ownership, classification, deadlines, and Project-Contract links are
   deterministic in the canonical domain. No other category-E structural gap was

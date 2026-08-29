@@ -102,7 +102,7 @@ changing its traceability anchor.
 | FR-092 | Permessi assegnati per Azienda | §§26.5–26.6 | S1 — Azienda, accesso e impostazioni | verified |
 | FR-093 | Audit di permessi e Impostazioni | §§26.8–26.10 | S1 — Azienda, accesso e impostazioni | verified |
 | FR-094 | Operazioni inter-Esercizio atomiche | §10 | S5 — Contratti | verified |
-| FR-095 | Relazioni informative senza effetto economico | §7.3 | S5 — Contratti | planned |
+| FR-095 | `Collegato a` senza effetto economico | §7.3 | S5 — Contratti | verified |
 | FR-096 | Report separato delle correzioni e annotazioni | §§24.11, 25.13 | S11 — Reportistica ed esportazione | implemented |
 | FR-097 | Approvazione economica esterna ammessa | §26.11 | S6 — Proposta e Budget iniziale | verified |
 | FR-098 | EUR, netto IVA e anno solare | §4.3 | S3 — Esercizi, Spese e Righe | verified |

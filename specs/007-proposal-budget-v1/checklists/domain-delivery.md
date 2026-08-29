@@ -34,7 +34,7 @@ measurable before implementation
 - [x] CHK017 Are Actual changes treated consistently as readiness-invalidating reality while remaining excluded from plan actions and Budget baseline? [Consistency, Spec §US1–US3, S6-FR-009, S6-FR-025, S6-FR-043]
 - [x] CHK018 Are Company capabilities consistent between read, manage, review and approve journeys? [Consistency, Spec §S6-FR-001–S6-FR-002, SC-009]
 - [x] CHK019 Are zero-allocation decision-bearing sources consistently included in Budget while excluded from totals? [Consistency, Spec §Edge Cases, S6-FR-038, S6-FR-044]
-- [x] CHK020 Are Project–Contract `Collegato a` requirements consistent with the explicit `Sostituisce` exclusion and zero economic propagation? [Consistency, Spec §S6-FR-021–S6-FR-022]
+- [x] CHK020 Are Project–Contract `Collegato a` requirements consistent with canonical §32 and zero economic propagation? [Consistency, Spec §S6-FR-021–S6-FR-022]
 
 ## Acceptance Criteria Quality
 
@@ -57,7 +57,7 @@ measurable before implementation
 
 - [x] CHK032 Are S3–S5 dependencies and reused authority boundaries stated without redefining their behavior? [Dependency, Spec §Assumptions]
 - [x] CHK033 Are S7 resolution/Revision, S8 carryover/reprogramming, S9 Closing, S10 late correction and S11 full reporting boundaries explicit? [Coverage, Spec §S6-FR-023, S6-FR-027, S6-FR-050]
-- [x] CHK034 Is the category-E directed replacement gap documented as blocked rather than resolved by a technical assumption? [Conflict, Spec §S6-FR-022, Assumptions]
+- [x] CHK034 Is structured source replacement absent without introducing endpoint-movement rules? [Conflict, Spec §S6-FR-022, Assumptions]
 - [x] CHK035 Are Forecast, fuzzy matching, parallel alternatives, arbitrary as-of reconstruction and maker-checker explicitly excluded? [Coverage, Spec §S6-FR-043, S6-FR-045, S6-FR-050]
 - [x] CHK036 Are the 16 canonical S6 FRs and seven primary invariants traceably accounted for without claiming later-slice rules? [Traceability, Spec §Requirements, Assumptions]
 

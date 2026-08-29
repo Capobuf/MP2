@@ -99,7 +99,7 @@ Also verify:
 - `visualizza`, `gestisce_proposte`, and `approva_budget` remain distinct;
 - another Company cannot read or submit any S7 action;
 - terminal Proposals expose no mutations;
-- no S8–S11, Forecast, `Sostituisce`, delete or field-merge control appears;
+- no S8–S11, Forecast, structured source-replacement, delete or field-merge control appears;
 - browser console errors and failed Livewire requests are absent.
 
 ### Authenticated browser evidence — 2026-08-23

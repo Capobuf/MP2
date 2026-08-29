@@ -558,7 +558,7 @@ code paths:
 - Closing Snapshot and automatic creation of `N+1`: S9.
 - Historical corrections and late Actual semantics: S10.
 - Full report comparison, export, Forecast, and trend semantics: S11.
-- Directed `Sostituisce` relation gap already recorded in the roadmap.
+- Structured source replacement, permanently absent under canonical §32.
 - Automatic maximum Carryover.
 - Split Carryover + Reprogramming for one Project passage.
 - Automatic source-line selection or FIFO/LIFO matching.

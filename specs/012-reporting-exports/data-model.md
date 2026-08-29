@@ -157,7 +157,7 @@ Ogni valore resta nominato anche quando due importi coincidono.
 - contract_expiry_in_selected_interval;
 - undefined_expiry.
 
-`replaced` non appartiene al vocabolario S11 finché FR-095/INV-28.60 restano `planned`.
+`replaced` non appartiene al vocabolario S11 perché la §32 ha rimosso permanentemente l'etichetta corrispondente dal dominio.
 
 ## Regole di costruzione per riferimento
 
@@ -214,4 +214,3 @@ Storno o azzeramento materializzato nel finale resta `modified`.
 - Nessun lifecycle di report o export.
 - Il PDF esiste solo nella risposta HTTP; nessun file permanente o job.
 - Qualunque riferimento incoerente interrompe la costruzione prima di produrre output.
-

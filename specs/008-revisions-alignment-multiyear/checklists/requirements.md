@@ -33,5 +33,5 @@
 
 - Validation completed against canonical §§7.6.3, 10, 12.2–12.16, 13.2–13.6, 22.7–22.9,
   26.3, 28.18, 28.22, 28.55, and roadmap S7 boundaries.
-- FR-095 directed `Sostituisce` remains explicitly excluded because its recorded
-  category-E endpoint-movement gap has not been reopened.
+- FR-095 and invariant 28.60 are fully represented by `Collegato a`; canonical §32
+  permanently removes structured source replacement.

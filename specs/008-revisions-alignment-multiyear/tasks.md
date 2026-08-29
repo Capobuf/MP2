@@ -196,7 +196,7 @@ idempotent, authorized, atomic and terminal.
 compatibility, then update traceability only from passing evidence.
 
 - [X] T046 [P] Add authoritative invariant 28.18, 28.22 and 28.55 tests in `tests/Feature/Proposals/S7InvariantTest.php`.
-- [X] T047 [P] Add S7 authorization/tenant and explicit S8–S11, Forecast, `Sostituisce`, field-merge, physical-delete and generic-inconsistency rejection coverage in `tests/Feature/Proposals/S7ExcludedBehaviorTest.php` and `tests/Feature/Proposals/ProposalAuthorizationTest.php`.
+- [X] T047 [P] Add S7 authorization/tenant and explicit S8–S11, Forecast, non-canonical relation, field-merge, physical-delete and generic-inconsistency rejection coverage in `tests/Feature/Proposals/S7ExcludedBehaviorTest.php` and `tests/Feature/Proposals/ProposalAuthorizationTest.php`.
 - [X] T048 Run all focused S7 tests and Laravel boot, fix regressions within S7 scope, and record focused evidence in `specs/008-revisions-alignment-multiyear/quickstart.md`.
 - [X] T049 Run the final heavy gate from `quickstart.md`: Composer validation/audit, Pint, PHPStan, complete isolated Pest suite, and `git diff --check`; fix only S7-caused failures.
 - [X] T050 Perform the authenticated browser Revision-to-vN+1, three realignment choices, acknowledgement, Closed divergence, copy-from-Closed, discard and terminal-readonly demonstration; record non-destructive evidence in `specs/008-revisions-alignment-multiyear/quickstart.md`.

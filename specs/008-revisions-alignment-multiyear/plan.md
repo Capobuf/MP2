@@ -63,7 +63,7 @@ P1 journeys; no production throughput claim
 | Principle | Gate result |
 |---|---|
 | Canonical domain authority | PASS — behavior maps to FR-013, FR-024–FR-026, FR-029–FR-030 and invariants 28.18, 28.22 and 28.55. |
-| Category A–E discipline | PASS — all delivered cases are directly specified or composable; directed `Sostituisce` remains blocked by the recorded category-E gap. |
+| Category A–E discipline | PASS — all delivered cases are directly specified or composable; structured source replacement is absent under §32. |
 | Simplicity and proportionality | PASS — existing snapshots, value rules, Actions, audit receipts, policies and Filament screens are extended directly. |
 | Slice boundary | PASS — S8 carryover/reprogramming, S9 Closing, S10 late corrections/annotations and S11 full reports/exports remain absent. |
 | Dependency integrity | PASS — no dependency is added and dependency source remains untouched. |

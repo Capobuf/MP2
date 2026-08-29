@@ -64,7 +64,7 @@ production throughput claim
 | Principle | Gate result |
 |---|---|
 | Canonical domain authority | PASS — behavior maps to FR-011, FR-012, FR-015–FR-023, FR-027–FR-028, FR-085–FR-086, FR-097 and invariants 28.17, 28.19–28.21, 28.23, 28.47–28.48. |
-| Category A–E discipline | PASS — only deterministic `Collegato a` is exposed; the category-E `Sostituisce` gap remains blocked and unavailable. |
+| Category A–E discipline | PASS — only canonical `Collegato a` is exposed; structured source replacement is absent under §32. |
 | Simplicity and proportionality | PASS — direct models, source-specific value code, Actions, policies, native Filament, existing audit and private storage only. |
 | Slice boundary | PASS — S7 realignment resolution and revisions, S8 carryover/reprogramming, S9 Closing, S10 late correction, S11 complete reporting, Forecast and parallel alternatives remain absent. |
 | Dependency integrity | PASS — no dependency is added and dependency source remains untouched. |

@@ -211,8 +211,7 @@ lineage, atomicity, idempotency, immutability, and unchanged reality.
   original changes or is archived.
 - A user attempts to use Revision realignment to change, move, or reclassify Actuals.
 - A requested multi-year action is Carryover or Reprogramming, which belongs to S8.
-- A requested directed `Sostituisce` relation reaches the unresolved category-E
-  structural gap recorded by the roadmap.
+- A requested structured source-replacement relation is rejected under canonical §32.
 
 ## Requirements *(mandatory)*
 
@@ -335,9 +334,9 @@ lineage, atomicity, idempotency, immutability, and unchanged reality.
   Closing, late corrections, complete comparison/report/export semantics, Forecast,
   fuzzy matching, parallel Proposal alternatives, arbitrary-time reconstruction, or
   automatic rollback of live reality when a Draft is discarded.
-- **S7-FR-036**: Directed `Sostituisce` actions MUST remain unavailable under the
-  roadmap's existing category-E structural gap; S7 MUST NOT select an archive,
-  rejection, or historical-endpoint behavior for that unresolved case.
+- **S7-FR-036**: Structured source-replacement actions MUST remain unavailable under
+  canonical §32; S7 MUST NOT introduce archive, movement, or historical-endpoint
+  behavior for such a relation.
 
 ### Key Entities
 
@@ -406,8 +405,7 @@ lineage, atomicity, idempotency, immutability, and unchanged reality.
   planning workspace, a generic merge engine, or a generic multi-year rules engine.
 - Carryover and Reprogramming are intentionally deferred to S8 even when a Proposal
   displays existing values needed to explain an impact.
-- The directed `Sostituisce` endpoint-movement case remains a category-E structural
-  gap and therefore blocks that directed relation behavior until the canonical
-  domain is explicitly reopened.
+- Canonical §32 removes structured source replacement; endpoint movement follows only
+  the ordinary Expense rules and introduces no relation-specific behavior.
 - All requested behavior is directly specified by the canonical domain or composes
   already defined primitives; no new category-E case is introduced by this slice.

@@ -13,7 +13,7 @@
 ### Session 2026-08-24
 
 - Q: Quale formato e modalità di consegna deve usare S11 per le esportazioni? → A: Singolo PDF con download immediato.
-- Q: Come deve comportarsi S11 con l'etichetta `Sostituito`, dato che la specifica canonica elenca l'etichetta ma non definisce ancora la relazione `Sostituisce`? → A: S11 non assegna né espone `Sostituito`; FR-095 e INV-28.60 restano `planned`.
+- Q: Come deve comportarsi S11 con l'etichetta `Sostituito`? → A: S11 non la assegna né la espone perché la §32 l'ha rimossa permanentemente dal dominio.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -128,7 +128,7 @@ Un utente esporta il report selezionato e scarica immediatamente un singolo PDF 
 - **FR-S11-012**: Le etichette secondarie applicabili MUST potersi sovrapporre senza alterare o duplicare conteggi primari.
 - **FR-S11-013**: La sorgente di primo livello MUST ricevere `Non previsto` secondo la formula del §25.8, usando `HaEffettivi` e non il solo saldo netto.
 - **FR-S11-014**: La sorgente di primo livello MUST ricevere `Previsto e non avvenuto` solo nelle condizioni chiuse del §25.9; una sorgente ancora operativa in Esercizio Aperto riceve soltanto `Senza Effettivi`.
-- **FR-S11-015**: S11 MUST NOT assegnare o esporre l'etichetta `Sostituito`; FR-095 e INV-28.60 restano `planned` finché una futura specifica canonica non definisce la relazione diretta `Sostituisce`.
+- **FR-S11-015**: S11 MUST NOT assegnare o esporre l'etichetta `Sostituito`, rimossa permanentemente dal dominio dalla §32.
 - **FR-S11-016**: L'etichetta di scadenza entro intervallo MUST essere applicata solo quando il report dichiara un intervallo esplicito che contiene la scadenza; MUST NOT esistere una soglia implicita.
 - **FR-S11-017**: La vista annuale esecutiva MUST mostrare tutti i valori, conteggi e Annotazioni elencati nel §25.10.
 - **FR-S11-018**: Ogni totale MUST offrire drill-down per tutti i livelli applicabili elencati nel §25.11, fino a Righe, condizioni/cicli, eventi, Riporti e Annotazioni.
@@ -189,7 +189,7 @@ Un utente esporta il report selezionato e scarica immediatamente un singolo PDF 
 
 - L'autenticazione, la tenancy Filament e la capacità aziendale `visualizza` già esistenti vengono riutilizzate senza introdurre nuove capacità.
 - Budget Snapshot, Closing Snapshot, correzioni tardive, Annotazioni, Timeline e oggetti vivi restano le fonti già definite dal dominio; S11 non crea nuove baseline economiche.
-- Il gap diretto `Sostituisce`/FR-095/INV-28.60 non viene risolto o anticipato da S11.
+- FR-095 e INV-28.60 riguardano esclusivamente `Collegato a` e sono verificati in S5; S11 non introduce relazioni informative ulteriori.
 - S9 dispone di codice, test, prova browser e CI verdi, ma la roadmap resta correttamente `implemented` finché manca evidenza formale della revisione umana richiesta; S11 non ne modifica lo stato.
 - Il formato concordato è un singolo PDF con download immediato; il piano tecnico giustifica e vincola la dipendenza di rendering dopo il confronto con lo stack corrente.
 
@@ -199,4 +199,4 @@ Un utente esporta il report selezionato e scarica immediatamente un singolo PDF 
 - **Dependency S9**: Snapshot di Chiusura autonoma, valori e stati al 31 dicembre.
 - **Dependency S10**: correzioni tardive e Annotazioni append-only separate dalla Snapshot.
 - **In scope**: tutto il capitolo 25, i sei FR assegnati a S11, INV-28.50 e INV-28.51, regressioni di INV-28.52 e regole storiche/autorizzative direttamente necessarie.
-- **Out of scope**: Forecast, as-of arbitrario, matching fuzzy, nuove relazioni `Sostituisce`, modifica delle Snapshot, riapertura di Esercizi, nuovi Effettivi prodotti dai report, approvazioni o mutazioni economiche.
+- **Out of scope**: Forecast, as-of arbitrario, matching fuzzy, relazioni strutturate di sostituzione vietate dalla §32, modifica delle Snapshot, riapertura di Esercizi, nuovi Effettivi prodotti dai report, approvazioni o mutazioni economiche.

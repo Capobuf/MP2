@@ -43,7 +43,7 @@ it('rejects every non-plan baseline family recursively', function (string $key):
     'Correzione tardiva' => 'late_correction',
 ]);
 
-it('does not represent later-slice actions or directed replacement', function (): void {
+it('does not represent later-slice actions or non-canonical source replacement', function (): void {
     foreach ([
         'realign_source',
         'keep_proposal',

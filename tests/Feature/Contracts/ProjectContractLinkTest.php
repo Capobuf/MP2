@@ -8,10 +8,14 @@ use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\CompanyCapability;
 use App\Models\Contract;
+use App\Models\ContractExerciseClassification;
+use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\Project;
+use App\Models\ProjectDeferral;
+use App\Models\ProjectExerciseClassification;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -33,6 +37,17 @@ function projectContractLinkContext(): array
 it('creates one symmetric informational link without propagating economics and retries idempotently', function () {
     [$actor, $company, $project, $contract] = projectContractLinkContext();
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $nextExercise = Exercise::factory()->for($company)->create(['year' => 2027]);
+    $projectCostCenter = CostCenter::factory()->for($company)->create();
+    $contractCostCenter = CostCenter::factory()->for($company)->create();
+    ProjectExerciseClassification::factory()->forProjectAndExercise($project, $exercise)->create(['cost_center_id' => $projectCostCenter->id]);
+    ContractExerciseClassification::factory()->forContractAndExercise($contract, $exercise)->create(['cost_center_id' => $contractCostCenter->id]);
+    $deferral = ProjectDeferral::factory()->carryover('5.00')->create([
+        'company_id' => $company->id,
+        'project_id' => $project->id,
+        'source_exercise_id' => $exercise->id,
+        'destination_exercise_id' => $nextExercise->id,
+    ]);
     $projectExpense = Expense::factory()->forExercise($exercise)->for($project)->create(['direct_cost_center_id' => null]);
     ExpenseLine::factory()->for($projectExpense)->create(['amount' => '20.00']);
     $contractExpense = Expense::factory()->forExercise($exercise)->for($contract)->create(['origin' => 'manual', 'direct_cost_center_id' => null]);
@@ -50,6 +65,12 @@ it('creates one symmetric informational link without propagating economics and r
         ->and($contractExpense->project_id)->toBeNull()
         ->and($project->annualTotals()[$exercise->id]['allocation'])->toBe('20.00')
         ->and($contract->annualTotals()[$exercise->id]['actual'])->toBe('7.00')
+        ->and($project->stateAtDate('2026-06-01')?->value)->toBe('planned')
+        ->and($contract->stateAtDate('2026-06-01')->value)->toBe('active')
+        ->and(ProjectExerciseClassification::query()->sole()->cost_center_id)->toBe($projectCostCenter->id)
+        ->and(ContractExerciseClassification::query()->sole()->cost_center_id)->toBe($contractCostCenter->id)
+        ->and($deferral->refresh()->carryover_amount)->toBe('5.00')
+        ->and($deferral->carryover_state)->toBe('provisional')
         ->and(AuditEvent::query()->sole()->event_type)->toBe(AuditEventType::ProjectContractLinked);
 
     expect(fn () => app(CreateProjectContractLink::class)->execute($actor, $project, $contract, null, (string) Str::uuid()))

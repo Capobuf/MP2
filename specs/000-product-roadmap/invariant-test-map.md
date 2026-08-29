@@ -66,7 +66,7 @@ below. Later slices may add integration or regression coverage.
 | 28.57 | Permessi per Azienda | S1 — Azienda, accesso e impostazioni | verified |
 | 28.58 | Esercizio successivo | S9 — Chiusura | implemented |
 | 28.59 | Nessun Forecast | S0 — Foundation e ambiente di sviluppo live | verified |
-| 28.60 | Relazioni informative | S5 — Contratti | planned |
+| 28.60 | `Collegato a` non trasferisce valori, stato, classificazione o Riporto | S5 — Contratti | verified |
 | 28.61 | Plafond | S3 — Esercizi, Spese e Righe | verified |
 
 ## Test rule

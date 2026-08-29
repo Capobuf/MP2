@@ -16,7 +16,7 @@ run them only against the guarded `testing` database.
 
 **Organization**: Tasks are grouped by user story. No phase contains more than eight
 tasks. Every phase ends with focused tests, application boot, and an inspectable
-tenant UI. Directed `Sostituisce` relations remain excluded and receive no task.
+tenant UI. Only the canonical `Collegato a` informative relation receives tasks.
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -216,7 +216,7 @@ attachments, archive only terminal Contracts, and inspect immutable ordered even
 
 - [X] T050 [P] [US6] Add failing domain/feature tests for annual reclassification, new-Exercise inheritance, deadline/notice calculations and filters, Project-link uniqueness/no propagation, terminal Archive/restore, and complete Timeline ordering in `tests/Unit/Domain/Contracts/ContractDeadlineTest.php`, `tests/Feature/Contracts/ReclassifyContractTest.php`, `tests/Feature/Contracts/ContractDeadlinesTest.php`, `tests/Feature/Contracts/ProjectContractLinkTest.php`, and `tests/Feature/Contracts/SetContractArchivedTest.php`.
 - [X] T051 [P] [US6] Add failing private-storage tests for Contract/Expense/Line upload, checksum metadata, authenticated same-company download, guessed URL rejection, logical detach, retained blob/row, replacement identity, idempotent retry, typed Timeline events, and transaction/storage rollback with `Storage::fake('local')` in `tests/Feature/Contracts/AttachmentTest.php`.
-- [X] T052 [P] [US6] Add failing Livewire tests for classification previews, deadline page fields/filters, links, attachments, Archive visibility, Timeline detail, viewer read-only mode, and absence of reminders/delete/`Sostituisce` controls in `tests/Feature/Contracts/ContractGovernanceUiTest.php`.
+- [X] T052 [P] [US6] Add failing Livewire tests for classification previews, deadline page fields/filters, links, attachments, Archive visibility, Timeline detail, viewer read-only mode, and absence of reminders, delete, or non-canonical relation controls in `tests/Feature/Contracts/ContractGovernanceUiTest.php`.
 
 ### Implementation for User Story 6
 
@@ -227,7 +227,7 @@ attachments, archive only terminal Contracts, and inspect immutable ordered even
 - [X] T057 [US6] Run US6 plus all prior story regressions, verify private storage and tenant isolation, boot, and `/admin` smoke using `tests/Unit/Domain/Contracts/ContractDeadlineTest.php`, `tests/Feature/Contracts/`, `tests/Feature/Expenses/`, `tests/Feature/Projects/`, and `bootstrap/app.php`.
 
 **Checkpoint**: S5 governance is inspectable and tenant-safe without reminders,
-physical deletion, economic link propagation, or directed replacement.
+physical deletion, economic link propagation, or non-canonical relations.
 
 ---
 
@@ -238,10 +238,10 @@ traceability without expanding scope.
 
 - [X] T058 [P] Add focused N+1/query-count regression coverage for Contract lists, annual situations, deadline filters, and aggregate totals in `tests/Feature/Contracts/ContractAggregateQueryTest.php`.
 - [X] T059 [P] Add persistence/restart and immutable identity coverage for Contracts, generated Expenses/Lines, renewal facts, links, attachments, and audit sequences in `tests/Feature/Contracts/ContractPersistenceTest.php`.
-- [X] T060 [P] Add negative surface coverage proving no physical delete, prorata, matching, invoice/payment, reminder, carryover, Proposal/Budget/Closing, full-reporting, or `Sostituisce` UI/action exists in `tests/Feature/Contracts/ContractExcludedBehaviorTest.php`.
+- [X] T060 [P] Add negative surface coverage proving no physical delete, prorata, matching, invoice/payment, reminder, carryover, Proposal/Budget/Closing, full-reporting, or non-canonical relation UI/action exists in `tests/Feature/Contracts/ContractExcludedBehaviorTest.php`.
 - [X] T061 Re-run Pint, Larastan, Composer validation/audit, the complete guarded Pest suite, and application boot; fix only S5-caused findings in `app/`, `database/`, `tests/`, `composer.json`, and `composer.lock` without modifying `vendor/` or `node_modules/`.
 - [X] T062 Execute every non-destructive automated, renewal-command, browser, attachment, and restart journey and record any evidence/corrections directly in `specs/006-contracts/quickstart.md`.
-- [X] T063 Reconcile implemented evidence against S5 requirements and update only substantiated statuses while leaving directed `Sostituisce` planned in `specs/000-product-roadmap/traceability.md`, `specs/000-product-roadmap/invariant-test-map.md`, and `specs/000-product-roadmap/roadmap.md`.
+- [X] T063 Reconcile implemented evidence against S5 requirements and update only substantiated statuses in `specs/000-product-roadmap/traceability.md`, `specs/000-product-roadmap/invariant-test-map.md`, and `specs/000-product-roadmap/roadmap.md`.
 - [X] T064 Validate final spec/plan/task consistency, checklist state, Markdown, and absence of unresolved placeholders in `specs/006-contracts/spec.md`, `specs/006-contracts/plan.md`, `specs/006-contracts/research.md`, `specs/006-contracts/data-model.md`, `specs/006-contracts/contracts/ui.md`, `specs/006-contracts/tasks.md`, and `specs/006-contracts/checklists/requirements.md`.
 
 ---
@@ -249,12 +249,12 @@ traceability without expanding scope.
 ## Phase 10: Convergence — archived activity and attachment history
 
 **Purpose**: Close the final implementable gaps found by the post-T064 comparison
-without expanding S5 or resolving directed `Sostituisce`.
+without expanding S5.
 
 - [X] T065 Add failing regressions proving Contract Timeline retains Expense/Line attachment events after ownership movement and archived Contracts reject renewal, link-state, and attachment-detachment mutations in `tests/Feature/Contracts/AttachmentTest.php` and `tests/Feature/Contracts/SetContractArchivedTest.php`.
 - [X] T066 Persist the event-time Contract owner in attachment Timeline snapshots and include it in Contract filtering in `app/Actions/Operations/UploadAttachment.php`, `app/Actions/Operations/DetachAttachment.php`, and `app/Models/AuditEvent.php`.
 - [X] T067 Enforce the archived-Contract boundary in renewal, link-state, and attachment-detachment Actions in `app/Actions/Operations/UpdateContractRenewal.php`, `app/Actions/Operations/SetProjectContractLinkArchived.php`, and `app/Actions/Operations/DetachAttachment.php`.
-- [X] T068 Run focused convergence tests, the complete quality gate, Laravel boot, `/admin` smoke, and reconcile quickstart evidence plus roadmap status without changing FR-095 or invariant 28.60.
+- [X] T068 Run focused convergence tests, the complete quality gate, Laravel boot, `/admin` smoke, and reconcile quickstart evidence plus roadmap status.
 
 ---
 
@@ -402,5 +402,5 @@ T052 Governance UI tests
 - A generated Estimate is never exposed to manual mutation.
 - A task touching multiple open Exercises must use one immutable preview and one
   atomic confirmed operation.
-- The category-E `Sostituisce` ownership-movement gap remains documented and outside
-  implementation.
+- Structured source replacement is absent by canonical decision; Expense movement
+  follows only the ordinary owner rules implemented by S5.

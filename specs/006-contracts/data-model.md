@@ -273,8 +273,9 @@ Composite foreign keys enforce Company equality. A generated nullable active mar
 enforces one active link per Project/Contract pair. Archive and restore preserve the
 row and change no amount, state, ownership, classification, or carryover.
 
-Directed `Sostituisce` relations have no table, enum case, UI, or Action in this
-bounded plan. FR-095 and invariant 28.60 remain planned.
+No non-canonical informative relation has a table, enum case, UI, or Action. The
+`Collegato a` model and its economic-neutrality tests verify FR-095 and invariant
+28.60.
 
 ## Attachment
 

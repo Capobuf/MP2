@@ -270,8 +270,8 @@ relation, and retained approval attachment remains unchanged and readable.
 - **S6-FR-021**: S6 relation actions MUST support the already deterministic
   Project–Contract `Collegato a` relation, including links between new Proposal
   Items, without transferring economic values or states.
-- **S6-FR-022**: Directed `Sostituisce` actions MUST remain unavailable until the
-  recorded category-E gap in FR-095 and invariant 28.60 is resolved canonically.
+- **S6-FR-022**: Structured source-replacement actions MUST remain unavailable under
+  canonical §32.
 - **S6-FR-023**: Carryover, Reprogramming, and their cross-year plan actions MUST NOT
   be partially implemented in S6; their complete behavior remains in S8.
 - **S6-FR-024**: Each item state MUST be exactly `Allineato`, `Da prendere in
@@ -421,7 +421,7 @@ relation, and retained approval attachment remains unchanged and readable.
   S7.
 - Carryover and Reprogramming fields are materialized only when supplied by a fully
   implemented canonical operation; S6 does not introduce their S8 behavior early.
-- `Collegato a` is the only supported relation action in S6. Directed `Sostituisce`
-  remains unavailable under the existing category-E decision.
+- `Collegato a` is the only supported relation action in S6. Structured source
+  replacement is permanently absent under canonical §32.
 - Application language, money, calendar, precision, and company-local time follow
   the already verified product-wide rules.

@@ -20,10 +20,9 @@ Action invoked by a scheduled Artisan command; state and projected dates remain
 deterministic even before materialization. No queue, cache, plugin, package, generic
 repository, invoicing model, or frontend framework is added.
 
-Directed `Sostituisce` relations are not part of this bounded plan. Their interaction
-with movement of an autonomous Expense endpoint is a recorded category-E gap. S5
-implements only the deterministic `Collegato a` Project-Contract relation and does
-not claim complete FR-095 or invariant 28.60 coverage.
+S5 implements the deterministic Project-Contract `Collegato a` relation, the only
+informative relation admitted by canonical §32. Its economic neutrality completes
+FR-095 and invariant 28.60.
 
 ## Technical Context
 
@@ -67,16 +66,16 @@ claim
 
 | Principle | Gate result |
 |---|---|
-| Canonical domain authority | PASS — state, dates, renewal, recurrence, annual attribution, ownership, classification, deadlines, late census, attachments, and exclusions map directly to the canon. The unresolved `Sostituisce` interaction is excluded rather than inferred. |
+| Canonical domain authority | PASS — state, dates, renewal, recurrence, annual attribution, ownership, classification, deadlines, late census, attachments, and exclusions map directly to the canon. |
 | Simplicity and proportionality | PASS — direct models, value code, Actions, policies, native Filament, Laravel scheduler, and private filesystem only. |
-| Vertical slice and traceability | PASS — S5 completes the Contract-dependent first-level source rules; FR-095/28.60 remain planned because only `Collegato a` is delivered. |
+| Vertical slice and traceability | PASS — S5 completes the Contract-dependent first-level source rules and verifies FR-095/28.60 through `Collegato a`. |
 | Dependency integrity | PASS — no new dependency and no modification of installed source. |
 | Explicit domain operations | PASS — lifecycle, renewal, recalculation, classification, ownership movement, archive, attachment, and relation mutations use explicit Actions rather than UI-only callbacks. |
 | Proportional tests | PASS — pure date/economic rules, MUST NOT cases, tenancy, rollback, retry, stale preview, storage authorization, and UI journeys receive focused tests. |
 | Historical and transactional integrity | PASS — stable IDs, typed facts, revision tokens, ordered locks, deterministic event sequences, immutable closed references during late census, and private immutable blobs preserve history and atomicity. |
 | Forward-only migrations | PASS — S0-S4 migrations remain unchanged; S5 adds only forward Contract and corrective extension migrations. |
 | Inspectability | PASS — the later task plan must cap implementation phases at eight tasks and end each phase with boot, focused tests, and tenant UI inspection. |
-| Category A-E discipline | PASS — ordinary narratives use Notes/Timeline/attachments, unsupported commercial complexity remains category D, and the one category-E replacement gap is outside this plan. |
+| Category A-E discipline | PASS — ordinary narratives use Notes/Timeline/attachments and unsupported commercial complexity remains category D. |
 
 Post-design re-check: **PASS**. No complexity exception is required.
 
@@ -154,7 +153,7 @@ inside the bounded plan.
 Implementation will follow [tasks.md](tasks.md), generated separately. It must split
 the large S5 surface into bounded phases with at most eight implementation tasks per
 phase. Every phase ends with focused tests against `testing`, Laravel boot, and an
-inspectable `/admin` UI. `Sostituisce` receives no implementation task.
+inspectable `/admin` UI. No non-canonical informative relation receives an implementation task.
 
 ## Complexity Tracking
 

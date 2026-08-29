@@ -95,7 +95,7 @@ Estimates, or Timeline events. No deadlines page is opened during this check.
     informational labels, and absence of invoice/payment/reminder claims.
 17. Create, archive, and restore a `Collegato a` Project-Contract link. Verify
     duplicate active link rejection and zero economic/state/ownership impact. Verify
-    no `Sostituisce` control exists.
+    no structured source-replacement control exists.
 18. Upload and download one attachment for a Contract, Expense, and Line. Verify
     private authorized access, checksum/version metadata, cross-tenant rejection,
     logical detachment, retained blob/row, and new identity on replacement.
@@ -109,7 +109,7 @@ Estimates, or Timeline events. No deadlines page is opened during this check.
     attachment URLs and verify no disclosure.
 22. Verify absence of prorata, matching, invoice/payment, reminder, variable/tiered
     conditions, carryover, reprogramming, Proposal, Budget, Revision, Closing,
-    closed-year correction, Forecast, full reporting, and `Sostituisce` controls.
+    closed-year correction, Forecast, full reporting, and non-canonical relation controls.
 
 ## Full local quality gate
 

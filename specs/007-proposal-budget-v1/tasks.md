@@ -24,7 +24,7 @@ focused test, boot and inspectability checkpoint.
 
 **Purpose:** Preserve S3–S5 behavior and establish the exact S6 traceability boundary.
 
-- [X] T001 Reconcile all 16 S6 canonical FR rows, seven S6 invariant rows, the directed `Sostituisce` category-E exclusion and S7–S11 boundaries in `specs/000-product-roadmap/roadmap.md`, `specs/000-product-roadmap/traceability.md`, and `specs/000-product-roadmap/invariant-test-map.md` without marking unbuilt behavior implemented.
+- [X] T001 Reconcile all 16 S6 canonical FR rows, seven S6 invariant rows, informative-relation boundaries and S7–S11 boundaries in `specs/000-product-roadmap/roadmap.md`, `specs/000-product-roadmap/traceability.md`, and `specs/000-product-roadmap/invariant-test-map.md` without marking unbuilt behavior implemented.
 - [X] T002 Run the unchanged complete Pest baseline, Laravel boot and tenant route smoke checks; record only reproducible S6 commands or corrections in `specs/007-proposal-budget-v1/quickstart.md`.
 - [X] T003 Verify `.gitignore` and detected tool ignore rules cover Laravel/PHP/Node runtime artifacts without changing dependency source or adding a dependency in `.gitignore`, `.dockerignore`, and related existing configs.
 
@@ -144,13 +144,13 @@ Contract Estimates, overlaps, prorata and used-Supplier changes with no live wri
 Contract Items without economic effects.
 
 **Independent Test:** Link live/new endpoints in the same Proposal, reject wrong
-types/company/Proposal/duplicates and every `Sostituisce` request, and observe zero
+types/company/Proposal/duplicates and every non-canonical relation request, and observe zero
 allocation/state change.
 
 - [X] T040 [P] [US2] Add failing relation validation and economic-neutrality tests in `tests/Unit/Domain/Proposals/ProposalRelationPlanTest.php`.
-- [X] T041 [P] [US2] Add failing relation Action tests for live/new endpoints, duplicate, tenant, type, Proposal and blocked `Sostituisce` cases in `tests/Feature/Proposals/PlanProposalRelationTest.php`.
+- [X] T041 [P] [US2] Add failing relation Action tests for live/new endpoints, duplicate, tenant, type, Proposal and non-canonical relation cases in `tests/Feature/Proposals/PlanProposalRelationTest.php`.
 - [X] T042 [US2] Implement strict relation plan validation and atomic idempotent `PlanProposalRelation` in `app/Domain/Proposals/ProposalRelationPlan.php` and `app/Actions/Proposals/PlanProposalRelation.php`.
-- [X] T043 [US2] Add `Collega Progetto e Contratto` UI and immutable action display under `app/Filament/Resources/Proposals/`, with no `Sostituisce` input.
+- [X] T043 [US2] Add `Collega Progetto e Contratto` UI and immutable action display under `app/Filament/Resources/Proposals/`, with no structured source-replacement input.
 - [X] T044 [US2] Run relation tests and focused existing Project–Contract link regressions against `testing`, boot and inspect the UI.
 
 **Checkpoint:** US2 is complete across Expenses, Projects, Contracts and supported relations.
@@ -260,7 +260,7 @@ verify byte-for-byte Budget values, totals and evidence plus absent baseline Act
 **Purpose:** Close S6 with authoritative invariant/MUST NOT coverage, complete gates,
 authenticated browser evidence and truthful traceability.
 
-- [X] T077 [P] Add or tighten S6 rejection tests for Actual/Forecast/Residual/Variance/Closing fields, physical deletion, non-v1 creation, realignment resolution, Riporto/Riprogrammazione, `Sostituisce`, fuzzy matching, parallel Drafts and other S7–S11 controls in `tests/Feature/Proposals/ProposalExcludedBehaviorTest.php`.
+- [X] T077 [P] Add or tighten S6 rejection tests for Actual/Forecast/Residual/Variance/Closing fields, physical deletion, non-v1 creation, realignment resolution, Riporto/Riprogrammazione, non-canonical relations, fuzzy matching, parallel Drafts and other S7–S11 controls in `tests/Feature/Proposals/ProposalExcludedBehaviorTest.php`.
 - [X] T078 [P] Add explicit primary-invariant mapping tests for 28.17, 28.19–28.21, 28.23, 28.47–28.48 and canonical FR coverage documentation in `tests/Feature/Proposals/S6InvariantTest.php` and `specs/007-proposal-budget-v1/quickstart.md`.
 - [X] T079 Run Pint, PHPStan, complete Pest, `composer validate --strict`, `composer audit`, Laravel boot and `git diff --check`; fix only S6 or exposed regression defects in their owning files.
 - [X] T080 Execute the authenticated browser sequence in `specs/007-proposal-budget-v1/quickstart.md`, including Expense/Project/Contract actions, new linked objects, approval, live mutation/archive, immutable Budget re-read, authorization and console/network error inspection.

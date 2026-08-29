@@ -36,6 +36,5 @@
   28.47, and 28.48.
 - S7, S8, S9, S10, and S11 behavior is explicitly excluded rather than partially
   implemented.
-- FR-095 and invariant 28.60 remain blocked only for directed `Sostituisce`; the
-  already verified `Collegato a` relation is available to Proposal Items.
-
+- FR-095 and invariant 28.60 are fully represented by the verified `Collegato a`
+  relation available to Proposal Items; canonical §32 admits no other relation.

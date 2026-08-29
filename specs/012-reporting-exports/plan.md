@@ -32,7 +32,7 @@ S11 aggiunge una pagina Filament aziendale di sola lettura che richiede riferime
 
 *GATE: PASS prima della ricerca; PASS dopo il design.*
 
-- **I — Autorità canonica**: PASS. Le regole derivano dai §§6.4, 6.10-6.12, 9.2, 13.7, 14.9, 22-25, 26.5-26.6 e 28.47-28.53. `Sostituito` resta escluso senza colmare FR-095/INV-28.60.
+- **I — Autorità canonica**: PASS. Le regole derivano dai §§6.4, 6.10-6.12, 9.2, 13.7, 14.9, 22-25, 26.5-26.6, 28.47-28.53 e 32. `Sostituito` è assente per decisione canonica permanente; FR-095/INV-28.60 sono verificati in S5 per `Collegato a`.
 - **II — Semplicità**: PASS. Una pagina, un builder Eloquent, strutture dati dirette, calcoli deterministici e un renderer PDF; nessun repository layer, CQRS, cache, queue, Redis o feature flag.
 - **III — Slice e tracciabilità**: PASS. Il piano copre solo S11 e riconcilia FR-014, FR-043, FR-087-FR-089 e FR-096 con INV-28.50-28.52.
 - **IV — Dipendenze**: PASS. `dompdf/dompdf:^3.1.6` è giustificato in [research.md](research.md); non verrà modificato codice sotto `vendor/` e il lockfile sarà aggiornato tramite Composer.
@@ -115,7 +115,7 @@ tests/
 
 ### Phase A — Vocabolario e confronto deterministico
 
-Definire riferimenti, famiglie di report, categorie, dimensioni ed etichette ammesse (senza `Sostituito`), poi implementare correlazione esatta e classificazione pura. Verificare subito FR-S11-005-FR-S11-016 e INV-28.50-28.51.
+Definire riferimenti, famiglie di report, categorie, dimensioni ed etichette ammesse dalla §32, poi implementare correlazione esatta e classificazione pura. Verificare subito FR-S11-005-FR-S11-016 e INV-28.50-28.51.
 
 ### Phase B — Normalizzazione delle fonti e aggregazioni
 

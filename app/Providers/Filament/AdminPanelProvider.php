@@ -6,6 +6,7 @@ use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\Tenancy\RegisterCompany;
 use App\Http\Middleware\EnsureTenantCompanyIsActive;
 use App\Models\TenantCompany;
+use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Enums\ThemeMode;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -38,6 +39,11 @@ class AdminPanelProvider extends PanelProvider
             ->brandLogoHeight('2.5rem')
             ->defaultThemeMode(ThemeMode::Dark)
             ->login()
+            ->profile()
+            ->multiFactorAuthentication([
+                AppAuthentication::make()
+                    ->recoverable(),
+            ])
             ->tenant(TenantCompany::class, ownershipRelationship: 'tenantCompany')
             ->tenantRegistration(RegisterCompany::class)
             ->tenantMenu(false)

@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
 
-it('keeps S8 through S11 and directed replacement outside the S7 action vocabulary', function (): void {
+it('keeps S8 through S11 outside S7 and permanently excludes source replacement', function (): void {
     $actions = collect(ProposalActionType::cases())->map->value->all();
 
     expect($actions)->not->toContain('carryover', 'reprogramming', 'closing', 'late_correction', 'historical_annotation', 'forecast', 'replace_project_contract')

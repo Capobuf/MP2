@@ -175,7 +175,7 @@ L'utente demo disponibile era autorizzato su entrambe le Aziende presenti, quind
 
 ### Confini confermati
 
-- `Sostituito` non è esposto: FR-095 e INV-28.60 restano `planned`;
+- `Sostituito` non è esposto per decisione canonica permanente; FR-095 e INV-28.60 sono verificati in S5 per `Collegato a`;
 - S9 non è stato modificato;
 - nessun reset o mutazione del database persistente di sviluppo è stato eseguito;
 - nessun report o file PDF è stato persistito dall'applicazione.

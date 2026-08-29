@@ -32,7 +32,7 @@
 - [x] CHK016 Le Annotazioni sono coerentemente definite come evidenze non economiche incapaci di riclassificare l'imputazione storica? [Consistency, Spec FR-S11-022]
 - [x] CHK017 Le aggregazioni esecutive, specialistiche e per Fornitore condividono la stessa regola di contributo economico unico? [Consistency, Spec FR-S11-007/010/027/028]
 - [x] CHK018 Le regole storiche indicano quando usare dati materializzati e impediscono di consultare oggetti vivi come sostituti di una Snapshot? [Consistency, Spec FR-S11-029/030]
-- [x] CHK019 L'esclusione di `Sostituito` è coerente in requisiti, criteri e confini di scope e non anticipa FR-095/INV-28.60? [Consistency, Spec FR-S11-015]
+- [x] CHK019 L'assenza permanente di `Sostituito` è coerente in requisiti, criteri e confini di scope con la §32? [Consistency, Spec FR-S11-015]
 
 ## Qualità dei criteri di accettazione
 

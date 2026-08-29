@@ -29,10 +29,10 @@
 
 **⚠️ CRITICAL**: No user story work begins before this phase passes focused tests.
 
-- [X] T002 [P] Implement closed enums and Italian labels for report kinds, references, categories, modification dimensions and secondary labels—explicitly excluding `Sostituito`—in `app/Domain/Reporting/ReportKind.php`, `ActualReference.php`, `ComparisonCategory.php`, `ModificationDimension.php`, and `SecondaryLabel.php`
+- [X] T002 [P] Implement closed enums and Italian labels for report kinds, references, categories, modification dimensions and secondary labels, preserving the canonical absence of `Sostituito`, in `app/Domain/Reporting/ReportKind.php`, `ActualReference.php`, `ComparisonCategory.php`, `ModificationDimension.php`, and `SecondaryLabel.php`
 - [X] T003 [P] Implement immutable normalized structures for references, sources and results in `app/Domain/Reporting/ReportReference.php`, `ReportSource.php`, and `ReportResult.php`
 - [X] T004 Implement explicit `ReportDefinition` input validation and per-report reference requirements without defaults/fallbacks in `app/Domain/Reporting/ReportDefinition.php`
-- [X] T005 Add focused vocabulary and definition tests, including unknown values, missing references, mismatched year measures and absence of `Sostituito`, in `tests/Unit/Domain/Reporting/ReportDefinitionTest.php`
+- [X] T005 Add focused vocabulary and definition tests, including unknown values, missing references, mismatched year measures and the permanent absence of `Sostituito`, in `tests/Unit/Domain/Reporting/ReportDefinitionTest.php`
 
 **Checkpoint**: Foundation ready; all unsupported/incoherent definitions fail explicitly before queries.
 

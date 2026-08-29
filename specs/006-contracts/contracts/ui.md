@@ -195,8 +195,8 @@ many-to-many, unique while active, and used only for navigation/history.
 `Archivia collegamento` and `Ripristina collegamento` preserve identity and change no
 amount, state, ownership, classification, or carryover. There is no delete action.
 
-No `Sostituisce` action, field, type, route, or placeholder is exposed in this bounded
-plan. Its traceability rows remain planned pending a canonical decision.
+No structured source-replacement action, field, type, route, or placeholder is
+exposed, as required permanently by canonical §32.
 
 ## Attachments
 
@@ -235,7 +235,7 @@ No UI exposes physical deletion, state `Sospeso`, prorata, cycle-to-Actual match
 invoice/payment schedules, reminders, variable consumption, setup/one-time Contract
 components, tiers, indexation, carryover, reprogramming, Proposal, Budget, Revision,
 Closing, closed-year correction, Forecast, full reporting, percentage Cost Center
-splits, or directed `Sostituisce` relations.
+splits, or non-canonical informative relations.
 
 ## Error behavior
 

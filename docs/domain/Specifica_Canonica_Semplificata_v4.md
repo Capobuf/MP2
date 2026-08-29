@@ -25,7 +25,7 @@ Un implementatore **MUST NOT** completare per assunzione una regola economica o 
 
 In caso di dubbio si applica questa gerarchia:
 
-1. le sezioni da `0` a `26` e la sezione `30` sono normative;
+1. le sezioni da `0` a `26` e le sezioni `30`, `31` e `32` sono normative;
 2. gli Invarianti della sezione `28` riepilogano le regole normative e **MUST NOT** introdurre comportamenti diversi;
 3. l'indice dei Requisiti Funzionali della sezione `29` rinvia alle sezioni normative e **MUST NOT** parafrasarle in modo divergente;
 4. le casistiche della sezione `27` e le Appendici sono esplicative e **MUST NOT** introdurre regole assenti dalle sezioni normative;
@@ -192,10 +192,12 @@ Il sistema **MUST NOT** dedurre automaticamente che:
 - un Effettivo inferiore alla Stima costituisca un Risparmio prima della Chiusura del Progetto;
 - un Effettivo superiore alla Stima dipenda da un errore, da un aumento o da un imprevisto;
 - un Contratto senza Effettivi non sia stato erogato;
-- due sorgenti con titolo simile si sostituiscano;
+- due sorgenti con titolo simile rappresentino la stessa identità o una continuità canonica;
 - una Spesa sia un Plafond dalla Descrizione.
 
-La causa può essere dichiarata tramite Note, Timeline, relazioni informative o allegati.
+La causa può essere dichiarata tramite Note, Timeline o allegati. `Collegato a` resta
+una relazione informativa di navigazione fra Progetto e Contratto e **MUST NOT** essere
+usata per rappresentare una sostituzione.
 
 ---
 
@@ -624,10 +626,9 @@ NOT (Spesa.Progetto != null AND Spesa.Contratto != null)
 
 ## 7.3 Relazioni informative
 
-Sono ammesse due relazioni informative opzionali:
+È ammessa una sola relazione informativa opzionale:
 
-- `Collegato a`, esclusivamente fra Progetto e Contratto;
-- `Sostituisce`, fra due sorgenti economiche di primo livello, anche di tipo differente.
+- `Collegato a`, esclusivamente fra Progetto e Contratto.
 
 ### Collegato a
 
@@ -636,19 +637,11 @@ Sono ammesse due relazioni informative opzionali:
 - non richiede un Esercizio di efficacia;
 - cardinalità molti-a-molti è ammessa.
 
-### Sostituisce
-
-- è una relazione direzionale da sorgente sostitutiva a sorgente sostituita;
-- richiede un Esercizio di efficacia;
-- più sorgenti possono sostituirne una e una sorgente può sostituirne più di una;
-- nello stesso Esercizio sono vietati cicli diretti o indiretti di sostituzione.
-
 Ogni relazione contiene:
 
 - ID;
-- tipo;
-- sorgenti coinvolte;
-- Esercizio di efficacia quando richiesto;
+- Progetto;
+- Contratto;
 - Nota;
 - stato `Attiva` oppure `Archiviata`;
 - audit.
@@ -3321,7 +3314,7 @@ Per ogni Elemento di Proposta efficace conserva almeno:
 - tutte le condizioni che generano almeno una Stima approvata nell'Esercizio oppure sono create, modificate o Annullate da un'azione approvata;
 - tutte le scadenze, cessazioni, riattivazioni, annullamenti e rinnovi oggetto di un'azione approvata o necessari a determinare lo stato al 1° gennaio e al 31 dicembre;
 - azioni e motivazioni approvate;
-- relazioni informative efficaci;
+- relazioni informative `Collegato a` attive;
 - riferimenti agli eventi di approvazione.
 
 ### Dati esclusi dal Budget
@@ -3363,7 +3356,7 @@ Conserva inoltre:
 - Riporto approvato;
 - Importo Riprogrammato approvato;
 - Stime di Progetto;
-- relazioni informative;
+- relazioni informative `Collegato a`;
 - motivi di rinvio, apertura, Chiusura o cancellazione proposti.
 
 ## 23.7 Dettaglio del Budget per Contratto
@@ -3423,7 +3416,7 @@ Per ogni sorgente inclusa dal §7.6.5 conserva almeno:
 - decisioni di Chiusura;
 - tutte le condizioni con intervallo sovrapposto all'Esercizio o con almeno una Data di attribuzione nell'Esercizio;
 - tutte le scadenze, cessazioni, riattivazioni, annullamenti e rinnovi con data di efficacia nell'Esercizio, oltre alla prossima scadenza nota alla Chiusura;
-- relazioni informative efficaci;
+- relazioni informative `Collegato a` attive;
 - riferimenti agli eventi esplicativi.
 
 ## 23.9 Dettaglio della Chiusura per Spesa
@@ -3451,7 +3444,7 @@ Conserva inoltre:
 - Importo Riprogrammato;
 - Riporto consolidato;
 - decisione e motivo;
-- relazioni informative.
+- relazioni informative `Collegato a`.
 
 ## 23.11 Dettaglio della Chiusura per Contratto
 
@@ -3483,8 +3476,7 @@ Il confronto usa:
 
 1. OriginKey per la stessa sorgente;
 2. CopiedFromOriginKey per una derivazione esplicita senza identità condivisa;
-3. relazione informativa `Sostituisce` quando dichiarata;
-4. presenza in una sola sorgente per Aggiunto o Rimosso.
+3. presenza in un solo riferimento per Aggiunto o Rimosso.
 
 Il sistema **MUST NOT** usare fuzzy matching per titolo, importo o Fornitore.
 
@@ -3773,7 +3765,6 @@ Una sorgente può ricevere zero o più etichette:
 - `Stornato`;
 - `Cancellato`;
 - `Rinviato`;
-- `Sostituito`;
 - `Correzione tardiva`;
 - `Riporto variato`;
 - `Imputazione storica contestata`;
@@ -5383,7 +5374,7 @@ PrevisioneAFinire = non supportata
 
 ## 28.60 Relazioni informative
 
-Le relazioni informative non trasferiscono valori, stato, classificazione o Riporto.
+La relazione informativa `Collegato a` non trasferisce valori, stato, classificazione o Riporto.
 
 ## 28.61 Plafond
 
@@ -5492,7 +5483,7 @@ Questa sezione è un indice di tracciabilità. Le regole normative sono esclusiv
 | FR-092 | Permessi assegnati per Azienda | §§26.5–26.6 |
 | FR-093 | Audit di permessi e Impostazioni | §§26.8–26.10 |
 | FR-094 | Operazioni inter-Esercizio atomiche | §10 |
-| FR-095 | Relazioni informative senza effetto economico | §7.3 |
+| FR-095 | `Collegato a` senza effetto economico | §7.3 |
 | FR-096 | Report separato delle correzioni e annotazioni | §§24.11, 25.13 |
 | FR-097 | Approvazione economica esterna ammessa | §26.11 |
 | FR-098 | EUR, netto IVA e anno solare | §4.3 |
@@ -5821,9 +5812,9 @@ Una Chiusura errata non viene annullata. Gli effetti successivi vengono corretti
 
 Un Contratto senza prossima scadenza non può generare un evento di rinnovo o un termine di disdetta calcolabile. Viene mostrato come `Scadenza non definita`.
 
-### Relazioni informative
+### Relazione informativa `Collegato a`
 
-Non producono TCO, inclusione economica o propagazione automatica.
+Non produce TCO, inclusione economica o propagazione automatica.
 
 ### Plafond
 
@@ -6059,7 +6050,7 @@ Questa appendice riepiloga le decisioni che hanno chiuso i principali punti aper
 | Conflitto per singolo campo | Riallineamento dell'intera sorgente; §§12.11–12.12 |
 | Eliminazione, tombstone, Storno e Archivio | Nessuna cancellazione fisica ordinaria; distinzione netta Storno/Archivio; §§5.7–5.8, 24 |
 | Quantità e unitario obbligatori | Importo autoritativo; quantità e unitario opzionali; §8.1 |
-| Relazioni informative indefinite | Semantica, cardinalità, efficacia e vincoli definiti; §7.3 |
+| Relazione informativa indefinita | Semantica, cardinalità e ciclo di vita di `Collegato a` definiti; §7.3 |
 | Plafond come concetto canonico | Ridotto a caso d'uso della Spesa; §15.14 |
 | Referenti obbligatoriamente Commerciali/Tecnici | Tag opzionali; §21.2 |
 
@@ -7015,3 +7006,77 @@ Il `Tenant Azienda` governa **se il dominio esiste ed è utilizzabile nella piat
 L'`Azienda` governa **il dominio funzionale ed economico di MP2**.
 
 I due concetti **MUST NOT** essere nuovamente sovrapposti.
+
+# 32. Rimozione della relazione informativa `Sostituisce`
+
+## 32.1 Natura normativa e prevalenza
+
+La presente sezione è **normativa**.
+
+La relazione informativa `Sostituisce` viene rimossa dal dominio canonico di MP2.
+
+Ogni precedente riferimento alla relazione `Sostituisce`, alla relazione inversa `Sostituito da`, all'etichetta `Sostituito`, al relativo Esercizio di efficacia o a regole specifiche di sostituzione fra sorgenti deve essere interpretato secondo la presente sezione.
+
+Le altre regole relative alle relazioni informative restano valide esclusivamente dove applicabili alla relazione `Collegato a`.
+
+## 32.2 Relazione informativa ammessa
+
+La sola relazione informativa canonica è:
+
+`Collegato a`
+
+Essa resta ammessa esclusivamente fra Progetto e Contratto e conserva le regole già definite dal §7.3: relazione simmetrica e non direzionale, cardinalità molti-a-molti, nessun effetto economico, Archivio e ripristino con audit.
+
+La rimozione di `Sostituisce` **MUST NOT** modificare il comportamento di `Collegato a`, delle Proposte, delle Snapshot, della Timeline o dell'audit relativo alle relazioni informative ancora ammesse.
+
+## 32.3 Nessuna sostituzione strutturata fra sorgenti
+
+MP2 **MUST NOT** creare, memorizzare, dedurre o utilizzare una relazione strutturata che rappresenti che una sorgente economica ha sostituito un'altra.
+
+Il sistema **MUST NOT** reintrodurre lo stesso concetto mediante:
+
+`Predecessore`, `Successore`, `Sostituito da`, flag, stato, etichetta, tipo di relazione equivalente o utilizzo improprio di `Collegato a`.
+
+Quando una sorgente termina e una nuova sorgente ne prende operativamente il posto, le due sorgenti restano oggetti distinti.
+
+L'eventuale motivazione può essere descritta tramite Note, Timeline o allegati, ma tale informazione resta descrittiva e non costituisce una relazione strutturale interrogabile.
+
+## 32.4 Identità e confronti
+
+La correlazione fra sorgenti nei confronti usa esclusivamente:
+
+1. `OriginKey`, quando si tratta della stessa sorgente;
+2. `CopiedFromOriginKey`, quando esiste una derivazione esplicita prevista dal dominio;
+3. presenza in un solo riferimento, producendo `Aggiunto` oppure `Rimosso` secondo le normali regole del confronto.
+
+Il sistema **MUST NOT** usare titolo, Descrizione, importo, Fornitore, Note o altra somiglianza per dedurre continuità o sostituzione.
+
+Pertanto, se una sorgente `A` termina e viene creata una nuova sorgente `B` priva di `OriginKey` o `CopiedFromOriginKey` che le conferiscano continuità canonica, il confronto rappresenta:
+
+`A → Rimosso`
+
+`B → Aggiunto`
+
+anche quando una Nota o un evento di Timeline dichiara che `B` ha preso operativamente il posto di `A`.
+
+## 32.5 Reporting e Snapshot
+
+L'etichetta secondaria `Sostituito` viene rimossa dal dominio e **MUST NOT** essere assegnata o esposta nei report.
+
+Budget Approvati e Snapshot di Chiusura **MUST NOT** materializzare relazioni di sostituzione.
+
+Continuano invece a materializzare le relazioni `Collegato a` quando richiesto dalle normali regole delle relazioni informative.
+
+La rimozione di `Sostituisce` non modifica importi, Allocato, Effettivi, Riporto, Riprogrammazione, categorie primarie dei confronti o qualsiasi altra regola economica.
+
+## 32.6 Adeguamento dei riferimenti precedenti
+
+Ai fini della coerenza dell'intera specifica:
+
+* il §7.3 ammette esclusivamente `Collegato a`;
+* il §23.13 non utilizza più `Sostituisce` come criterio di correlazione;
+* ogni riferimento a `Sostituito` nei report è eliminato;
+* l'Invariante §28.60 e FR-095 continuano a riguardare le relazioni informative senza effetto economico, ma nel dominio corrente si applicano esclusivamente a `Collegato a`;
+* le regole generiche di Proposta, riallineamento, Snapshot, Timeline, Archivio e audit delle relazioni informative continuano a valere per `Collegato a`.
+
+La rimozione di `Sostituisce` **MUST NOT** essere interpretata come rimozione generale del concetto di relazione informativa.

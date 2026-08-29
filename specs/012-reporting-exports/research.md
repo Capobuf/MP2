@@ -26,7 +26,7 @@
 
 ## Decision 3 — Correlazione e classificazione
 
-**Decision**: correlare identità condivise con OriginKey; rappresentare CopiedFromOriginKey come derivazione esplicita nei confronti fra Esercizi senza fondere le identità; non usare `Sostituisce`, fuzzy matching o euristiche. La categoria primaria deriva solo da presenza e dimensioni confrontate; etichette e dimensioni non incidono sul conteggio.
+**Decision**: correlare identità condivise con OriginKey; rappresentare CopiedFromOriginKey come derivazione esplicita nei confronti fra Esercizi senza fondere le identità; non usare relazioni strutturate di sostituzione, fuzzy matching o euristiche. La categoria primaria deriva solo da presenza e dimensioni confrontate; etichette e dimensioni non incidono sul conteggio.
 
 **Rationale**: applica §§23.13, 25.3, 25.5-25.7 e 25.18, oltre a INV-28.50-28.51.
 
@@ -34,7 +34,7 @@
 
 - matching per titolo/importo/Fornitore/Note: vietato;
 - unire CopiedFromOriginKey come identità: rifiutato perché il dominio la definisce derivazione, non stessa Spesa;
-- esporre `Sostituito` senza relazione: escluso dalla chiarificazione del 2026-08-24.
+- esporre `Sostituito`: vietato permanentemente dalla §32.
 
 ## Decision 4 — Aggregazione di primo livello e Fornitori
 
@@ -98,4 +98,3 @@
 - ultima versione Budget selezionata automaticamente: rifiutata perché FR-014 richiede riferimento esplicito;
 - sostituire Chiusura assente con Corrente: vietato;
 - generare automaticamente il primo report disponibile: rifiutato perché nasconde il riferimento scelto.
-

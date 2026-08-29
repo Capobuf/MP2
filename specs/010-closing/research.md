@@ -257,13 +257,8 @@ This does **not** reopen or recalculate the earlier Closed Exercises:
 Therefore post-Closing temporal guards must distinguish this canonical automatic
 materialization path from user-driven ordinary historical mutation.
 
-## 14. Existing directed `Sostituisce` gap
+## 14. Canonical informative-relation boundary
 
-The repository roadmap already declares the directed `Sostituisce` behavior as an
-unresolved separate domain gap.
-
-Closing must materialize effective informative relations that actually exist, but S9
-must not implement or infer `Sostituisce` merely because §23.8 mentions effective
-relations.
-
-No fuzzy replacement relation is allowed.
+Closing materializes the active `Collegato a` relations that actually exist. Under
+canonical §32 it does not implement or infer a structured source-replacement
+relation, and no fuzzy relation is allowed.

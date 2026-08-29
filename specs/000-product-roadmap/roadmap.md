@@ -100,14 +100,14 @@ change several open Exercises. It therefore owns the first complete verification
 FR-094. Later Proposal, reprogramming and Closing slices reuse and extend the same
 canonical impact-plan, locking, revalidation and all-or-nothing behavior.
 
-### Directed source replacement gap
+### Informative source relations
 
-S5 implements the deterministic Project-Contract `Collegato a` relation. The
-directed `Sostituisce` portion of FR-095 and invariant 28.60 remains `planned`: the
-canonical domain does not define what happens when an autonomous Expense that is an
-active replacement endpoint is later moved into a Project or Contract. Until the
-domain is explicitly reopened, no automatic relation archive, movement rejection or
-historical-endpoint behavior is selected.
+S5 implements the only canonical informative relation, the deterministic
+Project-Contract `Collegato a`. FR-095 and invariant 28.60 are verified by
+`tests/Feature/Contracts/ProjectContractLinkTest.php`: creation leaves ownership and
+economic values unchanged, while Archive and restore preserve identity and produce
+typed audit events. The canonical §32 permanently excludes a structured directed
+source-replacement relation; it is not an open roadmap gap.
 
 ### Snapshot materialization
 

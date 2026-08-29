@@ -77,7 +77,7 @@ Also verify:
 - a user from another Company receives no access;
 - browser console errors and failed network requests are absent;
 - no Revision, realignment-resolution, Riporto/Riprogrammazione, Closing, Forecast,
-  `Sostituisce`, delete or full report/export control is present.
+  structured source-replacement, delete or full report/export control is present.
 
 ## Atomicity and retry evidence
 

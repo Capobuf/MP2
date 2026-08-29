@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Enums\ThemeMode;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -32,6 +33,11 @@ class PlatformPanelProvider extends PanelProvider
             ->brandLogoHeight('2.5rem')
             ->defaultThemeMode(ThemeMode::Dark)
             ->login()
+            ->profile()
+            ->multiFactorAuthentication([
+                AppAuthentication::make()
+                    ->recoverable(),
+            ])
             ->colors([
                 'gray' => Color::hex('#91A3A8'),
                 'primary' => Color::hex('#39D5C4'),
