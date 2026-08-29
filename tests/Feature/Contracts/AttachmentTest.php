@@ -84,6 +84,38 @@ it('downloads only after authenticated same-company authorization and does not d
     $this->actingAs($actor)->get('/attachments/999999/download')->assertNotFound();
 });
 
+it('streams a PDF inline only after authenticated same-company authorization', function () {
+    ['actor' => $actor, 'contract' => $contract] = attachmentContext();
+    $attachment = app(UploadAttachment::class)->execute(
+        $actor,
+        $contract,
+        UploadedFile::fake()->create('evidenza.pdf', 10, 'application/pdf'),
+        (string) Str::uuid(),
+    );
+
+    $this->get(route('attachments.preview', $attachment))->assertRedirect();
+    $this->actingAs($actor)->get(route('attachments.preview', $attachment))
+        ->assertOk()
+        ->assertHeader('content-type', 'application/pdf')
+        ->assertHeader('cache-control', 'private, no-store')
+        ->assertHeader('x-content-type-options', 'nosniff')
+        ->assertHeader('content-disposition', 'inline; filename=evidenza.pdf');
+
+    $other = User::factory()->create();
+    $this->actingAs($other)->get(route('attachments.preview', $attachment))->assertNotFound();
+
+    $nonPdf = app(UploadAttachment::class)->execute(
+        $actor,
+        $contract,
+        UploadedFile::fake()->createWithContent('note.txt', 'testo'),
+        (string) Str::uuid(),
+    );
+    $this->actingAs($actor)->get(route('attachments.preview', $nonPdf))->assertNotFound();
+
+    Storage::disk('local')->delete($attachment->storage_path);
+    $this->actingAs($actor)->get(route('attachments.preview', $attachment))->assertNotFound();
+});
+
 it('retries upload idempotently and replacement uses a new row and immutable blob', function () {
     ['actor' => $actor, 'contract' => $contract] = attachmentContext();
     $operationId = (string) Str::uuid();

@@ -12,7 +12,7 @@
             <x-filament::dropdown placement="bottom-start" width="xs">
                 <x-slot name="trigger">
                     <button type="button" class="mp2-context-control mp2-context-company" aria-label="Apri selettore e azioni Azienda">
-                        <span class="mp2-context-dot" aria-hidden="true"></span>
+                        <x-filament::icon icon="heroicon-m-building-office-2" class="mp2-context-icon" />
                         <span class="mp2-context-copy">
                             <span class="mp2-context-label">Azienda</span>
                             <span class="mp2-context-value">{{ $company->name }}</span>
@@ -81,7 +81,7 @@
             </x-filament::dropdown>
         @else
             <div class="mp2-context-control mp2-context-company" aria-label="Azienda corrente">
-                <span class="mp2-context-dot" aria-hidden="true"></span>
+                <x-filament::icon icon="heroicon-m-building-office-2" class="mp2-context-icon" />
                 <span class="mp2-context-copy">
                     <span class="mp2-context-label">Azienda</span>
                     <span class="mp2-context-value">{{ $company->name }}</span>
@@ -93,6 +93,7 @@
             <x-filament::dropdown placement="bottom-start" width="xs">
                 <x-slot name="trigger">
                     <button type="button" class="mp2-context-control mp2-context-exercise" aria-label="Apri selettore e azioni Esercizio">
+                        <x-filament::icon icon="heroicon-m-calendar-days" class="mp2-context-icon" />
                         <span class="mp2-context-copy">
                             <span class="mp2-context-label">Esercizio</span>
                             <span class="mp2-context-value">
@@ -154,6 +155,7 @@
             </x-filament::dropdown>
         @else
             <div class="mp2-context-control mp2-context-exercise" aria-label="Esercizio corrente">
+                <x-filament::icon icon="heroicon-m-calendar-days" class="mp2-context-icon" />
                 <span class="mp2-context-copy">
                     <span class="mp2-context-label">Esercizio</span>
                     <span class="mp2-context-value">Nessun Esercizio</span>
@@ -165,6 +167,7 @@
             <x-filament::dropdown placement="bottom-start" width="xs">
                 <x-slot name="trigger">
                     <button type="button" class="mp2-context-control mp2-context-budget" aria-label="Budget globale">
+                        <x-filament::icon icon="heroicon-m-banknotes" class="mp2-context-icon" />
                         <span class="mp2-context-copy">
                             <span class="mp2-context-label">Budget</span>
                             <span class="mp2-context-value">

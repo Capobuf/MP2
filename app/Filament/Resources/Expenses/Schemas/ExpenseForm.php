@@ -15,6 +15,7 @@ use App\Domain\Projects\ProjectExpenseActivity;
 use App\Domain\Projects\ProjectOverspend;
 use App\Domain\Projects\ProjectOverspendResult;
 use App\Domain\Projects\ProjectState;
+use App\Filament\Forms\AttachmentUpload;
 use App\Filament\Forms\DecimalInput;
 use App\Models\Company;
 use App\Models\Contract;
@@ -28,7 +29,6 @@ use App\Support\ExerciseContext;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Checkbox;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
@@ -152,7 +152,7 @@ class ExpenseForm
                     ->visible(fn (Get $get): bool => $get('container') === 'autonomous')
                     ->dehydrated(fn (Get $get): bool => $get('container') === 'autonomous'),
                 Textarea::make('notes')->label('Note')->columnSpanFull(),
-                FileUpload::make('attachments')
+                AttachmentUpload::make('attachments')
                     ->label('Allegati')
                     ->multiple()
                     ->storeFiles(false)

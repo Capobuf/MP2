@@ -3,6 +3,7 @@
 use App\Domain\Company\AuditEventType;
 use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExerciseStatus;
+use App\Filament\Forms\AttachmentUpload;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Resources\Expenses\Pages\CreateExpense;
 use App\Filament\Resources\Expenses\Pages\EditExpense;
@@ -24,7 +25,6 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Support\ExerciseContext;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -64,7 +64,7 @@ it('creates an expense in the selected global Exercise without exposing a second
         ->assertFormComponentActionHidden('direct_cost_center_id', 'createOption')
         ->assertFormFieldExists('project_id')
         ->assertFormFieldExists('contract_id')
-        ->assertFormFieldExists('attachments', fn ($field): bool => $field instanceof FileUpload && $field->isMultiple())
+        ->assertFormFieldExists('attachments', fn ($field): bool => $field instanceof AttachmentUpload && $field->isMultiple())
         ->assertFormFieldDoesNotExist('actual_kind')
         ->assertFormFieldDoesNotExist('contract_owner_id')
         ->assertFormFieldDoesNotExist('budget_id')
@@ -180,6 +180,37 @@ it('edits existing Lines and saves a duplicated Line with a new identity', funct
         ->and($expense->lines()->whereNotIn('id', [$estimate->id, $actual->id])->sole()->amount)->toBe('30.00')
         ->and(AuditEvent::query()->where('event_type', AuditEventType::ExpenseLineUpdated)->where('subject_id', $estimate->id)->count())->toBe(1)
         ->and(AuditEvent::query()->where('event_type', AuditEventType::ExpenseLineCreated)->count())->toBe(1);
+});
+
+it('shows stored attachments inline and adds new ones through the Expense edit form', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
+    $expense = Expense::factory()->forExercise($exercise)->create();
+    ExpenseLine::factory()->for($expense)->create();
+    $stored = Attachment::factory()->forExpense($expense)->create([
+        'original_name' => 'fattura-esistente.pdf',
+        'uploaded_by_id' => $manager->id,
+    ]);
+    $this->actingAs($manager);
+    Filament::setTenant($company->tenantCompany);
+    Storage::fake('local');
+
+    Livewire::test(EditExpense::class, ['record' => $expense->getRouteKey()])
+        ->assertFormFieldExists("attachment_{$stored->id}", fn ($field): bool => $field instanceof AttachmentUpload)
+        ->assertFormFieldExists('attachments', fn ($field): bool => $field instanceof AttachmentUpload && $field->isMultiple())
+        ->fillForm([
+            'attachments' => [UploadedFile::fake()->create('nuova-fattura.pdf', 10, 'application/pdf')],
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $uploaded = $expense->attachments()->where('original_name', 'nuova-fattura.pdf')->sole();
+
+    Storage::disk('local')->assertExists($uploaded->storage_path);
+    expect($expense->attachments()->attached()->count())->toBe(2)
+        ->and(AuditEvent::query()->where('event_type', AuditEventType::AttachmentUploaded)->count())->toBe(1);
 });
 
 it('rolls back every Line change when one row in the complete edit form is invalid', function () {

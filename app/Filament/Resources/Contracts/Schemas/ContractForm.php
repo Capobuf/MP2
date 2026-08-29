@@ -8,6 +8,7 @@ use App\Domain\Company\Capability;
 use App\Domain\Contracts\ContractAttributionMode;
 use App\Domain\Contracts\ContractCycle;
 use App\Domain\Contracts\ContractCycleType;
+use App\Filament\Forms\AttachmentUpload;
 use App\Filament\Forms\DecimalInput;
 use App\Models\Company;
 use App\Models\CostCenter;
@@ -18,7 +19,6 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
@@ -75,7 +75,7 @@ class ContractForm
                         ->placeholder('Non classificato')
                         ->helperText('Predefinito per tutti gli Esercizi Aperti. Le eventuali eccezioni si impostano in Avanzate.'),
                     Textarea::make('notes')->label('Note')->rows(3)->columnSpanFull(),
-                    FileUpload::make('attachments')
+                    AttachmentUpload::make('attachments')
                         ->label('Allegati')
                         ->multiple()
                         ->storeFiles(false)

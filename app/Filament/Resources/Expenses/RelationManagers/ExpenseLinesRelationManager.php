@@ -9,6 +9,7 @@ use App\Actions\Operations\UpdateExpenseLine;
 use App\Actions\Operations\UploadAttachment;
 use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExpenseLineType;
+use App\Filament\Forms\AttachmentUpload;
 use App\Filament\Resources\Expenses\Schemas\ExpenseForm;
 use App\Filament\Support\ProjectOverspendNotifier;
 use App\Models\Attachment;
@@ -18,7 +19,6 @@ use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -104,6 +104,19 @@ class ExpenseLinesRelationManager extends RelationManager
                     }),
             ])
             ->recordActions([
+                Action::make('previewAttachments')->label('Visualizza PDF')->icon('heroicon-m-eye')
+                    ->visible(fn (ExpenseLine $record): bool => $record->attachments()->attached()->where('media_type', 'application/pdf')->exists())
+                    ->modalHeading('Allegati PDF')
+                    ->modalWidth(Width::FiveExtraLarge)
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Chiudi')
+                    ->form(fn (ExpenseLine $record): array => $record->attachments()
+                        ->attached()
+                        ->where('media_type', 'application/pdf')
+                        ->orderBy('original_name')
+                        ->get()
+                        ->map(fn (Attachment $attachment): AttachmentUpload => AttachmentUpload::forStoredAttachment($attachment))
+                        ->all()),
                 EditAction::make()
                     ->modalHeading('Modifica riga')
                     ->modalDescription('La modifica conserva l’identità della Riga e viene registrata nella Timeline.')
@@ -155,7 +168,7 @@ class ExpenseLinesRelationManager extends RelationManager
                     ->action(fn (ExpenseLine $record, array $data) => $this->setActive($record, true, $data)),
                 Action::make('uploadAttachment')->label('Carica Allegato')->visible(fn (): bool => $this->canManageAttachments())
                     ->form([
-                        FileUpload::make('file')->label('File')->storeFiles(false)->required(),
+                        AttachmentUpload::make('file')->label('File')->storeFiles(false)->required(),
                         Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
                     ])->action(function (ExpenseLine $record, array $data): void {
                         $actor = auth()->user();

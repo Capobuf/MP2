@@ -10,6 +10,7 @@ use App\Domain\Company\Capability;
 use App\Domain\LateCorrections\HistoricalCorrectionSource;
 use App\Domain\LateCorrections\HistoricalErrorKind;
 use App\Domain\LateCorrections\HistoricalExpenseCompatibility;
+use App\Filament\Forms\AttachmentUpload;
 use App\Filament\Resources\Budgets\BudgetResource;
 use App\Filament\Resources\Closings\ClosingResource;
 use App\Filament\Resources\Exercises\ExerciseResource;
@@ -32,7 +33,6 @@ use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Checkbox;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -162,7 +162,7 @@ class ViewExercise extends ViewRecord
                         ->label('L’importo apparteneva realmente a questo Esercizio')
                         ->accepted()
                         ->required(),
-                    FileUpload::make('evidence')
+                    AttachmentUpload::make('evidence')
                         ->label('Evidenza conservata (opzionale)')
                         ->storeFiles(false),
                     Hidden::make('expected_exercise_revision')->default(fn (): int => $this->exerciseRecord()->revision),
@@ -235,7 +235,7 @@ class ViewExercise extends ViewRecord
                         ->label('Motivo')
                         ->required()
                         ->maxLength(65535),
-                    FileUpload::make('evidence')
+                    AttachmentUpload::make('evidence')
                         ->label('Evidenza conservata (opzionale)')
                         ->storeFiles(false),
                     Hidden::make('expected_exercise_revision')->default(fn (): int => $this->exerciseRecord()->revision),

@@ -33,7 +33,7 @@ class PlatformPanelProvider extends PanelProvider
             ->brandLogoHeight('2.5rem')
             ->defaultThemeMode(ThemeMode::Dark)
             ->login()
-            ->profile()
+            ->profile(isSimple: false)
             ->multiFactorAuthentication([
                 AppAuthentication::make()
                     ->recoverable(),

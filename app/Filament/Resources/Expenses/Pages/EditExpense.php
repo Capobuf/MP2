@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Expenses\Pages;
 use App\Actions\Operations\CreateExpenseLine;
 use App\Actions\Operations\UpdateExpense;
 use App\Actions\Operations\UpdateExpenseLine;
+use App\Actions\Operations\UploadAttachment;
 use App\Domain\Contracts\ContractActualKind;
 use App\Domain\Contracts\ContractState;
 use App\Domain\Expenses\Decimal;
@@ -15,6 +16,7 @@ use App\Domain\Projects\ProjectExpenseActivity;
 use App\Domain\Projects\ProjectOverspend;
 use App\Domain\Projects\ProjectOverspendResult;
 use App\Domain\Projects\ProjectState;
+use App\Filament\Forms\AttachmentUpload;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Resources\Expenses\Schemas\ExpenseForm;
 use App\Filament\Support\ProjectOverspendNotifier;
@@ -34,6 +36,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -63,6 +66,12 @@ class EditExpense extends EditRecord
     public function form(Schema $schema): Schema
     {
         $expense = $this->expenseRecord();
+        $storedAttachments = $expense->attachments()
+            ->attached()
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($attachment): AttachmentUpload => AttachmentUpload::forStoredAttachment($attachment))
+            ->all();
 
         return $schema->components([
             Section::make('Spesa')->schema([
@@ -149,6 +158,18 @@ class EditExpense extends EditRecord
                         ->addActionLabel('Aggiungi riga')
                         ->columnSpanFull(),
                 ])->columnSpanFull(),
+            Section::make('Allegati')
+                ->description('I PDF già associati sono consultabili qui. Trascina altri file nel box per aggiungerli insieme al normale salvataggio della Spesa.')
+                ->schema([
+                    ...$storedAttachments,
+                    AttachmentUpload::make('attachments')
+                        ->label('Aggiungi allegati')
+                        ->multiple()
+                        ->storeFiles(false)
+                        ->visible($expense->contract === null || ! $expense->contract->isArchived())
+                        ->columnSpanFull(),
+                ])
+                ->columnSpanFull(),
             Section::make('Informazioni aggiuntive')
                 ->description('Sono richieste soltanto quando le modifiche alle Righe Effettivo incidono sullo stato del contenitore o sulla sovraspesa.')
                 ->schema([
@@ -234,6 +255,17 @@ class EditExpense extends EditRecord
         $actor = auth()->user();
         abort_unless($actor instanceof User && $record instanceof Expense, 403);
 
+        $attachments = $data['attachments'] ?? [];
+        unset($data['attachments']);
+        if (! is_array($attachments)) {
+            throw ValidationException::withMessages(['attachments' => 'Gli Allegati caricati non sono validi.']);
+        }
+        foreach ($attachments as $attachment) {
+            if (! $attachment instanceof UploadedFile) {
+                throw ValidationException::withMessages(['attachments' => 'Gli Allegati caricati non sono validi.']);
+            }
+        }
+
         $submittedLines = $data['lines'] ?? null;
         if (! is_array($submittedLines)) {
             throw ValidationException::withMessages(['lines' => 'Le Righe della Spesa non sono valide.']);
@@ -250,7 +282,7 @@ class EditExpense extends EditRecord
         ];
         $notifierOperationIds = [];
 
-        $updated = DB::transaction(function () use ($actor, $record, $data, $mutations, $shared, &$notifierOperationIds): Expense {
+        $updated = DB::transaction(function () use ($actor, $record, $data, $mutations, $shared, $attachments, &$notifierOperationIds): Expense {
             $updated = $record;
             if ($this->detailsChanged($record, $data)) {
                 $updated = app(UpdateExpense::class)->updateDetails($actor, $record, [
@@ -278,6 +310,15 @@ class EditExpense extends EditRecord
                 }
 
                 $notifierOperationIds[] = $operationId;
+            }
+
+            foreach (array_values($attachments) as $index => $attachment) {
+                app(UploadAttachment::class)->execute(
+                    $actor,
+                    $updated,
+                    $attachment,
+                    Uuid::uuid5($this->operationId, "attachment:{$index}")->toString(),
+                );
             }
 
             return $updated->refresh();

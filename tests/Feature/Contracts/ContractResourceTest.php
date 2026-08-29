@@ -2,6 +2,7 @@
 
 use App\Domain\Company\AuditEventType;
 use App\Domain\Company\Capability;
+use App\Filament\Forms\AttachmentUpload;
 use App\Filament\Resources\Contracts\ContractResource;
 use App\Filament\Resources\Contracts\Pages\CreateContract;
 use App\Filament\Resources\Contracts\Pages\EditContract;
@@ -32,7 +33,6 @@ use App\Support\ExerciseContext;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\TextInput;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -83,7 +83,7 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
         ->assertFormFieldExists('title')
         ->assertFormFieldExists('supplier_id')
         ->assertFormFieldExists('default_cost_center_id')
-        ->assertFormFieldExists('attachments', fn ($field): bool => $field instanceof FileUpload && $field->isMultiple())
+        ->assertFormFieldExists('attachments', fn ($field): bool => $field instanceof AttachmentUpload && $field->isMultiple())
         ->assertFormComponentActionHidden('supplier_id', 'createOption')
         ->assertFormFieldExists('conditions')
         ->assertFormFieldExists('contractual_start_date', fn ($field): bool => $field instanceof TextInput && $field->getMask() === '99/99/9999')
@@ -553,6 +553,35 @@ it('allows descriptive and eligible Supplier edit while keeping contractual date
     expect($contract->refresh()->title)->toBe('Dopo')
         ->and($contract->supplier_id)->toBe($replacement->id)
         ->and($contract->revision)->toBe(1);
+});
+
+it('shows stored attachments inline and adds new ones through the Contract edit form', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantContractResource($manager, $company);
+    $contract = Contract::factory()->for($company)->create();
+    $stored = Attachment::factory()->forContract($contract)->create([
+        'original_name' => 'contratto-esistente.pdf',
+        'uploaded_by_id' => $manager->id,
+    ]);
+    $this->actingAs($manager);
+    Filament::setTenant($company->tenantCompany);
+    Storage::fake('local');
+
+    Livewire::test(EditContract::class, ['record' => $contract->getRouteKey()])
+        ->assertFormFieldExists("attachment_{$stored->id}", fn ($field): bool => $field instanceof AttachmentUpload)
+        ->assertFormFieldExists('attachments', fn ($field): bool => $field instanceof AttachmentUpload && $field->isMultiple())
+        ->fillForm([
+            'attachments' => [UploadedFile::fake()->create('nuove-condizioni.pdf', 10, 'application/pdf')],
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $uploaded = $contract->attachments()->where('original_name', 'nuove-condizioni.pdf')->sole();
+
+    Storage::disk('local')->assertExists($uploaded->storage_path);
+    expect($contract->attachments()->attached()->count())->toBe(2)
+        ->and(AuditEvent::query()->where('event_type', AuditEventType::AttachmentUploaded)->count())->toBe(1);
 });
 
 it('registers explicit lifecycle and renewal management surfaces', function () {

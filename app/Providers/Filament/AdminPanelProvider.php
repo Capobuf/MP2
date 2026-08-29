@@ -4,10 +4,13 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\Tenancy\RegisterCompany;
+use App\Filament\Pages\UserProfile;
 use App\Http\Middleware\EnsureTenantCompanyIsActive;
 use App\Models\TenantCompany;
+use Filament\Actions\Action;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Enums\ThemeMode;
+use Filament\Facades\Filament;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -39,7 +42,14 @@ class AdminPanelProvider extends PanelProvider
             ->brandLogoHeight('2.5rem')
             ->defaultThemeMode(ThemeMode::Dark)
             ->login()
-            ->profile()
+            ->profile(null)
+            ->userMenuItems([
+                'profile' => fn (Action $action): Action => $action
+                    ->label('Profilo')
+                    ->url(fn (): ?string => Filament::getTenant()
+                        ? route('filament.admin.profile', ['tenant' => Filament::getTenant()])
+                        : null),
+            ])
             ->multiFactorAuthentication([
                 AppAuthentication::make()
                     ->recoverable(),
@@ -70,6 +80,10 @@ class AdminPanelProvider extends PanelProvider
                 fn () => view('filament.components.sidebar-brand'),
             )
             ->renderHook(
+                PanelsRenderHook::SIDEBAR_FOOTER,
+                fn () => view('filament.components.sidebar-collapse-control'),
+            )
+            ->renderHook(
                 PanelsRenderHook::SCRIPTS_AFTER,
                 fn () => view('filament.components.date-picker-script'),
             )
@@ -77,6 +91,7 @@ class AdminPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
                 Dashboard::class,
+                UserProfile::class,
             ])
             ->navigationGroups([
                 'Panoramica',

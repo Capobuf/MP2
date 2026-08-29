@@ -118,6 +118,7 @@ it('renders every canonical deadline field and filters defined versus undefined 
 
 it('registers classification link and private attachment governance surfaces without Sostituisce or delete', function () {
     ['user' => $user, 'company' => $company, 'defined' => $contract] = governanceUiContext();
+    $attachment = Attachment::factory()->forContract($contract)->create(['uploaded_by_id' => $user->id]);
     $this->actingAs($user);
     Filament::setTenant(($company)->tenantCompany);
 
@@ -143,7 +144,10 @@ it('registers classification link and private attachment governance surfaces wit
         ->assertTableActionDoesNotExist('delete');
 
     Livewire::test(ContractAttachmentsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
-        ->assertTableActionExists('upload')
+        ->assertTableActionDoesNotExist('upload')
+        ->assertTableActionVisible('preview', record: $attachment)
+        ->mountTableAction('preview', record: $attachment)
+        ->assertSchemaComponentExists('attachment_'.$attachment->id)
         ->assertTableActionDoesNotExist('delete');
 });
 
@@ -224,7 +228,7 @@ it('shows terminal Archive and ordered Contract Timeline detail while keeping vi
         ->assertActionHidden('restore')
         ->assertActionHidden('createContractActual');
     Livewire::test(ContractAttachmentsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
-        ->assertTableActionHidden('upload');
+        ->assertTableActionDoesNotExist('upload');
 });
 
 it('exposes Expense and Line attachment controls to operators and keeps them read only for viewers', function () {
@@ -235,15 +239,22 @@ it('exposes Expense and Line attachment controls to operators and keeps them rea
         'uploaded_by_id' => $manager->id,
         'size_bytes' => 113621,
     ]);
+    $lineAttachment = Attachment::factory()->forExpenseLine($line)->create(['uploaded_by_id' => $manager->id]);
     $this->actingAs($manager);
     Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ExpenseAttachmentsRelationManager::class, ['ownerRecord' => $expense, 'pageClass' => ViewExpense::class])
-        ->assertTableActionExists('upload')
+        ->assertTableActionDoesNotExist('upload')
+        ->assertTableActionVisible('preview', record: $attachment)
+        ->mountTableAction('preview', record: $attachment)
+        ->assertSchemaComponentExists('attachment_'.$attachment->id)
         ->assertTableColumnFormattedStateSet('size_bytes', '110,96 KB', $attachment)
         ->assertTableActionDoesNotExist('delete');
     Livewire::test(ExpenseLinesRelationManager::class, ['ownerRecord' => $expense, 'pageClass' => ViewExpense::class])
         ->assertTableActionVisible('uploadAttachment', record: $line)
+        ->assertTableActionVisible('previewAttachments', record: $line)
+        ->mountTableAction('previewAttachments', record: $line)
+        ->assertSchemaComponentExists('attachment_'.$lineAttachment->id)
         ->assertTableColumnExists('attachments_live')
         ->assertTableActionDoesNotExist('delete', record: $line);
 
@@ -251,7 +262,7 @@ it('exposes Expense and Line attachment controls to operators and keeps them rea
     CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $viewer->id, 'capability' => Capability::View]);
     $this->actingAs($viewer);
     Livewire::test(ExpenseAttachmentsRelationManager::class, ['ownerRecord' => $expense, 'pageClass' => ViewExpense::class])
-        ->assertTableActionHidden('upload');
+        ->assertTableActionDoesNotExist('upload');
     Livewire::test(ExpenseLinesRelationManager::class, ['ownerRecord' => $expense, 'pageClass' => ViewExpense::class])
         ->assertTableActionHidden('uploadAttachment', record: $line);
 });

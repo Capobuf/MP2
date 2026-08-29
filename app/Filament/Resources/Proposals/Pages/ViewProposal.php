@@ -28,6 +28,7 @@ use App\Domain\Proposals\ProposalPurpose;
 use App\Domain\Proposals\ProposalReadiness;
 use App\Domain\Proposals\ProposalRealignmentChoice;
 use App\Domain\Proposals\ProposalSourceType;
+use App\Filament\Forms\AttachmentUpload;
 use App\Filament\Forms\DecimalInput;
 use App\Filament\Pages\CompanyAudit;
 use App\Filament\Resources\Budgets\BudgetResource;
@@ -47,7 +48,6 @@ use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
@@ -106,7 +106,7 @@ class ViewProposal extends ViewRecord
             Action::make('timeline')->label('Timeline della Proposta')->icon('heroicon-m-chart-bar')->color('gray')->outlined()->url(fn (): string => CompanyAudit::getUrl(['tenant' => $this->proposal()->company, 'proposal' => $this->proposal()->id])),
             Action::make('viewBudget')->label(fn (): string => 'Apri Budget v'.$this->proposal()->budget()->value('version'))->icon('heroicon-m-banknotes')->url(fn (): string => BudgetResource::getUrl('view', ['record' => $this->proposal()->budget()->sole()], tenant: $this->proposal()->company))->visible(fn (): bool => $this->proposal()->budget()->exists()),
             Action::make('approveBudget')->label(fn (): string => 'Approva e crea Budget v'.$this->nextBudgetVersion())->color('success')->requiresConfirmation()->modalHeading(fn (): string => 'Approva '.($this->proposal()->purpose === ProposalPurpose::Revision ? 'Revisione' : 'Proposta').' e crea Budget v'.$this->nextBudgetVersion())->modalDescription(fn (): string => 'La conferma rivalida e applica atomicamente il piano. '.$this->approvalSummary())->modalSubmitActionLabel(fn (): string => 'Approva e crea Budget v'.$this->nextBudgetVersion())->visible(fn (): bool => $this->canApprove())->disabled(fn (): bool => ! $this->approvalReady())->tooltip(fn (): ?string => $this->approvalReady() ? null : 'Risolvere tutti i blocchi di verifica prima dell’approvazione.')->form([
-                Placeholder::make('final_impact')->label('Impatto finale da approvare')->content(fn (): string => $this->approvalSummary()), TextInput::make('external_subject')->label('Soggetto approvante esterno')->maxLength(255), TextInput::make('external_venue')->label('Sede o verbale')->maxLength(255), Textarea::make('reason')->label('Motivazione della Revisione')->required(fn (): bool => $this->proposal()->purpose === ProposalPurpose::Revision), FileUpload::make('new_evidence')->label('Nuova evidenza privata')->storeFiles(false), Select::make('attachment_ids')->label('Evidenze già presenti')->multiple()->options(fn (): array => Attachment::query()->where('company_id', $this->proposal()->company_id)->whereNull('detached_at')->orderBy('original_name')->pluck('original_name', 'id')->all()), Hidden::make('evidence_operation_id')->default(fn (): string => $this->evidenceOperationId), Hidden::make('operation_id')->default(fn (): string => $this->approvalOperationId),
+                Placeholder::make('final_impact')->label('Impatto finale da approvare')->content(fn (): string => $this->approvalSummary()), TextInput::make('external_subject')->label('Soggetto approvante esterno')->maxLength(255), TextInput::make('external_venue')->label('Sede o verbale')->maxLength(255), Textarea::make('reason')->label('Motivazione della Revisione')->required(fn (): bool => $this->proposal()->purpose === ProposalPurpose::Revision), AttachmentUpload::make('new_evidence')->label('Nuova evidenza privata')->storeFiles(false), Select::make('attachment_ids')->label('Evidenze già presenti')->multiple()->options(fn (): array => Attachment::query()->where('company_id', $this->proposal()->company_id)->whereNull('detached_at')->orderBy('original_name')->pluck('original_name', 'id')->all()), Hidden::make('evidence_operation_id')->default(fn (): string => $this->evidenceOperationId), Hidden::make('operation_id')->default(fn (): string => $this->approvalOperationId),
             ])->action(function (array $data): void {
                 $ids = array_map('intval', $data['attachment_ids'] ?? []);
                 $file = $data['new_evidence'] ?? null;

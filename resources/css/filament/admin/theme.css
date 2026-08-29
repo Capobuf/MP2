@@ -44,6 +44,7 @@
     --primary-soft: var(--mp2-brand-soft);
     --sidebar-bg: #07171e;
     --mp2-topbar-height: 3.75rem;
+    --mp2-shell-radius: 10px;
     color-scheme: dark;
 }
 
@@ -100,11 +101,15 @@ html.fi {
 
 .fi-sidebar {
     position: fixed !important;
+    z-index: 40;
     inset-block-start: 0 !important;
     inset-inline-start: 0 !important;
     height: 100dvh !important;
     border-inline-end: 1px solid rgb(255 255 255 / 8%);
-    background: var(--sidebar-bg) !important;
+    background:
+        radial-gradient(circle at 18% 4%, rgb(25 91 88 / 26%), transparent 32%),
+        linear-gradient(180deg, #081b22 0%, var(--sidebar-bg) 48%, #06131a 100%) !important;
+    box-shadow: inset -1px 0 rgb(255 255 255 / 2%);
     transform: none;
 }
 
@@ -118,21 +123,47 @@ html.fi {
 }
 
 .fi-sidebar-header-ctn {
-    border-block-end: 1px solid rgb(255 255 255 / 7%);
-    background: transparent !important;
+    display: none;
 }
 
 .mp2-sidebar-brand {
+    position: relative;
     display: grid;
     min-height: var(--mp2-topbar-height);
     flex: none;
     place-items: center;
     border-block-end: 1px solid rgb(255 255 255 / 7%);
+    background: linear-gradient(180deg, rgb(255 255 255 / 2%), transparent);
+}
+
+.mp2-sidebar-brand::before {
+    position: absolute;
+    width: 2.875rem;
+    height: 2.875rem;
+    border: 1px solid rgb(255 255 255 / 7%);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgb(57 213 196 / 8%), transparent 70%);
+    box-shadow: inset 0 1px rgb(255 255 255 / 4%);
+    content: '';
+}
+
+.mp2-sidebar-brand-link {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    width: 100%;
+    min-height: var(--mp2-topbar-height);
+    place-items: center;
+}
+
+.mp2-sidebar-brand-link:focus-visible {
+    outline: 2px solid var(--mp2-focus);
+    outline-offset: -4px;
 }
 
 .mp2-sidebar-brand .mp2-brand-logo {
-    width: 3.125rem;
-    height: 3.125rem;
+    width: 2.75rem;
+    height: 2.75rem;
 }
 
 .mp2-brand-logo {
@@ -223,8 +254,10 @@ html.fi {
 .fi-sidebar-item-btn {
     min-height: 40px;
     justify-content: flex-start;
-    border-radius: 8px;
+    border: 1px solid transparent;
+    border-radius: var(--mp2-shell-radius);
     padding: 8px 10px;
+    transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease, transform 150ms ease;
 }
 
 .fi-sidebar-item-btn > .fi-sidebar-item-label {
@@ -238,18 +271,38 @@ html.fi {
 }
 
 .fi-sidebar-item.fi-active > .fi-sidebar-item-btn {
-    background: color-mix(in srgb, var(--primary) 12%, var(--sidebar-bg)) !important;
-    box-shadow: inset 2px 0 0 var(--primary);
+    border-color: rgb(91 224 209 / 22%);
+    background:
+        radial-gradient(circle at 12% 50%, rgb(57 213 196 / 17%), transparent 46%),
+        linear-gradient(105deg, rgb(25 63 68 / 94%), rgb(13 42 49 / 90%)) !important;
+    box-shadow:
+        inset 0 1px rgb(255 255 255 / 7%),
+        inset 0 0 0 1px rgb(57 213 196 / 3%),
+        0 6px 16px rgb(0 0 0 / 18%),
+        0 0 14px rgb(57 213 196 / 10%);
+    transform: translateY(-1px);
 }
 
-.fi-sidebar-item.fi-active > .fi-sidebar-item-btn > .fi-sidebar-item-label,
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn > .fi-sidebar-item-label {
+    color: var(--text-primary) !important;
+    font-weight: 600;
+    text-shadow: 0 1px 10px rgb(57 213 196 / 10%);
+}
+
 .fi-sidebar-item.fi-active > .fi-sidebar-item-btn > .fi-icon {
-    color: var(--primary) !important;
+    color: var(--primary-hover) !important;
+    filter: drop-shadow(0 0 5px rgb(57 213 196 / 24%));
 }
 
 .fi-sidebar-item.fi-sidebar-item-has-url:not(.fi-active) > .fi-sidebar-item-btn:hover,
 .fi-sidebar-item.fi-sidebar-item-has-url:not(.fi-active) > .fi-sidebar-item-btn:focus-visible {
-    background: rgb(255 255 255 / 7%) !important;
+    border-color: rgb(255 255 255 / 7%);
+    background: linear-gradient(90deg, rgb(255 255 255 / 7%), rgb(255 255 255 / 4%)) !important;
+}
+
+.fi-sidebar-item-btn:focus-visible {
+    outline: 2px solid rgb(105 231 216 / 50%);
+    outline-offset: 2px;
 }
 
 .fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-nav-groups,
@@ -309,6 +362,10 @@ html.fi {
 .fi-topbar > .fi-topbar-open-sidebar-btn,
 .fi-topbar > .fi-topbar-close-sidebar-btn {
     order: 0;
+}
+
+.fi-topbar-collapse-sidebar-btn-ctn {
+    display: none !important;
 }
 
 .fi-topbar > .mp2-context-selector {
@@ -563,9 +620,29 @@ html.fi {
     min-width: 0;
     align-items: center;
     justify-content: flex-end;
-    gap: 8px;
+    gap: 0;
     margin-inline-start: auto;
     margin-inline-end: 8px;
+    border: 1px solid rgb(83 116 124 / 60%);
+    border-radius: calc(var(--mp2-shell-radius) + 2px);
+    background: linear-gradient(180deg, rgb(16 40 49 / 94%), rgb(9 29 37 / 94%));
+    padding: 3px;
+    box-shadow: inset 0 1px rgb(255 255 255 / 4%), 0 8px 22px rgb(0 0 0 / 12%);
+}
+
+.mp2-context-selector > .fi-dropdown,
+.mp2-context-selector > .mp2-context-control {
+    position: relative;
+}
+
+.mp2-context-selector > :not(:first-child)::before {
+    position: absolute;
+    z-index: 1;
+    inset-block: 8px;
+    inset-inline-start: 0;
+    width: 1px;
+    background: linear-gradient(180deg, transparent, rgb(121 151 157 / 24%), transparent);
+    content: '';
 }
 
 .mp2-context-menu-group-divided {
@@ -991,20 +1068,24 @@ html.fi {
     height: 44px;
     align-items: center;
     gap: 8px;
-    border: 1px solid var(--border-strong);
-    border-radius: 8px;
-    background: var(--surface);
+    border: 1px solid transparent;
+    border-radius: calc(var(--mp2-shell-radius) - 2px);
+    background: transparent;
     padding: 4px 10px;
     color: var(--text-primary);
     text-align: start;
-    transition: border-color 150ms ease, background-color 150ms ease;
+    transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
 }
 
 .mp2-context-control:hover,
 .mp2-context-control:focus-visible {
-    border-color: color-mix(in srgb, var(--primary) 55%, var(--border-strong));
-    background: var(--surface-elevated);
+    border-color: rgb(91 224 209 / 16%);
+    background: linear-gradient(180deg, rgb(255 255 255 / 6%), rgb(57 213 196 / 5%));
     outline: none;
+}
+
+.mp2-context-control:focus-visible {
+    box-shadow: inset 0 0 0 1px rgb(105 231 216 / 42%), 0 0 0 2px rgb(57 213 196 / 10%);
 }
 
 .mp2-context-company {
@@ -1050,12 +1131,11 @@ html.fi {
     gap: 6px;
 }
 
-.mp2-context-dot {
-    width: 8px;
-    height: 8px;
+.mp2-context-icon {
+    width: 16px;
+    height: 16px;
     flex: none;
-    border-radius: 999px;
-    background: var(--primary);
+    color: color-mix(in srgb, var(--primary) 72%, var(--text-muted));
 }
 
 .mp2-context-label {
@@ -1157,12 +1237,78 @@ html.fi {
         width: 76px;
     }
 
-    .mp2-context-dot {
+    .mp2-context-icon {
         display: none;
     }
 
     .mp2-context-value {
         font-size: 0.75rem;
+    }
+}
+
+.mp2-sidebar-collapse {
+    flex: none;
+    border-block-start: 1px solid rgb(255 255 255 / 7%);
+    padding: 10px 12px 12px;
+    background: linear-gradient(0deg, rgb(0 0 0 / 12%), transparent);
+}
+
+.mp2-sidebar-collapse-button {
+    display: flex;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    border: 1px solid rgb(255 255 255 / 8%);
+    border-radius: var(--mp2-shell-radius);
+    background: rgb(255 255 255 / 3%);
+    padding: 8px 10px;
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.mp2-sidebar-collapse-button:hover {
+    border-color: rgb(255 255 255 / 13%);
+    background: rgb(255 255 255 / 6%);
+    color: var(--text-primary);
+}
+
+.mp2-sidebar-collapse-button:focus-visible {
+    outline: 2px solid rgb(105 231 216 / 45%);
+    outline-offset: 2px;
+}
+
+.mp2-sidebar-collapse-icon {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    color: var(--text-muted);
+}
+
+.fi-sidebar:not(.fi-sidebar-open) .mp2-sidebar-collapse {
+    padding-inline: 16px;
+}
+
+.fi-sidebar:not(.fi-sidebar-open) .mp2-sidebar-collapse-button {
+    width: 40px;
+    justify-content: center;
+    padding: 8px;
+}
+
+@media (max-width: 480px) {
+    .mp2-context-company {
+        width: 56px;
+    }
+
+    .mp2-context-exercise {
+        width: 54px;
+    }
+
+    .mp2-context-budget {
+        width: 50px;
     }
 }
 
