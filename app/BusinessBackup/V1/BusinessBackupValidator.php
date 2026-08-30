@@ -538,9 +538,14 @@ final class BusinessBackupValidator
         foreach ($m as $sheet => $data) {
             $counts[$sheet] = count($data['rows']);
         }
-        $warnings = ['I file allegati sono inventariati ma non verranno ripristinati.'];
-        if (Company::query()->where('name', $manifest['company_name'])->exists()) {
-            $warnings[] = 'Esiste già una Azienda con la stessa denominazione; il restore creerà comunque una nuova identità.';
+        $attachmentCount = count($m['_MP2_attachments']['rows']);
+        $nameCollision = Company::query()->where('name', $manifest['company_name'])->exists();
+        $warnings = [];
+        if ($attachmentCount > 0) {
+            $warnings[] = "{$attachmentCount} allegati non saranno ripristinati. Il backup ne conserva l’inventario, ma il formato V1 non contiene i file originali.";
+        }
+        if ($nameCollision) {
+            $warnings[] = "Esiste già un’Azienda denominata “{$manifest['company_name']}”. Il ripristino creerà una nuova Azienda indipendente. L’Azienda esistente non verrà modificata né unita ai dati importati.";
         }
 
         return new BackupPreview(
@@ -549,7 +554,8 @@ final class BusinessBackupValidator
             array_map(fn (array $row): array => ['year' => (int) $row[1], 'status' => $row[2]], $m['_MP2_exercises']['rows']),
             $this->sum(array_column($m['_MP2_budgets']['rows'], 6)),
             $this->sum(array_column($m['_MP2_closings']['rows'], 8)),
-            count($m['_MP2_attachments']['rows']),
+            $attachmentCount,
+            $nameCollision,
             $warnings,
         );
     }

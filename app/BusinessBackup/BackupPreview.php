@@ -19,6 +19,7 @@ final readonly class BackupPreview
         public string $budgetTotal,
         public string $closingActualTotal,
         public int $attachmentCount,
+        public bool $nameCollision,
         public array $warnings,
     ) {}
 }

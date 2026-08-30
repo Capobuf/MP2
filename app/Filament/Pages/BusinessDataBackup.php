@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Actions\BusinessBackup\ExportBusinessBackup;
 use App\Actions\BusinessBackup\StoreBusinessBackupOnDrive;
+use App\Filament\Platform\Pages\ImportCompanyBackup;
 use App\Models\Company;
 use App\Models\TenantCompany;
 use App\Models\User;
@@ -48,6 +49,12 @@ final class BusinessDataBackup extends Page
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('importCompany')
+                ->label('Importa nuova Azienda')
+                ->icon(Heroicon::OutlinedArrowUpTray)
+                ->color('gray')
+                ->url(ImportCompanyBackup::getUrl(panel: 'platform'))
+                ->visible(fn (): bool => $this->actor()->is_platform_admin),
             Action::make('download')
                 ->label('Scarica XLSX')
                 ->icon(Heroicon::OutlinedArrowDownTray)
