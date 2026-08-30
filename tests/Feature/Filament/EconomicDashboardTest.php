@@ -178,6 +178,71 @@ it('changes the exact comparison version without a silent Budget fallback', func
         ->and(collect($v2['sources'])->firstWhere('origin_key', $fixture['standalone']->originKey())['budget'])->toBe('100.00');
 });
 
+it('renders live charts without a Budget and keeps comparative charts unavailable', function (): void {
+    $fixture = economicDashboardFixture();
+    $this->actingAs($fixture['viewer']);
+    Filament::setTenant(($fixture['company'])->tenantCompany);
+    app(ExerciseContext::class)->select($fixture['company'], $fixture['exercise']->id);
+
+    $budgetContext = app(BudgetContext::class);
+    expect($budgetContext->current($fixture['company'], $fixture['exercise']))->toBeNull();
+
+    $dashboard = app(EconomicDashboardReadModel::class)->load(
+        $fixture['viewer'],
+        $fixture['company'],
+        $fixture['exercise'],
+        null,
+    );
+    $sourceProfile = chartData(SourceEconomicProfileChart::class);
+    $costCenters = chartData(CostCenterEconomicChart::class);
+    $operationalVariance = chartData(OperationalVarianceBySourceChart::class);
+
+    expect($dashboard['has_budget'])->toBeFalse()
+        ->and($dashboard['budget_id'])->toBeNull()
+        ->and(collect($dashboard['sources'])->pluck('budget')->unique()->all())->toBe([null])
+        ->and(array_column($sourceProfile['datasets'], 'label'))->toBe(['Allocato Corrente', 'Effettivo'])
+        ->and(array_sum($sourceProfile['datasets'][0]['data']))->toBe(600.0)
+        ->and(array_sum($sourceProfile['datasets'][1]['data']))->toBe(640.0)
+        ->and(array_column($costCenters['datasets'], 'label'))->toBe(['Allocato Corrente', 'Effettivo'])
+        ->and($costCenters['labels'])->not->toBeEmpty()
+        ->and($operationalVariance['datasets'][0]['label'])->toBe('Scostamento Operativo')
+        ->and(array_sum($operationalVariance['datasets'][0]['data']))->toBe(40.0)
+        ->and(chartData(BudgetVariationChart::class))->toBe([])
+        ->and(chartData(AllocationComparisonScatterChart::class))->toBe([])
+        ->and($budgetContext->current($fixture['company'], $fixture['exercise']))->toBeNull();
+
+    Livewire::test(SourceEconomicProfileChart::class)
+        ->assertSuccessful()
+        ->assertSee('Allocato Corrente ed Effettivo per sorgente primaria.')
+        ->assertDontSee('Seleziona una versione di Budget');
+});
+
+it('enriches live charts and enables comparative charts with the selected Budget', function (): void {
+    $fixture = economicDashboardFixture();
+    $this->actingAs($fixture['viewer']);
+    Filament::setTenant(($fixture['company'])->tenantCompany);
+    app(ExerciseContext::class)->select($fixture['company'], $fixture['exercise']->id);
+    app(BudgetContext::class)->select($fixture['company'], $fixture['exercise'], $fixture['budget1']->id);
+
+    $sourceProfile = chartData(SourceEconomicProfileChart::class);
+    $costCenters = chartData(CostCenterEconomicChart::class);
+    $operationalVariance = chartData(OperationalVarianceBySourceChart::class);
+    $budgetVariation = chartData(BudgetVariationChart::class);
+    $allocationComparison = chartData(AllocationComparisonScatterChart::class);
+
+    expect(array_column($sourceProfile['datasets'], 'label'))->toBe([
+        'Budget selezionato',
+        'Allocato Corrente',
+        'Effettivo',
+    ])->and(array_column($costCenters['datasets'], 'label'))->toBe([
+        'Budget selezionato',
+        'Allocato Corrente',
+        'Effettivo',
+    ])->and($operationalVariance['datasets'][0]['data'])->not->toBeEmpty()
+        ->and($budgetVariation['datasets'][0]['data'])->not->toBeEmpty()
+        ->and($allocationComparison['datasets'][0]['data'])->not->toBeEmpty();
+});
+
 it('uses ComparisonEngine primary categories and counts the union once', function (): void {
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
     $viewer = s11ReportingViewer($company);
@@ -297,7 +362,8 @@ it('renders every chart and handles no Exercise no Budget and no sources', funct
 
     Livewire::test(SourceEconomicProfileChart::class)
         ->assertSuccessful()
-        ->assertSee('Seleziona una versione di Budget');
+        ->assertSee('Allocato Corrente ed Effettivo per sorgente primaria.')
+        ->assertDontSee('Seleziona una versione di Budget');
 
     $proposal = Proposal::factory()->for($company)->for($exercise)->create();
     $budget = BudgetSnapshot::factory()->for($proposal)->create(['company_id' => $company->id, 'exercise_id' => $exercise->id]);

@@ -25,25 +25,26 @@ class SourceEconomicProfileChart extends EconomicChartWidget
 
         return ($data['has_budget'] ?? false)
             ? 'Budget selezionato, Allocato Corrente ed Effettivo per sorgente primaria.'
-            : 'Seleziona una versione di Budget nel contesto globale per visualizzare il confronto.';
+            : 'Allocato Corrente ed Effettivo per sorgente primaria.';
     }
 
     /** @return array<string, mixed> */
     protected function getData(): array
     {
         $dashboard = $this->economicData();
-        if (! ($dashboard['has_budget'] ?? false) || ($dashboard['sources'] ?? []) === []) {
+        if (($dashboard['sources'] ?? []) === []) {
             return [];
         }
 
         $sources = $dashboard['sources'];
+        $hasBudget = $dashboard['has_budget'] ?? false;
 
         return [
             'labels' => array_column($sources, 'label'),
             'sourceUrls' => array_column($sources, 'url'),
             'operationalVariances' => array_column($sources, 'operational_variance'),
             'datasets' => [
-                [
+                ...($hasBudget ? [[
                     'label' => 'Budget selezionato',
                     'data' => array_map('floatval', array_column($sources, 'budget')),
                     'borderColor' => '#91A3A8',
@@ -54,7 +55,7 @@ class SourceEconomicProfileChart extends EconomicChartWidget
                     'pointHoverRadius' => 6,
                     'cubicInterpolationMode' => 'monotone',
                     'tension' => 0.35,
-                ],
+                ]] : []),
                 [
                     'label' => 'Allocato Corrente',
                     'data' => array_map('floatval', array_column($sources, 'allocation')),
@@ -77,7 +78,7 @@ class SourceEconomicProfileChart extends EconomicChartWidget
                     'pointHoverRadius' => 6,
                     'cubicInterpolationMode' => 'monotone',
                     'tension' => 0.35,
-                    'fill' => 1,
+                    'fill' => $hasBudget ? 1 : 0,
                 ],
             ],
         ];
