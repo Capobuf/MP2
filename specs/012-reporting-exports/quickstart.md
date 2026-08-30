@@ -119,15 +119,15 @@ Per un report completo:
 ## Authenticated browser journey
 
 1. Accedere a `/admin/<azienda>/reports`.
-2. Verificare stato iniziale privo di riferimenti impliciti.
-3. Selezionare Esercizio, Budget, tipo Effettivo e report Budget vs Actual.
-4. Generare e controllare header/categorie.
-5. Aprire drill-down fino a Spese figlie, Righe ed eventi.
-6. Passare a un Esercizio Chiuso e verificare Chiusura/Conoscenza Corrente/correzioni.
-7. Generare report Progetti, Contratti, Riporti e Fornitori.
-8. Scaricare il PDF e aprirlo.
-9. Tentare un URL di report/PDF per una seconda Azienda non autorizzata.
-10. Verificare nessun errore console, pagina, Livewire o risposta HTTP >= 400 nel viaggio autorizzato.
+2. Verificare il chooser iniziale e l’assenza di Esercizio, Budget o tipo Effettivo impliciti.
+3. Scegliere la famiglia Budget vs Actual.
+4. Selezionare esplicitamente Esercizio, Budget e tipo Effettivo e verificare la comparsa automatica del report, senza un’azione Genera.
+5. Modificare il tipo Effettivo o il Budget e verificare l’aggiornamento automatico di header, indicatori, grafici e tabelle.
+6. Aprire Filtri, selezionare un Fornitore e verificare aggiornamento automatico e chip del filtro attivo anche a pannello chiuso.
+7. Aprire il drill-down fino a Spese figlie, Righe ed eventi, verificando l’assenza di dump JSON.
+8. Passare a un Esercizio Chiuso e verificare Chiusura, Conoscenza Corrente e correzioni; cambiare inoltre famiglia verso Progetti, Contratti, Riporti e Fornitori.
+9. Scaricare il PDF del report visibile, aprirlo e verificare riferimenti e filtri identici; tentare poi un URL di report/PDF per una seconda Azienda non autorizzata.
+10. Ripetere le superfici principali a viewport desktop, tablet e mobile e verificare nessun errore console, pagina, Livewire o risposta HTTP >= 400 nel viaggio autorizzato.
 
 ## Full quality gate
 

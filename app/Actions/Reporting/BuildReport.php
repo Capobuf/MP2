@@ -437,6 +437,15 @@ final class BuildReport
             ? $definition->initialReference->budgetSnapshotId
             : $definition->finalReference?->budgetSnapshotId;
         $budget = $budgetId === null ? null : BudgetSnapshot::query()->where('company_id', $company->id)->findOrFail($budgetId);
+        $budgets = BudgetSnapshot::query()
+            ->where('company_id', $company->id)
+            ->where('exercise_id', $exercise->id)
+            ->orderBy('version')
+            ->get();
+        $closingExists = ClosingSnapshot::query()
+            ->where('company_id', $company->id)
+            ->where('exercise_id', $exercise->id)
+            ->exists();
 
         return [
             'company_id' => $company->id,
@@ -448,8 +457,22 @@ final class BuildReport
             'title' => $definition->kind->label(),
             'initial_reference' => $definition->initialReference?->type->label(),
             'final_reference' => $definition->finalReference?->type->label(),
+            'initial_reference_label' => $this->referenceLabel($company, $definition->initialReference),
+            'final_reference_label' => $this->referenceLabel($company, $definition->finalReference),
             'budget_version' => $budget?->version,
             'budget_purpose' => $budget?->purpose->label(),
+            'initial_budget_label' => $budgets->first() instanceof BudgetSnapshot
+                ? 'Budget v'.$budgets->first()->version.' · '.$budgets->first()->purpose->label()
+                : null,
+            'current_budget_label' => $budgets->last() instanceof BudgetSnapshot
+                ? 'Budget v'.$budgets->last()->version.' · '.$budgets->last()->purpose->label()
+                : null,
+            'availability' => [
+                'initial_budget' => $budgets->isNotEmpty(),
+                'current_budget' => $budgets->isNotEmpty(),
+                'selected_budget' => $budget instanceof BudgetSnapshot,
+                'closing' => $closingExists,
+            ],
             'actual_reference' => $definition->actualReference?->label(),
             'reference_date' => ProjectAnnualReferenceDate::forYear($exercise->year, CarbonImmutable::now($company->timezone))->toDateString(),
             'generated_at' => $definition->generatedAt->setTimezone($company->timezone)->toDateTimeString(),
@@ -460,6 +483,34 @@ final class BuildReport
             'currency' => 'EUR',
             'amount_basis' => 'Importi netti IVA',
         ];
+    }
+
+    private function referenceLabel(Company $company, ?ReportReference $reference): ?string
+    {
+        if ($reference === null) {
+            return null;
+        }
+
+        $exercise = Exercise::query()
+            ->where('company_id', $company->id)
+            ->findOrFail($reference->exerciseId);
+
+        if ($reference->type !== ReferenceType::Budget) {
+            $label = match ($reference->type) {
+                ReferenceType::Current => 'Situazione Corrente',
+                ReferenceType::Closing => 'Snapshot di Chiusura',
+                ReferenceType::CurrentKnowledge => 'Effettivo a Conoscenza Corrente',
+            };
+
+            return $label.' · Esercizio '.$exercise->year;
+        }
+
+        $budget = BudgetSnapshot::query()
+            ->where('company_id', $company->id)
+            ->where('exercise_id', $exercise->id)
+            ->findOrFail($reference->budgetSnapshotId);
+
+        return 'Budget v'.$budget->version.' · '.$budget->purpose->label().' · Esercizio '.$exercise->year;
     }
 
     /**
