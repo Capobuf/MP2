@@ -7,6 +7,7 @@ use App\BusinessBackup\V1\PortablePayload;
 use App\Domain\Company\Capability;
 use App\Models\Company;
 use App\Models\CompanyCapability;
+use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -67,6 +68,7 @@ it('rejects corrupt future orphan duplicate and non-canonical workbooks before w
     ExpenseLine::factory()->for($first)->create(['amount' => '10.00']);
     $second = Expense::factory()->forExercise($exercise)->create();
     ExpenseLine::factory()->for($second)->create(['amount' => '20.00']);
+    Contract::factory()->create(['company_id' => $company->id]);
     $artifact = app(ExportBusinessBackup::class)->execute($company, $actor);
     $initialCompanies = Company::query()->count();
 
@@ -125,6 +127,11 @@ it('rejects corrupt future orphan duplicate and non-canonical workbooks before w
                 $workbook->getSheetByName('_MP2_exercises')
                     ->setCellValueExplicit('B2', 'not-a-year', DataType::TYPE_STRING);
                 refreshBackupValidatorChecksum($workbook, '_MP2_exercises');
+            },
+            'renewal-duration' => function ($workbook): void {
+                $workbook->getSheetByName('_MP2_contracts')
+                    ->setCellValueExplicit('I2', 'not-a-duration', DataType::TYPE_STRING);
+                refreshBackupValidatorChecksum($workbook, '_MP2_contracts');
             },
         ];
 

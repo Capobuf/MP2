@@ -250,11 +250,29 @@ final class BusinessBackupValidator
 
         $this->assertJsonColumns($m);
         $this->assertDates($m);
+        $this->assertContractRenewals($m);
         $this->assertExpenses($m);
         $this->assertBudgets($m);
         $this->assertClosings($m);
         $this->assertDeferrals($m, $refs);
         $this->assertCorrections($m);
+    }
+
+    /** @param array<string, array{columns: list<string>, rows: list<list<string>>}> $m */
+    private function assertContractRenewals(array $m): void
+    {
+        foreach ([
+            '_MP2_contracts' => [5, 7, 8, 9],
+            '_MP2_contract_renewals' => [4, 3, 5, 6],
+        ] as $sheet => [$expiryIndex, $automaticIndex, $durationIndex, $noticeIndex]) {
+            foreach ($m[$sheet]['rows'] as $row) {
+                $duration = $row[$durationIndex];
+                $notice = $row[$noticeIndex];
+                $this->assert($duration === '' || $this->validUnsignedInteger($duration, 1), "Durata rinnovo non valida in [$sheet].");
+                $this->assert($notice === '' || $this->validUnsignedInteger($notice), "Preavviso non valido in [$sheet].");
+                $this->assert($row[$automaticIndex] !== '1' || $row[$expiryIndex] === '' || $duration !== '', "Durata rinnovo mancante in [$sheet].");
+            }
+        }
     }
 
     /** @param array<string, array{columns: list<string>, rows: list<list<string>>}> $m */
@@ -673,6 +691,13 @@ final class BusinessBackupValidator
     private function validMoney(string $value): bool
     {
         return (bool) preg_match('/^-?\d+\.\d{2}$/', $value);
+    }
+
+    private function validUnsignedInteger(string $value, int $minimum = 0): bool
+    {
+        return (bool) preg_match('/^(0|[1-9]\d*)$/D', $value)
+            && (int) $value >= $minimum
+            && (int) $value <= 4_294_967_295;
     }
 
     private function assert(bool $condition, string $message): void
