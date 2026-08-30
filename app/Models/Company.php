@@ -113,6 +113,12 @@ class Company extends Model implements HasName
         return $this->hasMany(HistoricalErrorAnnotation::class);
     }
 
+    /** @return HasOne<BusinessBackupImport, $this> */
+    public function businessBackupImport(): HasOne
+    {
+        return $this->hasOne(BusinessBackupImport::class);
+    }
+
     public function getFilamentName(): string
     {
         return $this->name;

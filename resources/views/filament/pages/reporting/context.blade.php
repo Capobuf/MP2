@@ -1,21 +1,10 @@
-<section class="mp2-report-context" aria-labelledby="report-context-title">
+<div class="mp2-report-context" aria-label="Riferimenti e filtri del report">
     <div class="mp2-report-context-heading">
-        <div>
-            <p class="mp2-report-kicker">Riferimenti e filtri</p>
-            <h3 id="report-context-title">Contesto del report</h3>
-        </div>
+        <p class="mp2-report-kicker">Riferimenti e filtri</p>
         <x-filament::button color="gray" outlined wire:click="toggleFilters" icon="heroicon-m-funnel">
             Filtri @if ($this->activeFilterCount() > 0) ({{ $this->activeFilterCount() }}) @endif
         </x-filament::button>
     </div>
-
-    @if ($this->referenceSummary() !== [])
-        <div class="mp2-report-reference-strip" role="list" aria-label="Riferimenti selezionati">
-            @foreach ($this->referenceSummary() as $item)
-                <span role="listitem">{{ $item }}</span>
-            @endforeach
-        </div>
-    @endif
 
     <div class="mp2-report-reference-form">
         {{ $this->references }}
@@ -49,4 +38,4 @@
             @endif
         </div>
     @endif
-</section>
+</div>

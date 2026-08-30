@@ -71,8 +71,10 @@ class BudgetInfolist
                 'previous_version' => $budget->previousBudget === null ? '—' : 'v'.$budget->previousBudget->version,
                 'purpose' => $budget->purpose->label(),
                 'approved_at' => CarbonImmutable::parse($budget->approved_at)->timezone($budget->company->timezone)->format('d/m/Y H:i'),
-                'approver' => $budget->approver->name,
-                'proposal' => '#'.$budget->proposal_id,
+                'approver' => $budget->approved_by_id === null
+                    ? 'Autore originale non disponibile'
+                    : $budget->approver->name,
+                'proposal' => $budget->proposal_id === null ? 'Non disponibile (Budget importato)' : '#'.$budget->proposal_id,
                 'total' => self::money($budget->total_approved_allocation),
                 'affected_exercises' => $affectedExercises,
                 'source_count' => count($rows),

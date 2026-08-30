@@ -124,10 +124,12 @@ Per un report completo:
 4. Selezionare esplicitamente Esercizio, Budget e tipo Effettivo e verificare la comparsa automatica del report, senza un’azione Genera.
 5. Modificare il tipo Effettivo o il Budget e verificare l’aggiornamento automatico di header, indicatori, grafici e tabelle.
 6. Aprire Filtri, selezionare un Fornitore e verificare aggiornamento automatico e chip del filtro attivo anche a pannello chiuso.
-7. Aprire il drill-down fino a Spese figlie, Righe ed eventi, verificando l’assenza di dump JSON.
-8. Passare a un Esercizio Chiuso e verificare Chiusura, Conoscenza Corrente e correzioni; cambiare inoltre famiglia verso Progetti, Contratti, Riporti e Fornitori.
-9. Scaricare il PDF del report visibile, aprirlo e verificare riferimenti e filtri identici; tentare poi un URL di report/PDF per una seconda Azienda non autorizzata.
-10. Ripetere le superfici principali a viewport desktop, tablet e mobile e verificare nessun errore console, pagina, Livewire o risposta HTTP >= 400 nel viaggio autorizzato.
+7. Aprire lo switcher inline e passare direttamente fra almeno cinque famiglie, senza tornare al chooser iniziale.
+8. A ogni cambio verificare che Esercizio, filtri e riferimenti ancora compatibili restino selezionati, mentre i riferimenti non usati dalla nuova famiglia vengano rimossi senza fallback; se la configurazione resta completa il nuovo report compare subito, altrimenti compare `Completa i riferimenti`.
+9. Aprire il drill-down fino a Spese figlie, Righe ed eventi, verificando l’assenza di dump JSON.
+10. Passare a un Esercizio Chiuso e verificare Chiusura, Conoscenza Corrente e correzioni; cambiare inoltre famiglia verso Progetti, Contratti, Riporti e Fornitori.
+11. Scaricare il PDF del report visibile, aprirlo e verificare riferimenti e filtri identici; tentare poi un URL di report/PDF per una seconda Azienda non autorizzata.
+12. Ripetere le superfici principali a viewport desktop, tablet e mobile e verificare nessun errore console, pagina, Livewire o risposta HTTP >= 400 nel viaggio autorizzato.
 
 ## Full quality gate
 
@@ -179,3 +181,31 @@ L'utente demo disponibile era autorizzato su entrambe le Aziende presenti, quind
 - S9 non è stato modificato;
 - nessun reset o mutazione del database persistente di sviluppo è stato eseguito;
 - nessun report o file PDF è stato persistito dall'applicazione.
+
+## Evidenze di rifinitura — 30 agosto 2026
+
+### Verifica automatizzata
+
+- suite Reporting mirata: **61 test superati, 268 asserzioni**;
+- build frontend: superata;
+- `git diff --check`: superato;
+- Pint e PHPStan sui file della rifinitura: superati;
+- il gate globale Pint/PHPStan è rimasto rosso esclusivamente per modifiche concorrenti della feature `BusinessBackup`, estranee a S11.
+
+### Verifica browser autenticata
+
+Sul database persistente di sviluppo, senza reset o mutazioni preparatorie, sono stati verificati:
+
+- chooser iniziale senza riferimenti impliciti e generazione automatica di Budget vs Actual dopo Esercizio, Budget ed Effettivo espliciti;
+- switcher inline con passaggio diretto fra Budget vs Actual, Budget vs Allocato Corrente, Fornitori, Contratti, Progetti, Riporti, Versioni Budget e Vista annuale esecutiva, senza ritorno al chooser;
+- conservazione di Esercizio, Budget e filtro Fornitore quando compatibili; rimozione di Effettivo, Budget e intervallo date quando non applicabili;
+- stato `Completa i riferimenti` per Versioni Budget con il primo Budget preservato e nessun secondo Budget implicito;
+- cambio e ripristino del Budget opzionale, cambio Effettivo con rifiuto esplicito della Chiusura assente e successivo recupero del report Corrente;
+- cambio Esercizio 2026 → 2025 con rigenerazione automatica dello Scostamento Operativo;
+- KPI specifici, grafici alimentati dal risultato, drill-down fino alle Righe e PDF autenticato con risposta 200, `application/pdf` e firma `%PDF-`;
+- viewport 1440×900, 1024×768 e 390×844 senza overflow orizzontale della pagina;
+- console ed errori browser vuoti e richieste Livewire osservate con risposta 200.
+
+### Limiti della verifica del 30 agosto
+
+L’Azienda browser con dati completi disponeva di una sola versione Budget e di un solo Esercizio aperto. Il browser ha quindi verificato correttamente lo stato incompleto di Versioni Budget, ma non il relativo risultato con due versioni; ha inoltre verificato il rifiuto della Chiusura assente, non una Chiusura disponibile. I due scenari completi restano coperti dalle regressioni automatizzate Reporting con due Budget e dai test di Chiusura/Conoscenza Corrente.

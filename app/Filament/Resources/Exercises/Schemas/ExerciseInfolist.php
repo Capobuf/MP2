@@ -43,7 +43,7 @@ class ExerciseInfolist
                             TextEntry::make('supplier_context')->label('Fornitore storico')->state(fn (LateCorrection $record): string => self::json($record->supplier_context))->placeholder('—'),
                             TextEntry::make('reason')->label('Motivo')->columnSpanFull()->wrap(),
                             TextEntry::make('belongs_to_closed_exercise')->label('Dichiarazione')->formatStateUsing(fn (bool $state): string => $state ? 'Apparteneva realmente a questo Esercizio' : 'Non dichiarata'),
-                            TextEntry::make('recordedBy.name')->label('Autore'),
+                            TextEntry::make('recordedBy.name')->label('Autore')->placeholder('Autore originale non disponibile'),
                             TextEntry::make('created_at')->label('Registrata il')->state(fn (LateCorrection $record): string => $record->created_at->copy()->timezone($record->company->timezone)->format('d/m/Y H:i')),
                             TextEntry::make('expenseLine.attachments')
                                 ->label('Evidenze conservate')
@@ -75,7 +75,7 @@ class ExerciseInfolist
                             TextEntry::make('affected_sources')->label('Sorgenti interessate')->state(fn (HistoricalErrorAnnotation $record): string => self::sources($record->affected_sources))->columnSpanFull()->wrap(),
                             TextEntry::make('reason')->label('Motivo')->columnSpanFull()->wrap(),
                             TextEntry::make('economic_impact')->label('Impatto economico')->state(fn (): string => 'Nessun impatto economico'),
-                            TextEntry::make('recordedBy.name')->label('Autore'),
+                            TextEntry::make('recordedBy.name')->label('Autore')->placeholder('Autore originale non disponibile'),
                             TextEntry::make('created_at')->label('Registrata il')->state(fn (HistoricalErrorAnnotation $record): string => $record->created_at->copy()->timezone($record->company->timezone)->format('d/m/Y H:i')),
                             TextEntry::make('attachments')
                                 ->label('Evidenze conservate')

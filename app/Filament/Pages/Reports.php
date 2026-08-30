@@ -109,6 +109,10 @@ class Reports extends Page
             return;
         }
 
+        if ($this->kind !== null) {
+            $this->preserveCompatibleContext(ReportKind::from($this->kind));
+        }
+
         if ($this->isReportConfigurationComplete()) {
             $this->generate();
         }
@@ -211,9 +215,20 @@ class Reports extends Page
         $this->resetErrorBag();
 
         if ($property === 'kind') {
-            $this->resetKindReferences();
+            $kind = $this->kind === null ? null : ReportKind::tryFrom($this->kind);
+            if ($kind instanceof ReportKind) {
+                $this->preserveCompatibleContext($kind);
+            }
         } elseif ($property === 'exerciseId') {
             $this->resetExerciseReferences();
+        } elseif (in_array($property, [
+            'budgetId', 'secondBudgetId', 'actualReference', 'comparisonExerciseId',
+            'exerciseMeasure', 'dateFrom', 'dateTo',
+        ], true) && $this->kind !== null) {
+            $kind = ReportKind::tryFrom($this->kind);
+            if ($kind instanceof ReportKind) {
+                $this->preserveCompatibleContext($kind);
+            }
         }
 
         if ($this->dateIntervalIncomplete()) {
@@ -245,25 +260,26 @@ class Reports extends Page
 
     public function selectReport(string $kind): void
     {
-        abort_unless(ReportKind::tryFrom($kind) instanceof ReportKind, 404);
-        $this->kind = $kind;
-        $this->resetErrorBag();
-        $this->resetKindReferences();
-
-        if ($this->isReportConfigurationComplete()) {
-            $this->generate();
-        }
+        $this->switchReport($kind);
     }
 
-    public function changeReport(): void
+    public function switchReport(string $kind): void
     {
-        $this->kind = null;
-        $this->resetKindReferences();
-        $this->clearFilters(refresh: false);
-        $this->report = null;
-        $this->definition = null;
-        $this->filtersOpen = false;
+        $reportKind = ReportKind::tryFrom($kind);
+        abort_unless($reportKind instanceof ReportKind, 404);
+
+        $this->kind = $reportKind->value;
         $this->resetErrorBag();
+        $this->preserveCompatibleContext($reportKind);
+
+        if (! $this->isReportConfigurationComplete()) {
+            $this->report = null;
+            $this->definition = null;
+
+            return;
+        }
+
+        $this->generate();
     }
 
     public function toggleFilters(): void
@@ -371,32 +387,6 @@ class Reports extends Page
     }
 
     /** @return array<int, string> */
-    public function referenceSummary(): array
-    {
-        $items = [];
-        if ($this->exerciseId !== null) {
-            $items[] = 'Esercizio '.($this->exerciseOptions()[$this->exerciseId] ?? $this->exerciseId);
-        }
-        if ($this->budgetId !== null) {
-            $items[] = $this->budgetOptions()[$this->budgetId] ?? 'Budget #'.$this->budgetId;
-        }
-        if ($this->secondBudgetId !== null) {
-            $items[] = $this->budgetOptions()[$this->secondBudgetId] ?? 'Budget #'.$this->secondBudgetId;
-        }
-        if ($this->actualReference !== null) {
-            $items[] = $this->actualOptions()[$this->actualReference] ?? $this->actualReference;
-        }
-        if ($this->comparisonExerciseId !== null) {
-            $items[] = 'Secondo Esercizio '.($this->exerciseOptions()[$this->comparisonExerciseId] ?? $this->comparisonExerciseId);
-        }
-        if ($this->exerciseMeasure !== null) {
-            $items[] = $this->exerciseMeasureOptions()[$this->exerciseMeasure] ?? $this->exerciseMeasure;
-        }
-
-        return $items;
-    }
-
-    /** @return array<int, string> */
     public function activeFilterLabels(): array
     {
         $labels = [];
@@ -412,7 +402,8 @@ class Reports extends Page
             }
         }
         if ($this->dateFrom !== null && $this->dateTo !== null) {
-            $labels[] = 'Intervallo: '.$this->dateFrom.' – '.$this->dateTo;
+            $labels[] = 'Intervallo: '.str($this->dateFrom)->before(' ')->toString()
+                .' – '.str($this->dateTo)->before(' ')->toString();
         }
 
         return $labels;
@@ -431,8 +422,6 @@ class Reports extends Page
         }
 
         $this->resetErrorBag();
-        $this->report = null;
-        $this->definition = null;
 
         try {
             $definition = ReportDefinition::fromArray($this->definitionInput());
@@ -442,10 +431,14 @@ class Reports extends Page
             $this->definition = $definition->toArray();
             $this->report = $this->serializeResult($result);
         } catch (ValidationException $exception) {
+            $this->report = null;
+            $this->definition = null;
             foreach ($exception->errors() as $field => $messages) {
                 $this->addError($this->uiErrorField($field, $messages[0]), $messages[0]);
             }
         } catch (\InvalidArgumentException $exception) {
+            $this->report = null;
+            $this->definition = null;
             $this->addError($this->uiErrorField('kind', $exception->getMessage()), $exception->getMessage());
         }
     }
@@ -646,6 +639,7 @@ class Reports extends Page
             'title' => $section['title'],
             'rows' => array_map(fn (mixed $row): array => $row instanceof ReportSource ? $source($row) : $row, $section['rows']),
         ], $result->sections);
+        $comparisonTotals = $this->comparisonTotals($result->comparisons);
 
         return [
             'header' => $result->header,
@@ -665,12 +659,17 @@ class Reports extends Page
                 'count' => (int) ($result->labelCounts[$label->value] ?? 0),
             ])->filter(fn (array $item): bool => $item['count'] > 0)->values()->all(),
             'sections' => $sections,
-            'charts' => $this->charts($result),
+            'comparison_totals' => $comparisonTotals,
+            'specialist_totals' => $this->specialistTotals($result->definition->kind, $sections),
+            'charts' => $this->charts($result, $comparisonTotals),
         ];
     }
 
-    /** @return array<int, array<string, mixed>> */
-    private function charts(ReportResult $result): array
+    /**
+     * @param  array{initial: string, final: string, delta: string, source_count: int}  $comparisonTotals
+     * @return array<int, array<string, mixed>>
+     */
+    private function charts(ReportResult $result, array $comparisonTotals): array
     {
         $charts = [];
         $kind = $result->definition->kind;
@@ -729,8 +728,8 @@ class Reports extends Page
                     (string) ($result->header['final_reference_label'] ?? $result->header['final_reference']),
                 ],
                 [
-                    (float) Decimal::sum(array_column($result->comparisons, 'initial_value')),
-                    (float) Decimal::sum(array_column($result->comparisons, 'final_value')),
+                    (float) $comparisonTotals['initial'],
+                    (float) $comparisonTotals['final'],
                 ],
             );
             $categoryChart = $this->categoryChart($result);
@@ -867,14 +866,101 @@ class Reports extends Page
         ];
     }
 
-    private function resetKindReferences(): void
+    private function preserveCompatibleContext(ReportKind $kind): void
     {
-        $this->reset('budgetId', 'secondBudgetId', 'actualReference', 'comparisonExerciseId', 'exerciseMeasure');
-        if ($this->kind !== ReportKind::Contracts->value) {
+        if (! in_array($kind, [
+            ReportKind::AnnualExecutive,
+            ReportKind::BudgetActual,
+            ReportKind::BudgetCurrentAllocation,
+            ReportKind::BudgetVersions,
+        ], true) || ! $this->optionExists($this->budgetId, $this->budgetOptions())) {
+            $this->budgetId = null;
+        }
+
+        if ($kind !== ReportKind::BudgetVersions || ! $this->optionExists($this->secondBudgetId, $this->budgetOptions())) {
+            $this->secondBudgetId = null;
+        }
+
+        if (! in_array($kind, [ReportKind::AnnualExecutive, ReportKind::BudgetActual], true)
+            || $this->actualReference === null
+            || ActualReference::tryFrom($this->actualReference) === null) {
+            $this->actualReference = null;
+        }
+
+        if ($kind !== ReportKind::Exercises) {
+            $this->comparisonExerciseId = null;
+            $this->exerciseMeasure = null;
+        } else {
+            if (! $this->optionExists($this->comparisonExerciseId, $this->exerciseOptions())
+                || $this->comparisonExerciseId === $this->exerciseId) {
+                $this->comparisonExerciseId = null;
+            }
+            if ($this->exerciseMeasure === null || ! array_key_exists($this->exerciseMeasure, $this->exerciseMeasureOptions())) {
+                $this->exerciseMeasure = null;
+            }
+        }
+
+        if ($kind !== ReportKind::Contracts) {
             $this->reset('dateFrom', 'dateTo');
         }
-        $this->report = null;
-        $this->definition = null;
+
+        foreach ([
+            'costCenterId' => $this->costCenterOptions(),
+            'projectId' => $this->projectOptions(),
+            'contractId' => $this->contractOptions(),
+            'expenseId' => $this->expenseOptions(),
+            'supplierId' => $this->supplierOptions(),
+        ] as $property => $options) {
+            if (! $this->optionExists($this->{$property}, $options)) {
+                $this->{$property} = null;
+            }
+        }
+    }
+
+    /**
+     * @param  array<int|string, string>  $options
+     */
+    private function optionExists(?int $value, array $options): bool
+    {
+        return $value !== null && array_key_exists($value, $options);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $comparisons
+     * @return array{initial: string, final: string, delta: string, source_count: int}
+     */
+    private function comparisonTotals(array $comparisons): array
+    {
+        $initial = Decimal::sum(array_column($comparisons, 'initial_value'));
+        $final = Decimal::sum(array_column($comparisons, 'final_value'));
+
+        return [
+            'initial' => $initial,
+            'final' => $final,
+            'delta' => Decimal::subtract($final, $initial),
+            'source_count' => count($comparisons),
+        ];
+    }
+
+    /**
+     * @param  array<int, array{title: string, rows: array<int, array<string, mixed>>}>  $sections
+     * @return array<string, string|int>
+     */
+    private function specialistTotals(ReportKind $kind, array $sections): array
+    {
+        if (! in_array($kind, [ReportKind::Suppliers, ReportKind::Contracts, ReportKind::Projects, ReportKind::Carryovers], true)) {
+            return [];
+        }
+
+        $rows = $sections[0]['rows'] ?? [];
+
+        return [
+            'allocation' => Decimal::sum(array_column($rows, 'allocation')),
+            'actual' => Decimal::sum(array_column($rows, 'actual')),
+            'operational_variance' => Decimal::sum(array_column($rows, 'operational_variance')),
+            'carryover' => Decimal::sum(array_column($rows, 'carryover')),
+            'item_count' => count($rows),
+        ];
     }
 
     private function resetExerciseReferences(): void

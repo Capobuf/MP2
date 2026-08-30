@@ -49,7 +49,7 @@ class ProjectTransitionsRelationManager extends RelationManager
                 TextColumn::make('effective_date')->label('Data efficacia')->date('d/m/Y')->sortable(),
                 TextColumn::make('status')->label('Stato')->state(fn (ProjectTransition $record): string => $record->status($this->today())->label())->badge(),
                 TextColumn::make('reason')->label('Motivo')->placeholder('—')->wrap(),
-                TextColumn::make('creator.name')->label('Autore'),
+                TextColumn::make('creator.name')->label('Autore')->placeholder('Autore originale non disponibile'),
             ])
             ->headerActions([
                 Action::make('createTransition')

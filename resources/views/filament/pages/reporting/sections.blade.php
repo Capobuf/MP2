@@ -18,8 +18,8 @@
             <div class="mp2-report-table-wrap" tabindex="0">
                 <table class="mp2-report-table">
                     <thead><tr><th>Fornitore</th><th class="mp2-report-number">Allocato</th><th class="mp2-report-number">Effettivo</th><th class="mp2-report-number">Scostamento</th><th>Sorgenti</th></tr></thead>
-                    <tbody>
-                        @foreach ($section['rows'] as $row)
+                    @foreach ($section['rows'] as $row)
+                        <tbody x-data="{ expanded: false }" class="mp2-report-row-group">
                             <tr>
                                 <th scope="row">{{ $row['label'] }}</th>
                                 <td class="mp2-report-number">{{ $money($row['allocation']) }}</td>
@@ -35,8 +35,8 @@
             <div class="mp2-report-table-wrap" tabindex="0">
                 <table class="mp2-report-table">
                     <thead><tr><th>Contratto</th><th>Stato</th><th class="mp2-report-number">Allocato</th><th class="mp2-report-number">Effettivo</th><th class="mp2-report-number">Scostamento</th><th>Etichette</th><th>Drill-down</th></tr></thead>
-                    <tbody>
-                        @foreach ($section['rows'] as $row)
+                    @foreach ($section['rows'] as $row)
+                        <tbody x-data="{ expanded: false }" class="mp2-report-row-group">
                             <tr>
                                 <th scope="row">{{ $row['label'] }}</th>
                                 <td>{{ $this->stateLabel($row['state']) }}</td>
@@ -45,28 +45,33 @@
                                 <td class="mp2-report-number">{{ $money($row['operational_variance']) }}</td>
                                 <td><div class="mp2-report-chip-list">@forelse ($row['labels'] as $label)<span>{{ $label }}</span>@empty<span>—</span>@endforelse</div></td>
                                 <td>
-                                    <details class="mp2-report-drilldown">
-                                        <summary>Apri dettaglio</summary>
-                                        @include('filament.pages.reporting.drilldown', ['source' => [
-                                            'source_type' => 'contract', 'label' => $row['label'], 'summary' => null,
-                                            'supplier' => null, 'state' => $row['state'], 'allocation' => $row['allocation'],
-                                            'actual' => $row['actual'], 'operational_variance' => $row['operational_variance'],
-                                            'carryover' => '0.00', 'residual' => '0.00', 'saving' => '0.00', 'unused' => '0.00',
-                                            'detail' => $row['detail'], 'corrections' => [], 'annotations' => [],
-                                        ]])
-                                    </details>
+                                    <button type="button" class="mp2-report-drilldown-trigger" x-on:click="expanded = ! expanded" x-bind:aria-expanded="expanded">
+                                        <span x-text="expanded ? 'Chiudi dettaglio' : 'Apri dettaglio'">Apri dettaglio</span>
+                                        <x-filament::icon icon="heroicon-m-chevron-down" x-bind:class="{ 'is-expanded': expanded }" />
+                                    </button>
                                 </td>
                             </tr>
-                        @endforeach
-                    </tbody>
+                            <tr class="mp2-report-detail-row" x-show="expanded" x-cloak>
+                                <td colspan="7">
+                                    @include('filament.pages.reporting.drilldown', ['source' => [
+                                        'source_type' => 'contract', 'label' => $row['label'], 'summary' => null,
+                                        'supplier' => null, 'state' => $row['state'], 'allocation' => $row['allocation'],
+                                        'actual' => $row['actual'], 'operational_variance' => $row['operational_variance'],
+                                        'carryover' => '0.00', 'residual' => '0.00', 'saving' => '0.00', 'unused' => '0.00',
+                                        'detail' => $row['detail'], 'corrections' => [], 'annotations' => [],
+                                    ]])
+                                </td>
+                            </tr>
+                        </tbody>
+                    @endforeach
                 </table>
             </div>
         @elseif (in_array($report['header']['kind'], ['projects', 'carryovers'], true))
             <div class="mp2-report-table-wrap" tabindex="0">
                 <table class="mp2-report-table">
                     <thead><tr><th>Progetto</th><th>Stato</th><th class="mp2-report-number">Allocato</th><th class="mp2-report-number">Effettivo</th><th class="mp2-report-number">Residuo</th><th class="mp2-report-number">Risparmio</th><th class="mp2-report-number">Non utilizzato</th><th class="mp2-report-number">Riporto</th><th>Drill-down</th></tr></thead>
-                    <tbody>
-                        @foreach ($section['rows'] as $row)
+                    @foreach ($section['rows'] as $row)
+                        <tbody x-data="{ expanded: false }" class="mp2-report-row-group">
                             <tr>
                                 <th scope="row">{{ $row['label'] }}</th>
                                 <td>{{ $this->stateLabel($row['state']) }}</td>
@@ -76,10 +81,18 @@
                                 <td class="mp2-report-number">{{ $money($row['saving']) }}</td>
                                 <td class="mp2-report-number">{{ $money($row['unused']) }}</td>
                                 <td class="mp2-report-number">{{ $money($row['carryover']) }}</td>
-                                <td><details class="mp2-report-drilldown"><summary>Apri dettaglio</summary>@include('filament.pages.reporting.drilldown', ['source' => $row])</details></td>
+                                <td>
+                                    <button type="button" class="mp2-report-drilldown-trigger" x-on:click="expanded = ! expanded" x-bind:aria-expanded="expanded">
+                                        <span x-text="expanded ? 'Chiudi dettaglio' : 'Apri dettaglio'">Apri dettaglio</span>
+                                        <x-filament::icon icon="heroicon-m-chevron-down" x-bind:class="{ 'is-expanded': expanded }" />
+                                    </button>
+                                </td>
                             </tr>
-                        @endforeach
-                    </tbody>
+                            <tr class="mp2-report-detail-row" x-show="expanded" x-cloak>
+                                <td colspan="9">@include('filament.pages.reporting.drilldown', ['source' => $row])</td>
+                            </tr>
+                        </tbody>
+                    @endforeach
                 </table>
             </div>
         @else

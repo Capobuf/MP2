@@ -16,7 +16,9 @@
         "dompdf/dompdf": "^3.1.6",
         "filament/filament": "^5.0",
         "laravel/framework": "^13.17",
-        "relayercore/laravel-installer": "1.5.0"
+        "maatwebsite/excel": "^4.0",
+        "relayercore/laravel-installer": "1.5.0",
+        "yaza/laravel-google-drive-storage": "^5.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

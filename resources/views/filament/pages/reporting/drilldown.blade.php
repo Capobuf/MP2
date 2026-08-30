@@ -1,15 +1,27 @@
 @php
+    use Carbon\CarbonImmutable;
     use Illuminate\Support\Number;
 
     $money = static fn (string|int|float|null $value): string => $value === null
         ? '—'
         : Number::currency((float) $value, in: 'EUR', locale: 'it');
+    $date = static fn (mixed $value): string => blank($value)
+        ? 'Non definita'
+        : CarbonImmutable::parse((string) $value)->format('d/m/Y');
     $detail = is_array($source['detail'] ?? null) ? $source['detail'] : [];
     $expenses = is_array($detail['expenses'] ?? null) ? $detail['expenses'] : [];
     $lines = is_array($detail['lines'] ?? null) ? $detail['lines'] : [];
 @endphp
 
 <div class="mp2-report-drilldown-content">
+    <div class="mp2-report-drilldown-heading">
+        <div>
+            <p class="mp2-report-kicker">Dettaglio {{ $this->sourceTypeLabel($source['source_type']) }}</p>
+            <h4>{{ $source['label'] }}</h4>
+        </div>
+        <span class="mp2-report-state">{{ $this->stateLabel($source['state']) }}</span>
+    </div>
+
     @if ($source['summary'] ?? null)
         <p class="mp2-report-drilldown-summary">{{ $source['summary'] }}</p>
     @endif
@@ -52,9 +64,9 @@
         @php($knownKeys = ['expenses', 'transitions', 'transitions_in_exercise', 'deferrals', 'residual', 'saving', 'unused_allocation', 'consolidated_carryover', 'archived_or_reversed', 'deferred'])
     @else
         <dl class="mp2-report-detail-facts">
-            <div><dt>Scadenza</dt><dd>{{ $detail['deadline'] ?? $detail['next_expiry_date'] ?? 'Non definita' }}</dd></div>
+            <div><dt>Scadenza</dt><dd>{{ $date($detail['deadline'] ?? $detail['next_expiry_date'] ?? null) }}</dd></div>
             <div><dt>Rinnovo automatico</dt><dd>{{ ($detail['automatic_renewal'] ?? false) ? 'Sì' : 'No' }}</dd></div>
-            <div><dt>Data limite disdetta</dt><dd>{{ $detail['notice_limit_date'] ?? 'Non definita' }}</dd></div>
+            <div><dt>Data limite disdetta</dt><dd>{{ $date($detail['notice_limit_date'] ?? $detail['cancellation_deadline'] ?? null) }}</dd></div>
             <div><dt>Scostamento</dt><dd>{{ $money($source['operational_variance']) }}</dd></div>
             <div><dt>Archivio</dt><dd>{{ ($detail['archived_or_reversed'] ?? false) ? 'Archiviato' : 'Non archiviato' }}</dd></div>
         </dl>
@@ -70,19 +82,22 @@
                 @endforeach
             </section>
         @endif
-        @foreach ([['conditions', 'Condizioni'], ['cycles', 'Cicli'], ['annual_composition', 'Composizione annuale'], ['events', 'Eventi'], ['lifecycle_events', 'Eventi']] as [$key, $title])
-            @if (is_array($detail[$key] ?? null) && $detail[$key] !== [])
-                <section class="mp2-report-detail-group"><h5>{{ $title }}</h5>@include('filament.pages.reporting.key-value', ['data' => $detail[$key]])</section>
-            @endif
-        @endforeach
-        @php($knownKeys = ['expenses', 'conditions', 'cycles', 'annual_composition', 'events', 'lifecycle_events', 'deadline', 'next_expiry_date', 'automatic_renewal', 'notice_limit_date', 'operational_variance', 'archived_or_reversed'])
+        @include('filament.pages.reporting.contract-detail', ['detail' => $detail])
+        @php($knownKeys = [
+            'expenses', 'conditions', 'cycles', 'annual_composition', 'events', 'lifecycle_events', 'approved_lifecycle',
+            'renewal_configuration_at_31_december', 'deadline', 'next_expiry_date', 'contractual_start_date',
+            'automatic_renewal', 'renewal_duration_months', 'notice_days', 'notice_limit_date', 'cancellation_deadline',
+            'operational_variance', 'archived_or_reversed', 'contract_id', 'title', 'supplier', 'classification',
+            'state_at_31_december', 'start_state', 'end_state', 'cost_center', 'exercise_id', 'exercise_year',
+            'approved_estimate_total', 'relations', 'event_references',
+        ])
     @endif
 
     @foreach ($source['corrections'] ?? [] as $correction)
         <section class="mp2-report-correction">
             <h5>Correzione</h5>
             <p><strong>{{ $money($correction['amount']) }}</strong> · {{ $correction['reason'] }}</p>
-            @if ($correction['created_at'] ?? null)<time>{{ $correction['created_at'] }}</time>@endif
+            @if ($correction['created_at'] ?? null)<time>{{ $date($correction['created_at']) }}</time>@endif
         </section>
     @endforeach
 

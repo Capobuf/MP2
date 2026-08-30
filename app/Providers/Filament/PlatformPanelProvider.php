@@ -51,6 +51,10 @@ class PlatformPanelProvider extends PanelProvider
                 in: app_path('Filament/Platform/Resources'),
                 for: 'App\Filament\Platform\Resources',
             )
+            ->discoverPages(
+                in: app_path('Filament/Platform/Pages'),
+                for: 'App\Filament\Platform\Pages',
+            )
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

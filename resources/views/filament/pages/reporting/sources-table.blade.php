@@ -26,13 +26,10 @@
                     <th scope="col">Drill-down</th>
                 </tr>
             </thead>
-            <tbody>
-                @foreach ($report['sources'] as $source)
+            @foreach ($report['sources'] as $source)
+                <tbody x-data="{ expanded: false }" class="mp2-report-row-group">
                     <tr>
-                        <th scope="row">
-                            {{ $source['label'] }}
-                            <small>{{ $source['origin_key'] }}</small>
-                        </th>
+                        <th scope="row">{{ $source['label'] }}</th>
                         <td>{{ $this->sourceTypeLabel($source['source_type']) }}</td>
                         <td>{{ $source['cost_center'] ?? 'Non classificato' }}</td>
                         <td>{{ $source['supplier'] ?? '—' }}</td>
@@ -41,14 +38,24 @@
                         <td class="mp2-report-number">{{ $money($source['operational_variance']) }}</td>
                         <td><span class="mp2-report-state">{{ $this->stateLabel($source['state']) }}</span></td>
                         <td>
-                            <details class="mp2-report-drilldown">
-                                <summary>Apri dettaglio</summary>
-                                @include('filament.pages.reporting.drilldown', ['source' => $source])
-                            </details>
+                            <button
+                                type="button"
+                                class="mp2-report-drilldown-trigger"
+                                x-on:click="expanded = ! expanded"
+                                x-bind:aria-expanded="expanded"
+                            >
+                                <span x-text="expanded ? 'Chiudi dettaglio' : 'Apri dettaglio'">Apri dettaglio</span>
+                                <x-filament::icon icon="heroicon-m-chevron-down" x-bind:class="{ 'is-expanded': expanded }" />
+                            </button>
                         </td>
                     </tr>
-                @endforeach
-            </tbody>
+                    <tr class="mp2-report-detail-row" x-show="expanded" x-cloak>
+                        <td colspan="9">
+                            @include('filament.pages.reporting.drilldown', ['source' => $source])
+                        </td>
+                    </tr>
+                </tbody>
+            @endforeach
         </table>
     </div>
 </section>

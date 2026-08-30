@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * @property int $company_id
  * @property int $exercise_id
+ * @property int|null $proposal_id
+ * @property int|null $approved_by_id
  * @property ProposalPurpose $purpose
  * @property array<int, array<string, mixed>> $affected_exercises
  */

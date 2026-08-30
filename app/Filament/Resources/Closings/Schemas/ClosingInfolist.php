@@ -25,7 +25,7 @@ final class ClosingInfolist
                     TextEntry::make('company_name')->label('Azienda'),
                     TextEntry::make('exercise_year')->label('Esercizio'),
                     TextEntry::make('closed_at')->label('Chiuso il')->dateTime('d/m/Y H:i'),
-                    TextEntry::make('closer.name')->label('Chiuso da'),
+                    TextEntry::make('closer.name')->label('Chiuso da')->placeholder('Autore originale non disponibile'),
                     TextEntry::make('initialBudget.version')->label('Budget v1')->formatStateUsing(fn (mixed $state): string => 'v'.$state)->placeholder('Assente'),
                     TextEntry::make('currentBudget.version')->label('Budget corrente')->formatStateUsing(fn (mixed $state): string => 'v'.$state)->placeholder('Assente'),
                     TextEntry::make('total_final_allocation')->label('Allocato finale')->money('EUR', locale: 'it'),
@@ -83,7 +83,7 @@ final class ClosingInfolist
                             TextEntry::make('supplier_context')->label('Fornitore storico')->state(fn (LateCorrection $record): string => self::json($record->supplier_context))->placeholder('—'),
                             TextEntry::make('reason')->label('Motivo')->columnSpanFull()->wrap(),
                             TextEntry::make('belongs_to_closed_exercise')->label('Dichiarazione')->formatStateUsing(fn (bool $state): string => $state ? 'Apparteneva realmente a questo Esercizio' : 'Non dichiarata'),
-                            TextEntry::make('recordedBy.name')->label('Autore'),
+                            TextEntry::make('recordedBy.name')->label('Autore')->placeholder('Autore originale non disponibile'),
                             TextEntry::make('created_at')->label('Registrata il')->state(fn (LateCorrection $record): string => $record->created_at->copy()->timezone($record->company->timezone)->format('d/m/Y H:i')),
                             TextEntry::make('attachments')
                                 ->label('Evidenze conservate')
@@ -107,7 +107,7 @@ final class ClosingInfolist
                             TextEntry::make('affected_sources')->label('Sorgenti interessate')->state(fn (HistoricalErrorAnnotation $record): string => self::sources($record->affected_sources))->columnSpanFull()->wrap(),
                             TextEntry::make('reason')->label('Motivo')->columnSpanFull()->wrap(),
                             TextEntry::make('economic_impact')->label('Impatto economico')->state(fn (): string => 'Nessun impatto economico'),
-                            TextEntry::make('recordedBy.name')->label('Autore'),
+                            TextEntry::make('recordedBy.name')->label('Autore')->placeholder('Autore originale non disponibile'),
                             TextEntry::make('created_at')->label('Registrata il')->state(fn (HistoricalErrorAnnotation $record): string => $record->created_at->copy()->timezone($record->company->timezone)->format('d/m/Y H:i')),
                             TextEntry::make('attachments')
                                 ->label('Evidenze conservate')

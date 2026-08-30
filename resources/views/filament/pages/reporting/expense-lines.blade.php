@@ -16,7 +16,7 @@
                         <td>{{ ($line['annulled'] ?? (($line['state'] ?? null) === 'annulled')) ? 'Annullata' : 'Attiva' }}</td>
                         <td>
                             @forelse ($line['attachments'] ?? [] as $attachment)
-                                <span class="mp2-report-chip">{{ $attachment['name'] ?? 'Allegato #'.($attachment['id'] ?? '') }}</span>
+                                <span class="mp2-report-chip">{{ $attachment['name'] ?? 'Allegato' }}</span>
                             @empty
                                 —
                             @endforelse

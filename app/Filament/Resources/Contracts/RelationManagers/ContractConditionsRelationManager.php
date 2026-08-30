@@ -56,7 +56,7 @@ class ContractConditionsRelationManager extends RelationManager
             TextColumn::make('attribution_mode')->label('Attribuzione')->formatStateUsing(fn (string $state): string => ContractAttributionMode::from($state)->label()),
             TextColumn::make('valid_from')->label('Valida dal')->date('d/m/Y'),
             TextColumn::make('valid_to')->label('Valida fino al')->date('d/m/Y')->placeholder('Senza termine'),
-            TextColumn::make('creator.name')->label('Autore'),
+            TextColumn::make('creator.name')->label('Autore')->placeholder('Autore originale non disponibile'),
             TextColumn::make('reason')->label('Motivo')->placeholder('—')->wrap(),
         ])->headerActions([
             Action::make('createCondition')->label('Nuova condizione')->visible(fn (): bool => $this->canMutate())

@@ -42,7 +42,7 @@ class ContractRenewalsRelationManager extends RelationManager
             TextColumn::make('expiry_anchor_date')->label('Scadenza approvata')->date('d/m/Y')->placeholder('Scadenza non definita'),
             TextColumn::make('renewal_duration_months')->label('Durata mesi')->placeholder('—'),
             TextColumn::make('notice_days')->label('Preavviso giorni')->placeholder('—'),
-            TextColumn::make('creator.name')->label('Autore'),
+            TextColumn::make('creator.name')->label('Autore')->placeholder('Autore originale non disponibile'),
         ])->headerActions([
             Action::make('updateRenewal')->label('Modifica rinnovo')->visible(fn (): bool => $this->canMutate())->form([
                 DatePicker::make('effective_from')->label('Efficace dal')->required()->live()

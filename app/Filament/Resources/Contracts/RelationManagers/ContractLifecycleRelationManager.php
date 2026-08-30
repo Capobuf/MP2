@@ -47,7 +47,7 @@ class ContractLifecycleRelationManager extends RelationManager
             TextColumn::make('state_change_date')->label('Cambio stato dal')->date('d/m/Y')->placeholder('Stato invariato'),
             TextColumn::make('display_status')->label('Stato evento')->state(fn (ContractLifecycleFact $record): string => $record->annulledAt() !== null ? 'Annullato' : ($record->stateChangeDate()?->isFuture() ? 'Pianificato' : 'Efficace'))->badge(),
             TextColumn::make('reason')->label('Motivo')->placeholder('—')->wrap(),
-            TextColumn::make('creator.name')->label('Autore'),
+            TextColumn::make('creator.name')->label('Autore')->placeholder('Autore originale non disponibile'),
         ])->headerActions([
             Action::make('cease')->label('Cessa')->visible(fn (): bool => $this->canMutate())->form([
                 DatePicker::make('date')->label('Ultimo giorno attivo')->required(), Textarea::make('reason')->label('Nota')->required(),

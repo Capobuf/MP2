@@ -10,6 +10,7 @@ use App\Models\AuditEvent;
 use App\Models\BudgetEvidence;
 use App\Models\BudgetSnapshot;
 use App\Models\BudgetSourceRow;
+use App\Models\BusinessBackupImport;
 use App\Models\ClosingSnapshot;
 use App\Models\ClosingSourceRow;
 use App\Models\Company;
@@ -233,6 +234,13 @@ function createTenantDestructionGraph(
     string $exclusivePath,
     string $sharedPath,
 ): void {
+    BusinessBackupImport::query()->create([
+        'package_id' => (string) Str::uuid(),
+        'format_version' => 1,
+        'company_id' => $company->id,
+        'imported_by_id' => $actor->id,
+        'completed_at' => now(),
+    ]);
     CompanyCapability::query()->create([
         'company_id' => $company->id,
         'user_id' => $actor->id,

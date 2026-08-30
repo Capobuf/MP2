@@ -4,6 +4,10 @@ use App\Filament\Pages\Reports;
 use App\Models\BudgetSnapshot;
 use App\Models\BudgetSourceRow;
 use App\Models\Company;
+use App\Models\Contract;
+use App\Models\ContractCondition;
+use App\Models\ContractLifecycleFact;
+use App\Models\ContractRenewalConfiguration;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -23,13 +27,23 @@ function reportingUiContext(Company $company, User $viewer): void
     Filament::setTenant($company->tenantCompany);
 }
 
-function reportingUiBudget(Company $company, Exercise $exercise, Expense $expense, string $amount = '100.00'): BudgetSnapshot
-{
-    $proposal = Proposal::factory()->for($company)->for($exercise)->create(['status' => 'approved']);
+function reportingUiBudget(
+    Company $company,
+    Exercise $exercise,
+    Expense $expense,
+    string $amount = '100.00',
+    int $version = 1,
+): BudgetSnapshot {
+    $purpose = $version === 1 ? 'initial_budget' : 'revision';
+    $proposal = Proposal::factory()->for($company)->for($exercise)->create([
+        'purpose' => $purpose,
+        'status' => 'approved',
+    ]);
     $budget = BudgetSnapshot::factory()->for($proposal)->create([
         'company_id' => $company->id,
         'exercise_id' => $exercise->id,
-        'version' => 1,
+        'version' => $version,
+        'purpose' => $purpose,
         'total_approved_allocation' => $amount,
     ]);
     BudgetSourceRow::factory()->for($budget, 'budget')->create([
@@ -149,7 +163,7 @@ it('refreshes supplier filtering automatically and keeps the active filter visib
         ->assertSee('Azzera filtri');
 });
 
-it('removes incompatible hidden references when changing report family', function (): void {
+it('switches directly while preserving compatible references and filters', function (): void {
     $company = Company::factory()->create();
     $viewer = s11ReportingViewer($company);
     $exercise = Exercise::factory()->for($company)->create();
@@ -165,15 +179,109 @@ it('removes incompatible hidden references when changing report family', functio
         ->set('budgetId', $budget->id)
         ->set('actualReference', 'current')
         ->set('supplierId', $supplier->id)
-        ->call('changeReport')
-        ->assertSet('kind', null)
+        ->call('switchReport', 'budget_current_allocation')
+        ->assertSet('kind', 'budget_current_allocation')
+        ->assertSet('exerciseId', $exercise->id)
+        ->assertSet('budgetId', $budget->id)
+        ->assertSet('actualReference', null)
+        ->assertSet('supplierId', $supplier->id)
+        ->assertSet('definition.kind', 'budget_current_allocation')
+        ->assertSet('definition.filters.supplier_id', $supplier->id)
+        ->assertSet('report', fn (?array $report): bool => $report !== null)
+        ->assertDontSee('Scegli il report');
+});
+
+it('preserves annual references when switching to budget actual', function (): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create();
+    $expense = Expense::factory()->forExercise($exercise)->create();
+    ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '10.00']);
+    $budget = reportingUiBudget($company, $exercise, $expense);
+    reportingUiContext($company, $viewer);
+
+    Livewire::test(Reports::class)
+        ->set('exerciseId', $exercise->id)
+        ->set('kind', 'annual_executive')
+        ->set('budgetId', $budget->id)
+        ->set('actualReference', 'current')
+        ->call('switchReport', 'budget_actual')
+        ->assertSet('exerciseId', $exercise->id)
+        ->assertSet('budgetId', $budget->id)
+        ->assertSet('actualReference', 'current')
+        ->assertSet('definition.kind', 'budget_actual')
+        ->assertSet('report', fn (?array $report): bool => $report !== null);
+});
+
+it('drops budget and actual but keeps the supplier filter when switching to suppliers', function (): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create();
+    $supplier = Supplier::factory()->for($company)->create();
+    $expense = Expense::factory()->forExercise($exercise)->for($supplier)->create();
+    ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '10.00']);
+    $budget = reportingUiBudget($company, $exercise, $expense);
+    reportingUiContext($company, $viewer);
+
+    Livewire::test(Reports::class)
+        ->set('exerciseId', $exercise->id)
+        ->set('kind', 'budget_actual')
+        ->set('budgetId', $budget->id)
+        ->set('actualReference', 'current')
+        ->set('supplierId', $supplier->id)
+        ->call('switchReport', 'suppliers')
+        ->assertSet('exerciseId', $exercise->id)
         ->assertSet('budgetId', null)
         ->assertSet('actualReference', null)
-        ->assertSet('supplierId', null)
-        ->call('selectReport', 'projects')
-        ->assertSet('kind', 'projects')
+        ->assertSet('supplierId', $supplier->id)
+        ->assertSet('definition.kind', 'suppliers')
+        ->assertSet('definition.filters.supplier_id', $supplier->id)
+        ->assertSet('report', fn (?array $report): bool => $report !== null);
+});
+
+it('drops the contract date interval but keeps general filters when switching to projects', function (): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create();
+    $supplier = Supplier::factory()->for($company)->create();
+    reportingUiContext($company, $viewer);
+
+    Livewire::test(Reports::class)
+        ->set('exerciseId', $exercise->id)
+        ->set('kind', 'contracts')
+        ->set('supplierId', $supplier->id)
+        ->set('dateFrom', '2026-01-01 00:00:00')
+        ->set('dateTo', '2026-12-31 00:00:00')
+        ->assertSee('Intervallo: 2026-01-01 – 2026-12-31')
+        ->call('switchReport', 'projects')
+        ->assertSet('exerciseId', $exercise->id)
+        ->assertSet('supplierId', $supplier->id)
+        ->assertSet('dateFrom', null)
+        ->assertSet('dateTo', null)
         ->assertSet('definition.kind', 'projects')
-        ->assertSet('definition.filters', []);
+        ->assertSet('definition.filters.supplier_id', $supplier->id);
+});
+
+it('keeps one budget and requests the second when switching to budget versions', function (): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create();
+    $expense = Expense::factory()->forExercise($exercise)->create();
+    $budget = reportingUiBudget($company, $exercise, $expense);
+    reportingUiContext($company, $viewer);
+
+    Livewire::test(Reports::class)
+        ->set('exerciseId', $exercise->id)
+        ->set('kind', 'budget_current_allocation')
+        ->set('budgetId', $budget->id)
+        ->call('switchReport', 'budget_versions')
+        ->assertSet('exerciseId', $exercise->id)
+        ->assertSet('budgetId', $budget->id)
+        ->assertSet('secondBudgetId', null)
+        ->assertSet('report', null)
+        ->assertSet('definition', null)
+        ->assertSee('Completa i riferimenti')
+        ->assertSee('Budget finale');
 });
 
 it('does not generate a new contracts report from a partial date interval', function (): void {
@@ -256,6 +364,143 @@ it('renders canonical classification and structured detail without raw json or f
         ->set('actualReference', 'current')
         ->assertSee('Budget approvato corrente')
         ->assertSee('Non disponibile');
+});
+
+it('renders contract drill-down across the full row without technical persistence fields', function (): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $contract = Contract::factory()->for($company)->create([
+        'title' => 'Contratto leggibile',
+        'next_expiry_date' => '2028-02-20',
+    ]);
+    ContractCondition::factory()->forContract($contract)->create([
+        'amount' => '1138.50',
+        'cycle' => 'annual',
+        'attribution_mode' => 'cycle_start',
+        'valid_from' => '2026-02-20',
+        'created_by_id' => $viewer->id,
+    ]);
+    ContractRenewalConfiguration::factory()->forContract($contract)->create([
+        'effective_from' => '2026-02-20',
+        'expiry_anchor_date' => '2028-02-20',
+        'renewal_duration_months' => 24,
+        'notice_days' => 30,
+        'created_by_id' => $viewer->id,
+    ]);
+    ContractLifecycleFact::factory()->forContract($contract)->create([
+        'declared_contractual_date' => '2026-02-20',
+        'state_change_date' => '2026-02-20',
+        'reason' => 'Avvio del servizio',
+        'created_by_id' => $viewer->id,
+    ]);
+    reportingUiContext($company, $viewer);
+
+    Livewire::test(Reports::class)
+        ->set('exerciseId', $exercise->id)
+        ->set('kind', 'annual_executive')
+        ->set('actualReference', 'current')
+        ->assertHasNoErrors()
+        ->assertSee('Dettaglio Contratto')
+        ->assertSee('Condizioni economiche')
+        ->assertSee('Configurazioni di rinnovo')
+        ->assertSee('Eventi contrattuali')
+        ->assertSee('Annuale')
+        ->assertSee('Inizio ciclo')
+        ->assertSee('24 mesi')
+        ->assertSee('Avvio del servizio')
+        ->assertSeeHtml('class="mp2-report-detail-row"')
+        ->assertSeeHtml('colspan="9"')
+        ->assertDontSee('Company id')
+        ->assertDontSee('Created by id')
+        ->assertDontSee('Created at')
+        ->assertDontSee('Updated at')
+        ->assertDontSee('contract:'.$contract->id)
+        ->assertDontSee('2026-02-20T00:00:00.000000Z');
+});
+
+it('shows only budget references and their variation in budget versions KPIs', function (): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $expense = Expense::factory()->forExercise($exercise)->create();
+    $initialBudget = reportingUiBudget($company, $exercise, $expense, '100.00');
+    $finalBudget = reportingUiBudget($company, $exercise, $expense, '115.00', 2);
+    reportingUiContext($company, $viewer);
+
+    Livewire::test(Reports::class)
+        ->set('exerciseId', $exercise->id)
+        ->set('kind', 'budget_versions')
+        ->set('budgetId', $initialBudget->id)
+        ->set('secondBudgetId', $finalBudget->id)
+        ->assertHasNoErrors()
+        ->assertSee('Budget v1')
+        ->assertSee('Budget v2')
+        ->assertSee('Variazione fra Budget')
+        ->assertDontSee('Effettivo del riferimento')
+        ->assertDontSee('Scostamento Operativo del riferimento');
+});
+
+it('names the selected budget actual references and variance in its KPIs', function (): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $expense = Expense::factory()->forExercise($exercise)->create();
+    ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '90.00']);
+    $budget = reportingUiBudget($company, $exercise, $expense, '100.00');
+    reportingUiContext($company, $viewer);
+
+    Livewire::test(Reports::class)
+        ->set('exerciseId', $exercise->id)
+        ->set('kind', 'budget_actual')
+        ->set('budgetId', $budget->id)
+        ->set('actualReference', 'current')
+        ->assertHasNoErrors()
+        ->assertSee('Budget v1')
+        ->assertSee('Effettivo Corrente')
+        ->assertSee('Varianza Budget vs Actual');
+});
+
+it('names budget allocation references and variation in current allocation KPIs', function (): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $expense = Expense::factory()->forExercise($exercise)->create();
+    ExpenseLine::factory()->for($expense)->create(['amount' => '115.00']);
+    $budget = reportingUiBudget($company, $exercise, $expense, '100.00');
+    reportingUiContext($company, $viewer);
+
+    Livewire::test(Reports::class)
+        ->set('exerciseId', $exercise->id)
+        ->set('kind', 'budget_current_allocation')
+        ->set('budgetId', $budget->id)
+        ->assertHasNoErrors()
+        ->assertSee('Budget v1')
+        ->assertSee('Situazione Corrente')
+        ->assertSee('Variazione Allocato vs Budget')
+        ->assertSet('report.comparison_totals.initial', '100.00')
+        ->assertSet('report.comparison_totals.final', '115.00')
+        ->assertSet('report.comparison_totals.delta', '15.00')
+        ->assertSet('report.charts.0.data.datasets.0.data', [100.0, 115.0]);
+});
+
+it('names the selected measure in exercise comparison KPIs', function (): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $initialExercise = Exercise::factory()->for($company)->create(['year' => 2025]);
+    $finalExercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    reportingUiContext($company, $viewer);
+
+    Livewire::test(Reports::class)
+        ->set('exerciseId', $initialExercise->id)
+        ->set('kind', 'exercises')
+        ->set('comparisonExerciseId', $finalExercise->id)
+        ->set('exerciseMeasure', 'current')
+        ->assertHasNoErrors()
+        ->assertSee('Misura: Situazione Corrente')
+        ->assertSee('Esercizio 2025')
+        ->assertSee('Esercizio 2026')
+        ->assertSee('Delta complessivo');
 });
 
 it('denies the report page without visualizza', function (): void {
