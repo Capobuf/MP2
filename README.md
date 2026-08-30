@@ -1,8 +1,8 @@
 # MP2
 
-Foundation Laravel/Filament per MP2. S0 include solo ambiente di sviluppo, accesso
-tecnico, persistenza MySQL e controlli qualità; non contiene ancora entità del
-dominio economico.
+Applicazione Laravel/Filament per la governance della spesa IT MP2. Le regole di
+dominio autorevoli sono raccolte nella
+[`Specifica Canonica Semplificata`](docs/domain/Specifica_Canonica_Semplificata_v4.md).
 
 ## Requisiti
 
@@ -45,6 +45,6 @@ Lo stop normale conserva il database `mp2` nel volume nominato `sail-mysql`.
 ```
 
 La suite usa esclusivamente il database MySQL `testing` e si arresta prima dei
-reset se ambiente o database non sono quelli previsti. I controlli equivalenti alla
-CI sono documentati in
-[`quickstart.md`](specs/001-foundation-dev-environment/quickstart.md).
+reset se ambiente o database non sono quelli previsti. La policy corrente è in
+[`docs/testing-policy.md`](docs/testing-policy.md); il gate eseguibile dalla CI è
+definito in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).

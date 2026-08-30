@@ -130,7 +130,7 @@ quality gates required by the current CI workflow.
 
 ## Pull-request CI
 
-The current `.github/workflows/quality.yml` is the executable source of truth for the
+The current `.github/workflows/ci.yml` is the executable source of truth for the
 repository-wide CI gate.
 
 
