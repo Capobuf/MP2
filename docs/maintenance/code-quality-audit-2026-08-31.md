@@ -36,7 +36,11 @@ Inspected:
 - the V1 business-backup workbook contract, validator and its focused validation
   tests;
 - documentation entry points and references to the current CI workflow and completed
-  Spec Kit packages.
+  Spec Kit packages, plus the installed `.specify` integration state and its current
+  feature pointer;
+- current action/domain/support symbols for unused concrete classes and empty
+  wrappers, with framework-discovered Filament/models/policies excluded from unsafe
+  name-count deletion heuristics.
 
 Partially inspected:
 
@@ -65,8 +69,8 @@ Not systematically inspected:
   change the imported historical value.
 - Concrete impact: a corrupt package can pass pre-write validation with a different
   timestamp meaning from its serialized text.
-- Expected behavior: accept only the exact canonical second-resolution ISO 8601 form
-  emitted by `BusinessBackupCollector`, with an explicit offset; reject invalid or
+- Expected behavior: accept only canonical second-resolution ISO 8601 with an
+  explicit offset (including the equivalent `Z` UTC notation); reject invalid or
   normalized dates.
 - Remediation: replace permissive parsing with format-and-round-trip validation.
 - Verification: add a workbook mutation regression case and run
@@ -146,7 +150,7 @@ Not systematically inspected:
 - Expected behavior/remediation: reference the current workflow path.
 - Verification: repository-wide reference search and link/path existence check.
 - Status: resolved.
-- Resolution commit: pending.
+- Resolution commit: `d1cff54`.
 
 ### CQ-006 — Completed Spec Kit packages lack an explicit historical entry point
 
@@ -167,7 +171,117 @@ Not systematically inspected:
   completed atomically with all references updated.
 - Verification: review all resulting entry-point references and run a path check.
 - Status: resolved.
-- Resolution commit: pending.
+- Resolution commit: `d1cff54`.
+
+### CQ-007 — Entity reference prefixes are not validated at their source sheet
+
+- Category: confirmed validation bug.
+- Location: `app/BusinessBackup/V1/BusinessBackupValidator.php`, `assertStructure()`;
+  prefix vocabulary already exists in `BusinessBackupContract::PREFIXES`.
+- Current behavior: primary references are accepted with any uppercase prefix; the
+  expected prefix is checked only when another row happens to reference the entity.
+  An unreferenced row such as an Expense Line can therefore use `BAD-0000000001` and
+  still pass validation and restore.
+- Why this is a problem: the V1 workbook contract assigns a stable prefix to every
+  portable entity type. Accepting a different prefix makes the package non-canonical
+  and weakens type-safe reference validation.
+- Concrete impact: malformed identity data can enter the restore mapping even though
+  FR-BDB-041 requires invalid references to be rejected before writes.
+- Expected behavior: each sheet's first-column reference uses exactly the prefix for
+  that entity type.
+- Remediation: record the sheet-to-reference-type mapping next to the existing V1
+  vocabulary and validate every primary reference against it.
+- Verification: add a wrong-prefix workbook mutation, then run the focused validator
+  test, Pint and PHPStan.
+- Status: resolved.
+- Resolution commit: `d208a62`.
+
+### CQ-008 — Invalid Exercise years are silently cast during restore
+
+- Category: confirmed domain/validation bug / improper fallback conversion.
+- Location: `app/BusinessBackup/V1/BusinessBackupValidator.php`, `assertDates()`;
+  `app/Actions/BusinessBackup/ImportBusinessBackup.php` casts the serialized year to
+  `int`.
+- Current behavior: the validator accepts any text in `_MP2_exercises.year`; import
+  then turns a value such as `not-a-year` into `0`.
+- Why this is a problem: ordinary Exercise creation enforces an integer from 1 to
+  9999. Restore bypasses that boundary and must validate its portable input before
+  direct insertion rather than reinterpret it.
+- Concrete impact: a corrupt workbook can persist an Exercise year that normal MP2
+  workflows reject, affecting date/state calculations and uniqueness.
+- Expected behavior/remediation: require the canonical serialized form of a year in
+  the existing 1–9999 boundary before preview.
+- Verification: add an invalid-year workbook mutation and run the focused validator
+  regression test.
+- Status: resolved.
+- Resolution commit: `74435a2`.
+
+### CQ-009 — Unused action wrapper duplicates `UpdateExpense`
+
+- Category: verified dead code / wrapper without semantics.
+- Location: `app/Actions/Operations/MoveOrReclassifyExpense.php`.
+- Current behavior: the class only extends `UpdateExpense` with an empty body.
+- Evidence: a repository-wide executable-symbol search finds only its declaration;
+  current Filament pages and all movement/reclassification tests resolve
+  `UpdateExpense` directly. Historical Spec Kit task text retains the former class
+  name as delivery evidence, and Composer has no explicit binding for the wrapper.
+- Why this is a problem: it presents a second action name for the same behavior and
+  suggests a distinction or compatibility path that does not exist.
+- Concrete impact: callers and maintainers must decide between two APIs even though
+  only one is real, increasing cognitive cost and the chance of future divergence.
+- Expected behavior/remediation: retain the used `UpdateExpense` action and delete
+  the unused empty subclass.
+- Verification: repository-wide symbol search, PHPStan and final full suite.
+- Status: resolved.
+- Resolution commit: `1b981fc`.
+
+### CQ-010 — Invalid renewal integers are silently cast during restore
+
+- Category: confirmed domain/validation bug / improper fallback conversion.
+- Location: `app/BusinessBackup/V1/BusinessBackupValidator.php`, before
+  `ImportBusinessBackup::nullableInt()` consumes Contract and renewal-configuration
+  values.
+- Current behavior: duration and notice cells are not validated as integers. Import
+  casts non-empty strings directly, so a value such as `not-a-duration` becomes `0`.
+- Why this is a problem: canonical §§12.4 and 12.8 require a positive integer renewal
+  duration when automatic renewal has an expiry, and a non-negative integer notice.
+  Ordinary Contract actions enforce the same rules, while persistence uses unsigned
+  integer columns.
+- Concrete impact: restore can reinterpret corrupt input instead of rejecting it
+  before writes, and can attempt values outside the persistence boundary.
+- Expected behavior/remediation: require canonical unsigned integer strings within
+  the database boundary; require duration to be positive whenever present and when
+  automatic renewal has an expiry.
+- Verification: export a Contract, mutate its duration to non-numeric text, refresh
+  the authoritative checksum, and assert that validation rejects the workbook before
+  any Company is created.
+- Status: resolved.
+- Resolution commit: `884848f`.
+
+### CQ-011 — Portable JSON accepts source-local identity keys
+
+- Category: confirmed validation bug / historical data contamination.
+- Location: `app/BusinessBackup/V1/BusinessBackupValidator.php`,
+  `assertJsonColumns()`; `ImportBusinessBackup::hydrateJson()` preserves unknown
+  object keys in immutable Budget and Closing detail.
+- Current behavior: JSON cells are checked only for valid JSON syntax. A key such as
+  `company_id` in `detail_json` is neither rejected nor translated and is therefore
+  persisted with its source-local value.
+- Why this is a problem: the V1 workbook contract explicitly invalidates source
+  database IDs, local origin keys, proposal/action/audit identifiers, revision values,
+  operation UUIDs, storage coordinates and ordinary persistence timestamps wherever
+  they occur in portable JSON.
+- Concrete impact: a modified package can embed meaningless or cross-company local
+  identity in an immutable restored snapshot even though FR-BDB-010–012 require only
+  portable references and deterministic local reconstruction.
+- Expected behavior/remediation: walk decoded JSON values before preview and reject
+  the explicitly forbidden local-identity and persistence key forms. Keep the check
+  local to backup validation; do not introduce a new serialization layer.
+- Verification: export a real Budget row, replace its `detail_json` with an object
+  containing `company_id`, refresh its authoritative checksum, and assert rejection
+  before any Company write.
+- Status: resolved.
+- Resolution commit: `72be5f9`.
 
 ## Structural changes
 
@@ -177,6 +291,13 @@ Not systematically inspected:
   machine-only check was removed.
 - Late-correction validation builds the immutable expense-line index once, and an
   unnecessary Budget row alias was removed.
+- Primary portable references are checked against an explicit per-sheet type map,
+  and restore-bound Exercise years and Contract renewal integers are rejected before
+  permissive casts can reinterpret them.
+- Decoded portable JSON is recursively checked for source-local identity,
+  persistence and revision keys before hydration into immutable restored data.
+- The unused `MoveOrReclassifyExpense` alias was removed; its implemented and used
+  behavior remains in `UpdateExpense`.
 
 ## Documentation alignment
 
@@ -190,8 +311,9 @@ Not systematically inspected:
 
 ## Unresolved
 
-- A full repository audit is impossible to infer from the inspected subset; areas not
-  listed in scope remain unassessed.
+- No confirmed finding recorded in this audit remains pending or blocked.
+- The inspected subset does not support a claim that the entire repository is
+  defect-free; areas not listed in scope remain unassessed.
 - Broad exception catches inspected in attachment authorization, proposal readiness,
   approval auditing and batch processing have plausible fail-closed, validation or
   best-effort audit semantics. They remain unchanged because no incorrect behavior
@@ -204,9 +326,25 @@ Not systematically inspected:
 Checkpoint verification completed so far:
 
 - `./vendor/bin/sail artisan test tests/Feature/BusinessBackup/BusinessBackupValidatorTest.php`:
-  passed, 1 test / 28 assertions (94.91 s).
+  passed after the first checkpoint, 1 test / 28 assertions (94.91 s); passed again
+  after primary-reference validation, 1 test / 32 assertions (95.43 s); passed after
+  year validation, 1 test / 36 assertions (95.27 s); passed after renewal-integer
+  validation, 1 test / 40 assertions (94.01 s); passed with a materialized Budget
+  and forbidden-local-ID mutation, 1 test / 44 assertions (96.48 s).
+- `./vendor/bin/sail artisan test tests/Unit/BusinessBackup/BusinessBackupContractTest.php`:
+  passed, 3 tests / 112 assertions (0.08 s).
 - `./vendor/bin/sail composer format:test`: passed.
 - `./vendor/bin/sail composer analyse`: passed, no errors.
 - `git diff --check`: passed.
+- Relative-link scan across `AGENTS.md`, `README.md`, `docs/`, `specs/` and
+  `.specify/`: passed, 154 Markdown files and no missing relative target.
+- `COMPOSER_ALLOW_SUPERUSER=1 composer validate --no-check-publish`: passed; the same
+  baseline warning remains for the exact `relayercore/laravel-installer` constraint.
+- `COMPOSER_ALLOW_SUPERUSER=1 composer audit --locked --no-interaction`: passed; no
+  security advisories.
+- `npm run build`: passed (Vite 8.2.2, 4 modules, 1.21 s). No frontend source or asset
+  was changed by this branch.
+- Final `./vendor/bin/sail composer quality`: passed; Pint and PHPStan reported no
+  errors, and all 804 Pest tests passed with 5,935 assertions in 413.24 s.
 
-The final repository-wide gate remains pending after all planned checkpoints.
+Final verification completed at 2026-08-31 01:23:12 CEST, before the hard stop.
