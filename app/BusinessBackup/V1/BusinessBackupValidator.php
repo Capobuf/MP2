@@ -300,6 +300,10 @@ final class BusinessBackupValidator
     /** @param array<string, array{columns: list<string>, rows: list<list<string>>}> $m */
     private function assertDates(array $m): void
     {
+        foreach ($m['_MP2_exercises']['rows'] as $row) {
+            $this->assert((bool) preg_match('/^[1-9]\d{0,3}$/D', $row[1]), 'Anno Esercizio non valido.');
+        }
+
         $dates = [
             '_MP2_projects' => [5 => false], '_MP2_project_transitions' => [4 => false],
             '_MP2_contracts' => [4 => false, 5 => true, 6 => true],

@@ -121,6 +121,11 @@ it('rejects corrupt future orphan duplicate and non-canonical workbooks before w
                     ->setCellValueExplicit('A2', 'BAD-0000000001', DataType::TYPE_STRING);
                 refreshBackupValidatorChecksum($workbook, '_MP2_expense_lines');
             },
+            'exercise-year' => function ($workbook): void {
+                $workbook->getSheetByName('_MP2_exercises')
+                    ->setCellValueExplicit('B2', 'not-a-year', DataType::TYPE_STRING);
+                refreshBackupValidatorChecksum($workbook, '_MP2_exercises');
+            },
         ];
 
         foreach ($mutations as $name => $mutate) {
