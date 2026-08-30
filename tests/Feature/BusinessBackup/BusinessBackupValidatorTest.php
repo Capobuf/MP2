@@ -5,12 +5,15 @@ use App\BusinessBackup\V1\BusinessBackupContract;
 use App\BusinessBackup\V1\BusinessBackupValidator;
 use App\BusinessBackup\V1\PortablePayload;
 use App\Domain\Company\Capability;
+use App\Models\BudgetSnapshot;
+use App\Models\BudgetSourceRow;
 use App\Models\Company;
 use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
+use App\Models\Proposal;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -69,6 +72,20 @@ it('rejects corrupt future orphan duplicate and non-canonical workbooks before w
     $second = Expense::factory()->forExercise($exercise)->create();
     ExpenseLine::factory()->for($second)->create(['amount' => '20.00']);
     Contract::factory()->create(['company_id' => $company->id]);
+    $proposal = Proposal::factory()->for($company)->for($exercise)->for($actor, 'creator')->create(['status' => 'approved']);
+    $budget = BudgetSnapshot::factory()->for($proposal)->create([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'approved_by_id' => $actor->id,
+        'total_approved_allocation' => '10.00',
+    ]);
+    BudgetSourceRow::factory()->for($budget, 'budget')->create([
+        'company_id' => $company->id,
+        'origin_id' => $first->id,
+        'origin_key' => $first->originKey(),
+        'approved_allocation' => '10.00',
+        'detail' => [],
+    ]);
     $artifact = app(ExportBusinessBackup::class)->execute($company, $actor);
     $initialCompanies = Company::query()->count();
 
@@ -132,6 +149,11 @@ it('rejects corrupt future orphan duplicate and non-canonical workbooks before w
                 $workbook->getSheetByName('_MP2_contracts')
                     ->setCellValueExplicit('I2', 'not-a-duration', DataType::TYPE_STRING);
                 refreshBackupValidatorChecksum($workbook, '_MP2_contracts');
+            },
+            'local-id-in-json' => function ($workbook): void {
+                $workbook->getSheetByName('_MP2_budget_rows')
+                    ->setCellValueExplicit('S2', '{"company_id":123}', DataType::TYPE_STRING);
+                refreshBackupValidatorChecksum($workbook, '_MP2_budget_rows');
             },
         ];
 

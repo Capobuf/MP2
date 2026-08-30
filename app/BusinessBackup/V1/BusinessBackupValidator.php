@@ -290,12 +290,35 @@ final class BusinessBackupValidator
                         continue;
                     }
                     try {
-                        json_decode($row[$index], true, flags: JSON_THROW_ON_ERROR);
+                        $value = json_decode($row[$index], true, flags: JSON_THROW_ON_ERROR);
                     } catch (\Throwable) {
                         $this->fail("JSON non valido in [$sheet].");
                     }
+                    $this->assertPortableJsonKeys($value, $sheet);
                 }
             }
+        }
+    }
+
+    private function assertPortableJsonKeys(mixed $value, string $sheet): void
+    {
+        if (! is_array($value)) {
+            return;
+        }
+        $forbidden = [
+            'origin_key', 'copied_from_origin_key', 'source_expense_origin_key',
+            'approval_event_sequences', 'event_references', 'approved_actions',
+            'revision', 'storage_disk', 'storage_path', 'created_at', 'updated_at', 'deleted_at',
+        ];
+        foreach ($value as $key => $item) {
+            if (is_string($key)) {
+                $invalid = in_array($key, $forbidden, true)
+                    || str_ends_with($key, '_id')
+                    || str_ends_with($key, '_ids')
+                    || str_ends_with($key, '_revision');
+                $this->assert(! $invalid, "Chiave locale non ammessa nel JSON di [$sheet].");
+            }
+            $this->assertPortableJsonKeys($item, $sheet);
         }
     }
 
