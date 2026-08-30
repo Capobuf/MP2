@@ -93,6 +93,29 @@ it('rejects corrupt future orphan duplicate and non-canonical workbooks before w
                 $workbook->getSheetByName('_MP2_expense_lines')->setCellValueExplicit('D2', '10.0', DataType::TYPE_STRING);
                 refreshBackupValidatorChecksum($workbook, '_MP2_expense_lines');
             },
+            'timestamp' => function ($workbook): void {
+                $workbook->getSheetByName(BusinessBackupContract::MANIFEST)
+                    ->setCellValueExplicit('B4', '2026-02-30T00:00:00+00:00', DataType::TYPE_STRING);
+            },
+            'timestamp-offset' => function ($workbook): void {
+                $workbook->getSheetByName(BusinessBackupContract::MANIFEST)
+                    ->setCellValueExplicit('B4', '2026-08-31T00:00:00+25:00', DataType::TYPE_STRING);
+            },
+            'hidden-visible-sheet' => function ($workbook): void {
+                $workbook->getSheetByName(BusinessBackupContract::VISIBLE_SHEETS[0])
+                    ->setSheetState(Worksheet::SHEETSTATE_HIDDEN);
+            },
+            'manifest-company-mismatch' => function ($workbook): void {
+                $workbook->getSheetByName(BusinessBackupContract::MANIFEST)
+                    ->setCellValueExplicit('B7', 'Azienda diversa', DataType::TYPE_STRING);
+            },
+            'invalid-company-timezone' => function ($workbook): void {
+                $workbook->getSheetByName(BusinessBackupContract::MANIFEST)
+                    ->setCellValueExplicit('B8', 'Europe/Nowhere', DataType::TYPE_STRING);
+                $workbook->getSheetByName('_MP2_company')
+                    ->setCellValueExplicit('C2', 'Europe/Nowhere', DataType::TYPE_STRING);
+                refreshBackupValidatorChecksum($workbook, '_MP2_company');
+            },
         ];
 
         foreach ($mutations as $name => $mutate) {

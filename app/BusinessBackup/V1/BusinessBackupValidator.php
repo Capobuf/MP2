@@ -25,7 +25,7 @@ final class BusinessBackupValidator
             $reader = IOFactory::createReaderForFile($path);
             $reader->setReadDataOnly(false);
             $workbook = $reader->load($path);
-        } catch (\Throwable $exception) {
+        } catch (\Throwable) {
             throw ValidationException::withMessages(['backup' => 'Il file non è un workbook XLSX MP2 leggibile.']);
         }
 
@@ -62,6 +62,7 @@ final class BusinessBackupValidator
             }
 
             $this->assertStructure($machine);
+            $this->assertCompanyIdentity($manifest, $machine['_MP2_company']['rows'][0]);
             $preview = $this->preview($manifest, $machine);
 
             return ['manifest' => $manifest, 'machine' => $machine, 'preview' => $preview];
@@ -95,6 +96,22 @@ final class BusinessBackupValidator
         $this->assert(array_keys($manifest) === $expectedKeys, 'Il manifest contiene chiavi mancanti, aggiuntive o fuori ordine.');
         $this->assert($properties->getCustomPropertyValue('mp2_format_version') === BusinessBackupContract::FORMAT_VERSION, 'Metadata formato MP2 mancante o incoerente.');
         $this->assert($properties->getCustomPropertyValue('mp2_package_id') === $manifest['package_id'], 'Metadata package MP2 mancante o incoerente.');
+    }
+
+    /**
+     * @param  array<string, string>  $manifest
+     * @param  list<string>  $company
+     */
+    private function assertCompanyIdentity(array $manifest, array $company): void
+    {
+        $this->assert(
+            $manifest['company_ref'] === $company[0]
+            && $manifest['company_name'] === $company[1]
+            && $manifest['company_timezone'] === $company[2],
+            'Azienda del manifest incoerente con i dati macchina.',
+        );
+        $this->assert($company[1] !== '' && mb_strlen($company[1]) <= 255, 'Nome Azienda non valido.');
+        $this->assert(in_array($company[2], \DateTimeZone::listIdentifiers(), true), 'Fuso orario Azienda non valido.');
     }
 
     /** @param array<string, array{columns: list<string>, rows: list<list<string>>}> $stored
@@ -324,10 +341,9 @@ final class BusinessBackupValidator
         }
         foreach ($byExercise as $rows) {
             usort($rows, fn (array $left, array $right): int => (int) $left[2] <=> (int) $right[2]);
-            $ordered = $rows;
-            foreach ($ordered as $index => $row) {
+            foreach ($rows as $index => $row) {
                 $this->assert((int) $row[2] === $index + 1, 'Versioni Budget non contigue.');
-                $this->assert($row[5] === ($index === 0 ? '' : $ordered[$index - 1][0]), 'Lineage Budget incoerente.');
+                $this->assert($row[5] === ($index === 0 ? '' : $rows[$index - 1][0]), 'Lineage Budget incoerente.');
                 $this->assert($row[3] === ($index === 0 ? 'initial_budget' : 'revision'), 'Purpose Budget incoerente con la versione.');
             }
         }
@@ -482,11 +498,11 @@ final class BusinessBackupValidator
         foreach ($m['_MP2_expenses']['rows'] as $row) {
             $expenses[$row[0]] = $row;
         }
+        $lines = [];
+        foreach ($m['_MP2_expense_lines']['rows'] as $line) {
+            $lines[$line[0]] = $line;
+        }
         foreach ($m['_MP2_late_corrections']['rows'] as $row) {
-            $lines = [];
-            foreach ($m['_MP2_expense_lines']['rows'] as $line) {
-                $lines[$line[0]] = $line;
-            }
             $sourceMatches = match ($row[9]) {
                 'expense' => $row[10] === $row[3],
                 'project' => ($expenses[$row[3]][2] ?? null) === $row[10],
@@ -578,6 +594,8 @@ final class BusinessBackupValidator
     private function readUnknownSchema(?Worksheet $sheet, bool $hidden): array
     {
         $this->assert($sheet !== null, 'Foglio mancante.');
+        $expectedState = $hidden ? Worksheet::SHEETSTATE_VERYHIDDEN : Worksheet::SHEETSTATE_VISIBLE;
+        $this->assert($sheet->getSheetState() === $expectedState, "Visibilità non valida per il foglio [{$sheet->getTitle()}].");
         $lastColumn = $sheet->getHighestDataColumn();
         $columns = [];
         for ($column = 1; $column <= Coordinate::columnIndexFromString($lastColumn); $column++) {
@@ -601,7 +619,6 @@ final class BusinessBackupValidator
     private function readExact(?Worksheet $sheet, array $columns, bool $hidden): array
     {
         $this->assert($sheet !== null, 'Foglio macchina mancante.');
-        $this->assert(! $hidden || $sheet->getSheetState() === Worksheet::SHEETSTATE_VERYHIDDEN, "Il foglio [{$sheet->getTitle()}] non è very hidden.");
         $data = $this->readUnknownSchema($sheet, $hidden);
         $this->assert($data['columns'] === $columns, "Header non valido in [{$sheet->getTitle()}].");
 
@@ -625,13 +642,14 @@ final class BusinessBackupValidator
 
     private function validTimestamp(string $value): bool
     {
-        try {
-            CarbonImmutable::parse($value);
-
-            return (bool) preg_match('/(?:Z|[+-]\d{2}:\d{2})$/', $value);
-        } catch (\Throwable) {
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/D', $value)) {
             return false;
         }
+
+        $normalized = str_ends_with($value, 'Z') ? substr($value, 0, -1).'+00:00' : $value;
+        $timestamp = \DateTimeImmutable::createFromFormat('!Y-m-d\TH:i:sP', $normalized);
+
+        return $timestamp !== false && $timestamp->format('Y-m-d\TH:i:sP') === $normalized;
     }
 
     private function validDate(string $value): bool
