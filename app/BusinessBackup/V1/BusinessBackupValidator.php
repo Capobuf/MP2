@@ -186,9 +186,10 @@ final class BusinessBackupValidator
             if ($sheet === BusinessBackupContract::LONG_PAYLOADS) {
                 continue;
             }
+            $prefix = BusinessBackupContract::PREFIXES[BusinessBackupContract::SHEET_REFERENCE_TYPES[$sheet]];
             foreach ($data['rows'] as $row) {
                 $ref = $row[0];
-                $this->assert((bool) preg_match('/^[A-Z]+-\d{10}$/', $ref), "Riferimento non valido in [$sheet].");
+                $this->assert((bool) preg_match('/^'.preg_quote($prefix, '/').'-\d{10}$/D', $ref), "Riferimento non valido in [$sheet].");
                 $this->assert(! isset($refs[$ref]), "Riferimento duplicato [$ref].");
                 $refs[$ref] = $sheet;
             }

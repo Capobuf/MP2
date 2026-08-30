@@ -116,6 +116,11 @@ it('rejects corrupt future orphan duplicate and non-canonical workbooks before w
                     ->setCellValueExplicit('C2', 'Europe/Nowhere', DataType::TYPE_STRING);
                 refreshBackupValidatorChecksum($workbook, '_MP2_company');
             },
+            'reference-prefix' => function ($workbook): void {
+                $workbook->getSheetByName('_MP2_expense_lines')
+                    ->setCellValueExplicit('A2', 'BAD-0000000001', DataType::TYPE_STRING);
+                refreshBackupValidatorChecksum($workbook, '_MP2_expense_lines');
+            },
         ];
 
         foreach ($mutations as $name => $mutate) {

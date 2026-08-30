@@ -51,6 +51,22 @@ final class BusinessBackupContract
         'attachment' => 'ATT', 'payload' => 'PAY',
     ];
 
+    /** @var array<string, string> */
+    public const SHEET_REFERENCE_TYPES = [
+        '_MP2_company' => 'company', '_MP2_suppliers' => 'supplier', '_MP2_supplier_contacts' => 'contact',
+        '_MP2_cost_centers' => 'cost_center', '_MP2_exercises' => 'exercise', '_MP2_projects' => 'project',
+        '_MP2_project_transitions' => 'project_transition', '_MP2_project_classes' => 'project_classification',
+        '_MP2_contracts' => 'contract', '_MP2_contract_renewals' => 'contract_renewal',
+        '_MP2_contract_lifecycle' => 'contract_lifecycle', '_MP2_contract_conditions' => 'contract_condition',
+        '_MP2_contract_classes' => 'contract_classification', '_MP2_project_contract_links' => 'project_contract_link',
+        '_MP2_expenses' => 'expense', '_MP2_expense_lines' => 'expense_line',
+        '_MP2_project_deferrals' => 'project_deferral', '_MP2_budgets' => 'budget',
+        '_MP2_budget_rows' => 'budget_row', '_MP2_budget_evidence' => 'budget_evidence',
+        '_MP2_closings' => 'closing', '_MP2_closing_rows' => 'closing_row',
+        '_MP2_late_corrections' => 'late_correction', '_MP2_error_annotations' => 'annotation',
+        '_MP2_attachments' => 'attachment', self::LONG_PAYLOADS => 'payload',
+    ];
+
     /** @var list<string> */
     public const VISIBLE_SHEETS = [
         'Informazioni', 'Riepilogo Esercizi', 'Budget', 'Spese', 'Progetti', 'Contratti',

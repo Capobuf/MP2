@@ -11,6 +11,10 @@ it('defines stable unique sheet names within the XLSX limit', function (): void 
     foreach ($names as $name) {
         expect(mb_strlen($name))->toBeLessThanOrEqual(31);
     }
+    expect(array_keys(BusinessBackupContract::SHEET_REFERENCE_TYPES))->toBe(BusinessBackupContract::machineSheets());
+    foreach (BusinessBackupContract::SHEET_REFERENCE_TYPES as $type) {
+        expect(BusinessBackupContract::PREFIXES)->toHaveKey($type);
+    }
 });
 
 it('assigns deterministic refs without exposing source ids', function (): void {
