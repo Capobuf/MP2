@@ -5,11 +5,9 @@ use App\Actions\Operations\ProcessContractRenewals;
 use App\Actions\Tenancy\ArchiveTenantCompany;
 use App\Actions\Tenancy\RestoreTenantCompany;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Domain\Company\TenantCompanyStatus;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\ContractLifecycleFact;
@@ -24,6 +22,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -33,11 +32,11 @@ it('archives and restores only the technical Tenant while preserving the Company
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
 
-    foreach (Capability::cases() as $capability) {
-        CompanyCapability::query()->create([
+    foreach (TestPermissions::all() as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $operator->id,
-            'capability' => $capability,
+            'user' => $operator,
+            'permissions' => $capability,
         ]);
     }
 
@@ -58,7 +57,7 @@ it('archives and restores only the technical Tenant while preserving the Company
 
     $tenant = $company->tenantCompany;
     $companyBefore = $company->refresh()->getAttributes();
-    $capabilitiesBefore = $company->capabilities()->orderBy('capability')->get()->toArray();
+    $permissionsBefore = $operator->getAllPermissions()->pluck('name')->sort()->values()->all();
     $domainRecords = collect([$exercise, $proposal, $budget, $closing, $contract, $project]);
     $domainBefore = $domainRecords
         ->map(fn ($record): array => $record->refresh()->getAttributes())
@@ -68,9 +67,9 @@ it('archives and restores only the technical Tenant while preserving the Company
 
     expect($tenant->refresh()->status)->toBe(TenantCompanyStatus::Archived)
         ->and($company->refresh()->getAttributes())->toBe($companyBefore)
-        ->and($company->capabilities()->orderBy('capability')->get()->toArray())->toBe($capabilitiesBefore)
+        ->and($operator->getAllPermissions()->pluck('name')->sort()->values()->all())->toBe($permissionsBefore)
         ->and($domainRecords->map(fn ($record): array => $record->refresh()->getAttributes())->all())->toBe($domainBefore)
-        ->and($operator->hasCapability($company, Capability::ManageOperations))->toBeFalse()
+        ->and($operator->can(TestPermissions::MANAGE_OPERATIONS[0]))->toBeTrue()
         ->and($operator->canAccessTenant($tenant))->toBeFalse();
 
     expect(fn () => app(CreateExercise::class)->execute(
@@ -86,7 +85,7 @@ it('archives and restores only the technical Tenant while preserving the Company
     app(RestoreTenantCompany::class)->execute($platformAdmin, $tenant);
 
     expect($tenant->refresh()->status)->toBe(TenantCompanyStatus::Active)
-        ->and($operator->hasCapability($company, Capability::ManageOperations))->toBeTrue()
+        ->and($operator->can(TestPermissions::MANAGE_OPERATIONS[0]))->toBeTrue()
         ->and($operator->canAccessTenant($tenant))->toBeTrue()
         ->and($company->refresh()->getAttributes())->toBe($companyBefore)
         ->and($domainRecords->map(fn ($record): array => $record->refresh()->getAttributes())->all())->toBe($domainBefore);
@@ -96,11 +95,11 @@ it('denies lifecycle transitions to a user even when every Company capability is
     $user = User::factory()->create();
     $company = Company::factory()->create();
 
-    foreach (Capability::cases() as $capability) {
-        CompanyCapability::query()->create([
+    foreach (TestPermissions::all() as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $user->id,
-            'capability' => $capability,
+            'user' => $user,
+            'permissions' => $capability,
         ]);
     }
 
@@ -128,11 +127,11 @@ it('rejects an automatic renewal selected before Archive when mutation starts af
     $platformAdmin = User::factory()->platformAdmin()->create();
     $operator = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $operator->id,
-            'capability' => $capability,
+            'user' => $operator,
+            'permissions' => $capability,
         ]);
     }
     Exercise::factory()->for($company)->create(['year' => 2026]);

@@ -3,13 +3,11 @@
 use App\Actions\Operations\CreateExpenseLine;
 use App\Actions\Operations\SetExpenseLineActive;
 use App\Actions\Operations\UpdateExpenseLine;
-use App\Domain\Company\Capability;
 use App\Domain\Projects\ProjectState;
 use App\Filament\Resources\Expenses\Pages\ViewExpense;
 use App\Filament\Resources\Expenses\RelationManagers\ExpenseLinesRelationManager;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -21,6 +19,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -39,11 +38,11 @@ function overspendContext(bool $noteRequired = false): array
         'timezone' => 'Europe/Rome',
         'overspend_note_required' => $noteRequired,
     ]);
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $actor->id,
-            'capability' => $capability,
+            'user' => $actor,
+            'permissions' => $capability,
         ]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);

@@ -5,10 +5,8 @@ use App\Actions\BusinessBackup\ImportBusinessBackup;
 use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\InitializeProposal;
 use App\BusinessBackup\V1\BusinessBackupValidator;
-use App\Domain\Company\Capability;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -16,14 +14,15 @@ use App\Models\Proposal;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 it('creates and approves vN plus one from an imported Budget without a synthetic Proposal', function (): void {
     $company = Company::factory()->create();
     $actor = User::factory()->platformAdmin()->create();
-    foreach ([Capability::View, Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_PROPOSALS, TestPermissions::APPROVE_BUDGET] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $expense = Expense::factory()->forExercise($exercise)->create(['description' => 'Voce revisionabile']);

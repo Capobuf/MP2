@@ -3,10 +3,8 @@
 use App\Actions\BusinessBackup\ExportBusinessBackup;
 use App\Actions\BusinessBackup\ImportBusinessBackup;
 use App\BusinessBackup\V1\BusinessBackupValidator;
-use App\Domain\Company\Capability;
 use App\Models\BusinessBackupImport;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -15,13 +13,14 @@ use App\Models\Supplier;
 use App\Models\SupplierContact;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 it('round trips a representative portable business graph and retries idempotently', function (): void {
     $company = Company::factory()->create(['name' => '= Azienda È', 'overspend_note_required' => true]);
     $actor = User::factory()->platformAdmin()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::VIEW]);
     $longNotes = str_repeat('è', 16000);
     $supplier = Supplier::factory()->for($company)->create(['legal_name' => '+ Fornitore', 'notes' => $longNotes]);
     SupplierContact::factory()->for($supplier)->create(['role_tags' => ['Amministrazione', 'Tecnico']]);
@@ -49,7 +48,7 @@ it('round trips a representative portable business graph and retries idempotentl
             ->and($restored->suppliers()->sole()->notes)->toBe($longNotes)
             ->and($restored->expenses()->sole()->lines()->count())->toBe(2)
             ->and($restored->expenses()->sole()->lines()->where('type', 'actual')->sole()->amount)->toBe('0.00')
-            ->and($restored->capabilities()->where('user_id', $actor->id)->count())->toBe(count(Capability::cases()))
+            ->and($actor->refresh()->hasRole('super_admin'))->toBeTrue()
             ->and($restored->auditEvents()->count())->toBe(0);
     } finally {
         @unlink($artifact['path']);

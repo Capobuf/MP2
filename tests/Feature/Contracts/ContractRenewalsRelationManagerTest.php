@@ -1,11 +1,9 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Contracts\Pages\ViewContract;
 use App\Filament\Resources\Contracts\RelationManagers\ContractRenewalsRelationManager;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Proposal;
@@ -13,17 +11,18 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 it('shows only the renewal fields required by the current choices and Budget state', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $manager->id,
-            'capability' => $capability,
+            'user' => $manager,
+            'permissions' => $capability,
         ]);
     }
     $exercise = Exercise::factory()->for($company)->create();

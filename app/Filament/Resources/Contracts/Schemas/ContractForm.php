@@ -4,7 +4,6 @@ namespace App\Filament\Resources\Contracts\Schemas;
 
 use App\Actions\MasterData\CreateCostCenter;
 use App\Actions\MasterData\CreateSupplier;
-use App\Domain\Company\Capability;
 use App\Domain\Contracts\ContractAttributionMode;
 use App\Domain\Contracts\ContractCycle;
 use App\Domain\Contracts\ContractCycleType;
@@ -68,7 +67,7 @@ class ContractForm
                         ->createOptionAction(fn (Action $action): Action => $action
                             ->label('Crea fornitore')
                             ->modalHeading('Nuovo fornitore')
-                            ->visible(fn (): bool => self::canManageMasterData()))
+                            ->visible(fn (): bool => self::canCreateSupplier()))
                         ->required(),
                     self::costCenterSelect('default_cost_center_id')
                         ->label('Centro di Costo')
@@ -274,17 +273,27 @@ class ContractForm
             ->createOptionAction(fn (Action $action): Action => $action
                 ->label('Crea centro di costo')
                 ->modalHeading('Nuovo centro di costo')
-                ->visible(fn (): bool => self::canManageMasterData()));
+                ->visible(fn (): bool => self::canCreateCostCenter()));
     }
 
-    private static function canManageMasterData(): bool
+    private static function canCreateSupplier(): bool
     {
         $actor = auth()->user();
         $company = self::company();
 
         return $actor instanceof User
             && $company instanceof Company
-            && $actor->hasCapability($company, Capability::ManageMasterData);
+            && $actor->can('create', [Supplier::class, $company]);
+    }
+
+    private static function canCreateCostCenter(): bool
+    {
+        $actor = auth()->user();
+        $company = self::company();
+
+        return $actor instanceof User
+            && $company instanceof Company
+            && $actor->can('create', [CostCenter::class, $company]);
     }
 
     private static function dateInput(string $name, string $label): TextInput

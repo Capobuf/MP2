@@ -1,13 +1,11 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Projects\ProjectAnnualSituation;
 use App\Filament\Resources\Exercises\Pages\ListExercises;
 use App\Filament\Resources\Projects\Pages\ListProjects;
 use App\Filament\Resources\Projects\ProjectResource;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -20,6 +18,7 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -34,10 +33,10 @@ afterEach(function () {
 
 function grantAggregateViewer(User $user, Company $company): void
 {
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $user->id,
-        'capability' => Capability::View,
+        'user' => $user,
+        'permissions' => TestPermissions::VIEW,
     ]);
 }
 

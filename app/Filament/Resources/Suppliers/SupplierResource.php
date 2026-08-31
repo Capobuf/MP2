@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Suppliers;
 
 use App\Actions\MasterData\SetSupplierArchived;
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Suppliers\Pages\CreateSupplier;
 use App\Filament\Resources\Suppliers\Pages\EditSupplier;
 use App\Filament\Resources\Suppliers\Pages\ListSuppliers;
@@ -63,7 +62,7 @@ class SupplierResource extends Resource
 
         return $user instanceof User
             && $company instanceof Company
-            && $user->hasCapability($company, Capability::View);
+            && $user->can('viewAny', Supplier::class);
     }
 
     /** @return Builder<Supplier> */
@@ -88,7 +87,7 @@ class SupplierResource extends Resource
 
         return $user instanceof User
             && $company instanceof Company
-            && $user->hasCapability($company, Capability::ManageMasterData);
+            && $user->can('create', [Supplier::class, $company]);
     }
 
     public static function canView(Model $record): bool

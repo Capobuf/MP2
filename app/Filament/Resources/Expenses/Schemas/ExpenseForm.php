@@ -4,7 +4,6 @@ namespace App\Filament\Resources\Expenses\Schemas;
 
 use App\Actions\MasterData\CreateCostCenter;
 use App\Actions\MasterData\CreateSupplier;
-use App\Domain\Company\Capability;
 use App\Domain\Contracts\ContractActualKind;
 use App\Domain\Contracts\ContractState;
 use App\Domain\Expenses\Decimal;
@@ -124,7 +123,7 @@ class ExpenseForm
                     ->createOptionAction(fn (Action $action): Action => $action
                         ->label('Crea fornitore')
                         ->modalHeading('Nuovo fornitore')
-                        ->visible(fn (): bool => self::canManageMasterData()))
+                        ->visible(fn (): bool => self::canCreateSupplier()))
                     ->visible(fn (Get $get): bool => in_array($get('container'), ['autonomous', 'project'], true))
                     ->dehydrated(fn (Get $get): bool => in_array($get('container'), ['autonomous', 'project'], true))
                     ->placeholder('Nessuno'),
@@ -147,7 +146,7 @@ class ExpenseForm
                     ->createOptionAction(fn (Action $action): Action => $action
                         ->label('Crea centro di costo')
                         ->modalHeading('Nuovo centro di costo')
-                        ->visible(fn (): bool => self::canManageMasterData()))
+                        ->visible(fn (): bool => self::canCreateCostCenter()))
                     ->placeholder('Non classificata')
                     ->visible(fn (Get $get): bool => $get('container') === 'autonomous')
                     ->dehydrated(fn (Get $get): bool => $get('container') === 'autonomous'),
@@ -614,14 +613,24 @@ class ExpenseForm
         return $options;
     }
 
-    private static function canManageMasterData(): bool
+    private static function canCreateSupplier(): bool
     {
         $actor = auth()->user();
         $company = self::company();
 
         return $actor instanceof User
             && $company instanceof Company
-            && $actor->hasCapability($company, Capability::ManageMasterData);
+            && $actor->can('create', [Supplier::class, $company]);
+    }
+
+    private static function canCreateCostCenter(): bool
+    {
+        $actor = auth()->user();
+        $company = self::company();
+
+        return $actor instanceof User
+            && $company instanceof Company
+            && $actor->can('create', [CostCenter::class, $company]);
     }
 
     private static function company(): ?Company

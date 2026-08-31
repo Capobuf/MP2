@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Contracts\Pages;
 
 use App\Actions\Operations\SetContractArchived;
-use App\Domain\Company\Capability;
 use App\Domain\Contracts\ContractState;
 use App\Filament\Pages\CompanyAudit;
 use App\Filament\Resources\Contracts\ContractResource;
@@ -142,7 +141,7 @@ class ViewContract extends ViewRecord
         $actor = auth()->user();
 
         return $actor instanceof User && ! $contract->isArchived()
-            && $actor->hasCapability($contract->company, Capability::ManageOperations);
+            && $actor->can('update', $contract);
     }
 
     /** @param array<string, mixed> $arguments

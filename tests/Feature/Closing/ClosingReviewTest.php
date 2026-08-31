@@ -1,9 +1,7 @@
 <?php
 
 use App\Actions\Closing\PrepareExerciseClosing;
-use App\Domain\Company\Capability;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -14,6 +12,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -25,10 +24,10 @@ function s9ClosingUser(Company $company, array $capabilities): User
 {
     $user = User::factory()->create();
     foreach ($capabilities as $capability) {
-        CompanyCapability::query()->create([
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $user->id,
-            'capability' => $capability,
+            'user' => $user,
+            'permissions' => $capability,
         ]);
     }
 
@@ -55,8 +54,8 @@ it('requires the CloseExercise capability independently from ordinary operations
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
-    $operationsOnly = s9ClosingUser($company, [Capability::View, Capability::ManageOperations]);
-    $closingOnly = s9ClosingUser($company, [Capability::View, Capability::CloseExercise]);
+    $operationsOnly = s9ClosingUser($company, [TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS]);
+    $closingOnly = s9ClosingUser($company, [TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE]);
     $otherExercise = Exercise::factory()->create(['year' => 2025]);
 
     expect(fn () => app(PrepareExerciseClosing::class)->execute($operationsOnly, $exercise, ['create_next_exercise' => false, 'projects' => []]))
@@ -72,7 +71,7 @@ it('requires the CloseExercise capability independently from ordinary operations
 it('blocks Closing before the calendar year is over and when a previous Exercise is Open', function (): void {
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
-    $actor = s9ClosingUser($company, [Capability::View, Capability::CloseExercise]);
+    $actor = s9ClosingUser($company, [TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE]);
     $current = Exercise::factory()->for($company)->create(['year' => 2026]);
 
     $currentReview = app(PrepareExerciseClosing::class)->execute($actor, $current, ['create_next_exercise' => false, 'projects' => []])['review'];
@@ -88,7 +87,7 @@ it('blocks Closing before the calendar year is over and when a previous Exercise
 it('blocks a same-year Draft but does not require an approved Budget', function (): void {
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
-    $actor = s9ClosingUser($company, [Capability::View, Capability::CloseExercise]);
+    $actor = s9ClosingUser($company, [TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     Proposal::factory()->create([
         'company_id' => $company->id,
@@ -105,7 +104,7 @@ it('blocks a same-year Draft but does not require an approved Budget', function 
 it('requires explicit Project state and deferral decisions and caps final Carryover', function (): void {
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
-    $actor = s9ClosingUser($company, [Capability::View, Capability::CloseExercise]);
+    $actor = s9ClosingUser($company, [TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     Exercise::factory()->for($company)->create(['year' => 2026]);
     $project = s9OpenProject($company, $exercise, '100.00', '40.00');
@@ -146,7 +145,7 @@ it('requires explicit Project state and deferral decisions and caps final Carryo
 it('enumerates future Open Exercises changed only by a Project state decision', function (): void {
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
-    $actor = s9ClosingUser($company, [Capability::View, Capability::CloseExercise]);
+    $actor = s9ClosingUser($company, [TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE]);
     $source = Exercise::factory()->for($company)->create(['year' => 2025]);
     $future = Exercise::factory()->for($company)->create(['year' => 2026]);
     $project = Project::factory()->for($company)->create([
@@ -172,7 +171,7 @@ it('enumerates future Open Exercises changed only by a Project state decision', 
 it('exposes canonical non-blocking warnings without invoice inference', function (): void {
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
-    $actor = s9ClosingUser($company, [Capability::View, Capability::CloseExercise]);
+    $actor = s9ClosingUser($company, [TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     Exercise::factory()->for($company)->create(['year' => 2026]);
     $expense = Expense::factory()->forExercise($exercise)->create(['direct_cost_center_id' => null]);
@@ -209,7 +208,7 @@ it('exposes canonical non-blocking warnings without invoice inference', function
 it('turns missing first-level classification into a block under Company policy', function (): void {
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create(['unclassified_closing_policy' => 'blocking']);
-    $actor = s9ClosingUser($company, [Capability::View, Capability::CloseExercise]);
+    $actor = s9ClosingUser($company, [TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $expense = Expense::factory()->forExercise($exercise)->create(['direct_cost_center_id' => null]);
     ExpenseLine::factory()->for($expense)->create(['amount' => '10.00']);

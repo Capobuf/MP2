@@ -3,14 +3,12 @@
 use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\InitializeProposal;
 use App\Actions\Proposals\PlanExpense;
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\ProposalActionType;
 use App\Models\Attachment;
 use App\Models\BudgetEvidence;
 use App\Models\BudgetSnapshot;
 use App\Models\BudgetSourceRow;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\ContractExerciseClassification;
@@ -24,6 +22,7 @@ use App\Models\Proposal;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -32,11 +31,11 @@ it('keeps the approved Budget unchanged after the live source changes', function
     $exercise = Exercise::factory()->for($company)->create();
     $approver = User::factory()->create();
 
-    foreach ([Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::MANAGE_PROPOSALS, TestPermissions::APPROVE_BUDGET] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $approver->id,
-            'capability' => $capability,
+            'user' => $approver,
+            'permissions' => $capability,
         ]);
     }
 

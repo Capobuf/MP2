@@ -4,10 +4,8 @@ use App\Actions\Operations\ProcessContractRenewals;
 use App\Actions\Tenancy\ArchiveTenantCompany;
 use App\Actions\Tenancy\RestoreTenantCompany;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\ContractLifecycleFact;
@@ -18,6 +16,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -31,8 +30,8 @@ function renewalFixture(array $contractOverrides = []): array
 {
     $actor = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     Exercise::factory()->for($company)->create(['year' => 2026, 'status' => 'open']);
     $supplier = Supplier::factory()->for($company)->create();

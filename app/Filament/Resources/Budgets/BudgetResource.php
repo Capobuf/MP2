@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Budgets;
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Budgets\Pages\ListBudgets;
 use App\Filament\Resources\Budgets\Pages\ViewBudget;
 use App\Filament\Resources\Budgets\Schemas\BudgetInfolist;
@@ -53,7 +52,7 @@ class BudgetResource extends Resource
         $tenant = Filament::getTenant();
         $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
-        return $user instanceof User && $company instanceof Company && $user->hasCapability($company, Capability::View);
+        return $user instanceof User && $company instanceof Company && $user->can('viewAny', BudgetSnapshot::class);
     }
 
     public static function canCreate(): bool

@@ -3,7 +3,6 @@
 use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\InitializeProposal;
 use App\Actions\Proposals\PlanExpense;
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\ProposalActionType;
 use App\Models\Attachment;
 use App\Models\AuditEvent;
@@ -11,7 +10,6 @@ use App\Models\BudgetEvidence;
 use App\Models\BudgetSnapshot;
 use App\Models\BudgetSourceRow;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -20,6 +18,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -28,8 +27,8 @@ function snapshotApprovalFixture(): array
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create();
     $user = User::factory()->create();
-    foreach ([Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $user->id, 'capability' => $capability]);
+    foreach ([TestPermissions::MANAGE_PROPOSALS, TestPermissions::APPROVE_BUDGET] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $user, 'permissions' => $capability]);
     }
     $expense = Expense::factory()->forExercise($exercise)->create();
     $line = ExpenseLine::factory()->for($expense)->create(['type' => 'estimate', 'amount' => '5.00']);
@@ -62,7 +61,7 @@ it('downloads retained evidence through budget company authorization', function 
     Storage::disk('local')->put('evidence/prova.txt', 'prova');
     $budget = BudgetSnapshot::factory()->create();
     $viewer = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $budget->company_id, 'user_id' => $viewer->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $budget->company_id, 'user' => $viewer, 'permissions' => TestPermissions::VIEW]);
     $evidence = BudgetEvidence::factory()->for($budget, 'budget')->create(['company_id' => $budget->company_id, 'storage_disk' => 'local', 'storage_path' => 'evidence/prova.txt', 'original_name' => 'prova.txt', 'media_type' => 'text/plain', 'size_bytes' => 5, 'sha256' => hash('sha256', 'prova')]);
     $this->actingAs($viewer)->get(route('budget-evidence.download', $evidence))->assertOk()->assertDownload('prova.txt');
     $intruder = User::factory()->create();

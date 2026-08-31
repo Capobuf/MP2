@@ -1,11 +1,9 @@
 <?php
 
 use App\Actions\LateCorrections\RecordLateCorrection;
-use App\Domain\Company\Capability;
 use App\Models\BudgetSnapshot;
 use App\Models\ClosingSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -16,13 +14,14 @@ use App\Models\Proposal;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 it('keeps Closing, Budget, consolidated Carryover and historical owner facts unchanged', function (): void {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::CorrectClosedExercise]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::CORRECT_CLOSED_EXERCISE]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $destination = Exercise::factory()->for($company)->create(['year' => 2026]);
     $project = Project::factory()->for($company)->create([

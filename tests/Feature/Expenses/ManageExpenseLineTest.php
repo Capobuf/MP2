@@ -4,11 +4,9 @@ use App\Actions\Operations\CreateExpenseLine;
 use App\Actions\Operations\SetExpenseLineActive;
 use App\Actions\Operations\UpdateExpenseLine;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Models\AuditEvent;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -17,6 +15,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -24,8 +23,8 @@ function lineContext(bool $reversed = false): array
 {
     $actor = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => now('Europe/Rome')->year]);
     $expenseFactory = Expense::factory()->forExercise($exercise);

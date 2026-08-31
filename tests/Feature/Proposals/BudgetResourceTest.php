@@ -1,6 +1,5 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Budgets\BudgetResource;
 use App\Filament\Resources\Budgets\Pages\ListBudgets;
 use App\Filament\Resources\Budgets\Pages\ViewBudget;
@@ -8,13 +7,13 @@ use App\Models\BudgetEvidence;
 use App\Models\BudgetSnapshot;
 use App\Models\BudgetSourceRow;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Proposal;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -22,10 +21,10 @@ it('lists and views only immutable Budgets belonging to the active tenant', func
     $viewer = User::factory()->create();
     $company = Company::factory()->create();
     $otherCompany = Company::factory()->create();
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $viewer->id,
-        'capability' => Capability::View,
+        'user' => $viewer,
+        'permissions' => TestPermissions::VIEW,
     ]);
     $exercise = Exercise::factory()->for($company)->create();
     $proposal = Proposal::factory()->for($company)->for($exercise)->create();

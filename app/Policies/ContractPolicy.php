@@ -2,13 +2,13 @@
 
 namespace App\Policies;
 
-use App\Domain\Company\Capability;
 use App\Models\Company;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\ContractExerciseClassification;
 use App\Models\ContractLifecycleFact;
 use App\Models\ContractRenewalConfiguration;
+use App\Models\TenantCompany;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 
@@ -16,24 +16,23 @@ class ContractPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->capabilities()->where('capability', Capability::View->value)->exists();
+        return $user->can('ViewAny:Contract');
     }
 
     public function view(User $user, Model $record): bool
     {
-        return $user->hasCapability($this->company($record), Capability::View);
+        return $this->canUse($user, $this->company($record), 'View:Contract');
     }
 
     public function create(User $user, ?Company $company = null): bool
     {
-        return $company === null
-            ? $user->capabilities()->where('capability', Capability::ManageOperations->value)->exists()
-            : $user->hasCapability($company, Capability::ManageOperations);
+        return $user->can('Create:Contract')
+            && ($company === null || $this->canAccess($user, $company));
     }
 
     public function update(User $user, Model $record): bool
     {
-        return $user->hasCapability($this->company($record), Capability::ManageOperations);
+        return $this->canUse($user, $this->company($record), 'Update:Contract');
     }
 
     public function delete(User $user, Model $record): bool
@@ -57,5 +56,16 @@ class ContractPolicy
         }
 
         return $company;
+    }
+
+    private function canUse(User $user, Company $company, string $permission): bool
+    {
+        return $this->canAccess($user, $company) && $user->can($permission);
+    }
+
+    private function canAccess(User $user, Company $company): bool
+    {
+        return $company->tenantCompany instanceof TenantCompany
+            && $user->canAccessTenant($company->tenantCompany);
     }
 }

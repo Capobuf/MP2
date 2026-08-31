@@ -1,27 +1,26 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\CostCenters\CostCenterResource;
 use App\Filament\Resources\CostCenters\Pages\CreateCostCenter;
 use App\Filament\Resources\CostCenters\Pages\ListCostCenters;
 use App\Filament\Resources\CostCenters\Pages\ViewCostCenter;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\CostCenter;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 function grantCostCenterResourceCapabilities(User $user, Company $company, bool $manage = true): void
 {
-    foreach ($manage ? [Capability::View, Capability::ManageMasterData] : [Capability::View] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ($manage ? [TestPermissions::VIEW, TestPermissions::MANAGE_MASTER_DATA] : [TestPermissions::VIEW] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $user->id,
-            'capability' => $capability,
+            'user' => $user,
+            'permissions' => $capability,
         ]);
     }
 }

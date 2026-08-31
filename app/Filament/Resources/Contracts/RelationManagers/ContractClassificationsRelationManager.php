@@ -4,7 +4,6 @@ namespace App\Filament\Resources\Contracts\RelationManagers;
 
 use App\Actions\MasterData\CreateCostCenter;
 use App\Actions\Operations\UpdateContractClassification;
-use App\Domain\Company\Capability;
 use App\Models\Contract;
 use App\Models\ContractExerciseClassification;
 use App\Models\CostCenter;
@@ -128,7 +127,7 @@ class ContractClassificationsRelationManager extends RelationManager
         $actor = auth()->user();
 
         return $actor instanceof User
-            && $actor->hasCapability($this->contract()->company, Capability::ManageMasterData);
+            && $actor->can('create', [CostCenter::class, $this->contract()->company]);
     }
 
     private function classificationReasonRequired(ContractExerciseClassification $classification): bool

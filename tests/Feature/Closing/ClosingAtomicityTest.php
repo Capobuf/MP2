@@ -3,11 +3,9 @@
 use App\Actions\Closing\CloseExercise;
 use App\Actions\Closing\PrepareExerciseClosing;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Models\AuditEvent;
 use App\Models\ClosingSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -17,6 +15,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -26,8 +25,8 @@ it('rolls back all economic effects if Snapshot materialization fails', function
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::CloseExercise] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $project = Project::factory()->for($company)->create([

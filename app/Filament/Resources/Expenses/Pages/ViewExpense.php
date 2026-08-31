@@ -4,7 +4,6 @@ namespace App\Filament\Resources\Expenses\Pages;
 
 use App\Actions\MasterData\CreateSupplier;
 use App\Actions\Operations\UpdateExpense;
-use App\Domain\Company\Capability;
 use App\Domain\Contracts\ContractActualKind;
 use App\Domain\Expenses\ExpenseImpactPlan;
 use App\Domain\Projects\ProjectActualKind;
@@ -267,7 +266,7 @@ class ViewExpense extends ViewRecord
     {
         $actor = auth()->user();
 
-        return $actor instanceof User && $actor->hasCapability($expense->company, Capability::ManageMasterData);
+        return $actor instanceof User && $actor->can('create', [Supplier::class, $expense->company]);
     }
 
     private function requiresActivityDeclaration(Get $get, Expense $expense): bool

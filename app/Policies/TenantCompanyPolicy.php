@@ -9,31 +9,31 @@ class TenantCompanyPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->is_platform_admin;
+        return $user->hasRole('super_admin');
     }
 
     public function view(User $user, TenantCompany $tenant): bool
     {
-        return $user->is_platform_admin;
+        return $user->hasRole('super_admin');
     }
 
     public function create(User $user): bool
     {
-        return $user->is_platform_admin;
+        return $user->hasRole('super_admin');
     }
 
     public function archive(User $user, TenantCompany $tenant): bool
     {
-        return $user->is_platform_admin;
+        return $user->hasRole('super_admin');
     }
 
     public function restore(User $user, TenantCompany $tenant): bool
     {
-        return $user->is_platform_admin;
+        return $user->hasRole('super_admin');
     }
 
     public function destroy(User $user, TenantCompany $tenant): bool
     {
-        return $user->is_platform_admin;
+        return $user->hasRole('super_admin');
     }
 }

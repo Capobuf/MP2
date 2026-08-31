@@ -1,6 +1,5 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Domain\Projects\ProjectState;
 use App\Filament\Resources\Contracts\ContractResource;
 use App\Filament\Resources\Expenses\ExpenseResource;
@@ -12,7 +11,6 @@ use App\Filament\Resources\Projects\ProjectResource;
 use App\Livewire\ExpenseDetail;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -25,16 +23,17 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->user = User::factory()->create();
     $this->company = Company::factory()->create();
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $this->company->id,
-        'user_id' => $this->user->id,
-        'capability' => Capability::View,
+        'user' => $this->user,
+        'permissions' => TestPermissions::VIEW,
     ]);
     $this->exercise = Exercise::factory()->for($this->company)->create(['year' => 2026]);
     $this->actingAs($this->user);
@@ -154,10 +153,10 @@ it('shows only an existing Project or Contract reference in the expense header',
 });
 
 it('opens the complete edit page from the add Line action', function () {
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $this->company->id,
-        'user_id' => $this->user->id,
-        'capability' => Capability::ManageOperations,
+        'user' => $this->user,
+        'permissions' => TestPermissions::MANAGE_OPERATIONS,
     ]);
     $expense = Expense::factory()->forExercise($this->exercise)->create();
     ExpenseLine::factory()->for($expense)->create();
@@ -185,10 +184,10 @@ it('opens the complete edit page from the add Line action', function () {
 });
 
 it('shows the overspend note only when the entered Line creates or increases overspend', function () {
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $this->company->id,
-        'user_id' => $this->user->id,
-        'capability' => Capability::ManageOperations,
+        'user' => $this->user,
+        'permissions' => TestPermissions::MANAGE_OPERATIONS,
     ]);
     $this->company->update(['overspend_note_required' => true]);
     $project = Project::factory()->for($this->company)->create(['initial_state' => ProjectState::Open]);

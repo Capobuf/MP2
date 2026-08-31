@@ -20,7 +20,8 @@ it('creates the configured development administrator', function () {
     $administrator = User::query()->where('email', 'admin@mp2.local')->sole();
 
     expect($administrator->name)->toBe('Administrator')
-        ->and($administrator->is_platform_admin)->toBeTrue()
+        ->and($administrator->hasRole('super_admin'))->toBeTrue()
+        ->and($administrator->company_id)->toBeNull()
         ->and(Hash::check('stable-development-password', $administrator->password))->toBeTrue();
 });
 

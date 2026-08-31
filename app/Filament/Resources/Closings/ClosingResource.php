@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Closings;
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Closings\Pages\ViewClosing;
 use App\Filament\Resources\Closings\Schemas\ClosingInfolist;
 use App\Filament\Resources\Exercises\ExerciseResource;
@@ -39,7 +38,7 @@ class ClosingResource extends Resource
         $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
-            && $user->hasCapability($company, Capability::View);
+            && $user->can('viewAny', ClosingSnapshot::class);
     }
 
     public static function canCreate(): bool

@@ -1,12 +1,10 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Closings\Pages\ViewClosing as ViewClosingPage;
 use App\Filament\Resources\Exercises\Pages\CloseExercise as CloseExercisePage;
 use App\Filament\Resources\Exercises\Pages\ViewExercise;
 use App\Models\ClosingSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -19,6 +17,7 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -28,7 +27,7 @@ function s9UiUser(Company $company, array $capabilities): User
 {
     $user = User::factory()->create();
     foreach ($capabilities as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $user->id, 'capability' => $capability]);
+        grantTestPermissions(['company_id' => $company->id, 'user' => $user, 'permissions' => $capability]);
     }
 
     return $user;
@@ -38,7 +37,7 @@ it('shows the Closing action only to an authorized user and renders the transien
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
-    $closer = s9UiUser($company, [Capability::View, Capability::CloseExercise]);
+    $closer = s9UiUser($company, [TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE]);
     $this->actingAs($closer);
     Filament::setTenant(($company)->tenantCompany);
 
@@ -63,7 +62,7 @@ it('hides Closing mutation from a user who only manages ordinary operations', fu
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
-    $operator = s9UiUser($company, [Capability::View, Capability::ManageOperations]);
+    $operator = s9UiUser($company, [TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS]);
     $this->actingAs($operator);
     Filament::setTenant(($company)->tenantCompany);
 
@@ -74,7 +73,7 @@ it('hides Closing mutation from a user who only manages ordinary operations', fu
 it('shows the immutable Closing Snapshot entry point on a Closed Exercise', function (): void {
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
-    $closer = s9UiUser($company, [Capability::View, Capability::CloseExercise]);
+    $closer = s9UiUser($company, [TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $snapshot = ClosingSnapshot::query()->create([
         'company_id' => $company->id,
@@ -121,7 +120,7 @@ it('shows the immutable Closing Snapshot entry point on a Closed Exercise', func
 it('keeps the reviewed fingerprint while acknowledging warnings and confirms Closing', function (): void {
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
-    $closer = s9UiUser($company, [Capability::View, Capability::CloseExercise]);
+    $closer = s9UiUser($company, [TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $costCenter = CostCenter::factory()->for($company)->create();
     $expense = Expense::factory()->forExercise($exercise)->create(['direct_cost_center_id' => $costCenter->id]);
@@ -147,7 +146,7 @@ it('keeps the reviewed fingerprint while acknowledging warnings and confirms Clo
 it('confirms a newly reviewed Closing-time Reprogramming without changing its fingerprint', function (): void {
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
-    $closer = s9UiUser($company, [Capability::View, Capability::CloseExercise]);
+    $closer = s9UiUser($company, [TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $project = Project::factory()->for($company)->create([
         'initial_state' => 'open',

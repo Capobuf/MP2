@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Domain\Company\Capability;
 use App\Domain\Company\TenantCompanyStatus;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
@@ -17,39 +16,50 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
+use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'password', 'is_platform_admin'])]
+#[Fillable(['name', 'email', 'password', 'company_id'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasTenants
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, InteractsWithAppAuthentication, InteractsWithAppAuthenticationRecovery, Notifiable;
+    use HasFactory, HasRoles, InteractsWithAppAuthentication, InteractsWithAppAuthenticationRecovery, Notifiable;
 
     public function canAccessPanel(Panel $panel): bool
     {
         if ($panel->getId() === 'platform') {
-            return $this->is_platform_admin;
+            return $this->hasRole('super_admin');
         }
 
         if ($panel->getId() !== 'admin') {
             return false;
         }
 
-        return $this->is_platform_admin || $this->capabilities()
-            ->where('capability', Capability::View->value)
-            ->whereHas('company.tenantCompany', fn ($query) => $query
-                ->where('status', TenantCompanyStatus::Active->value))
-            ->exists();
+        if ($this->hasRole('super_admin')) {
+            return true;
+        }
+
+        return $this->company_id !== null
+            && $this->tenantCompany()
+                ->where('status', TenantCompanyStatus::Active->value)
+                ->exists();
     }
 
-    /** @return HasMany<CompanyCapability, $this> */
-    public function capabilities(): HasMany
+    /** @return BelongsTo<Company, $this> */
+    public function company(): BelongsTo
     {
-        return $this->hasMany(CompanyCapability::class);
+        return $this->belongsTo(Company::class);
+    }
+
+    /** @return BelongsTo<TenantCompany, $this> */
+    public function tenantCompany(): BelongsTo
+    {
+        return $this->belongsTo(TenantCompany::class, 'company_id', 'company_id');
     }
 
     /** @return HasMany<Attachment, $this> */
@@ -97,35 +107,28 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     /** @return Collection<int, TenantCompany> */
     public function getTenants(Panel $panel): Collection
     {
-        return TenantCompany::query()
+        $query = TenantCompany::query()
             ->select('tenant_companies.*')
             ->join('companies', 'companies.id', '=', 'tenant_companies.company_id')
             ->where('tenant_companies.status', TenantCompanyStatus::Active->value)
-            ->whereHas('company.capabilities', fn ($query) => $query
-                ->where('user_id', $this->getKey())
-                ->where('capability', Capability::View->value))
             ->with('company')
-            ->orderBy('companies.name')
-            ->get();
+            ->orderBy('companies.name');
+
+        if (! $this->hasRole('super_admin')) {
+            $query->where('tenant_companies.company_id', $this->company_id);
+        }
+
+        return $query->get();
     }
 
     public function canAccessTenant(Model $tenant): bool
     {
         return $tenant instanceof TenantCompany
-            && $tenant->status() === TenantCompanyStatus::Active
-            && $tenant->company instanceof Company
-            && $this->hasCapability($tenant->company, Capability::View);
-    }
-
-    public function hasCapability(Company $company, Capability $capability): bool
-    {
-        return $company->tenantCompany()
-            ->where('status', TenantCompanyStatus::Active->value)
-            ->exists()
-            && $this->capabilities()
-                ->where('company_id', $company->getKey())
-                ->where('capability', $capability->value)
-                ->exists();
+            && TenantCompany::query()
+                ->whereKey($tenant->getKey())
+                ->where('status', TenantCompanyStatus::Active->value)
+                ->exists()
+            && ($this->hasRole('super_admin') || $tenant->company_id === $this->company_id);
     }
 
     /**
@@ -137,7 +140,6 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     {
         return [
             'email_verified_at' => 'datetime',
-            'is_platform_admin' => 'boolean',
             'password' => 'hashed',
         ];
     }

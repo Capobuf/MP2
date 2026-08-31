@@ -2,7 +2,6 @@
 
 namespace App\Filament\Widgets;
 
-use App\Domain\Company\Capability;
 use App\Models\Company;
 use App\Models\Exercise;
 use App\Models\TenantCompany;
@@ -26,16 +25,6 @@ abstract class EconomicChartWidget extends ChartWidget
 
     /** @var array<string, mixed>|null */
     private ?array $economicData = null;
-
-    public static function canView(): bool
-    {
-        $tenant = Filament::getTenant();
-        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
-        $user = auth()->user();
-
-        return $company instanceof Company && $user instanceof User
-            && $user->hasCapability($company, Capability::View);
-    }
 
     public function chartSurfaceClass(): string
     {

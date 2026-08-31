@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Expenses;
 
 use App\Actions\Operations\SetExpenseReversed;
-use App\Domain\Company\Capability;
 use App\Domain\Contracts\ContractActualKind;
 use App\Domain\Contracts\ContractState;
 use App\Domain\Expenses\Decimal;
@@ -83,7 +82,7 @@ class ExpenseResource extends Resource
         $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
-            && $user->hasCapability($company, Capability::View);
+            && $user->can('viewAny', Expense::class);
     }
 
     /** @return Builder<Expense> */
@@ -108,7 +107,7 @@ class ExpenseResource extends Resource
         $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
-            && $user->hasCapability($company, Capability::ManageOperations);
+            && $user->can('create', [Expense::class, $company]);
     }
 
     public static function canView(Model $record): bool

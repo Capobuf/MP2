@@ -4,7 +4,6 @@ use App\Actions\BusinessBackup\ExportBusinessBackup;
 use App\Actions\BusinessBackup\ImportBusinessBackup;
 use App\Actions\Reporting\BuildReport;
 use App\BusinessBackup\V1\BusinessBackupValidator;
-use App\Domain\Company\Capability;
 use App\Domain\LateCorrections\HistoricalErrorKind;
 use App\Domain\Reporting\ReportDefinition;
 use App\Domain\Reporting\ReportResult;
@@ -14,7 +13,6 @@ use App\Models\BudgetSourceRow;
 use App\Models\ClosingSnapshot;
 use App\Models\ClosingSourceRow;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -29,6 +27,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -143,7 +142,7 @@ it('keeps all ten canonical S11 report families semantically equivalent after re
     CarbonImmutable::setTestNow('2026-08-30 10:00:00 Europe/Rome');
     $company = Company::factory()->create(['name' => 'Reporting Portabile', 'timezone' => 'Europe/Rome']);
     $actor = User::factory()->platformAdmin()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::VIEW]);
     $closed = Exercise::factory()->for($company)->create(['year' => 2025]);
     $next = Exercise::factory()->for($company)->create(['year' => 2026]);
     $supplier = Supplier::factory()->for($company)->create(['legal_name' => 'Fornitore Storico']);

@@ -2,7 +2,6 @@
 
 namespace App\Actions\Reporting;
 
-use App\Domain\Company\Capability;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Projects\ProjectAnnualReferenceDate;
 use App\Domain\Projects\ProjectDeferralMode;
@@ -49,7 +48,9 @@ final class BuildReport
     public function execute(User $user, ReportDefinition $definition): ReportResult
     {
         $company = Company::query()->findOrFail($definition->companyId);
-        if (! $user->hasCapability($company, Capability::View)) {
+        if ($company->tenantCompany === null
+            || ! $user->canAccessTenant($company->tenantCompany)
+            || ! $user->can('View:Reports')) {
             throw new AuthorizationException('Non autorizzato a visualizzare i report di questa Azienda.');
         }
 

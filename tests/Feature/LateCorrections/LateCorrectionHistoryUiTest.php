@@ -2,11 +2,9 @@
 
 use App\Actions\LateCorrections\RecordHistoricalErrorAnnotation;
 use App\Actions\LateCorrections\RecordLateCorrection;
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Closings\Pages\ViewClosing;
 use App\Models\Attachment;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -15,17 +13,18 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 it('keeps Closing values distinct from both immutable local evidence collections', function (): void {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::CorrectClosedExercise] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::VIEW, TestPermissions::CORRECT_CLOSED_EXERCISE] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $actor->id,
-            'capability' => $capability,
+            'user' => $actor,
+            'permissions' => $capability,
         ]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);

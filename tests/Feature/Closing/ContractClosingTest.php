@@ -2,9 +2,7 @@
 
 use App\Actions\Closing\CloseExercise;
 use App\Actions\Closing\PrepareExerciseClosing;
-use App\Domain\Company\Capability;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\ContractLifecycleFact;
@@ -15,6 +13,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -24,8 +23,8 @@ it('materializes missed automatic renewals only through the Closing cutoff and r
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::CloseExercise] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
 
     $contract = Contract::factory()->for($company)->create([
@@ -91,8 +90,8 @@ it('materializes a year-end expiry whose cessation changes state on the followin
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::CloseExercise] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $target = Exercise::factory()->for($company)->create(['year' => 2025]);
     Exercise::factory()->for($company)->create(['year' => 2026]);
@@ -143,8 +142,8 @@ it('preserves overlapping annulled Contract conditions without using them in the
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::CloseExercise] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $target = Exercise::factory()->for($company)->create(['year' => 2025]);
     Exercise::factory()->for($company)->create(['year' => 2026]);

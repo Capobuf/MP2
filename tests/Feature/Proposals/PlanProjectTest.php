@@ -3,12 +3,10 @@
 use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\InitializeProposal;
 use App\Actions\Proposals\PlanProject;
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalReadiness;
 use App\Models\BudgetSourceRow;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -20,13 +18,14 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 it('creates a project only as a proposal item and records a typed transition', function (): void {
     $proposal = Proposal::factory()->create();
     $user = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $proposal->company_id, 'user_id' => $user->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $proposal->company_id, 'user' => $user, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $action = app(PlanProject::class)->create($user, $proposal, ['title' => 'Nuovo progetto', 'description' => null, 'notes' => null, 'initial_state' => 'planned', 'initial_effective_date' => '2026-01-01', 'exercise_id' => $proposal->exercise_id, 'cost_center_id' => null], (string) Str::uuid(), 0);
     $item = $action->item;
     app(PlanProject::class)->execute($user, $proposal->refresh(), $item, ProposalActionType::PlanProjectTransition, ['from_state' => 'planned', 'to_state' => 'open', 'effective_date' => '2026-02-01', 'reason' => null], null, (string) Str::uuid(), 1);
@@ -37,8 +36,8 @@ it('plans existing child Estimates and annual classification without live writes
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create();
     $actor = User::factory()->create();
-    foreach ([Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::MANAGE_PROPOSALS, TestPermissions::APPROVE_BUDGET] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $project = Project::factory()->for($company)->create(['initial_state' => 'open', 'initial_effective_date' => $exercise->year.'-01-01']);
     $expense = Expense::factory()->forExercise($exercise)->for($project)->create();
@@ -78,7 +77,7 @@ it('rejects a Project classification that would reclassify Actuals and a non-Pla
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $project = Project::factory()->for($company)->create(['initial_state' => 'open']);
     $expense = Expense::factory()->forExercise($exercise)->for($project)->create();
     ExpenseLine::factory()->for($expense)->create(['type' => 'actual', 'amount' => '1.00']);
@@ -93,7 +92,7 @@ it('keeps an unchanged classified Project with Actuals approvable', function ():
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $project = Project::factory()->for($company)->create(['initial_state' => 'open']);
     $costCenter = CostCenter::factory()->for($company)->create();
     ProjectExerciseClassification::factory()->for($company)->for($project)->for($exercise)->for($costCenter)->create();

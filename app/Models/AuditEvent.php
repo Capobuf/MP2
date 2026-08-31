@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Domain\Company\Setting;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,7 +18,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'subject_type',
     'subject_id',
     'beneficiary_id',
-    'capability',
     'setting',
     'affected_exercise_ids',
     'effective_from',
@@ -161,7 +159,6 @@ class AuditEvent extends Model
         return [
             'event_type' => AuditEventType::class,
             'event_sequence' => 'integer',
-            'capability' => Capability::class,
             'setting' => Setting::class,
             'affected_exercise_ids' => 'array',
             'effective_from' => 'date',

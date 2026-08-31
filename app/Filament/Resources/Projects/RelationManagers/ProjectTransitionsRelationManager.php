@@ -5,7 +5,6 @@ namespace App\Filament\Resources\Projects\RelationManagers;
 use App\Actions\Operations\AnnulProjectTransition;
 use App\Actions\Operations\CreateProjectTransition;
 use App\Actions\Operations\ReplaceProjectTransition;
-use App\Domain\Company\Capability;
 use App\Domain\Projects\ProjectState;
 use App\Models\Project;
 use App\Models\ProjectTransition;
@@ -175,7 +174,7 @@ class ProjectTransitionsRelationManager extends RelationManager
 
         return $actor instanceof User && $project instanceof Project
             && ! $project->isArchived()
-            && $actor->hasCapability($project->company, Capability::ManageOperations);
+            && $actor->can('update', $project);
     }
 
     private function canChangeFuture(ProjectTransition $transition): bool

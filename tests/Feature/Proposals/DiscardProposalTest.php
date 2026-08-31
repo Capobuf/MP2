@@ -3,10 +3,8 @@
 use App\Actions\Proposals\DiscardProposal;
 use App\Actions\Proposals\InitializeProposal;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -15,6 +13,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -22,7 +21,7 @@ it('discards and retries a draft without reverting live reality', function (): v
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $expense = Expense::factory()->forExercise($exercise)->create();
     $line = ExpenseLine::factory()->for($expense)->create(['type' => 'estimate', 'amount' => '5.00']);
     $proposal = app(InitializeProposal::class)->execute($actor, $company, $exercise, (string) Str::uuid());
@@ -45,7 +44,7 @@ it('requires a reason and rejects unauthorized or terminal discard', function ()
     $exercise = Exercise::factory()->for($company)->create();
     $manager = User::factory()->create();
     $other = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $manager->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $manager, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $proposal = app(InitializeProposal::class)->execute($manager, $company, $exercise, (string) Str::uuid());
 
     expect(fn () => app(DiscardProposal::class)->execute($manager, $proposal, ' ', (string) Str::uuid()))

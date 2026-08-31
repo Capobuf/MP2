@@ -2,17 +2,16 @@
 
 use App\Actions\LateCorrections\RecordHistoricalErrorAnnotation;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Domain\LateCorrections\HistoricalErrorKind;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\HistoricalErrorAnnotation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -20,10 +19,10 @@ function annotationPersistenceFixture(): array
 {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $actor->id,
-        'capability' => Capability::CorrectClosedExercise,
+        'user' => $actor,
+        'permissions' => TestPermissions::CORRECT_CLOSED_EXERCISE,
     ]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $snapshot = closeExerciseFixture($exercise, $actor);

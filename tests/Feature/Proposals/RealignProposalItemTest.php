@@ -5,12 +5,10 @@ use App\Actions\Proposals\PlanExpense;
 use App\Actions\Proposals\RealignProposalItem;
 use App\Actions\Proposals\ReviewProposalReadiness;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalRealignmentChoice;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -19,6 +17,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -27,7 +26,7 @@ function staleExpenseProposal(): array
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $expense = Expense::factory()->forExercise($exercise)->create();
     $line = ExpenseLine::factory()->for($expense)->create(['type' => 'estimate', 'amount' => '5.00']);
     $proposal = app(InitializeProposal::class)->execute($actor, $company, $exercise, (string) Str::uuid());

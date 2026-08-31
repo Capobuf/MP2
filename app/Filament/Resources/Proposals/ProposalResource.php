@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Proposals;
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Proposals\Pages\ListProposals;
 use App\Filament\Resources\Proposals\Pages\ViewProposal;
 use App\Filament\Resources\Proposals\Schemas\ProposalInfolist;
@@ -53,7 +52,7 @@ class ProposalResource extends Resource
         $tenant = Filament::getTenant();
         $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
-        return $user instanceof User && $company instanceof Company && $user->hasCapability($company, Capability::View);
+        return $user instanceof User && $company instanceof Company && $user->can('viewAny', Proposal::class);
     }
 
     public static function canCreate(): bool

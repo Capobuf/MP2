@@ -1,10 +1,8 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Contracts\Pages\ViewContract;
 use App\Filament\Resources\Contracts\RelationManagers\ContractConditionsRelationManager;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\ContractLifecycleFact;
@@ -15,6 +13,7 @@ use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -24,8 +23,8 @@ afterEach(fn () => CarbonImmutable::setTestNow());
 it('creates and annuls conditions explicitly without raw edit or delete', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $manager->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $manager, 'permissions' => $capability]);
     }
     Exercise::factory()->for($company)->create(['year' => 2026]);
     $supplier = Supplier::factory()->for($company)->create();
@@ -52,7 +51,7 @@ it('creates and annuls conditions explicitly without raw edit or delete', functi
 it('hides condition mutations from viewers', function () {
     $viewer = User::factory()->create();
     $company = Company::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $viewer->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $viewer, 'permissions' => TestPermissions::VIEW]);
     $contract = Contract::factory()->for($company)->create();
     $condition = $contract->conditions()->create([
         'company_id' => $company->id, 'cycle' => 'monthly', 'attribution_mode' => 'cycle_start', 'amount' => '1.00',
@@ -70,8 +69,8 @@ it('hides condition mutations from viewers', function () {
 it('exposes separate confirmed previews for agreement changes and material corrections', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $manager->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $manager, 'permissions' => $capability]);
     }
     Exercise::factory()->for($company)->create(['year' => 2026]);
     $supplier = Supplier::factory()->for($company)->create();

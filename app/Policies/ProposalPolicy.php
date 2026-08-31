@@ -2,41 +2,55 @@
 
 namespace App\Policies;
 
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\ProposalStatus;
 use App\Models\Company;
 use App\Models\Proposal;
+use App\Models\TenantCompany;
 use App\Models\User;
 
 class ProposalPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->capabilities()->where('capability', Capability::View->value)->exists();
+        return $user->can('ViewAny:Proposal');
     }
 
     public function view(User $user, Proposal $proposal): bool
     {
-        return $user->hasCapability($proposal->company, Capability::View);
+        return $this->canUse($user, $proposal->company, 'View:Proposal');
     }
 
     public function create(User $user, ?Company $company = null): bool
     {
-        return $company === null ? $user->capabilities()->where('capability', Capability::ManageProposals->value)->exists() : $user->hasCapability($company, Capability::ManageProposals);
+        return $user->can('Create:Proposal')
+            && ($company === null || $this->canAccess($user, $company));
     }
 
     public function update(User $user, Proposal $proposal): bool
     {
-        return $proposal->status === ProposalStatus::Draft && $user->hasCapability($proposal->company, Capability::ManageProposals);
+        return $proposal->status === ProposalStatus::Draft
+            && $this->canUse($user, $proposal->company, 'Update:Proposal');
     }
 
     public function approve(User $user, Proposal $proposal): bool
     {
-        return $proposal->status === ProposalStatus::Draft && $user->hasCapability($proposal->company, Capability::ApproveBudget);
+        return $proposal->status === ProposalStatus::Draft
+            && $this->canUse($user, $proposal->company, 'Approve:Proposal');
     }
 
     public function delete(User $user, Proposal $proposal): bool
     {
         return false;
+    }
+
+    private function canUse(User $user, Company $company, string $permission): bool
+    {
+        return $this->canAccess($user, $company) && $user->can($permission);
+    }
+
+    private function canAccess(User $user, Company $company): bool
+    {
+        return $company->tenantCompany instanceof TenantCompany
+            && $user->canAccessTenant($company->tenantCompany);
     }
 }

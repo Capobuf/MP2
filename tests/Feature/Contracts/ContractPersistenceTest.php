@@ -3,11 +3,9 @@
 use App\Actions\Operations\CreateContract;
 use App\Actions\Operations\CreateProjectContractLink;
 use App\Actions\Operations\UploadAttachment;
-use App\Domain\Company\Capability;
 use App\Models\Attachment;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractLifecycleFact;
 use App\Models\Exercise;
@@ -22,6 +20,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -34,8 +33,8 @@ afterEach(fn () => CarbonImmutable::setTestNow());
 it('rehydrates every stable Contract identity and ordered audit sequence unchanged', function () {
     $actor = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $supplier = Supplier::factory()->for($company)->create();

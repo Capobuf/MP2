@@ -1,11 +1,9 @@
 <?php
 
 use App\Actions\Operations\UpdateExpense;
-use App\Domain\Company\Capability;
 use App\Domain\Projects\ProjectState;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractExerciseClassification;
 use App\Models\ContractLifecycleFact;
@@ -22,6 +20,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -37,8 +36,8 @@ function projectMoveContext(ProjectState $state = ProjectState::Open): array
 {
     $actor = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $project = Project::factory()->for($company)->create(['initial_state' => $state, 'initial_effective_date' => '2026-01-01']);
@@ -137,8 +136,8 @@ it('moves a contained Expense to a previous open Exercise and keeps the same Pro
 it('routes a future estimate-only Project move through Reprogramming', function () {
     $actor = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $source = Exercise::factory()->for($company)->create(['year' => 2025]);
     $target = Exercise::factory()->for($company)->create(['year' => 2026]);

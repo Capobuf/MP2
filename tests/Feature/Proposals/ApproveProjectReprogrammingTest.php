@@ -3,11 +3,9 @@
 use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\InitializeProposal;
 use App\Actions\Proposals\PlanProjectDeferral;
-use App\Domain\Company\Capability;
 use App\Models\BudgetSnapshot;
 use App\Models\BudgetSourceRow;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -16,6 +14,7 @@ use App\Models\ProjectDeferral;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -23,8 +22,8 @@ function reprogrammingApprovalFixture(): array
 {
     $actor = User::factory()->create();
     $company = Company::factory()->create();
-    foreach ([Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::MANAGE_PROPOSALS, TestPermissions::APPROVE_BUDGET] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $source = Exercise::factory()->for($company)->create(['year' => 2026]);
     $destination = Exercise::factory()->for($company)->create(['year' => 2027]);

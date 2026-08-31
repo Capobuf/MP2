@@ -6,12 +6,10 @@ use App\Actions\Proposals\PlanContract;
 use App\Actions\Proposals\PlanExpense;
 use App\Actions\Proposals\PlanProject;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalSourceType;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractLifecycleFact;
 use App\Models\Exercise;
@@ -21,6 +19,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -28,7 +27,7 @@ it('manually includes eligible closed Projects and cessated Contracts and permit
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
 
     $project = Project::factory()->for($company)->create(['initial_state' => 'open', 'initial_effective_date' => '2024-01-01']);
     ProjectTransition::factory()->forProject($project)->create(['from_state' => 'open', 'to_state' => 'closed', 'effective_date' => '2025-12-31', 'reason' => 'Chiusura precedente', 'created_by_id' => $actor->id]);
@@ -69,7 +68,7 @@ it('rejects an ineligible or cross-company manual source', function (): void {
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $proposal = app(InitializeProposal::class)->execute($actor, $company, $exercise, (string) Str::uuid());
     $active = Project::factory()->for($company)->create(['initial_state' => 'open', 'initial_effective_date' => '2025-01-01']);
     $foreign = Project::factory()->create(['initial_state' => 'closed', 'initial_effective_date' => '2025-01-01']);

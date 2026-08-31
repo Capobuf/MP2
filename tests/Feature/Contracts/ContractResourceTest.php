@@ -1,7 +1,6 @@
 <?php
 
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Filament\Forms\AttachmentUpload;
 use App\Filament\Resources\Contracts\ContractResource;
 use App\Filament\Resources\Contracts\Pages\CreateContract;
@@ -18,7 +17,6 @@ use App\Filament\Resources\Contracts\RelationManagers\ProjectContractLinksRelati
 use App\Models\Attachment;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\ContractExerciseClassification;
@@ -38,6 +36,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -51,11 +50,11 @@ afterEach(function () {
 
 function grantContractResource(User $user, Company $company, bool $manage = true): void
 {
-    foreach ($manage ? [Capability::View, Capability::ManageOperations] : [Capability::View] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ($manage ? [TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] : [TestPermissions::VIEW] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $user->id,
-            'capability' => $capability,
+            'user' => $user,
+            'permissions' => $capability,
         ]);
     }
 }
@@ -281,10 +280,10 @@ it('creates and selects a Supplier inline with a dedicated operation', function 
     $manager = User::factory()->create();
     $company = Company::factory()->create();
     grantContractResource($manager, $company);
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $manager->id,
-        'capability' => Capability::ManageMasterData,
+        'user' => $manager,
+        'permissions' => TestPermissions::MANAGE_MASTER_DATA,
     ]);
     $this->actingAs($manager);
     Filament::setTenant(($company)->tenantCompany);

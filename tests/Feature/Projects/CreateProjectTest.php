@@ -3,11 +3,9 @@
 use App\Actions\Operations\CreateProject;
 use App\Actions\Operations\UpdateProject;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Domain\Projects\ProjectState;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -18,16 +16,17 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 function grantProjectOperations(User $user, Company $company): void
 {
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $user->id,
-            'capability' => $capability,
+            'user' => $user,
+            'permissions' => $capability,
         ]);
     }
 }

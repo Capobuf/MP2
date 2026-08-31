@@ -9,6 +9,7 @@ use App\Domain\Company\TenantCompanyStatus;
 use App\Models\TenantCompany;
 use App\Models\User;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Checkbox;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Wizard\Step;
@@ -39,6 +40,11 @@ class TenantCompaniesTable
             ])
             ->recordUrl(null)
             ->recordActions([
+                Action::make('openTenant')
+                    ->label('Apri tenant')
+                    ->icon('heroicon-m-arrow-top-right-on-square')
+                    ->url(fn (TenantCompany $record): ?string => Filament::getPanel('admin')->getUrl($record))
+                    ->visible(fn (TenantCompany $record): bool => $record->status() === TenantCompanyStatus::Active),
                 Action::make('archive')
                     ->label('Archivia')
                     ->color('warning')
@@ -71,7 +77,7 @@ class TenantCompaniesTable
                     ->label('Elimina definitivamente')
                     ->color('danger')
                     ->modalHeading(fn (TenantCompany $record): string => "Elimina definitivamente {$record->company->name}")
-                    ->modalDescription('La cancellazione è irreversibile e rimuove Azienda, capacità, contratti, progetti, spese, snapshot, audit, allegati e ogni altro dato appartenente al Tenant. Gli account utente globali non saranno eliminati.')
+                    ->modalDescription('La cancellazione è irreversibile e rimuove Azienda, contratti, progetti, spese, snapshot, audit, allegati e ogni altro dato appartenente al Tenant. Il Tenant deve essere privo di utenti.')
                     ->modalSubmitActionLabel('Elimina definitivamente')
                     ->steps([
                         Step::make('Irreversibilità')->schema([

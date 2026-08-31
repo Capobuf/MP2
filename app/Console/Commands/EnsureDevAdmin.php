@@ -2,8 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\Authorization\SyncDefaultRoles;
 use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Validator;
 
 class EnsureDevAdmin extends Command
@@ -38,14 +40,29 @@ class EnsureDevAdmin extends Command
         /** @var array{name: string, email: string, password: string} $validated */
         $validated = $validator->validated();
 
-        User::query()->updateOrCreate(
+        $user = User::query()->updateOrCreate(
             ['email' => $validated['email']],
             [
                 'name' => $validated['name'],
                 'password' => $validated['password'],
-                'is_platform_admin' => true,
+                'company_id' => null,
             ],
         );
+
+        Artisan::call('shield:generate', [
+            '--all' => true,
+            '--option' => 'permissions',
+            '--panel' => 'admin',
+            '--no-interaction' => true,
+        ]);
+
+        app(SyncDefaultRoles::class)();
+
+        Artisan::call('shield:super-admin', [
+            '--user' => (string) $user->getKey(),
+            '--panel' => 'platform',
+            '--no-interaction' => true,
+        ]);
 
         $this->components->info('Amministratore di sviluppo pronto.');
 

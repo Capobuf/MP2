@@ -1,6 +1,5 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExerciseStatus;
 use App\Domain\Projects\ProjectState;
 use App\Filament\Resources\Projects\Pages\CreateProject;
@@ -10,7 +9,6 @@ use App\Filament\Resources\Projects\Pages\ViewProject;
 use App\Filament\Resources\Projects\ProjectResource;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -23,6 +21,7 @@ use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -36,11 +35,11 @@ afterEach(function () {
 
 function grantProjectResource(User $user, Company $company, bool $manage = true): void
 {
-    foreach ($manage ? [Capability::View, Capability::ManageOperations] : [Capability::View] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ($manage ? [TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] : [TestPermissions::VIEW] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $user->id,
-            'capability' => $capability,
+            'user' => $user,
+            'permissions' => $capability,
         ]);
     }
 }
@@ -142,10 +141,10 @@ it('creates and selects a Cost Center inline with a distinct operation', functio
     $manager = User::factory()->create();
     $company = Company::factory()->create();
     grantProjectResource($manager, $company);
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $manager->id,
-        'capability' => Capability::ManageMasterData,
+        'user' => $manager,
+        'permissions' => TestPermissions::MANAGE_MASTER_DATA,
     ]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $this->actingAs($manager);

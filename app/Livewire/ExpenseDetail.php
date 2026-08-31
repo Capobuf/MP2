@@ -3,7 +3,6 @@
 namespace App\Livewire;
 
 use App\Actions\Operations\SetExpenseLineActive;
-use App\Domain\Company\Capability;
 use App\Domain\Contracts\ContractActualKind;
 use App\Domain\Contracts\ContractState;
 use App\Domain\Expenses\Decimal;
@@ -498,7 +497,7 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
         return $actor instanceof User
             && $expense->origin !== 'system'
             && ! $expense->isReversed()
-            && $actor->hasCapability($expense->company, Capability::ManageOperations);
+            && $actor->can('update', $expense);
     }
 
     private function actor(): User

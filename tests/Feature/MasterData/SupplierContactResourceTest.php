@@ -1,33 +1,32 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Suppliers\Pages\EditSupplier;
 use App\Filament\Resources\Suppliers\Pages\ViewSupplier;
 use App\Filament\Resources\Suppliers\RelationManagers\ContactsRelationManager;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Supplier;
 use App\Models\SupplierContact;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 function grantContactResourceCapabilities(User $user, Company $company, bool $manage = true): void
 {
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $user->id,
-        'capability' => Capability::View,
+        'user' => $user,
+        'permissions' => TestPermissions::VIEW,
     ]);
 
     if ($manage) {
-        CompanyCapability::query()->create([
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $user->id,
-            'capability' => Capability::ManageMasterData,
+            'user' => $user,
+            'permissions' => TestPermissions::MANAGE_MASTER_DATA,
         ]);
     }
 }

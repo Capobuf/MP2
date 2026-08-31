@@ -2,12 +2,10 @@
 
 use App\Actions\Proposals\InitializeProposal;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\ProposalPurpose;
 use App\Models\AuditEvent;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -17,6 +15,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -42,7 +41,7 @@ it('starts an idempotent revision from live reality and references the latest bu
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $expense = Expense::factory()->forExercise($exercise)->create();
     $line = ExpenseLine::factory()->for($expense)->create(['type' => 'estimate', 'amount' => '10.00']);
     $budget = approvedBudget($company, $exercise, $actor);
@@ -64,7 +63,7 @@ it('uses the highest budget version as the only revision reference', function ()
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $v1 = approvedBudget($company, $exercise, $actor, 1);
     $v2Proposal = Proposal::factory()->for($company)->for($exercise)->for($actor, 'creator')->create(['purpose' => 'revision', 'reference_budget_id' => $v1->id]);
     $v2Proposal->update(['status' => 'approved', 'approved_by_id' => $actor->id, 'approved_at' => now(), 'approval_operation_id' => (string) Str::uuid()]);
@@ -82,7 +81,7 @@ it('rejects unauthorized foreign closed and concurrent revision creation without
     $closed = Exercise::factory()->for($company)->create(['status' => 'closed']);
     $actor = User::factory()->create();
     $manager = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $manager->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $manager, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     approvedBudget($company, $exercise, $manager);
     approvedBudget($company, $closed, $manager);
 

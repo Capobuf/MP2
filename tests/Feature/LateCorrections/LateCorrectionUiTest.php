@@ -2,10 +2,8 @@
 
 use App\Actions\LateCorrections\RecordLateCorrection;
 use App\Actions\Operations\UploadAttachment;
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Exercises\Pages\ViewExercise;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -22,14 +20,15 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 it('shows the Italian late-correction action only on an authorized Closed Exercise', function (): void {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::CorrectClosedExercise] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::CORRECT_CLOSED_EXERCISE] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $expense = Expense::factory()->forExercise($exercise)->create();
@@ -54,8 +53,8 @@ it('submits the correction journey and retains uploaded evidence on the generate
     Storage::fake('local');
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::CorrectClosedExercise] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::CORRECT_CLOSED_EXERCISE] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $expense = Expense::factory()->forExercise($exercise)->create();
@@ -97,8 +96,8 @@ it('submits the correction journey and retains uploaded evidence on the generate
 it('shows generated Expense identity and description for a new late Expense', function (): void {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::CorrectClosedExercise] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::CORRECT_CLOSED_EXERCISE] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $selectedExpense = Expense::factory()->forExercise($exercise)->create();
@@ -137,8 +136,8 @@ it('shows generated Expense identity and description for a new late Expense', fu
 it('attaches stale Exercise, source and selected Expense errors to visible fields and refreshes revisions', function (): void {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::CorrectClosedExercise] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::CORRECT_CLOSED_EXERCISE] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $expense = Expense::factory()->forExercise($exercise)->create();
@@ -211,7 +210,7 @@ it('attaches stale Exercise, source and selected Expense errors to visible field
 it('does not expose late correction to Open Exercises or viewers', function (): void {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::VIEW]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
 
     $this->actingAs($actor);
@@ -225,8 +224,8 @@ it('does not expose late correction to Open Exercises or viewers', function (): 
 it('offers only Project and Contract sources belonging to the Closed Exercise historical context', function (): void {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::CorrectClosedExercise] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::CORRECT_CLOSED_EXERCISE] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $historicalProject = Project::factory()->for($company)->create(['initial_effective_date' => '2025-01-01']);
@@ -261,8 +260,8 @@ it('permits retained evidence only on a generated correction line', function ():
     Storage::fake('local');
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::CorrectClosedExercise] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::CORRECT_CLOSED_EXERCISE] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $expense = Expense::factory()->forExercise($exercise)->create();
@@ -283,7 +282,7 @@ it('permits retained evidence only on a generated correction line', function ():
         'expected_expense_revision' => $expense->revision,
     ], (string) Str::uuid());
     expect($correction->expenseLine->lateCorrection()->exists())->toBeTrue()
-        ->and($actor->hasCapability($company, Capability::CorrectClosedExercise))->toBeTrue();
+        ->and($actor->can('CorrectClosed:Exercise'))->toBeTrue();
 
     $attachment = app(UploadAttachment::class)->execute(
         $actor,
@@ -306,9 +305,9 @@ it('permits retained evidence only on a generated correction line', function ():
 it('rejects altered-owner and cross-company retained-evidence retries', function (): void {
     Storage::fake('local');
     $company = Company::factory()->create();
-    $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::CorrectClosedExercise] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    $actor = User::factory()->platformAdmin()->create();
+    foreach ([TestPermissions::VIEW, TestPermissions::CORRECT_CLOSED_EXERCISE] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $expense = Expense::factory()->forExercise($exercise)->create();
@@ -345,10 +344,10 @@ it('rejects altered-owner and cross-company retained-evidence retries', function
     ))->toThrow(ValidationException::class);
 
     $otherCompany = Company::factory()->create();
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $otherCompany->id,
-        'user_id' => $actor->id,
-        'capability' => Capability::CorrectClosedExercise,
+        'user' => $actor,
+        'permissions' => TestPermissions::CORRECT_CLOSED_EXERCISE,
     ]);
     $otherExercise = Exercise::factory()->for($otherCompany)->create(['year' => 2025]);
     $otherExpense = Expense::factory()->forExercise($otherExercise)->create();

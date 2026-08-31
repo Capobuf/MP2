@@ -1,7 +1,6 @@
 <?php
 
 use App\Actions\Tenancy\DestroyTenantCompany;
-use App\Domain\Company\Capability;
 use App\Domain\Company\TenantCompanyStatus;
 use App\Filament\Resources\Budgets\BudgetResource;
 use App\Filament\Resources\Closings\ClosingResource;
@@ -16,7 +15,6 @@ use App\Models\Attachment;
 use App\Models\BudgetEvidence;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\CostCenter;
 use App\Models\Exercise;
@@ -28,6 +26,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -97,10 +96,10 @@ it('returns no tenant-owned file or report metadata after the Tenant is archived
     Storage::fake('local');
     $company = Company::factory()->create(['name' => 'Azienda Riservata']);
     $viewer = User::factory()->create();
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $viewer->id,
-        'capability' => Capability::View,
+        'user' => $viewer,
+        'permissions' => TestPermissions::VIEW,
     ]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $supplier = Supplier::factory()->for($company)->create();
@@ -157,14 +156,6 @@ it('denies every former Tenant URL after destruction while another Tenant remain
     $target = Company::factory()->create(['name' => 'Eliminata']);
     $other = Company::factory()->create(['name' => 'Conservata']);
     $platform = User::factory()->platformAdmin()->create();
-    $viewer = User::factory()->create();
-    foreach ([$target, $other] as $company) {
-        CompanyCapability::query()->create([
-            'company_id' => $company->id,
-            'user_id' => $viewer->id,
-            'capability' => Capability::View,
-        ]);
-    }
 
     $exercise = Exercise::factory()->for($target)->create(['year' => 2026]);
     $contract = Contract::factory()->for($target)->create();
@@ -198,7 +189,7 @@ it('denies every former Tenant URL after destruction while another Tenant remain
     Contract::factory()->for($other)->create();
 
     app(DestroyTenantCompany::class)->execute($platform, $target->tenantCompany, true, true);
-    $this->actingAs($viewer);
+    $this->actingAs($platform);
 
     $this->get(route('attachments.download', ['attachment' => $attachment->id]))->assertNotFound();
     $this->get(route('budget-evidence.download', ['evidence' => $evidence->id]))->assertNotFound();

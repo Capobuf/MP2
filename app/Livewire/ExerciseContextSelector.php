@@ -2,7 +2,6 @@
 
 namespace App\Livewire;
 
-use App\Filament\Pages\CompanyAccess;
 use App\Filament\Pages\CompanySettings;
 use App\Filament\Resources\Exercises\ExerciseResource;
 use App\Models\Company;
@@ -19,8 +18,6 @@ use Livewire\Component;
 
 class ExerciseContextSelector extends Component
 {
-    public ?int $companyId = null;
-
     public ?int $exerciseId = null;
 
     public ?int $budgetId = null;
@@ -37,7 +34,6 @@ class ExerciseContextSelector extends Component
             return;
         }
 
-        $this->companyId = $company->id;
         $exercise = app(ExerciseContext::class)->current($company);
         $this->exerciseId = $exercise?->id;
         $this->budgetId = $exercise instanceof Exercise
@@ -88,23 +84,6 @@ class ExerciseContextSelector extends Component
         $this->redirect($this->returnUrl, navigate: true);
     }
 
-    public function updatedCompanyId(mixed $companyId): void
-    {
-        $this->selectCompany((int) $companyId);
-    }
-
-    public function selectCompany(int $companyId): void
-    {
-        $user = auth()->user();
-        $tenant = TenantCompany::query()->with('company')->find($companyId);
-        abort_unless($user instanceof User && $tenant instanceof TenantCompany && $user->canAccessTenant($tenant), 403);
-
-        $url = Filament::getCurrentPanel()->getUrl($tenant);
-        abort_unless(is_string($url), 404);
-
-        $this->redirect($url, navigate: true);
-    }
-
     public function render(): View
     {
         $tenant = Filament::getTenant();
@@ -119,7 +98,6 @@ class ExerciseContextSelector extends Component
 
         return view('livewire.exercise-context-selector', [
             'company' => $currentCompany,
-            'companies' => $currentUser ? $currentUser->getTenants($panel) : collect(),
             'exercises' => $currentCompany
                 ? $currentCompany->exercises()->orderByDesc('year')->get()
                 : collect(),
@@ -137,10 +115,6 @@ class ExerciseContextSelector extends Component
             'companySettingsUrl' => $currentUser && $currentCompany
                 && Gate::forUser($currentUser)->allows('manageSettings', $currentCompany)
                     ? CompanySettings::getUrl(['tenant' => $tenant])
-                    : null,
-            'companyAccessUrl' => $currentUser && $currentCompany
-                && Gate::forUser($currentUser)->allows('managePermissions', $currentCompany)
-                    ? CompanyAccess::getUrl(['tenant' => $tenant])
                     : null,
             'companyRegistrationUrl' => $currentUser
                 && Gate::forUser($currentUser)->allows('create', TenantCompany::class)

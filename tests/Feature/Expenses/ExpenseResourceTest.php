@@ -1,7 +1,6 @@
 <?php
 
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExerciseStatus;
 use App\Filament\Forms\AttachmentUpload;
 use App\Filament\Resources\Expenses\ExpenseResource;
@@ -13,7 +12,6 @@ use App\Models\Attachment;
 use App\Models\AuditEvent;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractLifecycleFact;
 use App\Models\CostCenter;
@@ -30,16 +28,17 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 function grantExpenseResource(User $user, Company $company, bool $manage = true): void
 {
-    foreach ($manage ? [Capability::View, Capability::ManageOperations] : [Capability::View] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ($manage ? [TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] : [TestPermissions::VIEW] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $user->id,
-            'capability' => $capability,
+            'user' => $user,
+            'permissions' => $capability,
         ]);
     }
 }
@@ -513,10 +512,10 @@ it('creates and selects Supplier and Cost Center inline with distinct operations
     $manager = User::factory()->create();
     $company = Company::factory()->create();
     grantExpenseResource($manager, $company);
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $manager->id,
-        'capability' => Capability::ManageMasterData,
+        'user' => $manager,
+        'permissions' => TestPermissions::MANAGE_MASTER_DATA,
     ]);
     $exercise = Exercise::factory()->for($company)->create();
     $this->actingAs($manager);

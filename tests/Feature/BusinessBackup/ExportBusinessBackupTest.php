@@ -2,9 +2,7 @@
 
 use App\Actions\BusinessBackup\ExportBusinessBackup;
 use App\BusinessBackup\V1\BusinessBackupContract;
-use App\Domain\Company\Capability;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -12,6 +10,7 @@ use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -19,10 +18,10 @@ it('exports the exact V1 workbook only for a viewer of an active Tenant', functi
     $company = Company::factory()->create(['name' => 'Azienda Backup']);
     $viewer = User::factory()->create();
     $outsider = User::factory()->create();
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $viewer->id,
-        'capability' => Capability::View,
+        'user' => $viewer,
+        'permissions' => TestPermissions::VIEW,
     ]);
 
     expect(fn () => app(ExportBusinessBackup::class)->execute($company, $outsider))

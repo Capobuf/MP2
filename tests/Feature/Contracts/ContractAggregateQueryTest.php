@@ -1,12 +1,10 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Filament\Pages\ContractDeadlines;
 use App\Filament\Resources\Contracts\Pages\ListContracts;
 use App\Filament\Resources\Contracts\Pages\ViewContract;
 use App\Filament\Resources\Contracts\RelationManagers\ContractAnnualSituationsRelationManager;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\ContractExerciseClassification;
@@ -21,6 +19,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -39,10 +38,10 @@ function contractCapturedQueries(): Collection
 it('loads Contract list annual data in bounded set queries', function () {
     $viewer = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $viewer->id,
-        'capability' => Capability::View,
+        'user' => $viewer,
+        'permissions' => TestPermissions::VIEW,
     ]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $contracts = Contract::factory()->count(8)->for($company)->create([
@@ -82,7 +81,7 @@ it('loads Contract list annual data in bounded set queries', function () {
 it('renders all annual situations with bounded relation loads independent of Exercise count', function () {
     $viewer = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $viewer->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $viewer, 'permissions' => TestPermissions::VIEW]);
     $contract = Contract::factory()->for($company)->create(['next_expiry_date' => null, 'renewal_anchor_date' => null]);
     ContractLifecycleFact::factory()->forContract($contract)->create();
     ContractCondition::factory()->forContract($contract)->create();
@@ -114,7 +113,7 @@ it('renders all annual situations with bounded relation loads independent of Exe
 it('renders and filters many deadline rows without per-Contract domain queries', function () {
     $viewer = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $viewer->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $viewer, 'permissions' => TestPermissions::VIEW]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $contracts = Contract::factory()->count(8)->for($company)->create();
     foreach ($contracts as $contract) {

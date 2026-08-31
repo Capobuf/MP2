@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Exercises;
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Exercises\Pages\CloseExercise;
 use App\Filament\Resources\Exercises\Pages\CreateExercise;
 use App\Filament\Resources\Exercises\Pages\ListExercises;
@@ -67,7 +66,7 @@ class ExerciseResource extends Resource
         $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
-            && $user->hasCapability($company, Capability::View);
+            && $user->can('viewAny', Exercise::class);
     }
 
     /** @return Builder<Exercise> */
@@ -102,7 +101,7 @@ class ExerciseResource extends Resource
         $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
-            && $user->hasCapability($company, Capability::ManageOperations);
+            && $user->can('create', [Exercise::class, $company]);
     }
 
     public static function canView(Model $record): bool

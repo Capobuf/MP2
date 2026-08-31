@@ -3,7 +3,6 @@
 namespace App\Support\Reporting;
 
 use App\Actions\Reporting\BuildReport;
-use App\Domain\Company\Capability;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Reporting\ActualReference;
 use App\Domain\Reporting\ComparisonCategory;
@@ -35,7 +34,7 @@ final class EconomicDashboardReadModel
     /** @return array<string, mixed> */
     public function load(User $user, Company $company, Exercise $exercise, ?BudgetSnapshot $budget): array
     {
-        if (! $user->hasCapability($company, Capability::View)) {
+        if ($company->tenantCompany === null || ! $user->canAccessTenant($company->tenantCompany)) {
             throw new AuthorizationException('Non autorizzato a visualizzare la Dashboard di questa Azienda.');
         }
 

@@ -4,11 +4,9 @@ use App\Actions\BusinessBackup\ExportBusinessBackup;
 use App\BusinessBackup\V1\BusinessBackupContract;
 use App\BusinessBackup\V1\BusinessBackupValidator;
 use App\BusinessBackup\V1\PortablePayload;
-use App\Domain\Company\Capability;
 use App\Models\BudgetSnapshot;
 use App\Models\BudgetSourceRow;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -22,6 +20,7 @@ use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -65,7 +64,7 @@ function refreshBackupValidatorChecksum(Spreadsheet $workbook, string $sheetName
 it('rejects corrupt future orphan duplicate and non-canonical workbooks before writes', function (): void {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::VIEW]);
     $exercise = Exercise::factory()->for($company)->create();
     $first = Expense::factory()->forExercise($exercise)->create();
     ExpenseLine::factory()->for($first)->create(['amount' => '10.00']);

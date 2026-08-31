@@ -3,9 +3,7 @@
 use App\Actions\Closing\CloseExercise;
 use App\Actions\Closing\PrepareExerciseClosing;
 use App\Actions\Proposals\ApplyProjectDeferral;
-use App\Domain\Company\Capability;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -17,6 +15,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -25,8 +24,8 @@ afterEach(fn () => CarbonImmutable::setTestNow());
 function s9ReprogrammingActor(Company $company): User
 {
     $user = User::factory()->create();
-    foreach ([Capability::View, Capability::CloseExercise] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $user->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $user, 'permissions' => $capability]);
     }
 
     return $user;

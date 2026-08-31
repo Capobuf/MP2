@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Enums\ThemeMode;
 use Filament\Http\Middleware\Authenticate;
@@ -38,6 +39,14 @@ class PlatformPanelProvider extends PanelProvider
                 AppAuthentication::make()
                     ->recoverable(),
             ])
+            ->plugin(
+                FilamentShieldPlugin::make()
+                    ->navigationGroup('Amministrazione')
+                    ->navigationLabel('Ruoli')
+                    ->modelLabel('Ruolo')
+                    ->pluralModelLabel('Ruoli')
+                    ->scopeToTenant(false),
+            )
             ->colors([
                 'gray' => Color::hex('#91A3A8'),
                 'primary' => Color::hex('#39D5C4'),

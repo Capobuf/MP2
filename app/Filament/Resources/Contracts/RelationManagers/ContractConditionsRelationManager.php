@@ -6,7 +6,6 @@ use App\Actions\Operations\ChangeContractCondition;
 use App\Actions\Operations\CorrectContractCondition;
 use App\Actions\Operations\CreateContractCondition;
 use App\Actions\Operations\SetContractConditionAnnulled;
-use App\Domain\Company\Capability;
 use App\Domain\Contracts\ContractAttributionMode;
 use App\Domain\Contracts\ContractCycleType;
 use App\Domain\Contracts\ContractEconomicChangePlan;
@@ -161,7 +160,7 @@ class ContractConditionsRelationManager extends RelationManager
         $contract = $this->getOwnerRecord();
 
         return $actor instanceof User && $contract instanceof Contract && ! $contract->isArchived()
-            && $actor->hasCapability($contract->company, Capability::ManageOperations);
+            && $actor->can('update', $contract);
     }
 
     /** @return array<int, mixed> */

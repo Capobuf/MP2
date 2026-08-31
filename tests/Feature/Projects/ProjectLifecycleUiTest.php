@@ -1,17 +1,16 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Domain\Projects\ProjectState;
 use App\Filament\Resources\Projects\Pages\ListProjects;
 use App\Filament\Resources\Projects\Pages\ViewProject;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Project;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -26,8 +25,8 @@ afterEach(function () {
 it('shows archive only for terminal active Projects and restore only for archived Projects', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $manager->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $manager, 'permissions' => $capability]);
     }
     $open = Project::factory()->for($company)->create(['initial_state' => ProjectState::Open, 'initial_effective_date' => '2026-01-01']);
     $closed = Project::factory()->for($company)->create(['initial_state' => ProjectState::Closed, 'initial_effective_date' => '2026-01-01']);
@@ -63,7 +62,7 @@ it('shows archive only for terminal active Projects and restore only for archive
 it('keeps lifecycle actions hidden from a read-only viewer and exposes no delete', function () {
     $viewer = User::factory()->create();
     $company = Company::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $viewer->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $viewer, 'permissions' => TestPermissions::VIEW]);
     $project = Project::factory()->for($company)->create(['initial_state' => ProjectState::Closed]);
     $this->actingAs($viewer);
     Filament::setTenant(($company)->tenantCompany);

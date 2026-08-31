@@ -5,9 +5,7 @@ use App\Actions\BusinessBackup\ImportBusinessBackup;
 use App\Actions\Operations\ChangeProjectDeferral;
 use App\Actions\Proposals\ApplyProjectDeferral;
 use App\BusinessBackup\V1\BusinessBackupValidator;
-use App\Domain\Company\Capability;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -16,14 +14,15 @@ use App\Models\ProjectDeferral;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 it('reverses an imported active Reprogramming with rebuilt local effect metadata', function (): void {
     $company = Company::factory()->create();
     $actor = User::factory()->platformAdmin()->create();
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $source = Exercise::factory()->for($company)->create(['year' => 2026]);
     $destination = Exercise::factory()->for($company)->create(['year' => 2027]);

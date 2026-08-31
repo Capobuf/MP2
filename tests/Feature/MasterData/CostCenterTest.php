@@ -3,25 +3,24 @@
 use App\Actions\MasterData\CreateCostCenter;
 use App\Actions\MasterData\RenameCostCenter;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\CostCenter;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 function grantCostCenterManagement(User $user, Company $company): void
 {
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $user->id,
-        'capability' => Capability::ManageMasterData,
+        'user' => $user,
+        'permissions' => TestPermissions::MANAGE_MASTER_DATA,
     ]);
 }
 

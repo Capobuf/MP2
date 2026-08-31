@@ -3,7 +3,6 @@
 namespace App\Actions\Proposals;
 
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalImpactPlan;
 use App\Domain\Proposals\ProposalPurpose;
@@ -57,7 +56,10 @@ final class ApproveProposal
                 $company = Company::query()->lockForUpdate()->findOrFail($proposal->company_id);
                 $locked = Proposal::query()->lockForUpdate()->findOrFail($proposal->id);
                 if ($locked->status->value === 'approved') {
-                    if ($locked->approval_operation_id === $operationId && $actor->hasCapability($company, Capability::ApproveBudget)) {
+                    if ($locked->approval_operation_id === $operationId
+                        && $company->tenantCompany !== null
+                        && $actor->canAccessTenant($company->tenantCompany)
+                        && $actor->can('Approve:Proposal')) {
                         return BudgetSnapshot::query()->where('proposal_id', $locked->id)->sole();
                     }
                     throw ValidationException::withMessages(['proposal' => 'La Proposta è già terminale.']);

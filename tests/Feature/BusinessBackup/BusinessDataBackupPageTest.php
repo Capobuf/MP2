@@ -1,21 +1,20 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Filament\Pages\BusinessDataBackup;
 use App\Filament\Platform\Pages\ImportCompanyBackup;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 it('shows tenant backup only to a viewer and hides Drive when unconfigured', function (): void {
     $company = Company::factory()->create();
     $viewer = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $viewer->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $viewer, 'permissions' => TestPermissions::VIEW]);
     config()->set('filesystems.disks.google', ['driver' => 'google']);
     $this->actingAs($viewer);
     Filament::setCurrentPanel('admin');
@@ -29,7 +28,7 @@ it('shows tenant backup only to a viewer and hides Drive when unconfigured', fun
         ->assertActionHidden('drive');
 
     $admin = User::factory()->platformAdmin()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $admin->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $admin, 'permissions' => TestPermissions::VIEW]);
     $this->actingAs($admin);
     Livewire::test(BusinessDataBackup::class)
         ->assertActionVisible('download')

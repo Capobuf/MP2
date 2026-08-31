@@ -3,13 +3,11 @@
 use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\InitializeProposal;
 use App\Actions\Proposals\PlanContract;
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\ContractPlan;
 use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalReadiness;
 use App\Models\BudgetSourceRow;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\ContractRenewalConfiguration;
@@ -24,6 +22,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -34,7 +33,7 @@ it('creates and plans a contract without any live write', function (): void {
     $proposal = Proposal::factory()->create();
     $user = User::factory()->create();
     $supplier = Supplier::factory()->create(['company_id' => $proposal->company_id]);
-    CompanyCapability::query()->create(['company_id' => $proposal->company_id, 'user_id' => $user->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $proposal->company_id, 'user' => $user, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $created = app(PlanContract::class)->create($user, $proposal, ['title' => 'Contratto futuro', 'notes' => null, 'supplier_id' => $supplier->id, 'contractual_start_date' => '2026-01-01', 'next_expiry_date' => '2026-12-31', 'automatic_renewal' => false, 'renewal_duration_months' => null, 'notice_days' => 30, 'exercise_id' => $proposal->exercise_id, 'cost_center_id' => null], (string) Str::uuid(), 0);
     app(PlanContract::class)->execute($user, $proposal->refresh(), $created->item, ProposalActionType::AddContractCondition, ['cycle' => 'annual', 'attribution_mode' => 'cycle_start', 'amount' => '100.00', 'valid_from' => '2026-01-01', 'valid_to' => null, 'reason' => null], null, (string) Str::uuid(), 1);
     expect($created->item->refresh()->contract_id)->toBeNull()->and($created->item->result['planned_conditions'])->toHaveCount(1)->and(Contract::query()->count())->toBe(0);
@@ -44,8 +43,8 @@ it('inserts only planned renewal configurations during approval', function (): v
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $user = User::factory()->create();
-    foreach ([Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $user->id, 'capability' => $capability]);
+    foreach ([TestPermissions::MANAGE_PROPOSALS, TestPermissions::APPROVE_BUDGET] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $user, 'permissions' => $capability]);
     }
     $contract = Contract::factory()->for($company)->create([
         'contractual_start_date' => '2026-01-01',
@@ -85,8 +84,8 @@ it('derives and requires the canonical no-prorata Contract economic boundary', f
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $user = User::factory()->create();
-    foreach ([Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $user->id, 'capability' => $capability]);
+    foreach ([TestPermissions::MANAGE_PROPOSALS, TestPermissions::APPROVE_BUDGET] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $user, 'permissions' => $capability]);
     }
     $contract = Contract::factory()->for($company)->create(['contractual_start_date' => '2026-01-01', 'next_expiry_date' => null, 'renewal_anchor_date' => null]);
     $condition = ContractCondition::factory()->forContract($contract)->create(['cycle' => 'monthly', 'valid_from' => '2026-01-01', 'valid_to' => null]);
@@ -126,7 +125,7 @@ it('rejects overlapping conditions and plans lifecycle renewal and annual classi
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $user = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $user->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $user, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $contract = Contract::factory()->for($company)->create(['contractual_start_date' => '2026-01-01', 'next_expiry_date' => '2026-12-31']);
     ContractCondition::factory()->forContract($contract)->create(['valid_from' => '2026-01-01', 'valid_to' => '2026-06-30']);
     $costCenter = CostCenter::factory()->for($company)->create();
@@ -149,7 +148,7 @@ it('rejects Contract annual reclassification when Actuals exist', function (): v
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $user = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $user->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $user, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $contract = Contract::factory()->for($company)->create();
     ContractCondition::factory()->forContract($contract)->create();
     $expense = Expense::factory()->forExercise($exercise)->for($contract)->create();
@@ -163,7 +162,7 @@ it('blocks approval when the canonical Contract boundary changes after confirmat
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $user = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $user->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $user, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $contract = Contract::factory()->for($company)->create(['contractual_start_date' => '2026-01-01', 'next_expiry_date' => null, 'renewal_anchor_date' => null]);
     $condition = ContractCondition::factory()->forContract($contract)->create(['cycle' => 'monthly', 'valid_from' => '2026-01-01', 'valid_to' => null]);
     $proposal = app(InitializeProposal::class)->execute($user, $company, $exercise, (string) Str::uuid());

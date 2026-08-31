@@ -1,9 +1,7 @@
 <?php
 
 use App\Actions\Proposals\InitializeProposal;
-use App\Domain\Company\Capability;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -11,6 +9,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -18,7 +17,7 @@ it('initializes one isolated exact draft and retries by operation identity', fun
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $expense = Expense::factory()->forExercise($exercise)->create();
     ExpenseLine::factory()->for($expense)->create(['type' => 'actual', 'amount' => '5.00']);
     $operation = (string) Str::uuid();
@@ -39,7 +38,7 @@ it('includes reversed autonomous Expenses only when they still own plan or real 
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $active = Expense::factory()->forExercise($exercise)->create();
     $reversedWithEstimate = Expense::factory()->forExercise($exercise)->create(['reversed_at' => now()]);
     $reversedWithRealLine = Expense::factory()->forExercise($exercise)->create(['reversed_at' => now()]);

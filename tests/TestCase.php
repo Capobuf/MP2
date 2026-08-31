@@ -3,7 +3,11 @@
 namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\Support\TestEnvironmentGuard;
+use Tests\Support\TestPermissions;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -28,6 +32,21 @@ abstract class TestCase extends BaseTestCase
         );
 
         parent::setUp();
+
+        if (Schema::hasTable('permissions')) {
+            $now = now();
+            DB::table('permissions')->insertOrIgnore(
+                collect(TestPermissions::all())
+                    ->map(fn (string $name): array => [
+                        'name' => $name,
+                        'guard_name' => 'web',
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ])
+                    ->all(),
+            );
+            app(PermissionRegistrar::class)->forgetCachedPermissions();
+        }
     }
 
     private function environmentValue(string $key): string

@@ -3,14 +3,12 @@
 use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\InitializeProposal;
 use App\Actions\Proposals\PlanExpense;
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\BudgetPayloadGuard;
 use App\Domain\Proposals\ProposalActionType;
 use App\Models\BudgetEvidence;
 use App\Models\BudgetSnapshot;
 use App\Models\BudgetSourceRow;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -18,6 +16,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -26,11 +25,11 @@ function s6PrimaryInvariantFixture(): array
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create();
     $actor = User::factory()->create();
-    foreach ([Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::MANAGE_PROPOSALS, TestPermissions::APPROVE_BUDGET] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $actor->id,
-            'capability' => $capability,
+            'user' => $actor,
+            'permissions' => $capability,
         ]);
     }
     $expense = Expense::factory()->forExercise($exercise)->create(['description' => 'Piano originario']);
@@ -89,10 +88,10 @@ it('maps invariant 28.21: a new object remains only a ProposalItem until approva
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $actor->id,
-        'capability' => Capability::ManageProposals,
+        'user' => $actor,
+        'permissions' => TestPermissions::MANAGE_PROPOSALS,
     ]);
     $proposal = app(InitializeProposal::class)->execute($actor, $company, $exercise, (string) Str::uuid());
 

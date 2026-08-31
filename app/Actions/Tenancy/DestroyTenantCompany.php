@@ -35,6 +35,12 @@ class DestroyTenantCompany
 
             Gate::forUser($actor)->authorize('destroy', $lockedTenant);
 
+            if ($company->users()->exists()) {
+                throw ValidationException::withMessages([
+                    'tenant' => 'Il Tenant Azienda non può essere eliminato finché contiene utenti.',
+                ]);
+            }
+
             if (! in_array($lockedTenant->status(), [TenantCompanyStatus::Active, TenantCompanyStatus::Archived], true)) {
                 throw ValidationException::withMessages([
                     'tenant' => 'Lo stato del Tenant Azienda non consente la cancellazione definitiva.',

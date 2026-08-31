@@ -3,13 +3,11 @@
 use App\Actions\Operations\ChangeProjectDeferral;
 use App\Actions\Proposals\InitializeProposal;
 use App\Actions\Proposals\PlanProjectDeferral;
-use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Proposals\ProposalActionPayload;
 use App\Domain\Proposals\ProposalActionType;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -22,6 +20,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -40,7 +39,7 @@ it('rejects split modes, zero transfers and a Project deferral action on a non-P
 
     $actor = User::factory()->create();
     $company = Company::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $source = Exercise::factory()->for($company)->create(['year' => 2026]);
     $destination = Exercise::factory()->for($company)->create(['year' => 2027]);
     $proposal = app(InitializeProposal::class)->execute($actor, $company, $destination, (string) Str::uuid());
@@ -55,7 +54,7 @@ it('rejects split modes, zero transfers and a Project deferral action on a non-P
 it('does not infer or automatically prefill the maximum when a Proposal is initialized', function (): void {
     $actor = User::factory()->create();
     $company = Company::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $source = Exercise::factory()->for($company)->create(['year' => 2026]);
     $destination = Exercise::factory()->for($company)->create(['year' => 2027]);
     $project = Project::factory()->for($company)->create(['initial_state' => 'open', 'initial_effective_date' => '2026-01-01']);
@@ -72,7 +71,7 @@ it('does not infer or automatically prefill the maximum when a Proposal is initi
 it('blocks Closed-year and unauthorized direct mutation without changing Budgets or Actuals', function (): void {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $manager->id, 'capability' => Capability::ManageOperations]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $manager, 'permissions' => TestPermissions::MANAGE_OPERATIONS]);
     $source = Exercise::factory()->for($company)->create(['year' => 2026]);
     $destination = Exercise::factory()->for($company)->create(['year' => 2027]);
     $project = Project::factory()->for($company)->create();

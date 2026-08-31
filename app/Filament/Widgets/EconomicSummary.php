@@ -2,7 +2,6 @@
 
 namespace App\Filament\Widgets;
 
-use App\Domain\Company\Capability;
 use App\Models\Company;
 use App\Models\Exercise;
 use App\Models\TenantCompany;
@@ -20,16 +19,6 @@ class EconomicSummary extends Widget
     protected int|string|array $columnSpan = 'full';
 
     protected static bool $isLazy = false;
-
-    public static function canView(): bool
-    {
-        $tenant = Filament::getTenant();
-        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
-        $user = auth()->user();
-
-        return $company instanceof Company && $user instanceof User
-            && $user->hasCapability($company, Capability::View);
-    }
 
     /** @return array<string, mixed> */
     protected function getViewData(): array

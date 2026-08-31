@@ -2,14 +2,12 @@
 
 namespace App\Filament\Pages;
 
-use App\Domain\Company\Capability;
 use App\Filament\Widgets\AllocationComparisonScatterChart;
 use App\Filament\Widgets\BudgetVariationChart;
 use App\Filament\Widgets\CostCenterEconomicChart;
 use App\Filament\Widgets\EconomicSummary;
 use App\Filament\Widgets\OperationalVarianceBySourceChart;
 use App\Filament\Widgets\SourceEconomicProfileChart;
-use App\Models\Company;
 use App\Models\TenantCompany;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -26,11 +24,11 @@ class Dashboard extends BaseDashboard
     public static function canAccess(): bool
     {
         $tenant = Filament::getTenant();
-        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
         $user = auth()->user();
 
-        return $company instanceof Company && $user instanceof User
-            && $user->hasCapability($company, Capability::View);
+        return $tenant instanceof TenantCompany
+            && $user instanceof User
+            && $user->canAccessTenant($tenant);
     }
 
     /** @return array<class-string<Widget>|WidgetConfiguration> */

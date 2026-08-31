@@ -2,20 +2,22 @@
 
 namespace App\Policies;
 
-use App\Domain\Company\Capability;
 use App\Models\ClosingSnapshot;
+use App\Models\TenantCompany;
 use App\Models\User;
 
 class ClosingSnapshotPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->capabilities()->where('capability', Capability::View->value)->exists();
+        return $user->can('ViewAny:ClosingSnapshot');
     }
 
     public function view(User $user, ClosingSnapshot $snapshot): bool
     {
-        return $user->hasCapability($snapshot->company, Capability::View);
+        return $snapshot->company->tenantCompany instanceof TenantCompany
+            && $user->canAccessTenant($snapshot->company->tenantCompany)
+            && $user->can('View:ClosingSnapshot');
     }
 
     public function create(User $user): bool

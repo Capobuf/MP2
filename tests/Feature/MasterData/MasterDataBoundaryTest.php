@@ -1,8 +1,6 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\CostCenter;
 use App\Models\Supplier;
 use App\Models\SupplierContact;
@@ -10,6 +8,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -111,11 +110,11 @@ it('authorizes master data only through exact-company capabilities', function ()
     $contactA = SupplierContact::factory()->for($supplierA)->create();
     $costCenterA = CostCenter::factory()->for($companyA)->create();
 
-    foreach ([Capability::View, Capability::ManageMasterData] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_MASTER_DATA] as $capability) {
+        grantTestPermissions([
             'company_id' => $companyA->id,
-            'user_id' => $user->id,
-            'capability' => $capability,
+            'user' => $user,
+            'permissions' => $capability,
         ]);
     }
 

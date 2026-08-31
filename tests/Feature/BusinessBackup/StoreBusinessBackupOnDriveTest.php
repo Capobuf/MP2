@@ -2,12 +2,11 @@
 
 use App\Actions\BusinessBackup\ExportBusinessBackup;
 use App\Actions\BusinessBackup\StoreBusinessBackupOnDrive;
-use App\Domain\Company\Capability;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -18,7 +17,7 @@ it('writes the exact generated XLSX bytes to the configured Drive disk', functio
     ]);
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::VIEW]);
     $artifact = app(ExportBusinessBackup::class)->execute($company, $actor);
     $expectedHash = hash_file('sha256', $artifact['path']);
 

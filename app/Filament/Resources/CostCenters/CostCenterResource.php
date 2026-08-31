@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\CostCenters;
 
 use App\Actions\MasterData\SetCostCenterArchived;
-use App\Domain\Company\Capability;
 use App\Filament\Resources\CostCenters\Pages\CreateCostCenter;
 use App\Filament\Resources\CostCenters\Pages\EditCostCenter;
 use App\Filament\Resources\CostCenters\Pages\ListCostCenters;
@@ -72,7 +71,7 @@ class CostCenterResource extends Resource
 
         return $user instanceof User
             && $company instanceof Company
-            && $user->hasCapability($company, Capability::View);
+            && $user->can('viewAny', CostCenter::class);
     }
 
     /** @return Builder<CostCenter> */
@@ -97,7 +96,7 @@ class CostCenterResource extends Resource
 
         return $user instanceof User
             && $company instanceof Company
-            && $user->hasCapability($company, Capability::ManageMasterData);
+            && $user->can('create', [CostCenter::class, $company]);
     }
 
     public static function canView(Model $record): bool

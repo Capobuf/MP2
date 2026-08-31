@@ -7,7 +7,6 @@ use App\Actions\Operations\DetachAttachment;
 use App\Actions\Operations\SetExpenseLineActive;
 use App\Actions\Operations\UpdateExpenseLine;
 use App\Actions\Operations\UploadAttachment;
-use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Filament\Forms\AttachmentUpload;
 use App\Filament\Resources\Expenses\Schemas\ExpenseForm;
@@ -200,7 +199,7 @@ class ExpenseLinesRelationManager extends RelationManager
         $expense = $this->getOwnerRecord();
 
         return $actor instanceof User && $expense instanceof Expense && $expense->origin !== 'system' && ! $expense->isReversed()
-            && $actor->hasCapability($expense->company, Capability::ManageOperations);
+            && $actor->can('update', $expense);
     }
 
     private function canManageAttachments(): bool

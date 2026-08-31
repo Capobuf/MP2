@@ -3,7 +3,6 @@
 namespace App\Actions\Proposals;
 
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\Proposal;
@@ -30,7 +29,10 @@ final class DiscardProposal
             $locked = Proposal::query()->with('company')->lockForUpdate()->findOrFail($proposal->id);
 
             if ($locked->status->value === 'discarded') {
-                if ($locked->discard_operation_id === $operationId && $actor->hasCapability($company, Capability::ManageProposals)) {
+                if ($locked->discard_operation_id === $operationId
+                    && $company->tenantCompany !== null
+                    && $actor->canAccessTenant($company->tenantCompany)
+                    && $actor->can('Update:Proposal')) {
                     return $locked;
                 }
                 throw ValidationException::withMessages(['proposal' => 'La Proposta è già terminale.']);

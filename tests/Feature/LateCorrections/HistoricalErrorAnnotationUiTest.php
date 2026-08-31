@@ -1,9 +1,7 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Exercises\Pages\ViewExercise;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\HistoricalErrorAnnotation;
 use App\Models\User;
@@ -11,17 +9,18 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 it('shows the Italian zero-impact annotation journey only for an authorized Closed Exercise', function (): void {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::CorrectClosedExercise] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::VIEW, TestPermissions::CORRECT_CLOSED_EXERCISE] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $actor->id,
-            'capability' => $capability,
+            'user' => $actor,
+            'permissions' => $capability,
         ]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
@@ -47,11 +46,11 @@ it('shows the Italian zero-impact annotation journey only for an authorized Clos
 it('records immutable annotation details and keeps the Closed Exercise controls read-only', function (): void {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::CorrectClosedExercise] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::VIEW, TestPermissions::CORRECT_CLOSED_EXERCISE] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $actor->id,
-            'capability' => $capability,
+            'user' => $actor,
+            'permissions' => $capability,
         ]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
@@ -80,10 +79,10 @@ it('records immutable annotation details and keeps the Closed Exercise controls 
 it('does not expose annotation action on an Open Exercise or to viewers without correction capability', function (): void {
     $company = Company::factory()->create();
     $viewer = User::factory()->create();
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $viewer->id,
-        'capability' => Capability::View,
+        'user' => $viewer,
+        'permissions' => TestPermissions::VIEW,
     ]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
 

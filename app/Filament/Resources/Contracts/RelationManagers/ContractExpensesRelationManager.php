@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Contracts\RelationManagers;
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Models\Contract;
 use App\Models\Expense;
@@ -59,6 +58,6 @@ class ContractExpensesRelationManager extends RelationManager
         $contract = $this->getOwnerRecord();
 
         return $actor instanceof User && $contract instanceof Contract && ! $contract->isArchived()
-            && $actor->hasCapability($contract->company, Capability::ManageOperations);
+            && $actor->can('update', $contract);
     }
 }

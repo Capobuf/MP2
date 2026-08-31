@@ -5,11 +5,9 @@ use App\Actions\Operations\SetContractArchived;
 use App\Actions\Operations\SetProjectContractLinkArchived;
 use App\Actions\Operations\UpdateContractRenewal;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Models\Attachment;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\ContractExerciseClassification;
@@ -24,6 +22,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -34,8 +33,8 @@ function terminalContractContext(string $terminalType): array
 {
     $actor = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $contract = Contract::factory()->for($company)->create([
@@ -87,7 +86,7 @@ it('archives and restores terminal Contracts while preserving every identity and
 it('rejects archive for Planned or Active Contracts and stale revisions', function () {
     $actor = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageOperations]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_OPERATIONS]);
     $active = Contract::factory()->for($company)->create(['contractual_start_date' => '2026-01-01']);
     $planned = Contract::factory()->for($company)->create([
         'contractual_start_date' => '2027-01-01', 'next_expiry_date' => null, 'renewal_anchor_date' => null,

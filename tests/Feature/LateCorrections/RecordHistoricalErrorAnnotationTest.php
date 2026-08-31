@@ -2,11 +2,9 @@
 
 use App\Actions\LateCorrections\RecordHistoricalErrorAnnotation;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Models\AuditEvent;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\HistoricalErrorAnnotation;
 use App\Models\Project;
@@ -19,6 +17,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 /** @return array<string, mixed> */
@@ -27,10 +26,10 @@ function annotationActionFixture(bool $grant = true): array
     $company = Company::factory()->create();
     $actor = User::factory()->create();
     if ($grant) {
-        CompanyCapability::query()->create([
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $actor->id,
-            'capability' => Capability::CorrectClosedExercise,
+            'user' => $actor,
+            'permissions' => TestPermissions::CORRECT_CLOSED_EXERCISE,
         ]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
@@ -228,10 +227,10 @@ it('rejects arbitrary or stale sources and materializes authoritative references
 it('rejects direct annotation attempts on an Open Exercise', function (): void {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $actor->id,
-        'capability' => Capability::CorrectClosedExercise,
+        'user' => $actor,
+        'permissions' => TestPermissions::CORRECT_CLOSED_EXERCISE,
     ]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
 

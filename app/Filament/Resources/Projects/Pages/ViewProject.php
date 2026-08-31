@@ -5,7 +5,6 @@ namespace App\Filament\Resources\Projects\Pages;
 use App\Actions\Operations\ChangeProjectDeferral;
 use App\Actions\Operations\SetProjectArchived;
 use App\Actions\Operations\UpdateProjectClassification;
-use App\Domain\Company\Capability;
 use App\Domain\Projects\ProjectDeferralMode;
 use App\Domain\Projects\ProjectState;
 use App\Filament\Pages\CompanyAudit;
@@ -367,7 +366,7 @@ class ViewProject extends ViewRecord
 
         return $actor instanceof User
             && ! $project->isArchived()
-            && $actor->hasCapability($project->company, Capability::ManageOperations);
+            && $actor->can('update', $project);
     }
 
     private function canManageDeferral(): bool

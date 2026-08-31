@@ -3,10 +3,8 @@
 use App\Actions\Operations\CreateProjectTransition;
 use App\Actions\Proposals\InitializeProposal;
 use App\Actions\Proposals\PlanProjectDeferral;
-use App\Domain\Company\Capability;
 use App\Domain\Projects\ProjectDeferralValues;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -16,6 +14,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -43,7 +42,7 @@ it('proves INV-28.11 and INV-28.13 from live Project values including both negat
 it('counts received Carryover once but permits Reprogramming only from selected reducible Estimates', function (): void {
     $actor = User::factory()->create();
     $company = Company::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $previous = Exercise::factory()->for($company)->create(['year' => 2025]);
     $source = Exercise::factory()->for($company)->create(['year' => 2026]);
     $destination = Exercise::factory()->for($company)->create(['year' => 2027]);
@@ -69,7 +68,7 @@ it('counts received Carryover once but permits Reprogramming only from selected 
 it('proves INV-28.16 by blocking terminal live state while preserving the outgoing decision', function (): void {
     $actor = User::factory()->create();
     $company = Company::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageOperations]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_OPERATIONS]);
     $source = Exercise::factory()->for($company)->create(['year' => 2026]);
     $destination = Exercise::factory()->for($company)->create(['year' => 2027]);
     $project = Project::factory()->for($company)->create(['initial_state' => 'open', 'initial_effective_date' => '2026-01-01']);

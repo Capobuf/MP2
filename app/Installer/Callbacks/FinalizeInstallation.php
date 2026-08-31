@@ -18,7 +18,7 @@ class FinalizeInstallation
     {
         $this->assertPipelineCompleted();
 
-        if (! User::query()->where('is_platform_admin', true)->exists()) {
+        if (! User::role('super_admin')->exists()) {
             throw new RuntimeException(__('installer::installer.finalization_admin_error'));
         }
 

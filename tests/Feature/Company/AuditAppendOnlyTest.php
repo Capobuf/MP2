@@ -20,5 +20,5 @@ it('rejects updates and deletes of persisted audit events', function () {
         ->toThrow(LogicException::class, 'Audit events are append-only.');
 
     expect($event->refresh()->reason)->toBeNull()
-        ->and($company->auditEvents()->count())->toBe(10);
+        ->and($company->auditEvents()->count())->toBe(1);
 });

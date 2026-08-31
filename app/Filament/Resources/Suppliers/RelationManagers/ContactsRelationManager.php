@@ -4,7 +4,6 @@ namespace App\Filament\Resources\Suppliers\RelationManagers;
 
 use App\Actions\MasterData\CreateSupplierContact;
 use App\Actions\MasterData\UpdateSupplierContact;
-use App\Domain\Company\Capability;
 use App\Models\Supplier;
 use App\Models\SupplierContact;
 use App\Models\User;
@@ -33,7 +32,7 @@ class ContactsRelationManager extends RelationManager
 
         return $ownerRecord instanceof Supplier
             && $actor instanceof User
-            && $actor->hasCapability($ownerRecord->company, Capability::View);
+            && $actor->can('view', $ownerRecord);
     }
 
     public function form(Schema $schema): Schema
@@ -129,7 +128,7 @@ class ContactsRelationManager extends RelationManager
 
         return $actor instanceof User
             && $supplier instanceof Supplier
-            && $actor->hasCapability($supplier->company, Capability::ManageMasterData)
+            && $actor->can('update', $supplier)
                 ? Response::allow()
                 : Response::deny();
     }

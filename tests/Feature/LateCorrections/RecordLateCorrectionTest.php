@@ -1,10 +1,8 @@
 <?php
 
 use App\Actions\LateCorrections\RecordLateCorrection;
-use App\Domain\Company\Capability;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -17,18 +15,19 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
-function makeLateCorrectionFixture(bool $withCapability = true): array
+function makeLateCorrectionFixture(bool $withPermission = true): array
 {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    if ($withCapability) {
-        CompanyCapability::query()->create([
+    if ($withPermission) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $actor->id,
-            'capability' => Capability::CorrectClosedExercise,
+            'user' => $actor,
+            'permissions' => TestPermissions::CORRECT_CLOSED_EXERCISE,
         ]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
@@ -415,10 +414,10 @@ it('rejects same-company Project and Contract sources outside the Closed Exercis
 it('rejects a current-year correction on an Open Exercise even with the capability', function (): void {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $actor->id,
-        'capability' => Capability::CorrectClosedExercise,
+        'user' => $actor,
+        'permissions' => TestPermissions::CORRECT_CLOSED_EXERCISE,
     ]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $expense = Expense::factory()->forExercise($exercise)->create();
@@ -435,10 +434,10 @@ it('rejects a current-year correction on an Open Exercise even with the capabili
 it('rejects a Closed Exercise without its canonical Snapshot before writing', function (): void {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $actor->id,
-        'capability' => Capability::CorrectClosedExercise,
+        'user' => $actor,
+        'permissions' => TestPermissions::CORRECT_CLOSED_EXERCISE,
     ]);
     $exercise = Exercise::factory()->for($company)->create(['status' => 'closed']);
     $expense = Expense::factory()->forExercise($exercise)->create();

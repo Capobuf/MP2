@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Projects\RelationManagers;
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Models\Expense;
 use App\Models\Project;
@@ -65,6 +64,6 @@ class ProjectExpensesRelationManager extends RelationManager
         $project = $this->getOwnerRecord();
 
         return $actor instanceof User && $project instanceof Project && ! $project->isArchived()
-            && $actor->hasCapability($project->company, Capability::ManageOperations);
+            && $actor->can('update', $project);
     }
 }

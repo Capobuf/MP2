@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Contracts\RelationManagers;
 
 use App\Actions\Operations\UpdateContractRenewal;
-use App\Domain\Company\Capability;
 use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\User;
@@ -92,7 +91,7 @@ class ContractRenewalsRelationManager extends RelationManager
         $contract = $this->getOwnerRecord();
 
         return $actor instanceof User && $contract instanceof Contract && ! $contract->isArchived()
-            && $actor->hasCapability($contract->company, Capability::ManageOperations);
+            && $actor->can('update', $contract);
     }
 
     private function renewalReasonRequired(): bool

@@ -4,13 +4,11 @@ use App\Actions\Proposals\InitializeProposal;
 use App\Actions\Proposals\PlanExpense;
 use App\Actions\Proposals\PlanProject;
 use App\Actions\Proposals\PlanProjectDeferral;
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\ProposalActionPayload;
 use App\Domain\Proposals\ProposalActionReplay;
 use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalSourceSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -22,6 +20,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -29,10 +28,10 @@ function deferralPlanningFixture(): array
 {
     $actor = User::factory()->create();
     $company = Company::factory()->create();
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $actor->id,
-        'capability' => Capability::ManageProposals,
+        'user' => $actor,
+        'permissions' => TestPermissions::MANAGE_PROPOSALS,
     ]);
     $source = Exercise::factory()->for($company)->create(['year' => 2026]);
     $destination = Exercise::factory()->for($company)->create(['year' => 2027]);
@@ -170,13 +169,15 @@ it('rejects missing reasons invalid limits unbalanced or implicit source selecti
 
 it('rejects unauthorized, foreign and Closed Proposal deferral planning atomically', function (): void {
     extract(deferralPlanningFixture());
-    CompanyCapability::query()->where('company_id', $company->id)->where('user_id', $actor->id)->delete();
+    foreach (TestPermissions::MANAGE_PROPOSALS as $permission) {
+        revokeTestPermission($actor, $permission);
+    }
     expect(fn () => app(PlanProjectDeferral::class)->execute($actor, $proposal, $item, [
         'source_exercise_id' => $source->id, 'destination_exercise_id' => $destination->id,
         'mode' => 'carryover', 'carryover_amount' => '10.00',
     ], 'Non autorizzato', (string) Str::uuid(), 0))->toThrow(AuthorizationException::class);
 
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $foreignCompany = Company::factory()->create();
     $foreignSource = Exercise::factory()->for($foreignCompany)->create(['year' => 2026]);
     expect(fn () => app(PlanProjectDeferral::class)->execute($actor, $proposal, $item, [
@@ -211,7 +212,7 @@ it('preserves a live baseline and rejects planning after the Project source beca
 it('initializes a Proposal from an already-live deferral without recalculating it', function (): void {
     $actor = User::factory()->create();
     $company = Company::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $source = Exercise::factory()->for($company)->create(['year' => 2026]);
     $destination = Exercise::factory()->for($company)->create(['year' => 2027]);
     $project = Project::factory()->for($company)->create(['initial_state' => 'open', 'initial_effective_date' => '2026-01-01']);

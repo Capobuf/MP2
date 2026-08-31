@@ -3,7 +3,6 @@
 use App\Actions\Tenancy\ArchiveTenantCompany;
 use App\Actions\Tenancy\DestroyTenantCompany;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Domain\Company\TenantCompanyStatus;
 use App\Models\Attachment;
 use App\Models\AuditEvent;
@@ -14,7 +13,6 @@ use App\Models\BusinessBackupImport;
 use App\Models\ClosingSnapshot;
 use App\Models\ClosingSourceRow;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\ContractExerciseClassification;
@@ -46,6 +44,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -61,7 +60,7 @@ it('matches the complete foreign-key contract and preserves every global User re
     );
     $expected = collect($matches)->mapWithKeys(fn (array $match): array => [
         $match[2] => str_replace('*', '', $match[3]),
-    ])->sortKeys()->all();
+    ])->except('company_capabilities_company_id_foreign')->sortKeys()->all();
     $actual = DB::table('information_schema.REFERENTIAL_CONSTRAINTS')
         ->where('CONSTRAINT_SCHEMA', DB::getDatabaseName())
         ->whereIn('CONSTRAINT_NAME', array_keys($expected))
@@ -114,15 +113,16 @@ it('deletes the full Tenant graph while preserving shared Users, another Tenant 
         'storage_disk' => 'tenant-destruction',
         'storage_path' => $sharedPath,
     ]);
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $otherCompany->id,
-        'user_id' => $actor->id,
-        'capability' => Capability::View,
+        'user' => $actor,
+        'permissions' => TestPermissions::VIEW,
     ]);
 
     $tenantOwnedTables = DB::table('information_schema.COLUMNS')
         ->where('TABLE_SCHEMA', DB::getDatabaseName())
         ->where('COLUMN_NAME', 'company_id')
+        ->where('TABLE_NAME', '<>', 'users')
         ->pluck('TABLE_NAME')
         ->all();
     foreach ($tenantOwnedTables as $table) {
@@ -153,11 +153,11 @@ it('requires platform authorization and both independent confirmations with zero
     $company = Company::factory()->create();
     $ordinary = User::factory()->create();
     $platform = User::factory()->platformAdmin()->create();
-    foreach (Capability::cases() as $capability) {
-        CompanyCapability::query()->create([
+    foreach (TestPermissions::all() as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $ordinary->id,
-            'capability' => $capability,
+            'user' => $ordinary,
+            'permissions' => $capability,
         ]);
     }
 
@@ -171,6 +171,17 @@ it('requires platform authorization and both independent confirmations with zero
     expect(Company::query()->whereKey($company->id)->exists())->toBeTrue()
         ->and($company->tenantCompany()->exists())->toBeTrue()
         ->and(PendingFileDeletion::query()->count())->toBe(0);
+});
+
+it('refuses permanent destruction while tenant users are still linked', function (): void {
+    $company = Company::factory()->create();
+    $tenantUser = User::factory()->create(['company_id' => $company->id]);
+    $platform = User::factory()->platformAdmin()->create();
+
+    expect(fn () => app(DestroyTenantCompany::class)->execute($platform, $company->tenantCompany, true, true))
+        ->toThrow(ValidationException::class, 'contiene utenti')
+        ->and($tenantUser->refresh()->company_id)->toBe($company->id)
+        ->and($company->refresh()->exists)->toBeTrue();
 });
 
 it('serializes an Archive followed by destruction and rejects a stale deleted target', function (): void {
@@ -241,10 +252,10 @@ function createTenantDestructionGraph(
         'imported_by_id' => $actor->id,
         'completed_at' => now(),
     ]);
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $actor->id,
-        'capability' => Capability::View,
+        'user' => $actor,
+        'permissions' => TestPermissions::VIEW,
     ]);
     AuditEvent::query()->create([
         'operation_id' => (string) Str::uuid(),

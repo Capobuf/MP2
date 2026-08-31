@@ -1,9 +1,8 @@
 <div class="mp2-context-selector" role="group" aria-label="Contesto globale">
     @if ($company)
         @php
-            $canSwitchCompany = $companies->count() > 1;
-            $hasCompanyManagementActions = filled($companySettingsUrl) || filled($companyAccessUrl);
-            $hasCompanyMenu = $canSwitchCompany || $hasCompanyManagementActions || filled($companyRegistrationUrl);
+            $hasCompanyManagementActions = filled($companySettingsUrl);
+            $hasCompanyMenu = $hasCompanyManagementActions || filled($companyRegistrationUrl);
             $hasExerciseManagementActions = filled($exerciseManagementUrl);
             $hasExerciseMenu = $exercises->isNotEmpty() || $hasExerciseManagementActions || filled($exerciseCreationUrl);
         @endphp
@@ -21,22 +20,8 @@
                     </button>
                 </x-slot>
 
-                @if ($canSwitchCompany)
-                    <x-filament::dropdown.list>
-                        @foreach ($companies as $availableTenant)
-                            <x-filament::dropdown.list.item
-                                wire:click="selectCompany({{ $availableTenant->company_id }})"
-                                :icon="$availableTenant->company_id === $company->id ? 'heroicon-m-check' : null"
-                                :color="$availableTenant->company_id === $company->id ? 'primary' : 'gray'"
-                            >
-                                {{ $availableTenant->company->name }}
-                            </x-filament::dropdown.list.item>
-                        @endforeach
-                    </x-filament::dropdown.list>
-                @endif
-
                 @if ($hasCompanyManagementActions)
-                    <div @class(['mp2-context-menu-group', 'mp2-context-menu-group-divided' => $canSwitchCompany])>
+                    <div class="mp2-context-menu-group">
                         <x-filament::dropdown.list>
                             @if ($companySettingsUrl)
                                 <x-filament::dropdown.list.item
@@ -49,22 +34,12 @@
                                 </x-filament::dropdown.list.item>
                             @endif
 
-                            @if ($companyAccessUrl)
-                                <x-filament::dropdown.list.item
-                                    :href="$companyAccessUrl"
-                                    icon="heroicon-m-key"
-                                    tag="a"
-                                    wire:navigate
-                                >
-                                    Accessi e capacità
-                                </x-filament::dropdown.list.item>
-                            @endif
                         </x-filament::dropdown.list>
                     </div>
                 @endif
 
                 @if ($companyRegistrationUrl)
-                    <div @class(['mp2-context-menu-group', 'mp2-context-menu-group-divided' => $canSwitchCompany || $hasCompanyManagementActions])>
+                    <div @class(['mp2-context-menu-group', 'mp2-context-menu-group-divided' => $hasCompanyManagementActions])>
                         <x-filament::dropdown.list>
                             <x-filament::dropdown.list.item
                                 :href="$companyRegistrationUrl"

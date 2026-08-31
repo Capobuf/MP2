@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use DateTimeZone;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -21,12 +22,13 @@ use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 /** @property-read Schema $form */
 class CompanySettings extends Page
 {
+    use HasPageShield;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
 
     protected static ?string $navigationLabel = 'Impostazioni';
@@ -46,17 +48,6 @@ class CompanySettings extends Page
     {
         abort_unless(static::canAccess(), 403);
         $this->fillSettings();
-    }
-
-    public static function canAccess(): bool
-    {
-        $user = auth()->user();
-        $tenant = Filament::getTenant();
-        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
-
-        return $user instanceof User
-            && $company instanceof Company
-            && Gate::forUser($user)->allows('manageSettings', $company);
     }
 
     public function form(Schema $schema): Schema

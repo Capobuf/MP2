@@ -1,9 +1,7 @@
 <?php
 
 use App\Actions\Closing\PrepareExerciseClosing;
-use App\Domain\Company\Capability;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -12,6 +10,7 @@ use App\Models\ProjectTransition;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -21,8 +20,8 @@ it('enforces Closing state at 31 December and the negative-Actual Carryover cap'
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::CloseExercise] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $source = Exercise::factory()->for($company)->create(['year' => 2025]);
     Exercise::factory()->for($company)->create(['year' => 2026]);

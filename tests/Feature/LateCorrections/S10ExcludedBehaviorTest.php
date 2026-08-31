@@ -2,11 +2,9 @@
 
 use App\Actions\Operations\CreateExpenseLine;
 use App\Actions\Operations\UpdateExpense;
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Exercises\Pages\ViewExercise;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -21,6 +19,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -29,11 +28,11 @@ function s10ExcludedFixture(): array
 {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::ManageOperations, Capability::CorrectClosedExercise] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS, TestPermissions::CORRECT_CLOSED_EXERCISE] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $actor->id,
-            'capability' => $capability,
+            'user' => $actor,
+            'permissions' => $capability,
         ]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);

@@ -1,14 +1,11 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExerciseStatus;
-use App\Filament\Pages\CompanyAccess;
 use App\Filament\Pages\CompanySettings;
 use App\Filament\Resources\Exercises\ExerciseResource;
 use App\Filament\Widgets\EconomicSummary;
 use App\Livewire\ExerciseContextSelector;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\User;
 use App\Support\ExerciseContext;
@@ -17,6 +14,7 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -59,17 +57,16 @@ it('renders the Blade and Livewire global context for the current tenant', funct
     $user = User::factory()->create();
     $company = Company::factory()->create(['name' => 'Azienda Demo']);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $user->id,
-        'capability' => Capability::View,
+        'user' => $user,
+        'permissions' => TestPermissions::VIEW,
     ]);
     $this->actingAs($user);
     Filament::setCurrentPanel('admin');
     Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ExerciseContextSelector::class)
-        ->assertSet('companyId', $company->id)
         ->assertSet('exerciseId', $exercise->id)
         ->assertSee('Azienda Demo')
         ->assertSee('2026 · Aperto')
@@ -90,11 +87,11 @@ it('exposes authorized Exercise actions in the global context menu', function ()
     $manager = User::factory()->create();
     $company = Company::factory()->create(['name' => 'Azienda Demo']);
 
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $manager->id,
-            'capability' => $capability,
+            'user' => $manager,
+            'permissions' => $capability,
         ]);
     }
 
@@ -113,11 +110,11 @@ it('exposes authorized Company actions in the global context menu', function () 
     $administrator = User::factory()->platformAdmin()->create();
     $company = Company::factory()->create(['name' => 'Azienda Demo']);
 
-    foreach ([Capability::View, Capability::ManageSettings, Capability::ManagePermissions] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_SETTINGS, TestPermissions::MANAGE_PERMISSIONS] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $administrator->id,
-            'capability' => $capability,
+            'user' => $administrator,
+            'permissions' => $capability,
         ]);
     }
 
@@ -127,20 +124,18 @@ it('exposes authorized Company actions in the global context menu', function () 
 
     Livewire::test(ExerciseContextSelector::class)
         ->assertSee('Impostazioni Azienda')
-        ->assertSee('Accessi e capacità')
         ->assertSee('Crea Azienda')
         ->assertSeeHtml('href="'.CompanySettings::getUrl(['tenant' => $company]).'"')
-        ->assertSeeHtml('href="'.CompanyAccess::getUrl(['tenant' => $company]).'"')
         ->assertSeeHtml('href="'.Filament::getCurrentPanel()->getTenantRegistrationUrl().'"');
 });
 
 it('does not expose unauthorized Company actions', function () {
     $user = User::factory()->create();
     $company = Company::factory()->create(['name' => 'Azienda Demo']);
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $user->id,
-        'capability' => Capability::View,
+        'user' => $user,
+        'permissions' => TestPermissions::VIEW,
     ]);
 
     $this->actingAs($user);

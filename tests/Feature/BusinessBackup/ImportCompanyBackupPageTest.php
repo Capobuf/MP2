@@ -2,7 +2,6 @@
 
 use App\Actions\BusinessBackup\ExportBusinessBackup;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Domain\Company\TenantCompanyStatus;
 use App\Domain\Expenses\ExerciseStatus;
 use App\Filament\Platform\Pages\ImportCompanyBackup;
@@ -12,7 +11,6 @@ use App\Models\AuditEvent;
 use App\Models\BusinessBackupImport;
 use App\Models\ClosingSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Proposal;
@@ -25,6 +23,7 @@ use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -48,7 +47,7 @@ it('allows only a Platform Admin to validate and preview without writes', functi
     $source = Company::factory()->create(['name' => 'Anteprima Backup']);
     $admin = User::factory()->platformAdmin()->create();
     $ordinary = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $source->id, 'user_id' => $admin->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $source->id, 'user' => $admin, 'permissions' => TestPermissions::VIEW]);
     Exercise::factory()->for($source)->create(['year' => 2025, 'status' => ExerciseStatus::Open]);
     $closedExercise = Exercise::factory()->for($source)->create(['year' => 2026, 'status' => ExerciseStatus::Open]);
     ClosingSnapshot::query()->create([
@@ -113,8 +112,8 @@ it('restores a validated upload through the page', function (): void {
     $source = Company::factory()->create(['name' => 'Ripristino Pagina']);
     $admin = User::factory()->platformAdmin()->create();
     $sourceMember = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $source->id, 'user_id' => $admin->id, 'capability' => Capability::View]);
-    CompanyCapability::query()->create(['company_id' => $source->id, 'user_id' => $sourceMember->id, 'capability' => Capability::ManageOperations]);
+    grantTestPermissions(['company_id' => $source->id, 'user' => $admin, 'permissions' => TestPermissions::VIEW]);
+    grantTestPermissions(['company_id' => $source->id, 'user' => $sourceMember, 'permissions' => TestPermissions::MANAGE_OPERATIONS]);
     $exercise = Exercise::factory()->for($source)->create(['year' => 2026]);
     Proposal::factory()->for($source)->for($exercise)->for($sourceMember, 'creator')->create();
     $supplier = Supplier::factory()->for($source)->create();
@@ -157,7 +156,7 @@ it('restores a validated upload through the page', function (): void {
         ->and($restored->name)->toBe($source->name)
         ->and($restored->tenantCompany->status)->toBe(TenantCompanyStatus::Active)
         ->and(User::query()->count())->toBe($userCount)
-        ->and($restored->capabilities()->where('user_id', $sourceMember->id)->count())->toBe(0)
+        ->and($sourceMember->refresh()->company_id)->toBe($source->id)
         ->and($restored->auditEvents()->count())->toBe(0)
         ->and($restored->proposals()->count())->toBe(0)
         ->and(BusinessBackupImport::query()->where('company_id', $restored->id)->count())->toBe(1)
@@ -168,7 +167,7 @@ it('materializes a Livewire temporary upload during validation', function (): vo
     Storage::fake('local');
     $source = Company::factory()->create(['name' => 'Upload temporaneo']);
     $admin = User::factory()->platformAdmin()->create();
-    CompanyCapability::query()->create(['company_id' => $source->id, 'user_id' => $admin->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $source->id, 'user' => $admin, 'permissions' => TestPermissions::VIEW]);
     $storedUpload = storeBusinessBackupPageUpload($source, $admin, 'temporary-source.xlsx');
     $temporaryUpload = UploadedFile::fake()
         ->createWithContent('backup.xlsx', (string) Storage::disk('local')->get($storedUpload))
@@ -191,8 +190,8 @@ it('rejects a valid package that replaces the validated upload contents', functi
     $admin = User::factory()->platformAdmin()->create();
     $sourceA = Company::factory()->create(['name' => 'Package A']);
     $sourceB = Company::factory()->create(['name' => 'Package B']);
-    CompanyCapability::query()->create(['company_id' => $sourceA->id, 'user_id' => $admin->id, 'capability' => Capability::View]);
-    CompanyCapability::query()->create(['company_id' => $sourceB->id, 'user_id' => $admin->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $sourceA->id, 'user' => $admin, 'permissions' => TestPermissions::VIEW]);
+    grantTestPermissions(['company_id' => $sourceB->id, 'user' => $admin, 'permissions' => TestPermissions::VIEW]);
     $uploadA = storeBusinessBackupPageUpload($sourceA, $admin, 'package-a.xlsx');
     $uploadB = storeBusinessBackupPageUpload($sourceB, $admin, 'package-b.xlsx');
     $companyCount = Company::query()->count();
@@ -221,8 +220,8 @@ it('invalidates the previous validation when the FileUpload changes', function (
     $admin = User::factory()->platformAdmin()->create();
     $sourceA = Company::factory()->create(['name' => 'Upload A']);
     $sourceB = Company::factory()->create(['name' => 'Upload B']);
-    CompanyCapability::query()->create(['company_id' => $sourceA->id, 'user_id' => $admin->id, 'capability' => Capability::View]);
-    CompanyCapability::query()->create(['company_id' => $sourceB->id, 'user_id' => $admin->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $sourceA->id, 'user' => $admin, 'permissions' => TestPermissions::VIEW]);
+    grantTestPermissions(['company_id' => $sourceB->id, 'user' => $admin, 'permissions' => TestPermissions::VIEW]);
     $uploadA = storeBusinessBackupPageUpload($sourceA, $admin, 'upload-a.xlsx');
     $uploadB = storeBusinessBackupPageUpload($sourceB, $admin, 'upload-b.xlsx');
     $companyCount = Company::query()->count();

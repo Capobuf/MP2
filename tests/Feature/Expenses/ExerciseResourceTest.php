@@ -1,27 +1,26 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Exercises\ExerciseResource;
 use App\Filament\Resources\Exercises\Pages\CreateExercise;
 use App\Filament\Resources\Exercises\Pages\ListExercises;
 use App\Filament\Resources\Exercises\Pages\ViewExercise;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 function grantExerciseResource(User $user, Company $company, bool $manage = true): void
 {
-    foreach ($manage ? [Capability::View, Capability::ManageOperations] : [Capability::View] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ($manage ? [TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] : [TestPermissions::VIEW] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $user->id,
-            'capability' => $capability,
+            'user' => $user,
+            'permissions' => $capability,
         ]);
     }
 }

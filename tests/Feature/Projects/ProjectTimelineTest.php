@@ -2,13 +2,11 @@
 
 use App\Actions\Operations\CreateExpenseLine;
 use App\Actions\Operations\UpdateExpense;
-use App\Domain\Company\Capability;
 use App\Domain\Projects\ProjectState;
 use App\Filament\Pages\CompanyAudit;
 use App\Filament\Resources\Projects\Pages\ViewProject;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\Project;
@@ -17,14 +15,15 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 it('filters immutable Project history even after an Expense leaves the Project', function () {
     $actor = User::factory()->create();
     $company = Company::factory()->create();
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
     $project = Project::factory()->for($company)->create(['initial_state' => ProjectState::Open]);
@@ -61,8 +60,8 @@ it('filters immutable Project history even after an Expense leaves the Project',
 it('shows Project values references overspend and operation identity in Italian', function () {
     $actor = User::factory()->create();
     $company = Company::factory()->create();
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
     $project = Project::factory()->for($company)->create(['initial_state' => ProjectState::Open]);

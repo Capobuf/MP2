@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Projects\Schemas;
 
 use App\Actions\MasterData\CreateCostCenter;
-use App\Domain\Company\Capability;
 use App\Domain\Projects\ProjectState;
 use App\Models\Company;
 use App\Models\CostCenter;
@@ -75,7 +74,7 @@ class ProjectForm
 
         return $actor instanceof User
             && $company instanceof Company
-            && $actor->hasCapability($company, Capability::ManageMasterData);
+            && $actor->can('create', [CostCenter::class, $company]);
     }
 
     private static function company(): ?Company

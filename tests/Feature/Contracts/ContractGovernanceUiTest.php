@@ -1,6 +1,5 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Filament\Pages\CompanyAudit;
 use App\Filament\Pages\ContractDeadlines;
 use App\Filament\Resources\Contracts\ContractResource;
@@ -16,7 +15,6 @@ use App\Filament\Resources\Projects\ProjectResource;
 use App\Models\Attachment;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractExerciseClassification;
 use App\Models\ContractLifecycleFact;
@@ -29,6 +27,7 @@ use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -39,9 +38,9 @@ function governanceUiContext(bool $manager = true): array
 {
     $user = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $user->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $user, 'permissions' => TestPermissions::VIEW]);
     if ($manager) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $user->id, 'capability' => Capability::ManageOperations]);
+        grantTestPermissions(['company_id' => $company->id, 'user' => $user, 'permissions' => TestPermissions::MANAGE_OPERATIONS]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $defined = Contract::factory()->for($company)->create([
@@ -153,10 +152,10 @@ it('registers classification link and private attachment governance surfaces wit
 
 it('creates and selects a Cost Center inline while reclassifying a Contract', function () {
     ['user' => $user, 'company' => $company, 'defined' => $contract] = governanceUiContext();
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $user->id,
-        'capability' => Capability::ManageMasterData,
+        'user' => $user,
+        'permissions' => TestPermissions::MANAGE_MASTER_DATA,
     ]);
     $this->actingAs($user);
     Filament::setTenant(($company)->tenantCompany);
@@ -221,7 +220,7 @@ it('shows terminal Archive and ordered Contract Timeline detail while keeping vi
         ->assertSchemaComponentExists('detail_sequence');
 
     $viewer = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $viewer->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $viewer, 'permissions' => TestPermissions::VIEW]);
     $this->actingAs($viewer);
     Livewire::test(ViewContract::class, ['record' => $contract->id])
         ->assertActionHidden('archive')
@@ -259,7 +258,7 @@ it('exposes Expense and Line attachment controls to operators and keeps them rea
         ->assertTableActionDoesNotExist('delete', record: $line);
 
     $viewer = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $viewer->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $viewer, 'permissions' => TestPermissions::VIEW]);
     $this->actingAs($viewer);
     Livewire::test(ExpenseAttachmentsRelationManager::class, ['ownerRecord' => $expense, 'pageClass' => ViewExpense::class])
         ->assertTableActionDoesNotExist('upload');

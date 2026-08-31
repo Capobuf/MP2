@@ -3,12 +3,10 @@
 namespace App\Actions;
 
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Domain\Company\ClosingUnclassifiedPolicy;
 use App\Domain\Company\TenantCompanyStatus;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\TenantCompany;
 use App\Models\User;
 use DateTimeZone;
@@ -50,16 +48,6 @@ class CreateCompany
 
             $this->recordCompanyCreated($company, $actor);
 
-            foreach (Capability::cases() as $capability) {
-                CompanyCapability::query()->create([
-                    'company_id' => $company->id,
-                    'user_id' => $actor->id,
-                    'capability' => $capability,
-                ]);
-
-                $this->recordCapabilityAssigned($company, $actor, $capability);
-            }
-
             return $company->refresh()->load('tenantCompany');
         });
     }
@@ -77,20 +65,6 @@ class CreateCompany
                 'overspend_note_required' => $company->overspend_note_required,
                 'unclassified_closing_policy' => ClosingUnclassifiedPolicy::Warning->value,
             ],
-        ]);
-    }
-
-    private function recordCapabilityAssigned(Company $company, User $actor, Capability $capability): void
-    {
-        AuditEvent::query()->create([
-            ...$this->eventEnvelope($company, $actor),
-            'event_type' => AuditEventType::CapabilityAssigned,
-            'subject_type' => User::class,
-            'subject_id' => $actor->id,
-            'beneficiary_id' => $actor->id,
-            'capability' => $capability,
-            'previous_value' => false,
-            'new_value' => true,
         ]);
     }
 

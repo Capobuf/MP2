@@ -5,11 +5,9 @@ use App\Actions\Operations\CreateProjectTransition;
 use App\Actions\Proposals\ApplyProjectDeferral;
 use App\Actions\Proposals\InitializeProposal;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Filament\Pages\CompanyAudit;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -23,6 +21,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -30,8 +29,8 @@ function liveDeferralFixture(string $mode = 'carryover'): array
 {
     $actor = User::factory()->create();
     $company = Company::factory()->create();
-    foreach ([Capability::View, Capability::ManageOperations, Capability::ManageProposals] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS, TestPermissions::MANAGE_PROPOSALS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $source = Exercise::factory()->for($company)->create(['year' => 2026]);
     $destination = Exercise::factory()->for($company)->create(['year' => 2027]);

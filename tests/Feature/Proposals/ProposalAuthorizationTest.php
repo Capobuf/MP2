@@ -1,13 +1,12 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Proposal;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -15,8 +14,8 @@ it('maps proposal and budget authority to the exact company capabilities', funct
     $user = User::factory()->create();
     $company = Company::factory()->create();
     $other = Company::factory()->create();
-    foreach ([Capability::View, Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $user->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_PROPOSALS, TestPermissions::APPROVE_BUDGET] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $user, 'permissions' => $capability]);
     }
     $proposal = Proposal::factory()->for($company)->create();
     $otherProposal = Proposal::factory()->for($other)->create();

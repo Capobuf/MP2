@@ -5,12 +5,10 @@ use App\Actions\Proposals\PlanContract;
 use App\Actions\Proposals\PlanExpense;
 use App\Actions\Proposals\PlanProject;
 use App\Actions\Proposals\PlanProposalRelation;
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\ProposalActionReplay;
 use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalSourceSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\CostCenter;
@@ -22,6 +20,7 @@ use App\Models\ProposalItem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -31,10 +30,10 @@ function replayFixture(): array
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $actor = User::factory()->create();
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $actor->id,
-        'capability' => Capability::ManageProposals,
+        'user' => $actor,
+        'permissions' => TestPermissions::MANAGE_PROPOSALS,
     ]);
 
     return [$company, $exercise, $actor];

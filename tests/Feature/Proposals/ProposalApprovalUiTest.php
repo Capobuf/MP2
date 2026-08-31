@@ -1,12 +1,10 @@
 <?php
 
 use App\Actions\Proposals\InitializeProposal;
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Budgets\BudgetResource;
 use App\Filament\Resources\Proposals\Pages\ViewProposal;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\User;
@@ -16,6 +14,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -24,8 +23,8 @@ it('approves an aligned proposal with new evidence and redirects to budget', fun
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create();
     $user = User::factory()->create();
-    foreach ([Capability::View, Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $user->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_PROPOSALS, TestPermissions::APPROVE_BUDGET] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $user, 'permissions' => $capability]);
     }
     Expense::factory()->forExercise($exercise)->create();
     $proposal = app(InitializeProposal::class)->execute($user, $company, $exercise, (string) Str::uuid());
@@ -46,14 +45,14 @@ it('hides approval without capability and disables it when readiness is stale', 
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create();
     $manager = User::factory()->create();
-    foreach ([Capability::View, Capability::ManageProposals] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $manager->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_PROPOSALS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $manager, 'permissions' => $capability]);
     } $expense = Expense::factory()->forExercise($exercise)->create();
     $proposal = app(InitializeProposal::class)->execute($manager, $company, $exercise, (string) Str::uuid());
     $this->actingAs($manager);
     Filament::setTenant(($company)->tenantCompany);
     Livewire::test(ViewProposal::class, ['record' => $proposal->id])->assertActionHidden('approveBudget');
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $manager->id, 'capability' => Capability::ApproveBudget]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $manager, 'permissions' => TestPermissions::APPROVE_BUDGET]);
     $expense->increment('revision');
     Livewire::test(ViewProposal::class, ['record' => $proposal->id])->assertActionDisabled('approveBudget');
 });

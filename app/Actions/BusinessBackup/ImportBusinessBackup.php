@@ -3,7 +3,6 @@
 namespace App\Actions\BusinessBackup;
 
 use App\BusinessBackup\V1\BusinessBackupContract;
-use App\Domain\Company\Capability;
 use App\Domain\Company\TenantCompanyStatus;
 use App\Models\BusinessBackupImport;
 use App\Models\Company;
@@ -22,7 +21,7 @@ final class ImportBusinessBackup
      */
     public function execute(User $actor, array $package): Company
     {
-        if (! $actor->is_platform_admin) {
+        if (! $actor->hasRole('super_admin')) {
             throw new AuthorizationException('Solo un Platform Admin può importare un backup.');
         }
         $packageId = $package['manifest']['package_id'];
@@ -47,12 +46,6 @@ final class ImportBusinessBackup
                     'created_at' => $now, 'updated_at' => $now,
                 ]);
                 DB::table('tenant_companies')->insert(['company_id' => $companyId, 'status' => TenantCompanyStatus::Active->value, 'created_at' => $now, 'updated_at' => $now]);
-                foreach (Capability::cases() as $capability) {
-                    DB::table('company_capabilities')->insert([
-                        'company_id' => $companyId, 'user_id' => $actor->id, 'capability' => $capability->value, 'created_at' => $now,
-                    ]);
-                }
-
                 /** @var array<string, array<string, int>> $ids */
                 $ids = [];
                 $ids['company']['COM-0000000001'] = $companyId;

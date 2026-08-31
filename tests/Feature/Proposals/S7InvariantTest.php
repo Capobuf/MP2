@@ -5,11 +5,9 @@ use App\Actions\Proposals\CopyExpenseIntoProposal;
 use App\Actions\Proposals\InitializeProposal;
 use App\Actions\Proposals\RealignProposalItem;
 use App\Actions\Proposals\ReviewProposalReadiness;
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\ProposalRealignmentChoice;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -17,14 +15,15 @@ use App\Models\Proposal;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 function s7Actor(Company $company): User
 {
     $actor = User::factory()->create();
-    foreach ([Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::MANAGE_PROPOSALS, TestPermissions::APPROVE_BUDGET] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
 
     return $actor;

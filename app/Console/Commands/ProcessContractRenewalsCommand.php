@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Actions\Operations\ProcessContractRenewals;
-use App\Domain\Company\Capability;
 use App\Domain\Company\TenantCompanyStatus;
 use App\Models\Contract;
 use App\Models\User;
@@ -27,9 +26,10 @@ class ProcessContractRenewalsCommand extends Command
             ->orderBy('company_id')
             ->orderBy('id')
             ->each(function (Contract $contract) use ($process, &$failed): void {
-                $actor = User::query()->whereHas('capabilities', fn ($query) => $query
-                    ->where('company_id', $contract->company_id)
-                    ->where('capability', Capability::ManageOperations->value))
+                $actor = User::permission('Update:Contract')
+                    ->where(fn ($query) => $query
+                        ->where('company_id', $contract->company_id)
+                        ->orWhereHas('roles', fn ($query) => $query->where('name', 'super_admin')))
                     ->orderBy('id')->first();
                 if (! $actor instanceof User) {
                     $failed++;

@@ -3,10 +3,8 @@
 use App\Actions\Operations\CreateProjectContractLink;
 use App\Actions\Operations\SetProjectContractLinkArchived;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractExerciseClassification;
 use App\Models\CostCenter;
@@ -20,6 +18,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -27,8 +26,8 @@ function projectContractLinkContext(): array
 {
     $actor = User::factory()->create();
     $company = Company::factory()->create();
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
 
     return [$actor, $company, Project::factory()->for($company)->create(), Contract::factory()->for($company)->create()];

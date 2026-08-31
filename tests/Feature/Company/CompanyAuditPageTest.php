@@ -1,9 +1,7 @@
 <?php
 
 use App\Actions\CreateCompany;
-use App\Actions\SyncCompanyCapabilities;
 use App\Actions\UpdateCompanySettings;
-use App\Domain\Company\Capability;
 use App\Domain\Company\ClosingUnclassifiedPolicy;
 use App\Filament\Pages\CompanyAudit;
 use App\Models\AuditEvent;
@@ -11,6 +9,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -25,12 +24,19 @@ it('shows only current company events newest first with no mutation actions', fu
         'name' => 'Azienda B',
         'timezone' => 'Europe/Rome',
     ]);
-    app(SyncCompanyCapabilities::class)->execute(
-        $administrator,
-        $companyA,
-        $beneficiary,
-        [Capability::View],
-    );
+    grantTestPermissions([
+        'company_id' => $companyA->id,
+        'user' => $beneficiary,
+        'permissions' => TestPermissions::VIEW,
+    ]);
+    grantTestPermissions([
+        'company_id' => $companyA->id,
+        'user' => $administrator,
+        'permissions' => [
+            ...TestPermissions::VIEW,
+            ...TestPermissions::MANAGE_SETTINGS,
+        ],
+    ]);
     app(UpdateCompanySettings::class)->execute($administrator, $companyA, [
         'overspend_note_required' => true,
         'unclassified_closing_policy' => ClosingUnclassifiedPolicy::Blocking->value,
@@ -73,12 +79,11 @@ it('exposes audit to a company viewer but not an unrelated user', function () {
         'name' => 'Azienda',
         'timezone' => 'Europe/Rome',
     ]);
-    app(SyncCompanyCapabilities::class)->execute(
-        $administrator,
-        $company,
-        $viewer,
-        [Capability::View],
-    );
+    grantTestPermissions([
+        'company_id' => $company->id,
+        'user' => $viewer,
+        'permissions' => TestPermissions::VIEW,
+    ]);
 
     $this->actingAs($viewer);
     Filament::setTenant(($company)->tenantCompany);

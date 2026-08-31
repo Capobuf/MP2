@@ -4,10 +4,8 @@ use App\Actions\Closing\CloseExercise;
 use App\Actions\Closing\PrepareExerciseClosing;
 use App\Actions\Operations\ProcessContractRenewals;
 use App\Actions\Proposals\InitializeProposal;
-use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExerciseStatus;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\ContractLifecycleFact;
@@ -23,6 +21,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -32,8 +31,8 @@ it('prevents ordinary historical mutation after Closing', function (): void {
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::CloseExercise, Capability::ManageOperations, Capability::ManageProposals] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE, TestPermissions::MANAGE_OPERATIONS, TestPermissions::MANAGE_PROPOSALS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $source = Exercise::factory()->for($company)->create(['year' => 2025]);
     $destination = Exercise::factory()->for($company)->create(['year' => 2026]);
@@ -138,10 +137,10 @@ it('rejects moving Contract and Project facts out of Closed history', function (
 it('blocks ordinary non-renewal processing that would rewrite a Closed year', function (): void {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $actor->id,
-        'capability' => Capability::ManageOperations,
+        'user' => $actor,
+        'permissions' => TestPermissions::MANAGE_OPERATIONS,
     ]);
     $closed = Exercise::factory()->for($company)->create(['year' => 2025]);
     Exercise::factory()->for($company)->create(['year' => 2026]);

@@ -5,8 +5,6 @@ namespace App\Domain\Company;
 enum AuditEventType: string
 {
     case CompanyCreated = 'company_created';
-    case CapabilityAssigned = 'capability_assigned';
-    case CapabilityRevoked = 'capability_revoked';
     case SettingChanged = 'setting_changed';
     case SupplierCreated = 'supplier_created';
     case SupplierUpdated = 'supplier_updated';
@@ -98,8 +96,6 @@ enum AuditEventType: string
     {
         return match ($this) {
             self::CompanyCreated => 'Azienda creata',
-            self::CapabilityAssigned => 'Capacità assegnata',
-            self::CapabilityRevoked => 'Capacità revocata',
             self::SettingChanged => 'Impostazione modificata',
             self::SupplierCreated => 'Fornitore creato',
             self::SupplierUpdated => 'Fornitore modificato',

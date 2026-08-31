@@ -7,6 +7,7 @@ use App\Filament\Pages\Tenancy\RegisterCompany;
 use App\Filament\Pages\UserProfile;
 use App\Http\Middleware\EnsureTenantCompanyIsActive;
 use App\Models\TenantCompany;
+use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Enums\ThemeMode;
@@ -44,6 +45,12 @@ class AdminPanelProvider extends PanelProvider
             ->login()
             ->profile(null)
             ->userMenuItems([
+                Action::make('platform')
+                    ->label('Piattaforma')
+                    ->icon('heroicon-m-command-line')
+                    ->url(fn (): ?string => Filament::getPanel('platform')->getUrl())
+                    ->visible(fn (): bool => auth()->user() instanceof User
+                        && auth()->user()->hasRole('super_admin')),
                 'profile' => fn (Action $action): Action => $action
                     ->label('Profilo')
                     ->url(fn (): ?string => Filament::getTenant()
@@ -56,7 +63,6 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->tenant(TenantCompany::class, ownershipRelationship: 'tenantCompany')
             ->tenantRegistration(RegisterCompany::class)
-            ->tenantMenu(false)
             ->tenantMiddleware([
                 EnsureTenantCompanyIsActive::class,
             ], isPersistent: true)

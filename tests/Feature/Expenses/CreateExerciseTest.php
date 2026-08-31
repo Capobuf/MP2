@@ -2,27 +2,26 @@
 
 use App\Actions\Operations\CreateExercise;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Domain\Expenses\ExerciseStatus;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 function grantExerciseOperations(User $user, Company $company): void
 {
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $user->id,
-            'capability' => $capability,
+            'user' => $user,
+            'permissions' => $capability,
         ]);
     }
 }
@@ -47,17 +46,18 @@ it('creates an open exercise with one complete event and retries idempotently', 
 });
 
 it('allows multiple open years and same year in different companies but rejects a company duplicate', function () {
-    $actor = User::factory()->create();
+    $actorA = User::factory()->create();
+    $actorB = User::factory()->create();
     $companyA = Company::factory()->create();
     $companyB = Company::factory()->create();
-    grantExerciseOperations($actor, $companyA);
-    grantExerciseOperations($actor, $companyB);
+    grantExerciseOperations($actorA, $companyA);
+    grantExerciseOperations($actorB, $companyB);
 
-    app(CreateExercise::class)->execute($actor, $companyA, ['year' => 2026], (string) Str::uuid());
-    app(CreateExercise::class)->execute($actor, $companyA, ['year' => 2027], (string) Str::uuid());
-    app(CreateExercise::class)->execute($actor, $companyB, ['year' => 2026], (string) Str::uuid());
+    app(CreateExercise::class)->execute($actorA, $companyA, ['year' => 2026], (string) Str::uuid());
+    app(CreateExercise::class)->execute($actorA, $companyA, ['year' => 2027], (string) Str::uuid());
+    app(CreateExercise::class)->execute($actorB, $companyB, ['year' => 2026], (string) Str::uuid());
 
-    expect(fn () => app(CreateExercise::class)->execute($actor, $companyA, ['year' => 2026], (string) Str::uuid()))
+    expect(fn () => app(CreateExercise::class)->execute($actorA, $companyA, ['year' => 2026], (string) Str::uuid()))
         ->toThrow(ValidationException::class)
         ->and(Exercise::query()->count())->toBe(3)
         ->and(AuditEvent::query()->count())->toBe(3);

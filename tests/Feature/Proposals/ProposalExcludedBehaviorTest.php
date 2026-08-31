@@ -1,6 +1,5 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\BudgetPayloadGuard;
 use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalPurpose;
@@ -12,7 +11,6 @@ use App\Models\BudgetEvidence;
 use App\Models\BudgetSnapshot;
 use App\Models\BudgetSourceRow;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Proposal;
 use App\Models\ProposalAction;
@@ -23,6 +21,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -104,11 +103,11 @@ it('enforces one parallel Draft per company and Exercise at the database boundar
 it('does not expose carryover replacement closing forecast delete or export controls', function (): void {
     $viewer = User::factory()->create();
     $proposal = Proposal::factory()->create();
-    foreach ([Capability::View, Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_PROPOSALS, TestPermissions::APPROVE_BUDGET] as $capability) {
+        grantTestPermissions([
             'company_id' => $proposal->company_id,
-            'user_id' => $viewer->id,
-            'capability' => $capability,
+            'user' => $viewer,
+            'permissions' => $capability,
         ]);
     }
     $budget = BudgetSnapshot::factory()->for($proposal)->create();

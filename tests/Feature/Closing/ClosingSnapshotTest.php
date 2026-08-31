@@ -2,10 +2,8 @@
 
 use App\Actions\Closing\CloseExercise;
 use App\Actions\Closing\PrepareExerciseClosing;
-use App\Domain\Company\Capability;
 use App\Models\ClosingSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -18,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -27,8 +26,8 @@ it('materializes zero-net Actual presence autonomously and keeps Snapshot rows i
     CarbonImmutable::setTestNow('2026-08-23 12:00:00 Europe/Rome');
     $company = Company::factory()->create(['name' => 'Snapshot Company']);
     $actor = User::factory()->create();
-    foreach ([Capability::View, Capability::CloseExercise] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::CLOSE_EXERCISE] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $supplier = Supplier::factory()->for($company)->create(['legal_name' => 'Supplier at Closing']);
     $costCenter = CostCenter::factory()->for($company)->create(['name' => 'Cost Center at Closing']);

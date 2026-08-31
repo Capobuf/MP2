@@ -5,10 +5,8 @@ use App\Actions\Operations\UpdateExpenseLine;
 use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\InitializeProposal;
 use App\Actions\Proposals\PlanProject;
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\ProposalActionType;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -18,6 +16,7 @@ use App\Models\ProjectDeferral;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -50,7 +49,7 @@ it('adds received Carryover once to Project and Exercise allocation only', funct
 it('versions only touched Project Estimate lines and leaves no-ops at the same revision', function (): void {
     $actor = User::factory()->create();
     $company = Company::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageOperations]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_OPERATIONS]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $project = Project::factory()->for($company)->create(['initial_state' => 'open', 'initial_effective_date' => '2026-01-01']);
     $expense = Expense::factory()->forExercise($exercise)->for($project)->create();
@@ -70,8 +69,8 @@ it('versions only touched Project Estimate lines and leaves no-ops at the same r
 it('increments a Project Estimate line revision once when Proposal approval changes it', function (): void {
     $actor = User::factory()->create();
     $company = Company::factory()->create();
-    foreach ([Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::MANAGE_PROPOSALS, TestPermissions::APPROVE_BUDGET] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $project = Project::factory()->for($company)->create(['initial_state' => 'open', 'initial_effective_date' => '2026-01-01']);

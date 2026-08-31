@@ -3,7 +3,6 @@
 namespace App\Filament\Pages;
 
 use App\Actions\Reporting\BuildReport;
-use App\Domain\Company\Capability;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Reporting\ActualReference;
 use App\Domain\Reporting\ComparisonCategory;
@@ -23,6 +22,7 @@ use App\Models\Supplier;
 use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -39,6 +39,8 @@ use Livewire\Attributes\Url;
  */
 class Reports extends Page
 {
+    use HasPageShield;
+
     protected string $view = 'filament.pages.reports';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedChartBarSquare;
@@ -246,16 +248,6 @@ class Reports extends Page
         }
 
         $this->generate();
-    }
-
-    public static function canAccess(): bool
-    {
-        $user = auth()->user();
-        $tenant = Filament::getTenant();
-        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
-
-        return $user instanceof User && $company instanceof Company
-            && $user->hasCapability($company, Capability::View);
     }
 
     public function selectReport(string $kind): void

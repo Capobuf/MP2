@@ -1,16 +1,15 @@
 <?php
 
 use App\Actions\CreateCompany;
-use App\Domain\Company\Capability;
 use App\Domain\Company\TenantCompanyStatus;
 use App\Filament\Pages\Tenancy\RegisterCompany;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\TenantCompany;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -45,8 +44,7 @@ it('persists nothing when registration is abandoned before submission', function
         ->assertSet('tenant', null);
 
     expect(Company::query()->count())->toBe(0)
-        ->and(TenantCompany::query()->count())->toBe(0)
-        ->and(CompanyCapability::query()->count())->toBe(0);
+        ->and(TenantCompany::query()->count())->toBe(0);
 });
 
 it('hides company registration from ordinary users', function () {
@@ -68,10 +66,10 @@ it('rejects a guessed tenant URL outside the users view assignments', function (
         'timezone' => 'Europe/Rome',
     ]);
     $user = User::factory()->create();
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $companyA->id,
-        'user_id' => $user->id,
-        'capability' => Capability::View,
+        'user' => $user,
+        'permissions' => TestPermissions::VIEW,
     ]);
 
     $this->actingAs($user)
@@ -85,23 +83,20 @@ it('rejects a guessed tenant URL outside the users view assignments', function (
 
 it('removes an archived Tenant from selection and rejects its known operational URL', function (): void {
     $company = Company::factory()->create();
-    $activeCompany = Company::factory()->create();
     $user = User::factory()->create();
-    foreach ([$company, $activeCompany] as $visibleCompany) {
-        CompanyCapability::query()->create([
-            'company_id' => $visibleCompany->id,
-            'user_id' => $user->id,
-            'capability' => Capability::View,
-        ]);
-    }
+    grantTestPermissions([
+        'company_id' => $company->id,
+        'user' => $user,
+        'permissions' => TestPermissions::VIEW,
+    ]);
     $tenant = $company->tenantCompany;
     $tenant->update(['status' => TenantCompanyStatus::Archived]);
 
     expect($user->getTenants(Filament::getPanel('admin'))->modelKeys())
-        ->toBe([$activeCompany->id])
+        ->toBe([])
         ->and($user->canAccessTenant($tenant))->toBeFalse();
 
     $this->actingAs($user)
         ->get(Filament::getUrl($tenant))
-        ->assertNotFound();
+        ->assertForbidden();
 });

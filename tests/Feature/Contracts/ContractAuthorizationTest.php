@@ -2,11 +2,9 @@
 
 use App\Actions\Operations\UpdateContractRenewal;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Models\Attachment;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\ContractRenewalConfiguration;
@@ -16,6 +14,7 @@ use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -23,11 +22,11 @@ it('maps Contract reads and mutations to exact-company capabilities', function (
     $user = User::factory()->create();
     $companyA = Company::factory()->create();
     $companyB = Company::factory()->create();
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions([
             'company_id' => $companyA->id,
-            'user_id' => $user->id,
-            'capability' => $capability,
+            'user' => $user,
+            'permissions' => $capability,
         ]);
     }
 

@@ -9,16 +9,18 @@ use App\Models\Company;
 use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 final class BusinessDataBackup extends Page
 {
+    use HasPageShield;
+
     protected string $view = 'filament.pages.business-data-backup';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCircleStack;
@@ -36,15 +38,6 @@ final class BusinessDataBackup extends Page
         abort_unless(self::canAccess(), 403);
     }
 
-    public static function canAccess(): bool
-    {
-        $user = auth()->user();
-        $tenant = Filament::getTenant();
-        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
-
-        return $user instanceof User && $company instanceof Company && Gate::forUser($user)->allows('view', $company);
-    }
-
     /** @return array<Action> */
     protected function getHeaderActions(): array
     {
@@ -54,7 +47,7 @@ final class BusinessDataBackup extends Page
                 ->icon(Heroicon::OutlinedArrowUpTray)
                 ->color('gray')
                 ->url(ImportCompanyBackup::getUrl(panel: 'platform'))
-                ->visible(fn (): bool => $this->actor()->is_platform_admin),
+                ->visible(fn (): bool => $this->actor()->hasRole('super_admin')),
             Action::make('download')
                 ->label('Scarica XLSX')
                 ->icon(Heroicon::OutlinedArrowDownTray)

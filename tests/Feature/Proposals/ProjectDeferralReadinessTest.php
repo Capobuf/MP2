@@ -5,14 +5,12 @@ use App\Actions\Proposals\PlanProject;
 use App\Actions\Proposals\PlanProjectDeferral;
 use App\Actions\Proposals\RealignProposalItem;
 use App\Actions\Proposals\ReviewProposalReadiness;
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalImpactPlan;
 use App\Domain\Proposals\ProposalReadiness;
 use App\Domain\Proposals\ProposalReadinessReason;
 use App\Domain\Proposals\ProposalRealignmentChoice;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -22,6 +20,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -29,7 +28,7 @@ function readinessDeferralFixture(): array
 {
     $actor = User::factory()->create();
     $company = Company::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $source = Exercise::factory()->for($company)->create(['year' => 2026]);
     $destination = Exercise::factory()->for($company)->create(['year' => 2027]);
     $project = Project::factory()->for($company)->create(['initial_state' => 'open', 'initial_effective_date' => '2026-01-01']);
@@ -149,7 +148,7 @@ it('uses the resulting planned source-year terminal state', function (): void {
 it('includes a Project automatically when its only annual value is received Carryover', function (): void {
     $actor = User::factory()->create();
     $company = Company::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $source = Exercise::factory()->for($company)->create(['year' => 2026]);
     $destination = Exercise::factory()->for($company)->create(['year' => 2027]);
     $project = Project::factory()->for($company)->create([

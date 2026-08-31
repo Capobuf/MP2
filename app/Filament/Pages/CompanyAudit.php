@@ -3,7 +3,6 @@
 namespace App\Filament\Pages;
 
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Domain\Company\ClosingUnclassifiedPolicy;
 use App\Domain\Company\Setting;
 use App\Domain\Projects\ProjectDeferralMode;
@@ -31,6 +30,7 @@ use App\Models\SupplierContact;
 use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -44,10 +44,10 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Gate;
 
 class CompanyAudit extends Page implements HasTable
 {
+    use HasPageShield;
     use InteractsWithTable;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClock;
@@ -98,17 +98,6 @@ class CompanyAudit extends Page implements HasTable
         $this->proposal = $requestedProposal > 0 && Proposal::query()->where('company_id', $this->company()->id)->whereKey($requestedProposal)->exists() ? $requestedProposal : null;
         $requestedBudget = request()->integer('budget');
         $this->budget = $requestedBudget > 0 && BudgetSnapshot::query()->where('company_id', $this->company()->id)->whereKey($requestedBudget)->exists() ? $requestedBudget : null;
-    }
-
-    public static function canAccess(): bool
-    {
-        $user = auth()->user();
-        $tenant = Filament::getTenant();
-        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
-
-        return $user instanceof User
-            && $company instanceof Company
-            && Gate::forUser($user)->allows('view', $company);
     }
 
     public function table(Table $table): Table
@@ -170,13 +159,6 @@ class CompanyAudit extends Page implements HasTable
                     ->placeholder('—'),
                 TextColumn::make('beneficiary.email')->label('Beneficiario')->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('capability')
-                    ->label('Capacità')
-                    ->formatStateUsing(fn (mixed $state): string => match (true) {
-                        $state instanceof Capability => $state->label(),
-                        is_string($state) => Capability::from($state)->label(),
-                        default => '—',
-                    })->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('setting')
                     ->label('Impostazione')
                     ->formatStateUsing(fn (mixed $state): string => match (true) {

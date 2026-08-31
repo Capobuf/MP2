@@ -4,14 +4,12 @@ use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\InitializeProposal;
 use App\Actions\Proposals\PlanContract;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalImpactPlan;
 use App\Domain\Proposals\ProposalReadiness;
 use App\Models\AuditEvent;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\Exercise;
@@ -23,6 +21,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -34,7 +33,7 @@ it('does not erase a Project allocation outside the Proposal main Exercise', fun
     $exercise2026 = Exercise::factory()->for($company)->create(['year' => 2026]);
     $exercise2028 = Exercise::factory()->for($company)->create(['year' => 2028]);
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $project = Project::factory()->for($company)->create(['initial_state' => 'open', 'initial_effective_date' => '2026-01-01']);
     $expense = Expense::factory()->forExercise($exercise2026)->for($project)->create();
     ExpenseLine::factory()->for($expense)->create(['type' => 'estimate', 'amount' => '25.00']);
@@ -52,8 +51,8 @@ it('enumerates exact multi-Exercise Contract impacts unchanged Budgets stale Dra
     $exercise2026 = Exercise::factory()->for($company)->create(['year' => 2026]);
     $exercise2027 = Exercise::factory()->for($company)->create(['year' => 2027]);
     $actor = User::factory()->create();
-    foreach ([Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::MANAGE_PROPOSALS, TestPermissions::APPROVE_BUDGET] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $contract = Contract::factory()->for($company)->create([
         'contractual_start_date' => '2026-01-01', 'next_expiry_date' => null, 'renewal_anchor_date' => null,
@@ -99,8 +98,8 @@ it('applies the approved Contract allocation to every affected open Exercise', f
     $exercise2026 = Exercise::factory()->for($company)->create(['year' => 2026]);
     $exercise2027 = Exercise::factory()->for($company)->create(['year' => 2027]);
     $actor = User::factory()->create();
-    foreach ([Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::MANAGE_PROPOSALS, TestPermissions::APPROVE_BUDGET] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $contract = Contract::factory()->for($company)->create([
         'contractual_start_date' => '2026-01-01', 'next_expiry_date' => null, 'renewal_anchor_date' => null,

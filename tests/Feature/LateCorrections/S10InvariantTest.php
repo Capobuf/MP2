@@ -2,9 +2,7 @@
 
 use App\Actions\LateCorrections\RecordHistoricalErrorAnnotation;
 use App\Actions\LateCorrections\RecordLateCorrection;
-use App\Domain\Company\Capability;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -16,6 +14,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -24,10 +23,10 @@ function s10InvariantFixture(): array
 {
     $company = Company::factory()->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create([
+    grantTestPermissions([
         'company_id' => $company->id,
-        'user_id' => $actor->id,
-        'capability' => Capability::CorrectClosedExercise,
+        'user' => $actor,
+        'permissions' => TestPermissions::CORRECT_CLOSED_EXERCISE,
     ]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $nextExercise = Exercise::factory()->for($company)->create(['year' => 2026]);

@@ -9,26 +9,25 @@ use App\Actions\MasterData\SetSupplierArchived;
 use App\Actions\MasterData\UpdateSupplier;
 use App\Actions\MasterData\UpdateSupplierContact;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Filament\Pages\CompanyAudit;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 function grantMasterDataAuditCapabilities(User $user, Company $company): void
 {
-    foreach ([Capability::View, Capability::ManageMasterData] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_MASTER_DATA] as $capability) {
+        grantTestPermissions([
             'company_id' => $company->id,
-            'user_id' => $user->id,
-            'capability' => $capability,
+            'user' => $user,
+            'permissions' => $capability,
         ]);
     }
 }
@@ -107,10 +106,11 @@ it('records every S2 event with a complete immutable operation envelope', functi
 
 it('renders S2 history newest first in Italian and only for the current company', function () {
     $actor = User::factory()->create(['name' => 'Autore Audit']);
+    $otherActor = User::factory()->create();
     $companyA = Company::factory()->create(['timezone' => 'Europe/Rome']);
     $companyB = Company::factory()->create(['timezone' => 'Europe/Rome']);
     grantMasterDataAuditCapabilities($actor, $companyA);
-    grantMasterDataAuditCapabilities($actor, $companyB);
+    grantMasterDataAuditCapabilities($otherActor, $companyB);
     $supplier = app(CreateSupplier::class)->execute($actor, $companyA, [
         'legal_name' => 'Fornitore Timeline',
         'vat_number' => null,
@@ -121,7 +121,7 @@ it('renders S2 history newest first in Italian and only for the current company'
         'vat_number' => null,
         'notes' => null,
     ], (string) Str::uuid());
-    app(CreateSupplier::class)->execute($actor, $companyB, [
+    app(CreateSupplier::class)->execute($otherActor, $companyB, [
         'legal_name' => 'Segreto altra Azienda',
         'vat_number' => null,
         'notes' => null,

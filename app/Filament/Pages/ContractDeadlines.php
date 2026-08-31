@@ -2,7 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use App\Domain\Company\Capability;
 use App\Domain\Contracts\ContractDeadline;
 use App\Domain\Contracts\ContractState;
 use App\Filament\Resources\Contracts\ContractResource;
@@ -13,9 +12,9 @@ use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Supplier;
 use App\Models\TenantCompany;
-use App\Models\User;
 use App\Support\ExerciseContext;
 use BackedEnum;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
@@ -33,6 +32,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class ContractDeadlines extends Page implements HasTable
 {
+    use HasPageShield;
     use InteractsWithTable;
 
     protected string $view = 'filament.pages.contract-deadlines';
@@ -49,16 +49,6 @@ class ContractDeadlines extends Page implements HasTable
 
     /** @var array<int, ContractDeadline> */
     protected array $deadlineCache = [];
-
-    public static function canAccess(): bool
-    {
-        $user = auth()->user();
-        $tenant = Filament::getTenant();
-        $company = $tenant instanceof TenantCompany ? $tenant->company : null;
-
-        return $user instanceof User && $company instanceof Company
-            && $user->hasCapability($company, Capability::View);
-    }
 
     public function table(Table $table): Table
     {

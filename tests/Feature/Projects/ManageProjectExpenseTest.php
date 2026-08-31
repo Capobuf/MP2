@@ -5,11 +5,9 @@ use App\Actions\Operations\SetExpenseLineActive;
 use App\Actions\Operations\SetExpenseReversed;
 use App\Actions\Operations\UpdateExpense;
 use App\Actions\Operations\UpdateExpenseLine;
-use App\Domain\Company\Capability;
 use App\Domain\Projects\ProjectState;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -19,6 +17,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -34,8 +33,8 @@ function manageableProjectExpense(ProjectState $state = ProjectState::Open, bool
 {
     $actor = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome', 'overspend_note_required' => $noteRequired]);
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $project = Project::factory()->for($company)->create(['initial_state' => $state, 'initial_effective_date' => '2026-01-01']);

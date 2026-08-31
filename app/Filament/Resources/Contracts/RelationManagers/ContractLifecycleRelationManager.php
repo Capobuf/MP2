@@ -7,7 +7,6 @@ use App\Actions\Operations\CancelContract;
 use App\Actions\Operations\CeaseContract;
 use App\Actions\Operations\ReactivateContract;
 use App\Actions\Operations\ReplaceContractLifecycleFact;
-use App\Domain\Company\Capability;
 use App\Domain\Contracts\ContractAttributionMode;
 use App\Domain\Contracts\ContractCycleType;
 use App\Filament\Forms\DecimalInput;
@@ -110,6 +109,6 @@ class ContractLifecycleRelationManager extends RelationManager
         $contract = $this->getOwnerRecord();
 
         return $actor instanceof User && $contract instanceof Contract && ! $contract->isArchived()
-            && $actor->hasCapability($contract->company, Capability::ManageOperations);
+            && $actor->can('update', $contract);
     }
 }

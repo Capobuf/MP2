@@ -16,11 +16,12 @@ use RelayerCore\LaravelInstaller\Services\StepManager;
 uses(RefreshDatabase::class);
 
 it('promotes the native installer user to platform administrator', function () {
-    $user = User::factory()->create(['is_platform_admin' => false]);
+    $user = User::factory()->create();
 
     app(PromotePlatformAdmin::class)($user);
 
-    expect($user->refresh()->is_platform_admin)->toBeTrue();
+    expect($user->refresh()->hasRole('super_admin'))->toBeTrue()
+        ->and($user->company_id)->toBeNull();
 });
 
 it('keeps the native password validation without advertising an invented policy', function () {

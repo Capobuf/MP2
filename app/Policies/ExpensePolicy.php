@@ -2,38 +2,48 @@
 
 namespace App\Policies;
 
-use App\Domain\Company\Capability;
 use App\Models\Company;
 use App\Models\Expense;
+use App\Models\TenantCompany;
 use App\Models\User;
 
 class ExpensePolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->capabilities()->where('capability', Capability::View->value)->exists();
+        return $user->can('ViewAny:Expense');
     }
 
     public function view(User $user, Expense $expense): bool
     {
-        return $user->hasCapability($expense->company, Capability::View);
+        return $this->canUse($user, $expense->company, 'View:Expense');
     }
 
     public function create(User $user, ?Company $company = null): bool
     {
-        return $company === null
-            ? $user->capabilities()->where('capability', Capability::ManageOperations->value)->exists()
-            : $user->hasCapability($company, Capability::ManageOperations);
+        return $user->can('Create:Expense')
+            && ($company === null || $this->canAccess($user, $company));
     }
 
     public function update(User $user, Expense $expense): bool
     {
         return $expense->exercise->isOpen()
-            && $user->hasCapability($expense->company, Capability::ManageOperations);
+            && $this->canUse($user, $expense->company, 'Update:Expense');
     }
 
     public function delete(User $user, Expense $expense): bool
     {
         return false;
+    }
+
+    private function canUse(User $user, Company $company, string $permission): bool
+    {
+        return $this->canAccess($user, $company) && $user->can($permission);
+    }
+
+    private function canAccess(User $user, Company $company): bool
+    {
+        return $company->tenantCompany instanceof TenantCompany
+            && $user->canAccessTenant($company->tenantCompany);
     }
 }

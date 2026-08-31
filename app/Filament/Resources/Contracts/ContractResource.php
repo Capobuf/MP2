@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Contracts;
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Contracts\Pages\CreateContract;
 use App\Filament\Resources\Contracts\Pages\EditContract;
 use App\Filament\Resources\Contracts\Pages\ListContracts;
@@ -71,7 +70,7 @@ class ContractResource extends Resource
         $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
-            && $user->hasCapability($company, Capability::View);
+            && $user->can('viewAny', Contract::class);
     }
 
     /** @return Builder<Contract> */
@@ -96,7 +95,7 @@ class ContractResource extends Resource
         $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
-            && $user->hasCapability($company, Capability::ManageOperations);
+            && $user->can('create', [Contract::class, $company]);
     }
 
     public static function canView(Model $record): bool

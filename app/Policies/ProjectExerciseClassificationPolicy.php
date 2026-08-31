@@ -2,31 +2,39 @@
 
 namespace App\Policies;
 
-use App\Domain\Company\Capability;
+use App\Models\Company;
 use App\Models\Project;
 use App\Models\ProjectExerciseClassification;
+use App\Models\TenantCompany;
 use App\Models\User;
 
 class ProjectExerciseClassificationPolicy
 {
     public function view(User $user, ProjectExerciseClassification $classification): bool
     {
-        return $user->hasCapability($classification->project->company, Capability::View);
+        return $this->canUse($user, $classification->project->company, 'View:Project');
     }
 
     public function create(User $user, Project $project): bool
     {
-        return $user->hasCapability($project->company, Capability::ManageOperations);
+        return $this->canUse($user, $project->company, 'Update:Project');
     }
 
     public function update(User $user, ProjectExerciseClassification $classification): bool
     {
         return $classification->exercise->isOpen()
-            && $user->hasCapability($classification->project->company, Capability::ManageOperations);
+            && $this->canUse($user, $classification->project->company, 'Update:Project');
     }
 
     public function delete(User $user, ProjectExerciseClassification $classification): bool
     {
         return false;
+    }
+
+    private function canUse(User $user, Company $company, string $permission): bool
+    {
+        return $company->tenantCompany instanceof TenantCompany
+            && $user->canAccessTenant($company->tenantCompany)
+            && $user->can($permission);
     }
 }

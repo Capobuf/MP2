@@ -1,14 +1,13 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Exercise;
 use App\Models\Project;
 use App\Models\ProjectExerciseClassification;
 use App\Models\ProjectTransition;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -16,11 +15,11 @@ it('maps S4 reads and mutations to the exact company capabilities', function () 
     $user = User::factory()->create();
     $companyA = Company::factory()->create();
     $companyB = Company::factory()->create();
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create([
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions([
             'company_id' => $companyA->id,
-            'user_id' => $user->id,
-            'capability' => $capability,
+            'user' => $user,
+            'permissions' => $capability,
         ]);
     }
     $projectA = Project::factory()->for($companyA)->create();

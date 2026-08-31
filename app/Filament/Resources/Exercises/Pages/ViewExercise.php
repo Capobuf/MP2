@@ -6,7 +6,6 @@ use App\Actions\LateCorrections\RecordHistoricalErrorAnnotation;
 use App\Actions\LateCorrections\RecordLateCorrection;
 use App\Actions\Operations\UploadAttachment;
 use App\Actions\Proposals\InitializeProposal;
-use App\Domain\Company\Capability;
 use App\Domain\LateCorrections\HistoricalCorrectionSource;
 use App\Domain\LateCorrections\HistoricalErrorKind;
 use App\Domain\LateCorrections\HistoricalExpenseCompatibility;
@@ -299,7 +298,9 @@ class ViewExercise extends ViewRecord
         $tenant = Filament::getTenant();
         $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
-        return $actor instanceof User && $company instanceof Company && $actor->hasCapability($company, Capability::ManageProposals);
+        return $actor instanceof User
+            && $company instanceof Company
+            && $actor->can('create', [Proposal::class, $company]);
     }
 
     private function canCloseExercise(): bool
@@ -311,7 +312,7 @@ class ViewExercise extends ViewRecord
         return $this->exerciseRecord()->isOpen()
             && $actor instanceof User
             && $company instanceof Company
-            && $actor->hasCapability($company, Capability::CloseExercise);
+            && $actor->can('close', $this->exerciseRecord());
     }
 
     private function proposalDisabledReason(): ?string

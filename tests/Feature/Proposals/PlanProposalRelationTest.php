@@ -4,10 +4,8 @@ use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\InitializeProposal;
 use App\Actions\Proposals\PlanProposalRelation;
 use App\Domain\Company\AuditEventType;
-use App\Domain\Company\Capability;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\Exercise;
@@ -19,13 +17,14 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 it('records one idempotent economic-neutral link and rejects duplicates', function (): void {
     $proposal = Proposal::factory()->create();
     $user = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $proposal->company_id, 'user_id' => $user->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $proposal->company_id, 'user' => $user, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $project = ProposalItem::factory()->for($proposal)->create(['company_id' => $proposal->company_id, 'source_type' => 'project']);
     $contract = ProposalItem::factory()->for($proposal)->create(['company_id' => $proposal->company_id, 'source_type' => 'contract']);
     $payload = ['project_item_id' => $project->proposal_item_id, 'contract_item_id' => $contract->proposal_item_id];
@@ -40,8 +39,8 @@ it('restores the existing archived live link on approval and records its typed e
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $user = User::factory()->create();
-    foreach ([Capability::ManageProposals, Capability::ApproveBudget] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $user->id, 'capability' => $capability]);
+    foreach ([TestPermissions::MANAGE_PROPOSALS, TestPermissions::APPROVE_BUDGET] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $user, 'permissions' => $capability]);
     }
     $project = Project::factory()->for($company)->create(['initial_state' => 'open', 'initial_effective_date' => '2025-01-01']);
     $contract = Contract::factory()->for($company)->create(['contractual_start_date' => '2025-01-01', 'next_expiry_date' => null, 'renewal_anchor_date' => null]);

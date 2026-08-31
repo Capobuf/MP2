@@ -24,6 +24,12 @@ class TenantCompany extends Model implements HasName
         return $this->belongsTo(Company::class, 'company_id');
     }
 
+    /** @return HasMany<User, $this> */
+    public function users(): HasMany
+    {
+        return $this->hasMany(User::class, 'company_id', 'company_id');
+    }
+
     /** @return HasMany<BudgetSnapshot, $this> */
     public function budgetSnapshots(): HasMany
     {

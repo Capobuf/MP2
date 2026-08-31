@@ -1,6 +1,5 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Contracts\ContractResource;
 use App\Filament\Resources\Contracts\Pages\ViewContract;
 use App\Filament\Resources\Contracts\RelationManagers\ContractExpensesRelationManager;
@@ -8,7 +7,6 @@ use App\Filament\Resources\Expenses\Pages\CreateExpense;
 use App\Filament\Resources\Expenses\Pages\ViewExpense;
 use App\Filament\Resources\Expenses\RelationManagers\ExpenseLinesRelationManager;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -18,14 +16,15 @@ use App\Support\ExerciseContext;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
 it('shows Contract Actuals and creation only to operators while system Estimates remain read only', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $manager->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $manager, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create();
     $contract = Contract::factory()->for($company)->create();
@@ -56,8 +55,8 @@ it('shows Contract Actuals and creation only to operators while system Estimates
 it('exposes Contract declarations on manual Lines and no mutation on generated Estimate Lines', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
-    foreach ([Capability::View, Capability::ManageOperations] as $capability) {
-        CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $manager->id, 'capability' => $capability]);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $manager, 'permissions' => $capability]);
     }
     $exercise = Exercise::factory()->for($company)->create();
     $contract = Contract::factory()->for($company)->create();
@@ -83,7 +82,7 @@ it('exposes Contract declarations on manual Lines and no mutation on generated E
 it('hides Contract Actual creation from a read-only viewer', function () {
     $viewer = User::factory()->create();
     $company = Company::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $viewer->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $viewer, 'permissions' => TestPermissions::VIEW]);
     $contract = Contract::factory()->for($company)->create();
     $this->actingAs($viewer);
     Filament::setTenant(($company)->tenantCompany);

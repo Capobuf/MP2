@@ -54,7 +54,7 @@ final class ImportCompanyBackup extends Page
     {
         $user = auth()->user();
 
-        return $user instanceof User && $user->is_platform_admin;
+        return $user instanceof User && $user->hasRole('super_admin');
     }
 
     public function form(Schema $schema): Schema

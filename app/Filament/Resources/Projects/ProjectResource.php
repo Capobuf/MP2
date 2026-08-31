@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Projects;
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Projects\Pages\CreateProject;
 use App\Filament\Resources\Projects\Pages\EditProject;
 use App\Filament\Resources\Projects\Pages\ListProjects;
@@ -67,7 +66,7 @@ class ProjectResource extends Resource
         $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
-            && $user->hasCapability($company, Capability::View);
+            && $user->can('viewAny', Project::class);
     }
 
     /** @return Builder<Project> */
@@ -93,7 +92,7 @@ class ProjectResource extends Resource
         $company = $tenant instanceof TenantCompany ? $tenant->company : null;
 
         return $user instanceof User && $company instanceof Company
-            && $user->hasCapability($company, Capability::ManageOperations);
+            && $user->can('create', [Project::class, $company]);
     }
 
     public static function canView(Model $record): bool

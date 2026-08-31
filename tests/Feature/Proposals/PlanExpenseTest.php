@@ -3,11 +3,9 @@
 use App\Actions\Proposals\InitializeProposal;
 use App\Actions\Proposals\PlanExpense;
 use App\Actions\Proposals\PlanProject;
-use App\Domain\Company\Capability;
 use App\Domain\Proposals\ProposalActionType;
 use App\Models\AuditEvent;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -18,6 +16,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -25,7 +24,7 @@ it('plans expense estimates idempotently without touching live lines', function 
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $expense = Expense::factory()->forExercise($exercise)->create();
     $line = ExpenseLine::factory()->for($expense)->create(['type' => 'estimate', 'amount' => '5.00']);
     $proposal = app(InitializeProposal::class)->execute($actor, $company, $exercise, (string) Str::uuid());
@@ -48,7 +47,7 @@ it('validates the complete no-Actual ownership supplier classification and lifec
     $exercise = Exercise::factory()->for($company)->create();
     $otherExercise = Exercise::factory()->for($company)->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $expense = Expense::factory()->forExercise($exercise)->create();
     ExpenseLine::factory()->for($expense)->create(['type' => 'estimate', 'amount' => '5.00']);
     $project = Project::factory()->for($company)->create(['initial_state' => 'planned', 'initial_effective_date' => $exercise->year.'-01-01']);
@@ -79,7 +78,7 @@ it('represents Estimate annul restore zero and residual repositioning without to
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $expense = Expense::factory()->forExercise($exercise)->create();
     $estimate = ExpenseLine::factory()->for($expense)->create(['type' => 'estimate', 'amount' => '9.00']);
     $actual = ExpenseLine::factory()->for($expense)->create(['type' => 'actual', 'amount' => '4.00']);
@@ -105,7 +104,7 @@ it('rejects moving or reversing an expense containing actuals', function (): voi
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create();
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $expense = Expense::factory()->forExercise($exercise)->create();
     ExpenseLine::factory()->for($expense)->create(['type' => 'actual', 'amount' => '1.00']);
     $proposal = app(InitializeProposal::class)->execute($actor, $company, $exercise, (string) Str::uuid());
@@ -116,7 +115,7 @@ it('rejects an expense assigned to a same-Proposal Project not yet effective in 
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $actor = User::factory()->create();
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $actor->id, 'capability' => Capability::ManageProposals]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $proposal = app(InitializeProposal::class)->execute($actor, $company, $exercise, (string) Str::uuid());
     $projectAction = app(PlanProject::class)->create($actor, $proposal, [
         'title' => 'Progetto futuro', 'description' => null, 'notes' => null, 'initial_state' => 'planned',

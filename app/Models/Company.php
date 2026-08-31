@@ -23,10 +23,10 @@ class Company extends Model implements HasName
         return $this->hasOne(TenantCompany::class, 'company_id');
     }
 
-    /** @return HasMany<CompanyCapability, $this> */
-    public function capabilities(): HasMany
+    /** @return HasMany<User, $this> */
+    public function users(): HasMany
     {
-        return $this->hasMany(CompanyCapability::class);
+        return $this->hasMany(User::class);
     }
 
     /** @return HasMany<AuditEvent, $this> */

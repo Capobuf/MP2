@@ -1,10 +1,8 @@
 <?php
 
-use App\Domain\Company\Capability;
 use App\Filament\Resources\Contracts\Pages\ViewContract;
 use App\Filament\Resources\Contracts\RelationManagers\ContractAnnualSituationsRelationManager;
 use App\Models\Company;
-use App\Models\CompanyCapability;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\ContractExerciseClassification;
@@ -16,6 +14,7 @@ use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
@@ -23,7 +22,7 @@ it('shows exact annual composition without generated estimate mutation controls'
     CarbonImmutable::setTestNow('2026-08-20 10:00:00 Europe/Rome');
     $viewer = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
-    CompanyCapability::query()->create(['company_id' => $company->id, 'user_id' => $viewer->id, 'capability' => Capability::View]);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $viewer, 'permissions' => TestPermissions::VIEW]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $supplier = Supplier::factory()->for($company)->create();
     $contract = Contract::factory()->for($company)->for($supplier)->create(['next_expiry_date' => null, 'renewal_anchor_date' => null]);
