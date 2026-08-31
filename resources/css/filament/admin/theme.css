@@ -591,12 +591,115 @@ html.fi {
 .fi-fo-checkbox-list,
 .fi-fo-radio {
     border-color: var(--border-strong);
-    background: var(--surface);
+    background-color: var(--surface);
     color: var(--text-primary);
 }
 
 .fi-input::placeholder,
 .fi-textarea::placeholder {
+    color: var(--text-muted);
+}
+
+.mp2-closing-frame,
+.mp2-closing-muted {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+}
+
+.mp2-closing-muted,
+.mp2-closing-badge {
+    background: var(--surface-muted);
+}
+
+.mp2-closing-badge {
+    display: inline-flex;
+    border-radius: 999px;
+    padding: 4px 10px;
+    color: var(--text-secondary);
+}
+
+.mp2-closing-row {
+    border-color: var(--border);
+}
+
+.mp2-closing-select {
+    position: relative;
+    width: 100%;
+}
+
+.mp2-closing-select .fi-dropdown-trigger {
+    width: 100%;
+}
+
+.mp2-closing-select-trigger {
+    display: flex;
+    width: 100%;
+    min-height: 36px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background-color: var(--surface);
+    padding: 6px 10px 6px 12px;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    text-align: start;
+}
+
+.mp2-closing-select-trigger > .fi-icon {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    color: var(--text-muted);
+}
+
+.mp2-closing-select-trigger:focus-visible {
+    outline: 2px solid var(--mp2-focus);
+    outline-offset: 2px;
+}
+
+.mp2-closing-select-trigger:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.mp2-closing-select .fi-dropdown-panel {
+    width: 100% !important;
+    max-width: none !important;
+}
+
+.mp2-closing-select .fi-dropdown-list-item.fi-selected {
+    background: var(--primary-soft) !important;
+}
+
+.mp2-closing-select .fi-dropdown-list-item.fi-selected .fi-dropdown-list-item-label {
+    color: var(--primary) !important;
+    font-weight: 600;
+}
+
+.mp2-closing-textarea {
+    overflow: hidden;
+}
+
+.mp2-closing-textarea-input {
+    display: block;
+    width: 100%;
+    min-height: 4.5rem;
+    resize: vertical;
+    border: 0;
+    background: transparent;
+    padding: 8px 12px;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    outline: none;
+}
+
+.mp2-closing-textarea-input::placeholder {
     color: var(--text-muted);
 }
 

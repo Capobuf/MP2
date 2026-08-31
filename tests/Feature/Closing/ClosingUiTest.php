@@ -48,6 +48,8 @@ it('shows the Closing action only to an authorized user and renders the transien
     Livewire::test(CloseExercisePage::class, ['record' => $exercise->id])
         ->assertSuccessful()
         ->assertSee('Chiusura Esercizio 2025')
+        ->assertSeeHtml('class="mp2-closing-page space-y-6"')
+        ->assertSeeHtml('class="fi-section border p-6"')
         ->assertSee('L’Esercizio non potrà essere riaperto')
         ->assertSee('Crea N+1')
         ->assertSee('Non creare N+1')
@@ -159,6 +161,9 @@ it('confirms a newly reviewed Closing-time Reprogramming without changing its fi
     Filament::setTenant(($company)->tenantCompany);
 
     $component = Livewire::test(CloseExercisePage::class, ['record' => $exercise->id])
+        ->assertSeeHtml('class="mp2-closing-select-trigger"')
+        ->assertSeeHtml('role="listbox"')
+        ->assertSeeHtml('class="mp2-closing-textarea-input"')
         ->set('closing.create_next_exercise', true)
         ->set("closing.projects.{$project->id}.mode", 'reprogramming')
         ->set("closing.projects.{$project->id}.reason", 'Riprogrammazione finale')
