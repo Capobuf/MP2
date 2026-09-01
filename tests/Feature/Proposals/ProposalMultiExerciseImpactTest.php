@@ -12,12 +12,16 @@ use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
+
+beforeEach(fn () => CarbonImmutable::setTestNow('2026-08-21 10:00:00 Europe/Rome'));
+afterEach(fn () => CarbonImmutable::setTestNow());
 
 it('rejects a Proposal that would rewrite Contract conditions in a Closed year', function (): void {
     $company = Company::factory()->create();
