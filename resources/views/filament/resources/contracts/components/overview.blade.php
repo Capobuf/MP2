@@ -6,8 +6,8 @@
                     <x-filament::icon icon="heroicon-o-document-text" />
                 </span>
                 <div>
-                    <p class="mp2-object-eyebrow">Accordo corrente</p>
-                    <h2 id="contract-agreement-title">Accordo attuale</h2>
+                    <p class="mp2-object-eyebrow">Accordo Corrente</p>
+                    <h2 id="contract-agreement-title">Accordo Attuale</h2>
                 </div>
             </div>
 
@@ -50,15 +50,15 @@
             <div class="mp2-contract-terms">
                 <div class="mp2-contract-subheading">
                     <x-filament::icon icon="heroicon-o-shield-check" aria-hidden="true" />
-                    <h3>Termini contrattuali</h3>
+                    <h3>Termini Contrattuali</h3>
                 </div>
                 <dl>
                     <div>
-                        <dt>Rinnovo automatico</dt>
+                        <dt>Rinnovo Automatico</dt>
                         <dd>{{ $overview['terms']['automatic_renewal'] }}</dd>
                     </div>
                     <div>
-                        <dt>Durata rinnovo</dt>
+                        <dt>Durata Rinnovo</dt>
                         <dd>{{ $overview['terms']['renewal_duration'] }}</dd>
                     </div>
                     <div>
@@ -75,8 +75,8 @@
                     <x-filament::icon icon="heroicon-o-chart-bar-square" />
                 </span>
                 <div>
-                    <p class="mp2-object-eyebrow">Contesto globale</p>
-                    <h2 id="contract-current-exercise-title">Situazione Esercizio corrente</h2>
+                    <p class="mp2-object-eyebrow">Contesto Globale</p>
+                    <h2 id="contract-current-exercise-title">Situazione Esercizio Corrente</h2>
                 </div>
             </div>
 
@@ -87,11 +87,11 @@
                         <dd>{{ $overview['selected']['year'] }}</dd>
                     </div>
                     <div>
-                        <dt>Data di riferimento</dt>
+                        <dt>Data di Riferimento</dt>
                         <dd>{{ $overview['selected']['reference_date'] }}</dd>
                     </div>
                     <div>
-                        <dt>Stato alla data</dt>
+                        <dt>Stato alla Data</dt>
                         <dd>{{ $overview['selected']['state'] }}</dd>
                     </div>
                     <div class="mp2-object-cost-center">
@@ -118,16 +118,16 @@
                 <div class="mp2-contract-composition">
                     <div class="mp2-contract-subheading">
                         <h3>Composizione dell’Allocato</h3>
-                        <span>{{ $overview['selected']['composition_count'] }} {{ $overview['selected']['composition_count'] === 1 ? 'ciclo compone' : 'cicli compongono' }} l’Allocato</span>
+                        <span>{{ $overview['selected']['composition_count'] }} {{ $overview['selected']['composition_count'] === 1 ? 'Ciclo Compone' : 'Cicli Compongono' }} l’Allocato</span>
                     </div>
                     @if ($overview['selected']['composition'] !== [])
                         <dl class="mp2-contract-composition-summary">
                             <div>
-                                <dt>Primo ciclo incluso</dt>
+                                <dt>Primo Ciclo Incluso</dt>
                                 <dd>{{ $overview['selected']['first_cycle_start'] }}</dd>
                             </div>
                             <div>
-                                <dt>Ultimo ciclo incluso</dt>
+                                <dt>Ultimo Ciclo Incluso</dt>
                                 <dd>{{ $overview['selected']['last_cycle_start'] }}</dd>
                             </div>
                             <div>
@@ -175,13 +175,13 @@
     <section class="mp2-object-annual-section" aria-labelledby="contract-annual-title">
         <div class="mp2-object-annual-heading">
             <div>
-                <p class="mp2-object-eyebrow">Andamento pluriennale</p>
-                <h2 id="contract-annual-title">Situazioni annuali</h2>
+                <p class="mp2-object-eyebrow">Andamento Pluriennale</p>
+                <h2 id="contract-annual-title">Situazioni Annuali</h2>
             </div>
             <p>Valori calcolati alla data di riferimento canonica di ciascun Esercizio.</p>
         </div>
 
-        <div class="mp2-object-annual-table-wrap" tabindex="0" role="region" aria-label="Situazioni annuali del Contratto">
+        <div class="mp2-object-annual-table-wrap" tabindex="0" role="region" aria-label="Situazioni Annuali del Contratto">
             <table class="mp2-object-annual-table mp2-contract-annual-table">
                 <thead>
                     <tr>
@@ -201,7 +201,7 @@
                             <th scope="row">
                                 <span>{{ $row['year'] }}</span>
                                 @if ($row['selected'])
-                                    <small>Esercizio selezionato</small>
+                                    <small>Esercizio Selezionato</small>
                                 @endif
                             </th>
                             <td>{{ $row['reference_date'] }}</td>

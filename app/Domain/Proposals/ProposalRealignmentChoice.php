@@ -11,9 +11,9 @@ enum ProposalRealignmentChoice: string
     public function label(): string
     {
         return match ($this) {
-            self::Reload => 'Ricarica realtà',
-            self::Keep => 'Mantieni proposta',
-            self::Manual => 'Rivedi manualmente',
+            self::Reload => 'Ricarica Realtà',
+            self::Keep => 'Mantieni Proposta',
+            self::Manual => 'Rivedi Manualmente',
         };
     }
 }

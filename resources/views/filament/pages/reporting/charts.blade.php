@@ -3,7 +3,7 @@
         <div class="mp2-report-section-heading">
             <div>
                 <p class="mp2-report-kicker">Visualizzazioni</p>
-                <h3 id="report-analytics-title">Lettura analitica</h3>
+                <h3 id="report-analytics-title">Lettura Analitica</h3>
             </div>
         </div>
         <div class="mp2-report-chart-grid">

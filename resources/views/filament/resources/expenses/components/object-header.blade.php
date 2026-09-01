@@ -34,7 +34,7 @@
         <x-filament::actions :actions="$this->getCachedHeaderActions()" />
     </x-slot:actions>
 
-    <dl class="mp2-object-highlights" aria-label="Riepilogo economico">
+    <dl class="mp2-object-highlights" aria-label="Riepilogo Economico">
         <div>
             <dt>Stima</dt>
             <dd>{{ $money['allocation'] }}</dd>

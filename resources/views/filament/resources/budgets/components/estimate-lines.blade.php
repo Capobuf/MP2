@@ -5,8 +5,8 @@
                 <tr>
                     <th class="mp2-object-number">Importo</th>
                     <th class="mp2-object-number">Quantità</th>
-                    <th class="mp2-object-number">Importo unitario</th>
-                    <th>Unità di misura</th>
+                    <th class="mp2-object-number">Importo Unitario</th>
+                    <th>Unità di Misura</th>
                     <th>Nota</th>
                 </tr>
             </thead>

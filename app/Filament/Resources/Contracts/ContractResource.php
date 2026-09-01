@@ -38,8 +38,6 @@ class ContractResource extends Resource
 
     protected static ?string $navigationLabel = 'Contratti';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Operatività';
-
     protected static ?string $modelLabel = 'contratto';
 
     protected static ?string $pluralModelLabel = 'contratti';

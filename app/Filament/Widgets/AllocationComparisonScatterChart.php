@@ -8,7 +8,7 @@ class AllocationComparisonScatterChart extends EconomicChartWidget
 {
     protected ?string $heading = 'Budget → Allocato Corrente';
 
-    protected ?string $emptyStateHeading = 'Confronto Allocato non disponibile';
+    protected ?string $emptyStateHeading = 'Confronto Allocato Non Disponibile';
 
     protected function getType(): string
     {
@@ -20,7 +20,7 @@ class AllocationComparisonScatterChart extends EconomicChartWidget
         $data = $this->economicData();
 
         return ($data['has_budget'] ?? false)
-            ? 'Ogni punto è una sorgente primaria; la diagonale indica uguaglianza degli Allocati.'
+            ? 'Ogni Punto È una Sorgente Primaria; la Diagonale Indica Uguaglianza degli Allocati.'
             : 'Seleziona una versione di Budget nel contesto globale per visualizzare il confronto.';
     }
 
@@ -54,7 +54,7 @@ class AllocationComparisonScatterChart extends EconomicChartWidget
                 ],
                 [
                     'type' => 'line',
-                    'label' => 'Allocato invariato (x = y)',
+                    'label' => 'Allocato Invariato (x = y)',
                     'data' => [['x' => 0, 'y' => 0], ['x' => $max, 'y' => $max]],
                     'borderColor' => '#91A3A8',
                     'borderDash' => [5, 5],
@@ -87,7 +87,7 @@ class AllocationComparisonScatterChart extends EconomicChartWidget
                     },
                 },
                 scales: {
-                    x: { beginAtZero: true, title: { display: true, text: 'Budget selezionato' }, grid: { color: 'rgba(145, 163, 168, 0.12)' }, ticks: { callback: (value) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', notation: 'compact' }).format(value) } },
+                    x: { beginAtZero: true, title: { display: true, text: 'Budget Selezionato' }, grid: { color: 'rgba(145, 163, 168, 0.12)' }, ticks: { callback: (value) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', notation: 'compact' }).format(value) } },
                     y: { beginAtZero: true, title: { display: true, text: 'Allocato Corrente' }, grid: { color: 'rgba(145, 163, 168, 0.12)' }, ticks: { callback: (value) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', notation: 'compact' }).format(value) } },
                 },
                 onClick: (event, elements, chart) => {

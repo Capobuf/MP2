@@ -52,7 +52,7 @@ class ContactsRelationManager extends RelationManager
                 ->email()
                 ->maxLength(255),
             TagsInput::make('role_tags')
-                ->label('Tag di ruolo')
+                ->label('Tag di Ruolo')
                 ->placeholder('Aggiungi un tag')
                 ->default([])
                 ->columnSpanFull(),
@@ -83,11 +83,11 @@ class ContactsRelationManager extends RelationManager
                     ->label('Telefono')
                     ->placeholder('—'),
                 TextColumn::make('role_tags')
-                    ->label('Tag di ruolo')
+                    ->label('Tag di Ruolo')
                     ->badge()
                     ->placeholder('—'),
             ])
-            ->emptyStateHeading('Nessun referente')
+            ->emptyStateHeading('Nessun Referente')
             ->emptyStateDescription('Aggiungi un referente solo quando sono disponibili informazioni reali.')
             ->headerActions([
                 CreateAction::make()

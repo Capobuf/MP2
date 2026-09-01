@@ -70,11 +70,11 @@ class ProjectsTable
                     ->money('EUR', locale: 'it')->alignment(Alignment::End),
                 TextColumn::make('variance')->label('Scostamento')->state(fn (Project $record): string => $annual($record)['variance'])
                     ->money('EUR', locale: 'it')->alignment(Alignment::End),
-                TextColumn::make('initial_effective_date')->label('Efficacia iniziale')->date('d/m/Y')->sortable()
+                TextColumn::make('initial_effective_date')->label('Efficacia Iniziale')->date('d/m/Y')->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('archive_state')->label('Visibilità')->state(fn (Project $record): string => $record->isArchived() ? 'Archiviato' : 'Attivo')->badge()
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')->label('Ultima modifica')->dateTime('d/m/Y H:i')->sortable()
+                TextColumn::make('updated_at')->label('Ultima Modifica')->dateTime('d/m/Y H:i')->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
@@ -93,7 +93,7 @@ class ProjectsTable
             ->searchPlaceholder('Cerca per titolo')
             ->recordUrl(fn (Project $record): string => ProjectResource::getUrl('view', ['record' => $record]))
             ->recordActions([ViewAction::make(), EditAction::make()])
-            ->emptyStateHeading('Nessun progetto')
+            ->emptyStateHeading('Nessun Progetto')
             ->emptyStateDescription('Crea il primo Progetto per pianificare attività e consultarne la situazione annuale.');
     }
 

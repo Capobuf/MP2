@@ -21,7 +21,7 @@ class CreateProject extends CreateRecord
 {
     protected static string $resource = ProjectResource::class;
 
-    protected static ?string $title = 'Nuovo progetto';
+    protected static ?string $title = 'Nuovo Progetto';
 
     public string $operationId;
 
@@ -36,10 +36,10 @@ class CreateProject extends CreateRecord
         $exercise = $this->currentExercise();
 
         if (! $exercise instanceof Exercise) {
-            return 'Nessun Esercizio globale selezionato.';
+            return 'Nessun Esercizio Globale Selezionato.';
         }
 
-        return "Classificazione iniziale nell’Esercizio globale {$exercise->year} · {$exercise->status()->label()}";
+        return "Classificazione Iniziale nell’Esercizio Globale {$exercise->year} · {$exercise->status()->label()}";
     }
 
     /** @param array<string, mixed> $data */

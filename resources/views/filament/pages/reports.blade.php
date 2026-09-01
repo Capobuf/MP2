@@ -17,8 +17,8 @@
             @if (! $this->isReportConfigurationComplete())
                 <section class="mp2-report-incomplete" aria-labelledby="report-incomplete-title">
                     <div>
-                        <p class="mp2-report-kicker">Configurazione esplicita</p>
-                        <h3 id="report-incomplete-title">Completa i riferimenti</h3>
+                        <p class="mp2-report-kicker">Configurazione Esplicita</p>
+                        <h3 id="report-incomplete-title">Completa i Riferimenti</h3>
                         @if ($this->dateIntervalIncomplete())
                             <p>Completa entrambe le date dell’intervallo per aggiornare il report.</p>
                         @elseif ($this->missingReferences() !== [])
@@ -35,7 +35,7 @@
 
                     @if ($report['sources'] === [])
                         <section class="mp2-report-empty" aria-labelledby="report-empty-title">
-                            <h3 id="report-empty-title">Nessun dato</h3>
+                            <h3 id="report-empty-title">Nessun Dato</h3>
                             <p>Nessun dato per i riferimenti e i filtri selezionati.</p>
                         </section>
                     @else

@@ -38,7 +38,7 @@ it('initializes from the exercise and keeps proposal lists tenant scoped', funct
     Livewire::test(ViewProposal::class, ['record' => $proposal->getRouteKey()])
         ->assertSuccessful()
         ->assertSee('Confronto dell’Allocato')
-        ->assertSee('Piano risultante')
+        ->assertSee('Piano Risultante')
         ->assertSee('Realtà effettiva in sola lettura')
         ->assertSee('7,00')
         ->assertDontSee('estimate_lines')

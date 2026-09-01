@@ -213,7 +213,7 @@ it('renders live charts without a Budget and keeps comparative charts unavailabl
 
     Livewire::test(SourceEconomicProfileChart::class)
         ->assertSuccessful()
-        ->assertSee('Allocato Corrente ed Effettivo per sorgente primaria.')
+        ->assertSee('Allocato Corrente ed Effettivo per Sorgente Primaria.')
         ->assertDontSee('Seleziona una versione di Budget');
 });
 
@@ -231,11 +231,11 @@ it('enriches live charts and enables comparative charts with the selected Budget
     $allocationComparison = chartData(AllocationComparisonScatterChart::class);
 
     expect(array_column($sourceProfile['datasets'], 'label'))->toBe([
-        'Budget selezionato',
+        'Budget Selezionato',
         'Allocato Corrente',
         'Effettivo',
     ])->and(array_column($costCenters['datasets'], 'label'))->toBe([
-        'Budget selezionato',
+        'Budget Selezionato',
         'Allocato Corrente',
         'Effettivo',
     ])->and($operationalVariance['datasets'][0]['data'])->not->toBeEmpty()
@@ -352,7 +352,7 @@ it('renders every chart and handles no Exercise no Budget and no sources', funct
 
     Livewire::test(EconomicSummary::class)
         ->assertSuccessful()
-        ->assertSee('Nessun Esercizio selezionato');
+        ->assertSee('Nessun Esercizio Selezionato');
 
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     app(ExerciseContext::class)->select($company, $exercise->id);
@@ -362,7 +362,7 @@ it('renders every chart and handles no Exercise no Budget and no sources', funct
 
     Livewire::test(SourceEconomicProfileChart::class)
         ->assertSuccessful()
-        ->assertSee('Allocato Corrente ed Effettivo per sorgente primaria.')
+        ->assertSee('Allocato Corrente ed Effettivo per Sorgente Primaria.')
         ->assertDontSee('Seleziona una versione di Budget');
 
     $proposal = Proposal::factory()->for($company)->for($exercise)->create();
@@ -379,7 +379,7 @@ it('renders every chart and handles no Exercise no Budget and no sources', funct
         ->assertSet('exerciseId', $exercise->id)
         ->assertSet('budgetId', $budget->id)
         ->assertSee('Budget v1')
-        ->assertSeeHtml('aria-label="Budget globale"');
+        ->assertSeeHtml('aria-label="Seleziona Budget"');
 });
 
 it('preserves every Cost Center when the Radar degrades for high cardinality', function (): void {

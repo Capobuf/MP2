@@ -2,14 +2,14 @@
 
 return [
     'skip_to_content' => [
-        'label' => 'Vai al contenuto',
+        'label' => 'Vai al Contenuto',
     ],
 
     'navigation' => [
-        'label' => 'Navigazione laterale',
+        'label' => 'Navigazione Laterale',
     ],
 
     'topbar' => [
-        'label' => 'Barra superiore',
+        'label' => 'Barra Superiore',
     ],
 ];

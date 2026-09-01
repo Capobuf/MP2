@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Domain\Company\TenantCompanyStatus;
+use Filament\Models\Contracts\HasCurrentTenantLabel;
 use Filament\Models\Contracts\HasName;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['company_id', 'status'])]
-class TenantCompany extends Model implements HasName
+class TenantCompany extends Model implements HasCurrentTenantLabel, HasName
 {
     protected $primaryKey = 'company_id';
 
@@ -87,6 +88,11 @@ class TenantCompany extends Model implements HasName
     public function getFilamentName(): string
     {
         return $this->company->name;
+    }
+
+    public function getCurrentTenantLabel(): string
+    {
+        return 'Azienda';
     }
 
     public function status(): TenantCompanyStatus

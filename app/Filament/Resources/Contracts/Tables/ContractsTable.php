@@ -57,13 +57,13 @@ class ContractsTable
                 ->money('EUR', locale: 'it')->alignment(Alignment::End),
             TextColumn::make('variance')->label('Scostamento')->state(fn (Contract $record): string => $annual($record)['variance'])
                 ->money('EUR', locale: 'it')->alignment(Alignment::End),
-            TextColumn::make('next_expiry_date')->label('Prossima scadenza')->date('d/m/Y')->placeholder('Scadenza non definita')->sortable(),
-            TextColumn::make('automatic_renewal')->label('Rinnovo automatico')->formatStateUsing(fn (bool $state): string => $state ? 'Sì' : 'No'),
-            TextColumn::make('contractual_start_date')->label('Data inizio')->date('d/m/Y')->sortable()
+            TextColumn::make('next_expiry_date')->label('Prossima Scadenza')->date('d/m/Y')->placeholder('Scadenza non definita')->sortable(),
+            TextColumn::make('automatic_renewal')->label('Rinnovo Automatico')->formatStateUsing(fn (bool $state): string => $state ? 'Sì' : 'No'),
+            TextColumn::make('contractual_start_date')->label('Data Inizio')->date('d/m/Y')->sortable()
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('archive_state')->label('Visibilità')->state(fn (Contract $record): string => $record->isArchived() ? 'Archiviato' : 'Attivo')->badge()
                 ->toggleable(isToggledHiddenByDefault: true),
-            TextColumn::make('updated_at')->label('Ultima modifica')->dateTime('d/m/Y H:i')->sortable()
+            TextColumn::make('updated_at')->label('Ultima Modifica')->dateTime('d/m/Y H:i')->sortable()
                 ->toggleable(isToggledHiddenByDefault: true),
         ])->filters([
             SelectFilter::make('supplier')->label('Fornitore')
@@ -99,7 +99,7 @@ class ContractsTable
                             ->where('exercise_id', $exercise->id)
                             ->where('cost_center_id', $costCenterId));
                 }),
-            TernaryFilter::make('automatic_renewal')->label('Rinnovo automatico')->native(false)
+            TernaryFilter::make('automatic_renewal')->label('Rinnovo Automatico')->native(false)
                 ->placeholder('Tutti')->trueLabel('Attivo')->falseLabel('Disattivo'),
             TernaryFilter::make('next_expiry_date')->label('Durata')->native(false)
                 ->placeholder('Tutte')->trueLabel('Con scadenza')->falseLabel('Senza scadenza')
@@ -121,7 +121,7 @@ class ContractsTable
             ->searchPlaceholder('Cerca per titolo o fornitore')
             ->recordUrl(fn (Contract $record): string => ContractResource::getUrl('view', ['record' => $record]))
             ->recordActions([ViewAction::make(), EditAction::make()])
-            ->emptyStateHeading('Nessun contratto')
+            ->emptyStateHeading('Nessun Contratto')
             ->emptyStateDescription('Crea il primo Contratto per definire condizioni economiche e consultarne i valori annuali.');
     }
 

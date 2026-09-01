@@ -6,13 +6,13 @@
                     <x-filament::icon icon="heroicon-o-lock-closed" />
                 </span>
                 <div>
-                    <p class="mp2-object-eyebrow">Budget immutabile</p>
-                    <h2 id="budget-total-title">Versione approvata</h2>
+                    <p class="mp2-object-eyebrow">Budget Immutabile</p>
+                    <h2 id="budget-total-title">Versione Approvata</h2>
                 </div>
             </div>
 
             <div class="mp2-budget-total">
-                <span>Allocato approvato</span>
+                <span>Allocato Approvato</span>
                 <strong>{{ $overview['budget']['total'] }}</strong>
                 <p>Piano formalmente approvato per l’Esercizio {{ $overview['budget']['exercise'] }}.</p>
             </div>
@@ -46,7 +46,7 @@
 
             <dl class="mp2-budget-approval-facts">
                 <div>
-                    <dt>Data e ora</dt>
+                    <dt>Data e Ora</dt>
                     <dd>{{ $overview['budget']['approved_at'] }}</dd>
                 </div>
                 <div>
@@ -54,7 +54,7 @@
                     <dd>{{ $overview['budget']['approver'] }}</dd>
                 </div>
                 <div>
-                    <dt>Proposta di origine</dt>
+                    <dt>Proposta di Origine</dt>
                     <dd>{{ $overview['budget']['proposal'] }}</dd>
                 </div>
                 <div>
@@ -64,7 +64,7 @@
             </dl>
 
             <div class="mp2-budget-affected-exercises">
-                <span>Esercizi interessati contestualmente</span>
+                <span>Esercizi Interessati Contestualmente</span>
                 @if ($overview['budget']['affected_exercises'] !== [])
                     <div>
                         @foreach ($overview['budget']['affected_exercises'] as $year)
@@ -81,18 +81,18 @@
     <section class="mp2-object-annual-section mp2-budget-sources" aria-labelledby="budget-sources-title">
         <div class="mp2-object-annual-heading mp2-budget-sources-heading">
             <div>
-                <p class="mp2-object-eyebrow">Piano approvato</p>
-                <h2 id="budget-sources-title">Sorgenti materializzate</h2>
+                <p class="mp2-object-eyebrow">Piano Approvato</p>
+                <h2 id="budget-sources-title">Sorgenti Materializzate</h2>
             </div>
             <p>
                 {{ $overview['budget']['source_count'] }}
-                {{ $overview['budget']['source_count'] === 1 ? 'sorgente inclusa' : 'sorgenti incluse' }}
+                {{ $overview['budget']['source_count'] === 1 ? 'Sorgente Inclusa' : 'Sorgenti Incluse' }}
                 in {{ $overview['budget']['version'] }}.
             </p>
         </div>
 
         @if ($overview['source_counts'] !== [])
-            <dl class="mp2-budget-source-counts" aria-label="Composizione per tipo">
+            <dl class="mp2-budget-source-counts" aria-label="Composizione per Tipo">
                 @foreach ($overview['source_counts'] as $count)
                     <div>
                         <dt>{{ $count['label'] }}</dt>
@@ -131,7 +131,7 @@
                         </span>
 
                         <span class="mp2-budget-source-amount">
-                            <small>Allocato approvato</small>
+                            <small>Allocato Approvato</small>
                             <strong>{{ $source['allocation'] }}</strong>
                         </span>
 
@@ -155,12 +155,12 @@
                                 <dd>{{ $source['supplier'] ?? '—' }}</dd>
                             </div>
                             <div>
-                                <dt>Stime approvate</dt>
+                                <dt>Stime Approvate</dt>
                                 <dd>{{ $source['estimates'] }}</dd>
                             </div>
                             @if ($source['type_value'] === 'project')
                                 <div>
-                                    <dt>Riporto approvato</dt>
+                                    <dt>Riporto Approvato</dt>
                                     <dd>{{ $source['carryover'] }}</dd>
                                 </div>
                                 <div>
@@ -169,11 +169,11 @@
                                 </div>
                             @endif
                             <div>
-                                <dt>Stato al 1° gennaio</dt>
+                                <dt>Stato al 1° Gennaio</dt>
                                 <dd>{{ $source['start_state'] }}</dd>
                             </div>
                             <div>
-                                <dt>Stato al 31 dicembre</dt>
+                                <dt>Stato al 31 Dicembre</dt>
                                 <dd>{{ $source['end_state'] }}</dd>
                             </div>
                         </dl>
@@ -197,16 +197,16 @@
                             <section class="mp2-budget-source-section" aria-label="Dettaglio Progetto">
                                 <div class="mp2-budget-subheading">
                                     <h3>Dettaglio Progetto</h3>
-                                    <span>{{ count($source['project']['expenses']) }} {{ count($source['project']['expenses']) === 1 ? 'Spesa figlia' : 'Spese figlie' }}</span>
+                                    <span>{{ count($source['project']['expenses']) }} {{ count($source['project']['expenses']) === 1 ? 'Spesa Figlia' : 'Spese Figlie' }}</span>
                                 </div>
                                 <dl class="mp2-budget-inline-facts">
-                                    <div><dt>Modalità rinvio</dt><dd>{{ $source['project']['deferral_mode'] }}</dd></div>
-                                    <div><dt>Riprogrammato approvato</dt><dd>{{ $source['project']['reprogrammed'] }}</dd></div>
+                                    <div><dt>Modalità Rinvio</dt><dd>{{ $source['project']['deferral_mode'] }}</dd></div>
+                                    <div><dt>Riprogrammato Approvato</dt><dd>{{ $source['project']['reprogrammed'] }}</dd></div>
                                 </dl>
 
                                 @if ($source['project']['transitions'] !== [])
                                     <div class="mp2-budget-transition-list">
-                                        <h4>Transizioni approvate</h4>
+                                        <h4>Transizioni Approvate</h4>
                                         @foreach ($source['project']['transitions'] as $transition)
                                             <div>
                                                 <strong>{{ $transition['from'] }} → {{ $transition['to'] }}</strong>
@@ -241,12 +241,12 @@
                                     <span>{{ count($source['contract']['conditions']) }} {{ count($source['contract']['conditions']) === 1 ? 'condizione economica' : 'condizioni economiche' }}</span>
                                 </div>
                                 <dl class="mp2-budget-contract-facts">
-                                    <div><dt>Data di inizio</dt><dd>{{ $source['contract']['start_date'] }}</dd></div>
-                                    <div><dt>Prossima scadenza</dt><dd>{{ $source['contract']['expiry_date'] }}</dd></div>
-                                    <div><dt>Rinnovo automatico</dt><dd>{{ $source['contract']['automatic_renewal'] }}</dd></div>
-                                    <div><dt>Durata rinnovo</dt><dd>{{ $source['contract']['renewal_duration'] }}</dd></div>
+                                    <div><dt>Data di Inizio</dt><dd>{{ $source['contract']['start_date'] }}</dd></div>
+                                    <div><dt>Prossima Scadenza</dt><dd>{{ $source['contract']['expiry_date'] }}</dd></div>
+                                    <div><dt>Rinnovo Automatico</dt><dd>{{ $source['contract']['automatic_renewal'] }}</dd></div>
+                                    <div><dt>Durata Rinnovo</dt><dd>{{ $source['contract']['renewal_duration'] }}</dd></div>
                                     <div><dt>Preavviso</dt><dd>{{ $source['contract']['notice'] }}</dd></div>
-                                    <div><dt>Data limite disdetta</dt><dd>{{ $source['contract']['cancellation_deadline'] }}</dd></div>
+                                    <div><dt>Data Limite Disdetta</dt><dd>{{ $source['contract']['cancellation_deadline'] }}</dd></div>
                                 </dl>
 
                                 <div class="mp2-budget-condition-list">
@@ -269,9 +269,9 @@
                                             @if ($condition['composition'] !== [])
                                                 <details class="mp2-budget-nested-details">
                                                     <summary>Composizione annuale · {{ count($condition['composition']) }} {{ count($condition['composition']) === 1 ? 'ciclo' : 'cicli' }}</summary>
-                                                    <div class="mp2-budget-table-wrap" tabindex="0" role="region" aria-label="Composizione annuale della condizione">
+                                                    <div class="mp2-budget-table-wrap" tabindex="0" role="region" aria-label="Composizione Annuale della Condizione">
                                                         <table class="mp2-budget-detail-table">
-                                                            <thead><tr><th>Ciclo dal</th><th>Data di attribuzione</th><th class="mp2-object-number">Importo</th></tr></thead>
+                                                            <thead><tr><th>Ciclo dal</th><th>Data di Attribuzione</th><th class="mp2-object-number">Importo</th></tr></thead>
                                                             <tbody>
                                                                 @foreach ($condition['composition'] as $item)
                                                                     <tr><td>{{ $item['cycle_start'] }}</td><td>{{ $item['attribution_date'] }}</td><td class="mp2-object-number">{{ $item['amount'] }}</td></tr>
@@ -292,7 +292,7 @@
                         <div class="mp2-budget-secondary-grid">
                             <section class="mp2-budget-source-section">
                                 <div class="mp2-budget-subheading">
-                                    <h3>Azioni e motivazioni approvate</h3>
+                                    <h3>Azioni e Motivazioni Approvate</h3>
                                     <span>{{ count($source['actions']) }}</span>
                                 </div>
                                 @forelse ($source['actions'] as $action)
@@ -303,7 +303,7 @@
                                         </div>
                                         @if (filled($action['reason']))<p>{{ $action['reason'] }}</p>@endif
                                         <details class="mp2-budget-nested-details">
-                                            <summary>Dati dell’azione</summary>
+                                            <summary>Dati dell’Azione</summary>
                                             <pre>{{ $action['payload'] }}</pre>
                                         </details>
                                     </article>
@@ -314,7 +314,7 @@
 
                             <section class="mp2-budget-source-section">
                                 <div class="mp2-budget-subheading">
-                                    <h3>Relazioni informative</h3>
+                                    <h3>Relazioni Informative</h3>
                                     <span>{{ count($source['relations']) }}</span>
                                 </div>
                                 @forelse ($source['relations'] as $relation)
@@ -330,13 +330,13 @@
                         </div>
 
                         <details class="mp2-budget-traceability">
-                            <summary>Riferimenti e tracciabilità tecnica</summary>
+                            <summary>Riferimenti e Tracciabilità Tecnica</summary>
                             <dl>
                                 <div><dt>OriginKey</dt><dd><code>{{ $source['origin_key'] }}</code></dd></div>
                                 <div><dt>ProposalItemID</dt><dd><code>{{ $source['proposal_item_id'] }}</code></dd></div>
                                 <div><dt>CopiedFromOriginKey</dt><dd><code>{{ $source['copied_from_origin_key'] ?? '—' }}</code></dd></div>
-                                <div><dt>Versione schema dettaglio</dt><dd>{{ $source['detail_version'] }}</dd></div>
-                                <div><dt>Riferimenti eventi di approvazione</dt><dd>{{ $source['event_sequences'] === [] ? '—' : implode(', ', $source['event_sequences']) }}</dd></div>
+                                <div><dt>Versione Schema Dettaglio</dt><dd>{{ $source['detail_version'] }}</dd></div>
+                                <div><dt>Riferimenti Eventi di Approvazione</dt><dd>{{ $source['event_sequences'] === [] ? '—' : implode(', ', $source['event_sequences']) }}</dd></div>
                             </dl>
                         </details>
                     </div>
@@ -356,8 +356,8 @@
                 <x-filament::icon icon="heroicon-o-paper-clip" />
             </span>
             <div>
-                <p class="mp2-object-eyebrow">Approvazione esterna</p>
-                <h2 id="budget-evidence-title">Evidenza di approvazione</h2>
+                <p class="mp2-object-eyebrow">Approvazione Esterna</p>
+                <h2 id="budget-evidence-title">Evidenza di Approvazione</h2>
             </div>
         </div>
 
@@ -365,7 +365,7 @@
             <div class="mp2-budget-evidence-empty">
                 <x-filament::icon icon="heroicon-o-document" aria-hidden="true" />
                 <div>
-                    <strong>Nessuna evidenza esterna o allegato</strong>
+                    <strong>Nessuna Evidenza Esterna o Allegato</strong>
                     <p>Autore e data dell’approvazione restano registrati nella Snapshot.</p>
                 </div>
             </div>
@@ -374,8 +374,8 @@
                 @foreach ($overview['evidence'] as $evidence)
                     <article>
                         <dl>
-                            @if (filled($evidence['subject']))<div><dt>Soggetto esterno</dt><dd>{{ $evidence['subject'] }}</dd></div>@endif
-                            @if (filled($evidence['venue']))<div><dt>Sede/verbale</dt><dd>{{ $evidence['venue'] }}</dd></div>@endif
+                            @if (filled($evidence['subject']))<div><dt>Soggetto Esterno</dt><dd>{{ $evidence['subject'] }}</dd></div>@endif
+                            @if (filled($evidence['venue']))<div><dt>Sede/Verbale</dt><dd>{{ $evidence['venue'] }}</dd></div>@endif
                             @if (filled($evidence['reason']))<div class="mp2-budget-evidence-wide"><dt>Nota</dt><dd>{{ $evidence['reason'] }}</dd></div>@endif
                             @if (filled($evidence['attachment']))
                                 <div class="mp2-budget-evidence-wide">

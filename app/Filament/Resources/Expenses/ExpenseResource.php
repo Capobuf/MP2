@@ -50,8 +50,6 @@ class ExpenseResource extends Resource
 
     protected static ?string $navigationLabel = 'Spese';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Operatività';
-
     protected static ?string $modelLabel = 'spesa autonoma';
 
     protected static ?string $pluralModelLabel = 'spese';
@@ -155,7 +153,7 @@ class ExpenseResource extends Resource
             ->tooltip(fn (Expense $record): ?string => $record->hasActuals() ? 'La Spesa contiene Effettivi attivi non nulli.' : null)
             ->form([
                 Textarea::make('reason')->label('Motivo')->required(),
-                Textarea::make('overspend_note')->label('Nota di sovraspesa')
+                Textarea::make('overspend_note')->label('Nota di Sovraspesa')
                     ->visible(fn (Expense $record): bool => self::reversalRequiresOverspendNote($record, true))
                     ->required(fn (Expense $record): bool => self::reversalRequiresOverspendNote($record, true)),
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
@@ -173,20 +171,20 @@ class ExpenseResource extends Resource
             ->modalSubmitActionLabel('Ripristina')
             ->visible(fn (Expense $record): bool => $record->isReversed() && static::canEdit($record))
             ->form([
-                Textarea::make('reason')->label('Motivo del ripristino')
+                Textarea::make('reason')->label('Motivo del Ripristino')
                     ->visible(fn (Expense $record): bool => $record->exercise->hasApprovedBudget())
                     ->required(fn (Expense $record): bool => $record->exercise->hasApprovedBudget()),
                 Select::make('actual_kind')->label('Tipo di Effettivo')
                     ->options(fn (Expense $record): array => self::terminalActualOptions($record))
                     ->visible(fn (Expense $record): bool => self::restoreRequiresTerminalDeclaration($record))
                     ->required(fn (Expense $record): bool => self::restoreRequiresTerminalDeclaration($record)),
-                Checkbox::make('open_project')->label('Conferma apertura atomica se il Progetto è Pianificato')
+                Checkbox::make('open_project')->label('Conferma Apertura Atomica se il Progetto è Pianificato')
                     ->visible(fn (Expense $record): bool => self::restoreRequiresProjectOpening($record))
                     ->required(fn (Expense $record): bool => self::restoreRequiresProjectOpening($record)),
-                Textarea::make('activity_note')->label('Nota attività tardiva, rimborso o correzione')
+                Textarea::make('activity_note')->label('Nota Attività Tardiva, Rimborso o Correzione')
                     ->visible(fn (Expense $record): bool => self::restoreRequiresTerminalDeclaration($record))
                     ->required(fn (Expense $record): bool => self::restoreRequiresTerminalDeclaration($record)),
-                Textarea::make('overspend_note')->label('Nota di sovraspesa')
+                Textarea::make('overspend_note')->label('Nota di Sovraspesa')
                     ->visible(fn (Expense $record): bool => self::reversalRequiresOverspendNote($record, false))
                     ->required(fn (Expense $record): bool => self::reversalRequiresOverspendNote($record, false)),
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),

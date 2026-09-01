@@ -39,14 +39,14 @@
         <dl class="mp2-report-detail-facts">
             <div><dt>Residuo</dt><dd>{{ $money($source['residual']) }}</dd></div>
             <div><dt>Risparmio</dt><dd>{{ $money($source['saving']) }}</dd></div>
-            <div><dt>Allocato non utilizzato</dt><dd>{{ $money($source['unused']) }}</dd></div>
+            <div><dt>Allocato Non Utilizzato</dt><dd>{{ $money($source['unused']) }}</dd></div>
             <div><dt>Riporto</dt><dd>{{ $money($source['carryover']) }}</dd></div>
             <div><dt>Archivio</dt><dd>{{ ($detail['archived_or_reversed'] ?? false) ? 'Archiviato' : 'Non archiviato' }}</dd></div>
-            <div><dt>Presenza di rinvio</dt><dd>{{ ($detail['deferred'] ?? false) ? 'Sì' : 'No' }}</dd></div>
+            <div><dt>Presenza di Rinvio</dt><dd>{{ ($detail['deferred'] ?? false) ? 'Sì' : 'No' }}</dd></div>
         </dl>
         @if ($expenses !== [])
             <section class="mp2-report-detail-group">
-                <h5>Spese figlie</h5>
+                <h5>Spese Figlie</h5>
                 @foreach ($expenses as $expense)
                     <div class="mp2-report-child-expense">
                         <div><strong>{{ $expense['source'] ?? $expense['description'] ?? 'Spesa' }}</strong><span>{{ $expense['supplier_label'] ?? data_get($expense, 'supplier.label') ?? 'Nessun Fornitore' }}</span></div>
@@ -65,8 +65,8 @@
     @else
         <dl class="mp2-report-detail-facts">
             <div><dt>Scadenza</dt><dd>{{ $date($detail['deadline'] ?? $detail['next_expiry_date'] ?? null) }}</dd></div>
-            <div><dt>Rinnovo automatico</dt><dd>{{ ($detail['automatic_renewal'] ?? false) ? 'Sì' : 'No' }}</dd></div>
-            <div><dt>Data limite disdetta</dt><dd>{{ $date($detail['notice_limit_date'] ?? $detail['cancellation_deadline'] ?? null) }}</dd></div>
+            <div><dt>Rinnovo Automatico</dt><dd>{{ ($detail['automatic_renewal'] ?? false) ? 'Sì' : 'No' }}</dd></div>
+            <div><dt>Data Limite Disdetta</dt><dd>{{ $date($detail['notice_limit_date'] ?? $detail['cancellation_deadline'] ?? null) }}</dd></div>
             <div><dt>Scostamento</dt><dd>{{ $money($source['operational_variance']) }}</dd></div>
             <div><dt>Archivio</dt><dd>{{ ($detail['archived_or_reversed'] ?? false) ? 'Archiviato' : 'Non archiviato' }}</dd></div>
         </dl>
@@ -103,16 +103,16 @@
 
     @foreach ($source['annotations'] ?? [] as $annotation)
         <section class="mp2-report-annotation">
-            <h5>Annotazione di errore storico</h5>
+            <h5>Annotazione di Errore Storico</h5>
             <p>{{ $annotation['reason'] }}</p>
-            <strong>Impatto economico nullo</strong>
+            <strong>Impatto Economico Nullo</strong>
         </section>
     @endforeach
 
     @php($remaining = array_diff_key($detail, array_flip($knownKeys ?? [])))
     @if ($remaining !== [])
         <section class="mp2-report-detail-group">
-            <h5>Altri dati registrati</h5>
+            <h5>Altri Dati Registrati</h5>
             @include('filament.pages.reporting.key-value', ['data' => $remaining])
         </section>
     @endif

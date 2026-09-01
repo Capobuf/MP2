@@ -17,7 +17,7 @@ class ContractAnnualSituationsRelationManager extends RelationManager
 {
     protected static string $relationship = 'exercises';
 
-    protected static ?string $title = 'Situazioni annuali';
+    protected static ?string $title = 'Situazioni Annuali';
 
     public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
     {
@@ -28,7 +28,7 @@ class ContractAnnualSituationsRelationManager extends RelationManager
     {
         return $table->columns([
             TextColumn::make('year')->label('Esercizio')->sortable(),
-            TextColumn::make('reference_date')->label('Data di riferimento')->state(fn (Exercise $record): string => $this->reference($record)->format('d/m/Y')),
+            TextColumn::make('reference_date')->label('Data di Riferimento')->state(fn (Exercise $record): string => $this->reference($record)->format('d/m/Y')),
             TextColumn::make('state')->label('Stato')->state(fn (Exercise $record): string => $this->contract()->stateAtDate($this->reference($record)->toDateString())->label())->badge(),
             TextColumn::make('cost_center')->label('Centro di Costo')->state(function (Exercise $record): string {
                 $classification = $this->contract()->classifications->firstWhere('exercise_id', $record->id);
@@ -40,9 +40,9 @@ class ContractAnnualSituationsRelationManager extends RelationManager
             TextColumn::make('allocation')->label('Allocato')->state(fn (Exercise $record): string => $this->allocation($record)->amount)->money('EUR', locale: 'it'),
             TextColumn::make('actual')->label('Effettivo')->state(fn (Exercise $record): string => Decimal::sum($this->contract()->expenses
                 ->where('exercise_id', $record->id)->where('origin', 'manual')->map->actual()))->money('EUR', locale: 'it'),
-            TextColumn::make('composition')->label('Composizione esatta')->state(fn (Exercise $record): string => collect($this->allocation($record)->composition)->map(fn (array $item): string => CarbonImmutable::parse($item['attribution_date'])->format('d/m/Y').' · € '.$item['amount'])->implode(' · ') ?: 'Nessun ciclo')->wrap(),
+            TextColumn::make('composition')->label('Composizione Esatta')->state(fn (Exercise $record): string => collect($this->allocation($record)->composition)->map(fn (array $item): string => CarbonImmutable::parse($item['attribution_date'])->format('d/m/Y').' · € '.$item['amount'])->implode(' · ') ?: 'Nessun ciclo')->wrap(),
         ])->defaultSort('year')
-            ->emptyStateHeading('Nessuna situazione annuale')
+            ->emptyStateHeading('Nessuna Situazione Annuale')
             ->emptyStateDescription('Le situazioni compariranno per gli Esercizi disponibili.');
     }
 

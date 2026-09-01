@@ -47,7 +47,7 @@ it('uses the same report result for complete escaped HTML and PDF rendering', fu
     $html = view('reports.pdf', ['report' => $result])->render();
     $pdf = app(ReportPdfRenderer::class)->render($result);
 
-    expect($html)->toContain('&lt;Azienda sicura&gt;', '&lt;script&gt;alert(1)&lt;/script&gt;', 'EUR', 'importi netti IVA', 'Invariato', 'Dettaglio e riconciliazione')
+    expect($html)->toContain('&lt;Azienda sicura&gt;', '&lt;script&gt;alert(1)&lt;/script&gt;', 'EUR', 'importi netti IVA', 'Invariato', 'Dettaglio e Riconciliazione')
         ->and($html)->not->toContain('<script>alert(1)</script>')
         ->and($pdf)->toStartWith('%PDF-');
 });

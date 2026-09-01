@@ -1,9 +1,9 @@
 <header class="mp2-report-header">
     <div class="mp2-report-header-main">
-        <p class="mp2-report-kicker">Controllo economico</p>
+        <p class="mp2-report-kicker">Controllo Economico</p>
         <x-filament::dropdown placement="bottom-start" width="md">
             <x-slot name="trigger">
-                <button type="button" class="mp2-report-switcher" aria-label="Cambia famiglia di report">
+                <button type="button" class="mp2-report-switcher" aria-label="Cambia Famiglia di Report">
                     <span id="report-kind-title">{{ $this->currentKindLabel() }}</span>
                     <x-filament::icon icon="heroicon-m-chevron-down" />
                 </button>
@@ -47,9 +47,9 @@
         <dl class="mp2-report-header-meta">
             <div><dt>Azienda</dt><dd>{{ $report['header']['company_name'] }}</dd></div>
             @if ($kind === 'annual_executive' && $budgetId === null && $report['header']['initial_reference_label'])
-                <div><dt>Baseline disponibile</dt><dd>{{ $report['header']['initial_reference_label'] }}</dd></div>
+                <div><dt>Baseline Disponibile</dt><dd>{{ $report['header']['initial_reference_label'] }}</dd></div>
             @endif
-            <div><dt>Data di riferimento</dt><dd>{{ $report['header']['reference_date'] }}</dd></div>
+            <div><dt>Data di Riferimento</dt><dd>{{ $report['header']['reference_date'] }}</dd></div>
             <div><dt>Valuta</dt><dd>EUR · importi netti IVA</dd></div>
             <div><dt>Generato</dt><dd>{{ $report['header']['generated_at'] }}</dd></div>
         </dl>

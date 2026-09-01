@@ -115,6 +115,6 @@ it('labels contract expiry only for an explicitly selected interval', function (
     ]));
 
     expect($withInterval->sections[0]['rows'][0]['labels'])
-        ->toContain('Scadenza contrattuale entro l’intervallo selezionato')
+        ->toContain('Scadenza Contrattuale entro l’Intervallo Selezionato')
         ->and($withoutInterval->sections[0]['rows'][0]['labels'])->toBe([]);
 });

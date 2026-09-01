@@ -19,11 +19,11 @@ class TenantCompanyResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
 
-    protected static ?string $navigationLabel = 'Tenant Azienda';
+    protected static ?string $navigationLabel = 'Aziende';
 
-    protected static ?string $modelLabel = 'Tenant Azienda';
+    protected static ?string $modelLabel = 'Azienda';
 
-    protected static ?string $pluralModelLabel = 'Tenant Azienda';
+    protected static ?string $pluralModelLabel = 'Aziende';
 
     public static function table(Table $table): Table
     {

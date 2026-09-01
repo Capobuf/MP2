@@ -2,17 +2,13 @@
 
 namespace App\Livewire;
 
-use App\Filament\Pages\CompanySettings;
-use App\Filament\Resources\Exercises\ExerciseResource;
 use App\Models\Company;
 use App\Models\Exercise;
 use App\Models\TenantCompany;
-use App\Models\User;
 use App\Support\BudgetContext;
 use App\Support\ExerciseContext;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -88,10 +84,7 @@ class ExerciseContextSelector extends Component
     {
         $tenant = Filament::getTenant();
         $company = $tenant instanceof TenantCompany ? $tenant->company : null;
-        $user = auth()->user();
-        $panel = Filament::getCurrentPanel();
         $currentCompany = $company instanceof Company ? $company : null;
-        $currentUser = $user instanceof User ? $user : null;
         $currentExercise = $currentCompany
             ? app(ExerciseContext::class)->current($currentCompany)
             : null;
@@ -104,22 +97,6 @@ class ExerciseContextSelector extends Component
             'budgets' => $currentCompany && $currentExercise
                 ? $currentExercise->budgets()->orderByDesc('version')->get()
                 : collect(),
-            'exerciseManagementUrl' => $currentUser && $currentCompany
-                && ExerciseResource::canAccess()
-                    ? ExerciseResource::getUrl('index', tenant: $tenant)
-                    : null,
-            'exerciseCreationUrl' => $currentUser && $currentCompany
-                && ExerciseResource::canCreate()
-                    ? ExerciseResource::getUrl('create', tenant: $tenant)
-                    : null,
-            'companySettingsUrl' => $currentUser && $currentCompany
-                && Gate::forUser($currentUser)->allows('manageSettings', $currentCompany)
-                    ? CompanySettings::getUrl(['tenant' => $tenant])
-                    : null,
-            'companyRegistrationUrl' => $currentUser
-                && Gate::forUser($currentUser)->allows('create', TenantCompany::class)
-                    ? $panel->getTenantRegistrationUrl()
-                    : null,
         ]);
     }
 }

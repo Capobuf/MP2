@@ -6,13 +6,13 @@ use Filament\Support\RawJs;
 
 class SourceEconomicProfileChart extends EconomicChartWidget
 {
-    protected ?string $heading = 'Profilo economico delle sorgenti';
+    protected ?string $heading = 'Profilo Economico delle Sorgenti';
 
     protected int|string|array $columnSpan = 'full';
 
     protected ?string $maxHeight = '27rem';
 
-    protected ?string $emptyStateHeading = 'Nessun profilo economico disponibile';
+    protected ?string $emptyStateHeading = 'Nessun Profilo Economico Disponibile';
 
     protected function getType(): string
     {
@@ -24,8 +24,8 @@ class SourceEconomicProfileChart extends EconomicChartWidget
         $data = $this->economicData();
 
         return ($data['has_budget'] ?? false)
-            ? 'Budget selezionato, Allocato Corrente ed Effettivo per sorgente primaria.'
-            : 'Allocato Corrente ed Effettivo per sorgente primaria.';
+            ? 'Budget Selezionato, Allocato Corrente ed Effettivo per Sorgente Primaria.'
+            : 'Allocato Corrente ed Effettivo per Sorgente Primaria.';
     }
 
     /** @return array<string, mixed> */
@@ -45,7 +45,7 @@ class SourceEconomicProfileChart extends EconomicChartWidget
             'operationalVariances' => array_column($sources, 'operational_variance'),
             'datasets' => [
                 ...($hasBudget ? [[
-                    'label' => 'Budget selezionato',
+                    'label' => 'Budget Selezionato',
                     'data' => array_map('floatval', array_column($sources, 'budget')),
                     'borderColor' => '#91A3A8',
                     'backgroundColor' => 'rgba(145, 163, 168, 0.08)',
@@ -90,7 +90,16 @@ class SourceEconomicProfileChart extends EconomicChartWidget
             {
                 interaction: { mode: 'index', intersect: false },
                 plugins: {
-                    legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 18 } },
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            boxWidth: 12,
+                            boxHeight: 8,
+                            padding: 18,
+                            font: { family: getComputedStyle(document.body).fontFamily },
+                        },
+                    },
                     tooltip: {
                         padding: 12,
                         displayColors: true,

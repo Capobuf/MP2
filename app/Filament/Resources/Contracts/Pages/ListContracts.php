@@ -12,7 +12,7 @@ class ListContracts extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Elenco, valori annuali e scadenze dei Contratti.';
+        return 'Elenco, Valori Annuali e Scadenze dei Contratti.';
     }
 
     protected function getHeaderActions(): array

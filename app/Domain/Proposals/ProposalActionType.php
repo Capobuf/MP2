@@ -28,13 +28,28 @@ enum ProposalActionType: string
 
     public function label(): string
     {
-        if ($this === self::PlanProjectDeferral) {
-            return 'Rinvio';
-        }
-        if ($this === self::CreateProjectAllocation) {
-            return 'Nuova allocazione';
-        }
-
-        return str($this->value)->replace('_', ' ')->title()->toString();
+        return match ($this) {
+            self::CreateExpense => 'Create Expense',
+            self::CopyExpense => 'Copy Expense',
+            self::SetExpenseEstimates => 'Set Expense Estimates',
+            self::SetExpenseOwner => 'Set Expense Owner',
+            self::SetExpenseSupplier => 'Set Expense Supplier',
+            self::SetExpenseCostCenter => 'Set Expense Cost Center',
+            self::ReverseExpense => 'Reverse Expense',
+            self::RestoreExpense => 'Restore Expense',
+            self::CreateProject => 'Create Project',
+            self::PlanProjectChildExpenses => 'Plan Project Child Expenses',
+            self::SetProjectCostCenter => 'Set Project Cost Center',
+            self::PlanProjectTransition => 'Plan Project Transition',
+            self::PlanProjectDeferral => 'Rinvio',
+            self::CreateProjectAllocation => 'Nuova Allocazione',
+            self::CreateContract => 'Create Contract',
+            self::AddContractCondition => 'Add Contract Condition',
+            self::ChangeContractEconomics => 'Change Contract Economics',
+            self::PlanContractLifecycle => 'Plan Contract Lifecycle',
+            self::SetContractRenewal => 'Set Contract Renewal',
+            self::SetContractCostCenter => 'Set Contract Cost Center',
+            self::LinkProjectContract => 'Link Project Contract',
+        };
     }
 }

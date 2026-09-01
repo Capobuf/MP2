@@ -19,8 +19,8 @@ enum ContractActualKind: string
     {
         return match ($this) {
             self::Ordinary => 'Ordinario',
-            self::Late => 'Addebito tardivo',
-            self::CessationCost => 'Costo di cessazione',
+            self::Late => 'Addebito Tardivo',
+            self::CessationCost => 'Costo di Cessazione',
             self::Reimbursement => 'Rimborso',
             self::Corrective => 'Correttivo',
         };

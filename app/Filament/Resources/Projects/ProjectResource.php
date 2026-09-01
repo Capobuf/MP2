@@ -34,8 +34,6 @@ class ProjectResource extends Resource
 
     protected static ?string $navigationLabel = 'Progetti';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Operatività';
-
     protected static ?string $modelLabel = 'progetto';
 
     protected static ?string $pluralModelLabel = 'progetti';

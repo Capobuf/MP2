@@ -34,6 +34,6 @@ it('shows exactly the three realignment controls and action history for a stale 
         ->assertActionExists('reloadReality')
         ->assertActionExists('keepProposal')
         ->assertActionExists('manualRealignment')
-        ->assertSee('Da riallineare')
-        ->assertSee('Storico decisioni');
+        ->assertSee('Da Riallineare')
+        ->assertSee('Storico Decisioni');
 });

@@ -116,9 +116,9 @@ it('toggles the sibling expense detail from the row without exposing a detail bu
         ->assertSee('Righe della Spesa')
         ->assertSee('5')
         ->assertDontSee('5.000000')
-        ->assertSee('Timeline recente')
-        ->assertSee('Riga creata')
-        ->assertSee('Apri dettaglio completo');
+        ->assertSee('Timeline Recente')
+        ->assertSee('Riga Creata')
+        ->assertSee('Apri Dettaglio Completo');
 
     Livewire::test(ViewExpense::class, ['record' => $expense->getRouteKey()])
         ->assertSeeLivewire(ExpenseDetail::class)

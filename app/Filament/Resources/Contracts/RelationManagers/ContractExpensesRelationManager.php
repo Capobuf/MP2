@@ -36,11 +36,11 @@ class ContractExpensesRelationManager extends RelationManager
             TextColumn::make('origin')->label('Origine')->formatStateUsing(fn (string $state): string => $state === 'system' ? 'Stima di sistema' : 'Manuale')->badge(),
             TextColumn::make('exercise.year')->label('Esercizio')->sortable(),
             TextColumn::make('supplier.legal_name')->label('Fornitore'),
-            TextColumn::make('cost_center')->label('Centro di Costo ereditato')->state(fn (Expense $record): string => $record->costCenterLabel()),
+            TextColumn::make('cost_center')->label('Centro di Costo Ereditato')->state(fn (Expense $record): string => $record->costCenterLabel()),
             TextColumn::make('allocation')->label('Allocato')->state(fn (Expense $record): string => $record->allocation())->money('EUR', locale: 'it'),
             TextColumn::make('actual')->label('Effettivo')->state(fn (Expense $record): string => $record->actual())->money('EUR', locale: 'it'),
         ])->headerActions([
-            Action::make('createContractActual')->label('Nuova spesa')
+            Action::make('createContractActual')->label('Nuova Spesa')
                 ->url(fn (): string => ExpenseResource::getUrl('create', ['contract' => $this->getOwnerRecord()->getKey()]))
                 ->visible(fn (): bool => $this->canMutateOwner()),
         ])->recordActions([

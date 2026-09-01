@@ -32,6 +32,6 @@ it('shows explicit acknowledgement and exact new-source guidance', function (): 
 
     Livewire::test(ViewProposal::class, ['record' => $proposal->getRouteKey()])
         ->assertActionExists('acknowledgeSource')
-        ->assertSee('Da prendere in visione')
+        ->assertSee('Da Prendere in Visione')
         ->assertSee('Nuova fonte da prendere in visione');
 });

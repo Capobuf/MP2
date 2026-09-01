@@ -26,14 +26,14 @@
         <x-filament::actions :actions="$this->getCachedHeaderActions()" />
     </x-slot:actions>
 
-    <div class="mp2-object-time-position" role="group" aria-label="Posizione temporale del Contratto">
+    <div class="mp2-object-time-position" role="group" aria-label="Posizione Temporale del Contratto">
         <div class="mp2-object-time-line" aria-hidden="true"></div>
 
         <div class="mp2-object-time-point mp2-object-time-start">
             <span class="mp2-object-time-node" aria-hidden="true">
                 <x-filament::icon icon="heroicon-m-check" />
             </span>
-            <span class="mp2-object-time-label">Data di inizio</span>
+            <span class="mp2-object-time-label">Data di Inizio</span>
             <time datetime="{{ $contract->contractualStartDate()->toDateString() }}">
                 {{ $contract->contractualStartDate()->format('d/m/Y') }}
             </time>
@@ -41,20 +41,20 @@
 
         <div class="mp2-object-time-point mp2-object-time-current">
             <span class="mp2-object-time-node" aria-hidden="true"><span></span></span>
-            <span class="mp2-object-time-label">Oggi / Stato attuale</span>
+            <span class="mp2-object-time-label">Oggi / Stato Attuale</span>
             <strong>{{ $currentState->label() }}</strong>
             <span class="fi-sr-only">alla data {{ $today->format('d/m/Y') }}</span>
         </div>
 
         <div class="mp2-object-time-point mp2-object-time-end {{ $contract->nextExpiryDate() === null ? 'mp2-object-time-undefined' : '' }}">
             <span class="mp2-object-time-node" aria-hidden="true"></span>
-            <span class="mp2-object-time-label">Prossima scadenza</span>
+            <span class="mp2-object-time-label">Prossima Scadenza</span>
             @if ($contract->nextExpiryDate() !== null)
                 <time datetime="{{ $contract->nextExpiryDate()?->toDateString() }}">
                     {{ $contract->nextExpiryDate()?->format('d/m/Y') }}
                 </time>
             @else
-                <strong>Scadenza non definita</strong>
+                <strong>Scadenza Non Definita</strong>
             @endif
         </div>
     </div>

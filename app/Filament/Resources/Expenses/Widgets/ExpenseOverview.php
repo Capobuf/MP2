@@ -18,7 +18,7 @@ class ExpenseOverview extends StatsOverviewWidget
 {
     protected ?string $heading = 'Sintesi Spese';
 
-    protected ?string $description = 'Valori delle Spese nell’Esercizio globale selezionato.';
+    protected ?string $description = 'Valori delle Spese nell’Esercizio Globale Selezionato.';
 
     protected static bool $isLazy = false;
 
@@ -43,12 +43,12 @@ class ExpenseOverview extends StatsOverviewWidget
 
         return [
             Stat::make('Spese rappresentate', (clone $expenses)->count())
-                ->description("Spese registrate nell’Esercizio {$exercise->year}"),
+                ->description("Spese Registrate nell’Esercizio {$exercise->year}"),
             Stat::make('Totale Stime', self::formatMoney($company, $exercise->id, ExpenseLineType::Estimate))
-                ->description('Righe Stima attive delle Spese attive')
+                ->description('Righe Stima Attive delle Spese Attive')
                 ->color('primary'),
             Stat::make('Totale Effettivi', self::formatMoney($company, $exercise->id, ExpenseLineType::Actual))
-                ->description('Righe Effettivo attive delle Spese attive')
+                ->description('Righe Effettivo Attive delle Spese Attive')
                 ->color('success'),
             Stat::make('Senza Fornitore', (clone $expenses)->whereNull('supplier_id')->count())
                 ->description('Spese senza Fornitore nell’Esercizio'),

@@ -11,6 +11,6 @@ class ListProposals extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Decisioni di piano isolate dalla realtà effettiva fino all’approvazione.';
+        return 'Decisioni di Piano Isolate dalla Realtà Effettiva fino all’Approvazione.';
     }
 }

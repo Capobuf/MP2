@@ -24,9 +24,9 @@
     <div class="meta">
         <span><strong>Azienda:</strong> {{ $report->header['company_name'] }}</span>
         <span><strong>Esercizio:</strong> {{ $report->header['exercise_year'] }}</span>
-        <span><strong>Riferimento iniziale:</strong> {{ $report->header['initial_reference'] ?? 'Non applicabile' }}</span>
-        <span><strong>Riferimento finale:</strong> {{ $report->header['final_reference'] ?? 'Non applicabile' }}</span>
-        <span><strong>Data economica:</strong> {{ $report->header['reference_date'] }}</span>
+        <span><strong>Riferimento Iniziale:</strong> {{ $report->header['initial_reference'] ?? 'Non applicabile' }}</span>
+        <span><strong>Riferimento Finale:</strong> {{ $report->header['final_reference'] ?? 'Non applicabile' }}</span>
+        <span><strong>Data Economica:</strong> {{ $report->header['reference_date'] }}</span>
         <span><strong>Budget:</strong> {{ $report->header['budget_version'] ? 'v'.$report->header['budget_version'] : 'Non applicabile' }}</span>
         <span><strong>Tipo di Effettivo:</strong> {{ $report->header['actual_reference'] ?? 'Non applicabile' }}</span>
         <span><strong>Generato il:</strong> {{ $report->header['generated_at'] }}</span>
@@ -65,7 +65,7 @@
         </tbody></table>
     @endif
 
-    <h2>Dettaglio e riconciliazione</h2>
+    <h2>Dettaglio e Riconciliazione</h2>
     <table><thead><tr><th>Sorgente</th><th>Centro di Costo</th><th>Fornitore</th><th>Stato</th><th>Allocato</th><th>Effettivo</th><th>Riporto</th></tr></thead><tbody>
     @forelse ($report->sources as $source)
         <tr><td>{{ $source->label }}<br><small>{{ $source->originKey }}</small></td><td>{{ $source->costCenterLabel ?? 'Non classificato' }}</td><td>{{ $source->supplierLabel ?? 'Senza Fornitore' }}</td><td>{{ $source->state ?? '—' }}</td><td class="money">{{ $source->allocation }}</td><td class="money">{{ $source->actual }}</td><td class="money">{{ $source->carryover }}</td></tr>

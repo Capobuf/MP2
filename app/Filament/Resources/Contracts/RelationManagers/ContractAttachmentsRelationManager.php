@@ -45,7 +45,7 @@ class ContractAttachmentsRelationManager extends RelationManager
                     ->modalCancelActionLabel('Chiudi')
                     ->form(fn (Attachment $record): array => [AttachmentUpload::forStoredAttachment($record)]),
                 Action::make('download')->label('Scarica')->url(fn (Attachment $record): string => route('attachments.download', $record)),
-                Action::make('detach')->label('Rimuovi dall’oggetto')->color('warning')->requiresConfirmation()
+                Action::make('detach')->label('Rimuovi dall’Oggetto')->color('warning')->requiresConfirmation()
                     ->visible(fn (): bool => $this->canManage())
                     ->action(function (Attachment $record): void {
                         $actor = auth()->user();

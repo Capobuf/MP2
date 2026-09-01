@@ -18,7 +18,6 @@ use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -28,13 +27,11 @@ class ExerciseResource extends Resource
 {
     protected static ?string $model = Exercise::class;
 
-    protected static bool $shouldRegisterNavigation = false;
-
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCalendarDays;
+    protected static string|BackedEnum|null $navigationIcon = null;
 
     protected static ?string $navigationLabel = 'Esercizi';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Operatività';
+    protected static string|\UnitEnum|null $navigationGroup = 'Pianificazione';
 
     protected static ?string $modelLabel = 'esercizio';
 

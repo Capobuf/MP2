@@ -12,7 +12,7 @@ class ListCostCenters extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Anagrafica dei Centri di Costo usati per la classificazione annuale.';
+        return 'Anagrafica dei Centri di Costo Usati per la Classificazione Annuale.';
     }
 
     protected function getHeaderActions(): array

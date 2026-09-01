@@ -9,10 +9,12 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Width;
+use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -41,8 +43,9 @@ class PlatformPanelProvider extends PanelProvider
             ])
             ->plugin(
                 FilamentShieldPlugin::make()
-                    ->navigationGroup('Amministrazione')
+                    ->navigationGroup('Impostazioni')
                     ->navigationLabel('Ruoli')
+                    ->navigationSort(20)
                     ->modelLabel('Ruolo')
                     ->pluralModelLabel('Ruoli')
                     ->scopeToTenant(false),
@@ -56,6 +59,16 @@ class PlatformPanelProvider extends PanelProvider
                 'info' => Color::hex('#60A5FA'),
             ])
             ->maxContentWidth(Width::Full)
+            ->sidebarWidth('14rem')
+            ->collapsedSidebarWidth('3rem')
+            ->renderHook(
+                PanelsRenderHook::SIDEBAR_START,
+                fn () => view('filament.components.sidebar-brand'),
+            )
+            ->renderHook(
+                PanelsRenderHook::SIDEBAR_FOOTER,
+                fn () => view('filament.components.sidebar-collapse-control'),
+            )
             ->discoverResources(
                 in: app_path('Filament/Platform/Resources'),
                 for: 'App\Filament\Platform\Resources',
@@ -64,6 +77,11 @@ class PlatformPanelProvider extends PanelProvider
                 in: app_path('Filament/Platform/Pages'),
                 for: 'App\Filament\Platform\Pages',
             )
+            ->navigationGroups([
+                NavigationGroup::make('Impostazioni')
+                    ->collapsed(),
+            ])
+            ->sidebarCollapsibleOnDesktop()
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

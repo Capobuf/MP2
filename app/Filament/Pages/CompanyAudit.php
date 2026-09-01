@@ -54,11 +54,11 @@ class CompanyAudit extends Page implements HasTable
 
     protected static ?string $navigationLabel = 'Timeline';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Controllo';
+    protected static ?string $navigationParentItem = 'Panoramica';
 
     protected static ?string $title = 'Timeline Azienda';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 20;
 
     public ?int $expense = null;
 
@@ -138,7 +138,7 @@ class CompanyAudit extends Page implements HasTable
             })
             ->columns([
                 TextColumn::make('created_at')
-                    ->label('Data e ora')
+                    ->label('Data e Ora')
                     ->dateTime('d/m/Y H:i:s', timezone: $this->company()->timezone),
                 TextColumn::make('event_type')
                     ->label('Evento')
@@ -154,7 +154,7 @@ class CompanyAudit extends Page implements HasTable
                     ->label('Decorrenza')
                     ->date('d/m/Y'),
                 TextColumn::make('affected_exercise_ids')
-                    ->label('Esercizi interessati')
+                    ->label('Esercizi Interessati')
                     ->state(fn (AuditEvent $record): string => self::formatExercises($record))
                     ->placeholder('—'),
                 TextColumn::make('beneficiary.email')->label('Beneficiario')->placeholder('—')
@@ -167,12 +167,12 @@ class CompanyAudit extends Page implements HasTable
                         default => '—',
                     })->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('previous_value')
-                    ->label('Valore precedente')
+                    ->label('Valore Precedente')
                     ->state(fn (AuditEvent $record): string => self::formatValue($record, $record->previous_value))
                     ->wrap()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('new_value')
-                    ->label('Valore nuovo')
+                    ->label('Valore Nuovo')
                     ->state(fn (AuditEvent $record): string => self::formatValue($record, $record->new_value))
                     ->wrap()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -210,13 +210,13 @@ class CompanyAudit extends Page implements HasTable
                     ->form([
                         Placeholder::make('detail_effective_from')->label('Decorrenza')
                             ->content(fn (AuditEvent $record): string => self::formatEffectiveDate($record)),
-                        Placeholder::make('detail_exercises')->label('Esercizi interessati')
+                        Placeholder::make('detail_exercises')->label('Esercizi Interessati')
                             ->content(fn (AuditEvent $record): string => self::formatExercises($record)),
                         Placeholder::make('detail_actor')->label('Autore')
                             ->content(fn (AuditEvent $record): string => $record->actor->name),
-                        Placeholder::make('detail_previous')->label('Valore precedente')
+                        Placeholder::make('detail_previous')->label('Valore Precedente')
                             ->content(fn (AuditEvent $record): string => self::formatValue($record, $record->previous_value)),
-                        Placeholder::make('detail_new')->label('Valore nuovo')
+                        Placeholder::make('detail_new')->label('Valore Nuovo')
                             ->content(fn (AuditEvent $record): string => self::formatValue($record, $record->new_value)),
                         Placeholder::make('detail_allocated')->label('Impatto Allocato')
                             ->content(fn (AuditEvent $record): string => self::formatImpact($record->allocated_impact_by_exercise, $record)),
@@ -228,9 +228,9 @@ class CompanyAudit extends Page implements HasTable
                             ->content(fn (AuditEvent $record): string => self::formatReference($record)),
                         Placeholder::make('detail_overspend')->label('Sovraspesa')
                             ->content(fn (AuditEvent $record): string => self::formatOverspend($record)),
-                        Placeholder::make('detail_operation')->label('Identità operazione')
+                        Placeholder::make('detail_operation')->label('Identità Operazione')
                             ->content(fn (AuditEvent $record): string => $record->operation_id),
-                        Placeholder::make('detail_sequence')->label('Sequenza evento')
+                        Placeholder::make('detail_sequence')->label('Sequenza Evento')
                             ->content(fn (AuditEvent $record): string => (string) $record->event_sequence),
                     ]),
             ])
@@ -289,7 +289,7 @@ class CompanyAudit extends Page implements HasTable
             ProjectExerciseClassification::class => 'Classificazione Progetto',
             Contract::class => 'Contratto',
             ContractLifecycleFact::class => 'Evento Contratto',
-            ContractRenewalConfiguration::class => 'Configurazione rinnovo',
+            ContractRenewalConfiguration::class => 'Configurazione Rinnovo',
             ContractExerciseClassification::class => 'Classificazione Contratto',
             ProjectContractLink::class => 'Collegamento Progetto-Contratto',
             Attachment::class => 'Allegato',
@@ -319,7 +319,7 @@ class CompanyAudit extends Page implements HasTable
                 'phone' => 'Telefono',
                 'email' => 'Email',
                 'notes' => 'Note',
-                'role_tags' => 'Tag di ruolo',
+                'role_tags' => 'Tag di Ruolo',
             ],
             CostCenter::class => [
                 'name' => 'Denominazione',
@@ -351,8 +351,8 @@ class CompanyAudit extends Page implements HasTable
                 'type' => 'Tipo',
                 'amount' => 'Importo',
                 'quantity' => 'Quantità',
-                'unit_amount' => 'Importo unitario',
-                'unit_of_measure' => 'Unità di misura',
+                'unit_amount' => 'Importo Unitario',
+                'unit_of_measure' => 'Unità di Misura',
                 'note' => 'Nota',
                 'annulled' => 'Annullata',
             ],
@@ -361,8 +361,8 @@ class CompanyAudit extends Page implements HasTable
                 'title' => 'Titolo',
                 'description' => 'Descrizione',
                 'notes' => 'Note',
-                'initial_state' => 'Stato iniziale',
-                'initial_effective_date' => 'Efficacia iniziale',
+                'initial_state' => 'Stato Iniziale',
+                'initial_effective_date' => 'Efficacia Iniziale',
                 'archived_at' => 'Archivio',
                 'revision' => 'Revisione',
             ],
@@ -371,10 +371,10 @@ class CompanyAudit extends Page implements HasTable
                 'state' => 'Stato',
                 'from_state' => 'Da',
                 'to_state' => 'A',
-                'effective_date' => 'Data efficacia',
+                'effective_date' => 'Data Efficacia',
                 'reason' => 'Motivo',
                 'annulled_at' => 'Annullata il',
-                'annulment_reason' => 'Motivo annullamento',
+                'annulment_reason' => 'Motivo Annullamento',
             ],
             ProjectExerciseClassification::class => [
                 'project_id' => 'Progetto',
@@ -385,9 +385,9 @@ class CompanyAudit extends Page implements HasTable
                 'origin_key' => 'OriginKey',
                 'title' => 'Titolo',
                 'supplier_id' => 'Fornitore',
-                'contractual_start_date' => 'Data inizio',
-                'next_expiry_date' => 'Prossima scadenza',
-                'automatic_renewal' => 'Rinnovo automatico',
+                'contractual_start_date' => 'Data Inizio',
+                'next_expiry_date' => 'Prossima Scadenza',
+                'automatic_renewal' => 'Rinnovo Automatico',
                 'archived_at' => 'Archivio',
                 'revision' => 'Revisione',
             ],
@@ -408,7 +408,7 @@ class CompanyAudit extends Page implements HasTable
                 'expense_id' => 'Spesa',
                 'expense_line_id' => 'Riga',
                 'original_name' => 'File',
-                'media_type' => 'Tipo media',
+                'media_type' => 'Tipo Media',
                 'size_bytes' => 'Dimensione',
                 'sha256' => 'SHA-256',
                 'detached_at' => 'Rimosso il',

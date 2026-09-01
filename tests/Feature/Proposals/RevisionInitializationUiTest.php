@@ -44,7 +44,7 @@ it('creates a revision from an open exercise and shows live versus budget contex
     Livewire::test(ViewProposal::class, ['record' => $revision->getRouteKey()])
         ->assertSuccessful()
         ->assertSee('Revisione')
-        ->assertSee('Budget di riferimento')
+        ->assertSee('Budget di Riferimento')
         ->assertSee('realtà corrente');
 });
 

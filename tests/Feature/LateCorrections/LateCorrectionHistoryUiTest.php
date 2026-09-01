@@ -75,15 +75,15 @@ it('keeps Closing values distinct from both immutable local evidence collections
         ->assertSuccessful()
         ->assertSee('Effettivo alla Chiusura')
         ->assertSee('100,00')
-        ->assertSee('Correzioni tardive')
+        ->assertSee('Correzioni Tardive')
         ->assertSee('Correzione visibile dalla Chiusura')
         ->assertSee('evidenza-correzione.pdf')
-        ->assertSee('Annotazioni di errore storico')
+        ->assertSee('Annotazioni di Errore Storico')
         ->assertSee('Annotazione visibile dalla Chiusura')
         ->assertSee('Nessun impatto economico')
         ->assertSee('evidenza-annotazione.pdf')
         ->assertDontSee('Previsto')
-        ->assertDontSee('Non previsto')
+        ->assertDontSee('Non Previsto')
         ->assertDontSee('Esporta');
 
     expect($snapshot->refresh()->total_closing_actual)->toBe('100.00');

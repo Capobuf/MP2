@@ -23,13 +23,13 @@ final class BusinessDataBackup extends Page
 
     protected string $view = 'filament.pages.business-data-backup';
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCircleStack;
+    protected static string|BackedEnum|null $navigationIcon = null;
 
-    protected static ?string $navigationLabel = 'Backup dati';
+    protected static ?string $navigationLabel = 'Backup Dati';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Amministrazione';
+    protected static string|\UnitEnum|null $navigationGroup = 'Impostazioni';
 
-    protected static ?string $title = 'Backup dati aziendali';
+    protected static ?string $title = 'Backup Dati Aziendali';
 
     protected static ?int $navigationSort = 30;
 
@@ -43,7 +43,7 @@ final class BusinessDataBackup extends Page
     {
         return [
             Action::make('importCompany')
-                ->label('Importa nuova Azienda')
+                ->label('Importa Nuova Azienda')
                 ->icon(Heroicon::OutlinedArrowUpTray)
                 ->color('gray')
                 ->url(ImportCompanyBackup::getUrl(panel: 'platform'))
@@ -63,7 +63,7 @@ final class BusinessDataBackup extends Page
                 ->requiresConfirmation()
                 ->action(function (): void {
                     $filename = app(StoreBusinessBackupOnDrive::class)->execute($this->company(), $this->actor());
-                    Notification::make()->success()->title('Backup salvato su Drive')->body($filename)->send();
+                    Notification::make()->success()->title('Backup Salvato su Drive')->body($filename)->send();
                 }),
         ];
     }

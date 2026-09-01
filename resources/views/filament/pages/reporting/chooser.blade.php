@@ -1,7 +1,7 @@
 <section class="mp2-report-chooser" aria-labelledby="report-chooser-title">
     <div class="mp2-report-chooser-heading">
         <p class="mp2-report-kicker">Reportistica MP2</p>
-        <h2 id="report-chooser-title">Scegli il report</h2>
+        <h2 id="report-chooser-title">Scegli il Report</h2>
         <p>Seleziona una famiglia. Esercizio, Budget ed Effettivo resteranno scelte esplicite.</p>
     </div>
 

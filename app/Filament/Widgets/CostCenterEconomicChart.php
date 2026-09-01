@@ -10,7 +10,7 @@ class CostCenterEconomicChart extends EconomicChartWidget
 
     protected ?string $heading = 'Centri di Costo';
 
-    protected ?string $emptyStateHeading = 'Nessun Centro di Costo disponibile';
+    protected ?string $emptyStateHeading = 'Nessun Centro di Costo Disponibile';
 
     protected function getType(): string
     {
@@ -27,10 +27,10 @@ class CostCenterEconomicChart extends EconomicChartWidget
         $count = count($data['cost_centers'] ?? []);
 
         return match (true) {
-            $count > self::RADAR_AXIS_LIMIT => "{$count} Centri di Costo · barre orizzontali per preservare tutti i dati oltre 12 assi.",
-            $count > 0 && $count < 3 => "{$count} Centri di Costo · barre orizzontali perché un Radar richiede almeno tre assi leggibili.",
-            $data['has_budget'] ?? false => 'Budget selezionato, Allocato Corrente ed Effettivo per classificazione annuale.',
-            default => 'Allocato Corrente ed Effettivo per classificazione annuale.',
+            $count > self::RADAR_AXIS_LIMIT => "{$count} Centri di Costo · Barre Orizzontali per Preservare Tutti i Dati oltre 12 Assi.",
+            $count > 0 && $count < 3 => "{$count} Centri di Costo · Barre Orizzontali perché un Radar Richiede Almeno Tre Assi Leggibili.",
+            $data['has_budget'] ?? false => 'Budget Selezionato, Allocato Corrente ed Effettivo per Classificazione Annuale.',
+            default => 'Allocato Corrente ed Effettivo per Classificazione Annuale.',
         };
     }
 
@@ -49,7 +49,7 @@ class CostCenterEconomicChart extends EconomicChartWidget
             'labels' => array_column($centers, 'label'),
             'sourceUrls' => array_column($centers, 'url'),
             'datasets' => [
-                ...($hasBudget ? [['label' => 'Budget selezionato', 'data' => array_map('floatval', array_column($centers, 'budget')), 'borderColor' => '#91A3A8', 'backgroundColor' => 'rgba(145, 163, 168, 0.12)', 'borderWidth' => 2, 'pointRadius' => 3]] : []),
+                ...($hasBudget ? [['label' => 'Budget Selezionato', 'data' => array_map('floatval', array_column($centers, 'budget')), 'borderColor' => '#91A3A8', 'backgroundColor' => 'rgba(145, 163, 168, 0.12)', 'borderWidth' => 2, 'pointRadius' => 3]] : []),
                 ['label' => 'Allocato Corrente', 'data' => array_map('floatval', array_column($centers, 'allocation')), 'borderColor' => '#39D5C4', 'backgroundColor' => 'rgba(57, 213, 196, 0.14)', 'borderWidth' => 2, 'pointRadius' => 3],
                 ['label' => 'Effettivo', 'data' => array_map('floatval', array_column($centers, 'actual')), 'borderColor' => '#60A5FA', 'backgroundColor' => 'rgba(96, 165, 250, 0.13)', 'borderWidth' => 2, 'pointRadius' => 3],
             ],
@@ -68,7 +68,16 @@ class CostCenterEconomicChart extends EconomicChartWidget
                 __TYPE_OPTIONS__
                 interaction: { mode: 'index', intersect: false },
                 plugins: {
-                    legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 16 } },
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            boxWidth: 12,
+                            boxHeight: 8,
+                            padding: 16,
+                            font: { family: getComputedStyle(document.body).fontFamily },
+                        },
+                    },
                     tooltip: { padding: 12, callbacks: { label: (context) => `${context.dataset.label}: ${new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(__TOOLTIP_VALUE__)}` } },
                 },
                 onClick: (event, elements, chart) => {

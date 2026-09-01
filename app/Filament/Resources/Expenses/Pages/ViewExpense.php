@@ -112,10 +112,10 @@ class ViewExpense extends ViewRecord
     private function moveOrReclassifyAction(): Action
     {
         return Action::make('moveOrReclassify')
-            ->label('Sposta o riclassifica')
+            ->label('Sposta o Riclassifica')
             ->visible(fn (Expense $record): bool => ExpenseResource::canEdit($record))
-            ->modalHeading('Sposta o riclassifica la Spesa')
-            ->modalSubmitActionLabel('Conferma modifica')
+            ->modalHeading('Sposta o Riclassifica la Spesa')
+            ->modalSubmitActionLabel('Conferma Modifica')
             ->modalWidth(Width::FourExtraLarge)
             ->form($this->impactForm())
             ->action(function (array $data, Expense $record): void {
@@ -173,7 +173,7 @@ class ViewExpense extends ViewRecord
                     Select::make('supplier_id')->label('Fornitore')->options($this->supplierOptions($expense))
                         ->default($expense->supplier_id)->placeholder('Nessuno')->searchable()->live()->afterStateUpdated($invalidate)
                         ->createOptionForm([
-                            TextInput::make('legal_name')->label('Ragione sociale')->required()->maxLength(255),
+                            TextInput::make('legal_name')->label('Ragione Sociale')->required()->maxLength(255),
                             TextInput::make('vat_number')->label('Partita IVA')->maxLength(64),
                             Textarea::make('notes')->label('Note'),
                         ])
@@ -184,40 +184,40 @@ class ViewExpense extends ViewRecord
                             return app(CreateSupplier::class)->execute($actor, $expense->company, $data, (string) Str::uuid())->id;
                         })
                         ->createOptionAction(fn (Action $action): Action => $action
-                            ->label('Crea fornitore')
-                            ->modalHeading('Nuovo fornitore')
+                            ->label('Crea Fornitore')
+                            ->modalHeading('Nuovo Fornitore')
                             ->visible(fn (): bool => $this->canCreateSupplier($expense)))
                         ->visible(fn (Get $get): bool => blank($get('contract_id'))),
                     Select::make('direct_cost_center_id')->label('Centro di Costo')->options($this->costCenterOptions($expense))
                         ->default($expense->direct_cost_center_id)->placeholder('Non classificata')->searchable()->live()->afterStateUpdated($invalidate)
                         ->visible(fn (Get $get): bool => blank($get('project_id')) && blank($get('contract_id'))),
-                    Textarea::make('reason')->label('Motivo della modifica')
+                    Textarea::make('reason')->label('Motivo della Modifica')
                         ->helperText('Obbligatorio quando la modifica riclassifica Effettivi o interviene dopo un Budget approvato.')
                         ->visible(fn (Get $get): bool => $this->requiresChangeReason($get, $expense))
                         ->required(fn (Get $get): bool => $this->requiresChangeReason($get, $expense))
                         ->dehydrated(fn (Get $get): bool => $this->requiresChangeReason($get, $expense))
                         ->live()->afterStateUpdated($invalidate)->columnSpanFull(),
                 ])->columns(2),
-            Section::make('Informazioni richieste')
+            Section::make('Informazioni Richieste')
                 ->description('Compaiono soltanto le dichiarazioni necessarie per la destinazione selezionata.')
                 ->schema([
-                    Select::make('actual_kind')->label('Tipo di attribuzione degli Effettivi')
+                    Select::make('actual_kind')->label('Tipo di Attribuzione degli Effettivi')
                         ->options(fn (Get $get): array => filled($get('contract_id')) ? ContractActualKind::options() : ProjectActualKind::options())
                         ->placeholder('Ordinario')
                         ->visible(fn (Get $get): bool => $this->requiresActivityDeclaration($get, $expense))
                         ->live()->afterStateUpdated($invalidate),
                     Checkbox::make('open_project')
-                        ->label('Apri il Progetto insieme allo spostamento')
+                        ->label('Apri il Progetto insieme allo Spostamento')
                         ->helperText('Il Progetto selezionato è Pianificato: per attribuirgli gli Effettivi verrà aperto nella stessa operazione.')
                         ->visible(fn (Get $get): bool => $this->requiresProjectOpening($get, $expense))
                         ->accepted()->required()->live()->afterStateUpdated($invalidate),
                     Textarea::make('activity_note')
-                        ->label('Motivazione dell’attribuzione')
+                        ->label('Motivazione dell’Attribuzione')
                         ->helperText('Obbligatoria per Effettivi tardivi, rimborsi, costi di cessazione o correzioni.')
                         ->visible(fn (Get $get): bool => $this->requiresActivityNote($get, $expense))
                         ->required()->live()->afterStateUpdated($invalidate)->columnSpanFull(),
                     Textarea::make('overspend_note')
-                        ->label('Motivazione della sovraspesa')
+                        ->label('Motivazione della Sovraspesa')
                         ->helperText('Questa modifica crea o aumenta una sovraspesa e l’impostazione aziendale richiede una nota.')
                         ->visible(fn (Get $get): bool => $this->requiresOverspendNote($get, $expense))
                         ->required()->live()->afterStateUpdated($invalidate)->columnSpanFull(),
@@ -230,7 +230,7 @@ class ViewExpense extends ViewRecord
                 ->visible(fn (Get $get): bool => $this->requiresActivityDeclaration($get, $expense)
                     || $this->requiresOverspendNote($get, $expense)
                     || $this->requiresSupplierReplacement($get, $expense)),
-            Section::make('Riepilogo della modifica')
+            Section::make('Riepilogo della Modifica')
                 ->schema([
                     Placeholder::make('impact_preview')->hiddenLabel()
                         ->content(fn (Get $get): View => $this->impactPreview($get, $expense)),

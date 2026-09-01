@@ -97,7 +97,7 @@ it('links Proposal and Budget to their tenant-scoped immutable timeline', functi
     Livewire::withQueryParams(['budget' => $budget->id])
         ->test(CompanyAudit::class)
         ->assertCanSeeTableRecords($budgetEvents, inOrder: true)
-        ->assertSee('Budget creato')
+        ->assertSee('Budget Creato')
         ->mountTableAction('details', record: $budgetCreated)
         ->assertSchemaComponentExists('detail_new')
         ->assertSchemaComponentExists('detail_reference')

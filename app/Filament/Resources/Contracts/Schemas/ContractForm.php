@@ -19,7 +19,6 @@ use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Hidden;
-use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Repeater\TableColumn;
@@ -45,7 +44,7 @@ class ContractForm
     public static function configure(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('Dati principali')
+            Section::make('Dati Principali')
                 ->description('Inserisci le informazioni che identificano il Contratto. Le date di fattura e pagamento appartengono alle Spese.')
                 ->schema([
                     TextInput::make('title')->label('Titolo')->required()->maxLength(255),
@@ -53,7 +52,7 @@ class ContractForm
                         ->options(fn (): array => self::supplierOptions())
                         ->searchable()
                         ->createOptionForm([
-                            TextInput::make('legal_name')->label('Ragione sociale')->required()->maxLength(255),
+                            TextInput::make('legal_name')->label('Ragione Sociale')->required()->maxLength(255),
                             TextInput::make('vat_number')->label('Partita IVA')->maxLength(64),
                             Textarea::make('notes')->label('Note'),
                         ])
@@ -65,8 +64,8 @@ class ContractForm
                             return app(CreateSupplier::class)->execute($actor, $company, $data, (string) Str::uuid())->id;
                         })
                         ->createOptionAction(fn (Action $action): Action => $action
-                            ->label('Crea fornitore')
-                            ->modalHeading('Nuovo fornitore')
+                            ->label('Crea Fornitore')
+                            ->modalHeading('Nuovo Fornitore')
                             ->visible(fn (): bool => self::canCreateSupplier()))
                         ->required(),
                     self::costCenterSelect('default_cost_center_id')
@@ -81,13 +80,13 @@ class ContractForm
                         ->helperText('Opzionali. Potrai aggiungerne altri dalla scheda del Contratto.')
                         ->columnSpanFull(),
                 ])->columns(['default' => 1, 'md' => 2, 'xl' => 3])->columnSpanFull(),
-            Section::make('Condizioni economiche')
+            Section::make('Condizioni Economiche')
                 ->description('Ogni riga definisce un importo ricorrente; non sono calcolati prorata. “Valida fino al” termina solo quella condizione economica: non determina la scadenza del Contratto.')
                 ->schema([
                     Repeater::make('conditions')
                         ->hiddenLabel()
                         ->schema([
-                            DecimalInput::make('amount')->label('Importo per ciclo')->minValue(0)->prefix('€')->required(),
+                            DecimalInput::make('amount')->label('Importo per Ciclo')->minValue(0)->prefix('€')->required(),
                             Select::make('cycle')->label('Frequenza')->options(ContractCycleType::options())->native(false)->required(),
                             Select::make('attribution_mode')->label('Attribuzione')->options(ContractAttributionMode::options())->native(false)->required(),
                             self::dateInput('valid_from', 'Valida dal')->required()
@@ -123,12 +122,13 @@ class ContractForm
                         ->extraAttributes(['class' => 'mp2-economic-conditions'])
                         ->columnSpanFull(),
                 ])->columnSpanFull(),
-            Section::make('Termini contrattuali')
+            Section::make('Termini Contrattuali')
                 ->description('Il sistema propone scadenza e rinnovo dall’ultima condizione economica con termine. Verifica i valori: restano dati contrattuali distinti.')
                 ->schema([
                     Hidden::make('suggested_contractual_start_date')->dehydrated(false),
                     Hidden::make('suggested_next_expiry_date')->dehydrated(false),
                     Hidden::make('suggested_renewal_duration_months')->dehydrated(false),
+                    Hidden::make('duration_type_manually_selected')->default(false)->dehydrated(false),
                     Hidden::make('renewal_effective_from'),
                     Grid::make(['default' => 1, 'md' => 2])
                         ->schema([
@@ -140,32 +140,31 @@ class ContractForm
                                     ->required(fn (Get $get): bool => $get('duration_type') === 'fixed')
                                     ->visible(fn (Get $get): bool => $get('duration_type') === 'fixed')
                                     ->helperText('Data in cui il periodo contrattuale corrente termina o si rinnova; non è la fine di validità di un importo.'),
-                                TextInput::make('renewal_duration_months')->label('Rinnovo ogni')->numeric()->minValue(1)
+                                TextInput::make('renewal_duration_months')->label('Rinnovo Ogni')->numeric()->minValue(1)
                                     ->suffix('mesi')
                                     ->required(fn (Get $get): bool => $get('duration_type') === 'fixed' && (bool) $get('automatic_renewal'))
                                     ->visible(fn (Get $get): bool => $get('duration_type') === 'fixed' && (bool) $get('automatic_renewal')),
                             ]),
                             Group::make([
-                                Placeholder::make('duration_question')
-                                    ->label('Durata contrattuale')
-                                    ->content('Il Contratto ha una prossima scadenza?'),
                                 Radio::make('duration_type')
-                                    ->label('Prossima scadenza?')
-                                    ->hiddenLabel()
+                                    ->label('Durata Contrattuale')
                                     ->options([
-                                        'fixed' => 'Sì, la scadenza è definita',
-                                        'indefinite' => 'No, è senza scadenza',
-                                        'undefined' => 'La scadenza non è ancora definita',
+                                        'fixed' => 'Con Scadenza',
+                                        'indefinite' => 'Senza Scadenza',
+                                        'undefined' => 'Scadenza da Definire',
                                     ])
                                     ->descriptions([
                                         'fixed' => 'Indicherai la data e cosa accade quando viene raggiunta.',
                                         'indefinite' => 'Il Contratto prosegue fino a una cessazione esplicita.',
                                         'undefined' => 'Il Contratto prosegue, ma scadenze e rinnovi non possono ancora essere calcolati.',
                                     ])
+                                    ->default('undefined')
                                     ->required()
                                     ->live()
                                     ->dehydrated(false)
                                     ->afterStateUpdated(function (Get $get, Set $set, mixed $state): void {
+                                        $set('duration_type_manually_selected', true);
+
                                         if ($state === 'fixed') {
                                             if ($get('notice_days') === null || $get('notice_days') === '') {
                                                 $set('notice_days', 30);
@@ -180,7 +179,7 @@ class ContractForm
                                         $set('notice_days', null);
                                         $set('automatic_renewal', $state === 'undefined');
                                     }),
-                                Toggle::make('automatic_renewal')->label('Alla scadenza si rinnova automaticamente')->default(true)->live()
+                                Toggle::make('automatic_renewal')->label('Alla Scadenza si Rinnova Automaticamente')->default(true)->live()
                                     ->helperText(fn (Get $get): string => (bool) $get('automatic_renewal')
                                         ? 'Il Contratto resta Attivo e la prossima scadenza viene avanzata.'
                                         : 'Il Contratto termina alla scadenza indicata e risulta Cessato dal giorno successivo.')
@@ -195,22 +194,12 @@ class ContractForm
                                     })
                                     ->dehydratedWhenHidden()
                                     ->visible(fn (Get $get): bool => $get('duration_type') === 'fixed'),
-                                TextInput::make('notice_days')->label('Preavviso di disdetta')->numeric()->minValue(0)
+                                TextInput::make('notice_days')->label('Preavviso di Disdetta')->numeric()->minValue(0)
                                     ->suffix('giorni')
                                     ->helperText('Opzionale, in giorni di calendario. Non è una scadenza di pagamento.')
                                     ->visible(fn (Get $get): bool => $get('duration_type') === 'fixed'),
                             ]),
                         ])
-                        ->columnSpanFull(),
-                    Placeholder::make('indefinite_duration')
-                        ->hiddenLabel()
-                        ->content('Nessuna scadenza o data limite di disdetta verrà calcolata. Il Contratto resterà Attivo fino a una cessazione esplicita.')
-                        ->visible(fn (Get $get): bool => $get('duration_type') === 'indefinite')
-                        ->columnSpanFull(),
-                    Placeholder::make('undefined_expiry')
-                        ->hiddenLabel()
-                        ->content('La scadenza non è ancora definita. Le condizioni economiche senza “Valida fino al” continuano a generare Stime, ma non vengono calcolati rinnovi, termini di disdetta o promemoria futuri.')
-                        ->visible(fn (Get $get): bool => $get('duration_type') === 'undefined')
                         ->columnSpanFull(),
                 ])->columnSpanFull(),
             Section::make('Avanzate')
@@ -271,8 +260,8 @@ class ContractForm
                 return app(CreateCostCenter::class)->execute($actor, $company, $data, (string) Str::uuid())->id;
             })
             ->createOptionAction(fn (Action $action): Action => $action
-                ->label('Crea centro di costo')
-                ->modalHeading('Nuovo centro di costo')
+                ->label('Crea Centro di Costo')
+                ->modalHeading('Nuovo Centro di Costo')
                 ->visible(fn (): bool => self::canCreateCostCenter()));
     }
 
@@ -352,12 +341,15 @@ class ContractForm
 
         $previousExpirySuggestion = $get($rootPath.'suggested_next_expiry_date');
         $previousDurationSuggestion = $get($rootPath.'suggested_renewal_duration_months');
+        $durationType = $get($rootPath.'duration_type');
+        $durationTypeManuallySelected = (bool) $get($rootPath.'duration_type_manually_selected');
 
         $validFrom = is_array($latestCondition) ? self::dateString($latestCondition['valid_from'] ?? null) : null;
         $validTo = is_array($latestCondition) ? self::dateString($latestCondition['valid_to'] ?? null) : null;
 
         if ($validFrom === null || $validTo === null) {
-            if (self::dateString($get($rootPath.'next_expiry_date')) === self::dateString($previousExpirySuggestion)) {
+            $expiryWasSuggested = self::dateString($get($rootPath.'next_expiry_date')) === self::dateString($previousExpirySuggestion);
+            if ($expiryWasSuggested) {
                 $set($rootPath.'next_expiry_date', null);
             }
             if ((string) $get($rootPath.'renewal_duration_months') === (string) $previousDurationSuggestion) {
@@ -367,12 +359,24 @@ class ContractForm
             $set($rootPath.'suggested_next_expiry_date', null);
             $set($rootPath.'suggested_renewal_duration_months', null);
 
+            if (! $durationTypeManuallySelected && $durationType === 'fixed' && $expiryWasSuggested) {
+                $set($rootPath.'duration_type', 'undefined');
+                $set($rootPath.'notice_days', null);
+                $set($rootPath.'automatic_renewal', true);
+            }
+
             return;
         }
 
-        $durationType = $get($rootPath.'duration_type');
-        if (filled($durationType) && $durationType !== 'fixed') {
+        if ($durationType !== 'fixed' && $durationTypeManuallySelected) {
             return;
+        }
+
+        if ($durationType !== 'fixed') {
+            $set($rootPath.'duration_type', 'fixed');
+            if ($get($rootPath.'notice_days') === null || $get($rootPath.'notice_days') === '') {
+                $set($rootPath.'notice_days', 30);
+            }
         }
 
         $suggestedExpiry = (string) $latestCondition['valid_to'];
@@ -392,10 +396,6 @@ class ContractForm
 
         $set($rootPath.'suggested_next_expiry_date', $suggestedExpiry);
         $set($rootPath.'suggested_renewal_duration_months', $suggestedDuration);
-
-        if (blank($durationType)) {
-            $set($rootPath.'duration_type', 'fixed', shouldCallUpdatedHooks: true);
-        }
     }
 
     private static function suggestedRenewalMonths(string $validFrom, string $validTo): int

@@ -31,7 +31,7 @@ it('approves an aligned proposal with new evidence and redirects to budget', fun
     $this->actingAs($user);
     Filament::setTenant(($company)->tenantCompany);
     $component = Livewire::test(ViewProposal::class, ['record' => $proposal->id])
-        ->assertActionExists('approveBudget')->assertSee('Allocato base')->assertSee('Allocato risultante')->assertSee('Sorgenti interessate')->assertSee('Budget che restano invariati');
+        ->assertActionExists('approveBudget')->assertSee('Allocato Base')->assertSee('Allocato Risultante')->assertSee('Sorgenti Interessate')->assertSee('Budget che Restano Invariati');
     $approvalOperationId = $component->get('approvalOperationId');
     $component->mountAction('approveBudget')->assertSchemaComponentExists('final_impact');
     expect($component->get('approvalOperationId'))->toBe($approvalOperationId)->and(Str::isUuid($approvalOperationId))->toBeTrue();

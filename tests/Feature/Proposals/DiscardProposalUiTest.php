@@ -33,5 +33,5 @@ it('discards from the proposal page and leaves terminal history readable', funct
     Livewire::test(ViewProposal::class, ['record' => $proposal->id])
         ->assertActionHidden('discardProposal')
         ->assertSee('Scartata')
-        ->assertSee('Storico decisioni');
+        ->assertSee('Storico Decisioni');
 });

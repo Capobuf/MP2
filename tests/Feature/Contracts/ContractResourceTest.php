@@ -76,8 +76,13 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
         ->assertSee('Le date di fattura e pagamento appartengono alle Spese.')
         ->assertSee('non sono calcolati prorata')
         ->assertSee('non determina la scadenza del Contratto')
-        ->assertSee('Il Contratto ha una prossima scadenza?')
-        ->assertSee('Sì, la scadenza è definita')
+        ->assertSee('Durata Contrattuale')
+        ->assertSee('Con Scadenza')
+        ->assertSee('Senza Scadenza')
+        ->assertSee('Scadenza da Definire')
+        ->assertDontSee('Sì, la scadenza è definita')
+        ->assertDontSee('Nessuna scadenza o data limite di disdetta verrà calcolata.')
+        ->assertDontSee('Le condizioni economiche senza “Valida fino al” continuano a generare Stime')
         ->assertDontSee('Salva & nuovo')
         ->assertFormFieldExists('title')
         ->assertFormFieldExists('supplier_id')
@@ -95,6 +100,9 @@ it('creates a Contract through the tenant form and exposes only S5 inputs', func
         ->assertFormFieldDoesNotExist('proposal_id')
         ->assertFormFieldDoesNotExist('budget_id')
         ->assertFormSet(function (array $state) use ($exercise): array {
+            expect($state['duration_type'])->toBe('undefined')
+                ->and($state['automatic_renewal'])->toBeTrue();
+
             expect(array_values($state['classifications']))->toBe([[
                 'exercise_id' => $exercise->id,
                 'cost_center_selection' => '__default__',
@@ -262,6 +270,10 @@ it('suggests editable contractual terms from the latest bounded economic conditi
             'renewal_duration_months' => 12,
             'notice_days' => 30,
         ])
+        ->assertFormFieldExists('next_expiry_date')
+        ->assertFormFieldExists('automatic_renewal')
+        ->assertFormFieldExists('renewal_duration_months')
+        ->assertFormFieldExists('notice_days')
         ->set('data.next_expiry_date', '31/01/2027')
         ->set('data.renewal_duration_months', 6)
         ->set('data.notice_days', 60)
@@ -273,6 +285,74 @@ it('suggests editable contractual terms from the latest bounded economic conditi
             'next_expiry_date' => '31/01/2027',
             'renewal_duration_months' => 6,
             'notice_days' => 60,
+        ]);
+});
+
+it('returns an automatic duration suggestion to undefined when the economic term disappears', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    grantContractResource($manager, $company);
+    $this->actingAs($manager);
+    Filament::setTenant(($company)->tenantCompany);
+
+    Livewire::test(CreateContract::class)
+        ->set('data.conditions', [
+            'first' => ['valid_from' => '01/01/2026', 'valid_to' => '31/12/2026'],
+        ])
+        ->assertFormSet([
+            'duration_type' => 'fixed',
+            'next_expiry_date' => '31/12/2026',
+            'renewal_duration_months' => 12,
+        ])
+        ->set('data.conditions', [
+            'first' => ['valid_from' => '01/01/2026', 'valid_to' => null],
+        ])
+        ->assertFormSet([
+            'duration_type' => 'undefined',
+            'next_expiry_date' => null,
+            'automatic_renewal' => true,
+            'renewal_duration_months' => null,
+            'notice_days' => null,
+        ])
+        ->assertFormFieldDoesNotExist('next_expiry_date')
+        ->assertFormFieldDoesNotExist('automatic_renewal')
+        ->assertFormFieldDoesNotExist('renewal_duration_months')
+        ->assertFormFieldDoesNotExist('notice_days');
+});
+
+it('preserves a manual duration choice during later economic-condition updates', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    grantContractResource($manager, $company);
+    $this->actingAs($manager);
+    Filament::setTenant(($company)->tenantCompany);
+
+    Livewire::test(CreateContract::class)
+        ->set('data.conditions', [
+            'first' => ['amount' => '100,00', 'valid_from' => '01/01/2026', 'valid_to' => '31/12/2026'],
+        ])
+        ->assertFormSet(['duration_type' => 'fixed'])
+        ->set('data.duration_type', 'indefinite')
+        ->set('data.conditions', [
+            'first' => ['amount' => '200,00', 'valid_from' => '01/01/2026', 'valid_to' => '31/12/2026'],
+        ])
+        ->assertFormSet([
+            'duration_type' => 'indefinite',
+            'next_expiry_date' => null,
+            'automatic_renewal' => false,
+            'renewal_duration_months' => null,
+            'notice_days' => null,
+        ])
+        ->set('data.duration_type', 'undefined')
+        ->set('data.conditions', [
+            'first' => ['amount' => '300,00', 'valid_from' => '01/01/2026', 'valid_to' => '31/12/2026'],
+        ])
+        ->assertFormSet([
+            'duration_type' => 'undefined',
+            'next_expiry_date' => null,
+            'automatic_renewal' => true,
+            'renewal_duration_months' => null,
+            'notice_days' => null,
         ]);
 });
 
@@ -338,16 +418,16 @@ it('lists and views tenant Contracts with undefined expiry and annual situations
         ->assertSee('Visibile')
         ->assertSee($contractA->supplier->legal_name)
         ->assertSee('Attivo')
-        ->assertSee('Scadenza non definita')
+        ->assertSee('Scadenza Non Definita')
         ->assertSee('Nessuna condizione economica vigente')
         ->assertSee('Non classificato')
-        ->assertSee('Situazioni annuali')
-        ->assertSee('Condizioni economiche')
-        ->assertSee('Rinnovi e scadenze')
-        ->assertSee('Ciclo di vita')
+        ->assertSee('Situazioni Annuali')
+        ->assertSee('Condizioni Economiche')
+        ->assertSee('Rinnovi e Scadenze')
+        ->assertSee('Ciclo di Vita')
         ->assertSee('Spese')
         ->assertSee('Classificazioni')
-        ->assertSee('Progetti collegati')
+        ->assertSee('Progetti Collegati')
         ->assertSee('Allegati')
         ->assertActionHidden('createContractActual')
         ->assertActionDoesNotExist('delete')
@@ -417,7 +497,7 @@ it('renders the canonical current agreement and selected Exercise economics', fu
         ->assertDontSee('CONDIZIONE TERMINATA')
         ->assertDontSee('CONDIZIONE FUTURA')
         ->assertDontSee('CONDIZIONE ANNULLATA')
-        ->assertSee('Esercizio selezionato')
+        ->assertSee('Esercizio Selezionato')
         ->assertSee('2025')
         ->assertSee('1.200,00')
         ->assertSee('250,00')
@@ -455,13 +535,13 @@ it('previews a long annual allocation composition and exposes every cycle on dem
 
     $component = Livewire::test(ViewContract::class, ['record' => $contract->getRouteKey()])
         ->assertSuccessful()
-        ->assertSee('12 cicli compongono l’Allocato')
-        ->assertSee('Primo ciclo incluso')
-        ->assertSee('Ultimo ciclo incluso')
-        ->assertSee('Vedi tutti i 12 cicli')
+        ->assertSee('12 Cicli Compongono l’Allocato')
+        ->assertSee('Primo Ciclo Incluso')
+        ->assertSee('Ultimo Ciclo Incluso')
+        ->assertSee('Vedi Tutti i 12 Cicli')
         ->assertSeeHtml('mp2-list-preview-has-more')
         ->assertDontSeeHtml('<th scope="col">Composizione</th>')
-        ->assertSee('Dettaglio allocato 2026');
+        ->assertSee('Dettaglio Allocato 2026');
 
     $component->mountAction(TestAction::make('allocationDetail')->arguments(['year' => 2026]))
         ->assertMountedActionModalSee('Dettaglio Allocato 2026')
@@ -499,8 +579,8 @@ it('shows the complete allocation list without a fade when no cycles are hidden'
 
     Livewire::test(ViewContract::class, ['record' => $contract->getRouteKey()])
         ->assertSuccessful()
-        ->assertSee('4 cicli compongono l’Allocato')
-        ->assertDontSee('Vedi tutti i 4 cicli')
+        ->assertSee('4 Cicli Compongono l’Allocato')
+        ->assertDontSee('Vedi Tutti i 4 Cicli')
         ->assertDontSeeHtml('mp2-list-preview-has-more');
 });
 

@@ -52,10 +52,10 @@ it('shows the Closing action only to an authorized user and renders the transien
         ->assertSeeHtml('class="fi-section border p-6"')
         ->assertSee('L’Esercizio non potrà essere riaperto')
         ->assertSee('Crea N+1')
-        ->assertSee('Non creare N+1')
+        ->assertSee('Non Creare N+1')
         ->set('closing.create_next_exercise', false)
         ->call('reviewClosing')
-        ->assertSee('Valori che verranno congelati')
+        ->assertSee('Valori che Verranno Congelati')
         ->assertSee('Allocato')
         ->assertSee('Effettivo');
 });

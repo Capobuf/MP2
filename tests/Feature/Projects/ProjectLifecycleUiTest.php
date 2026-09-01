@@ -51,12 +51,12 @@ it('shows archive only for terminal active Projects and restore only for archive
         ->assertActionVisible('archive')
         ->callAction('archive')
         ->assertHasNoActionErrors()
-        ->assertNotified('Progetto archiviato');
+        ->assertNotified('Progetto Archiviato');
     Livewire::test(ViewProject::class, ['record' => $archived->getRouteKey()])
         ->assertActionVisible('restore')
         ->callAction('restore')
         ->assertHasNoActionErrors()
-        ->assertNotified('Progetto ripristinato');
+        ->assertNotified('Progetto Ripristinato');
 });
 
 it('keeps lifecycle actions hidden from a read-only viewer and exposes no delete', function () {

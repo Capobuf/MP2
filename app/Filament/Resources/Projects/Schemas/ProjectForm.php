@@ -28,16 +28,16 @@ class ProjectForm
                 Textarea::make('description')->label('Descrizione')->rows(3),
                 Textarea::make('notes')->label('Note')->rows(3),
             ])->columns(2)->columnSpanFull(),
-            Section::make('Configurazione iniziale')
+            Section::make('Configurazione Iniziale')
                 ->description('La classificazione iniziale appartiene all’Esercizio globale selezionato.')
                 ->schema([
                     Select::make('initial_state')
-                        ->label('Stato iniziale')
+                        ->label('Stato Iniziale')
                         ->options(ProjectState::options())
                         ->native(false)
                         ->required(),
                     DatePicker::make('initial_effective_date')
-                        ->label('Data di efficacia iniziale')
+                        ->label('Data di Efficacia Iniziale')
                         ->native(false)
                         ->displayFormat('d/m/Y')
                         ->placeholder('gg/mm/aaaa')
@@ -59,8 +59,8 @@ class ProjectForm
                             return app(CreateCostCenter::class)->execute($actor, $company, $data, (string) Str::uuid())->id;
                         })
                         ->createOptionAction(fn (Action $action): Action => $action
-                            ->label('Crea centro di costo')
-                            ->modalHeading('Nuovo centro di costo')
+                            ->label('Crea Centro di Costo')
+                            ->modalHeading('Nuovo Centro di Costo')
                             ->visible(fn (): bool => self::canManageMasterData()))
                         ->placeholder('Non classificato'),
                 ])->columns(3)->columnSpanFull(),

@@ -1,6 +1,6 @@
 <x-filament-panels::page>
     <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/5">
-        <h2 class="text-lg font-semibold text-gray-950 dark:text-white">Un file, tutto il patrimonio business</h2>
+        <h2 class="text-lg font-semibold text-gray-950 dark:text-white">Un File, Tutto il Patrimonio Business</h2>
         <p class="mt-2 max-w-3xl text-sm leading-6 text-gray-600 dark:text-gray-300">
             Il backup contiene viste leggibili e un contratto macchina nascosto per ripristinare l’Azienda in una nuova identità MP2.
             Utenti, permessi, Audit, Proposte e binari degli allegati non vengono inclusi; per gli allegati resta l’inventario verificabile.

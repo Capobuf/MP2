@@ -135,7 +135,7 @@ it('renders S2 history newest first in Italian and only for the current company'
     Livewire::test(CompanyAudit::class)
         ->assertCanSeeTableRecords($eventsA, inOrder: true)
         ->assertCanNotSeeTableRecords($eventsB)
-        ->assertTableColumnFormattedStateSet('event_type', 'Fornitore creato', $created)
+        ->assertTableColumnFormattedStateSet('event_type', 'Fornitore Creato', $created)
         ->assertTableColumnStateSet('subject', 'Fornitore #'.$supplier->id, $created)
         ->assertTableColumnFormattedStateSet('effective_from', now('Europe/Rome')->format('d/m/Y'), $created)
         ->assertTableColumnStateSet(

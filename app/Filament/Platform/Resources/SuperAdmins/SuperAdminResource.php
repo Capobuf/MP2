@@ -23,7 +23,7 @@ class SuperAdminResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Amministrazione';
+    protected static string|\UnitEnum|null $navigationGroup = 'Impostazioni';
 
     protected static ?string $navigationLabel = 'Super Admin';
 
@@ -32,6 +32,8 @@ class SuperAdminResource extends Resource
     protected static ?string $pluralModelLabel = 'Super Admin';
 
     protected static ?string $recordTitleAttribute = 'name';
+
+    protected static ?int $navigationSort = 10;
 
     public static function form(Schema $schema): Schema
     {

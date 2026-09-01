@@ -17,7 +17,7 @@ class ListProjects extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Elenco e situazione annuale dei Progetti.';
+        return 'Elenco e Situazione Annuale dei Progetti.';
     }
 
     protected function getHeaderActions(): array

@@ -8,7 +8,7 @@
         <div class="mp2-report-section-heading">
             <div>
                 <p class="mp2-report-kicker">Confronto</p>
-                <h3 id="report-comparisons-title">Variazioni per sorgente</h3>
+                <h3 id="report-comparisons-title">Variazioni per Sorgente</h3>
             </div>
         </div>
         <div class="mp2-report-table-wrap" tabindex="0">
@@ -16,12 +16,12 @@
                 <thead>
                     <tr>
                         <th scope="col">Sorgente</th>
-                        <th scope="col" class="mp2-report-number">Valore iniziale</th>
-                        <th scope="col" class="mp2-report-number">Valore finale</th>
+                        <th scope="col" class="mp2-report-number">Valore Iniziale</th>
+                        <th scope="col" class="mp2-report-number">Valore Finale</th>
                         <th scope="col" class="mp2-report-number">Delta</th>
-                        <th scope="col">Categoria primaria</th>
-                        <th scope="col">Dimensioni modificate</th>
-                        <th scope="col">Etichette secondarie</th>
+                        <th scope="col">Categoria Primaria</th>
+                        <th scope="col">Dimensioni Modificate</th>
+                        <th scope="col">Etichette Secondarie</th>
                     </tr>
                 </thead>
                 <tbody>

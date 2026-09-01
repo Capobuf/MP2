@@ -16,13 +16,13 @@ class ExercisesTable
             ->columns([
                 TextColumn::make('year')->label('Anno')->sortable(),
                 TextColumn::make('status')->label('Stato')->formatStateUsing(fn ($state): string => $state->label())->badge(),
-                TextColumn::make('allocation')->label('Allocato corrente')->state(fn (Exercise $record): string => $record->allocation())->money('EUR', locale: 'it'),
+                TextColumn::make('allocation')->label('Allocato Corrente')->state(fn (Exercise $record): string => $record->allocation())->money('EUR', locale: 'it'),
                 TextColumn::make('actual')->label('Effettivo')->state(fn (Exercise $record): string => $record->actual())->money('EUR', locale: 'it'),
-                TextColumn::make('variance')->label('Scostamento operativo')->state(fn (Exercise $record): string => $record->operationalVariance())->money('EUR', locale: 'it'),
+                TextColumn::make('variance')->label('Scostamento Operativo')->state(fn (Exercise $record): string => $record->operationalVariance())->money('EUR', locale: 'it'),
                 TextColumn::make('expenses_count')->label('Spese')->counts('expenses'),
             ])
             ->recordActions([ViewAction::make()])
-            ->emptyStateHeading('Nessun esercizio')
+            ->emptyStateHeading('Nessun Esercizio')
             ->emptyStateDescription('Crea un Esercizio Aperto per registrare Stime ed Effettivi.');
     }
 }

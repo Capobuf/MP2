@@ -109,7 +109,7 @@ class ExpenseForm
                         : [])
                     ->searchable()
                     ->createOptionForm([
-                        TextInput::make('legal_name')->label('Ragione sociale')->required()->maxLength(255),
+                        TextInput::make('legal_name')->label('Ragione Sociale')->required()->maxLength(255),
                         TextInput::make('vat_number')->label('Partita IVA')->maxLength(64),
                         Textarea::make('notes')->label('Note'),
                     ])
@@ -121,8 +121,8 @@ class ExpenseForm
                         return app(CreateSupplier::class)->execute($actor, $company, $data, (string) Str::uuid())->id;
                     })
                     ->createOptionAction(fn (Action $action): Action => $action
-                        ->label('Crea fornitore')
-                        ->modalHeading('Nuovo fornitore')
+                        ->label('Crea Fornitore')
+                        ->modalHeading('Nuovo Fornitore')
                         ->visible(fn (): bool => self::canCreateSupplier()))
                     ->visible(fn (Get $get): bool => in_array($get('container'), ['autonomous', 'project'], true))
                     ->dehydrated(fn (Get $get): bool => in_array($get('container'), ['autonomous', 'project'], true))
@@ -144,8 +144,8 @@ class ExpenseForm
                         return app(CreateCostCenter::class)->execute($actor, $company, $data, (string) Str::uuid())->id;
                     })
                     ->createOptionAction(fn (Action $action): Action => $action
-                        ->label('Crea centro di costo')
-                        ->modalHeading('Nuovo centro di costo')
+                        ->label('Crea Centro di Costo')
+                        ->modalHeading('Nuovo Centro di Costo')
                         ->visible(fn (): bool => self::canCreateCostCenter()))
                     ->placeholder('Non classificata')
                     ->visible(fn (Get $get): bool => $get('container') === 'autonomous')
@@ -158,7 +158,7 @@ class ExpenseForm
                     ->helperText('Opzionali. Potrai aggiungerne altri dalla scheda della Spesa.')
                     ->columnSpanFull(),
                 Textarea::make('change_reason')
-                    ->label('Motivo della variazione rispetto al Budget')
+                    ->label('Motivo della Variazione rispetto al Budget')
                     ->helperText('Richiesto perché l’Esercizio ha già un Budget approvato e la nuova Spesa ha un valore economico diverso da zero.')
                     ->visible(fn (Get $get): bool => self::creationRequiresBudgetReason($get))
                     ->required(fn (Get $get): bool => self::creationRequiresBudgetReason($get))
@@ -179,7 +179,7 @@ class ExpenseForm
                         ->addActionLabel('Aggiungi riga')
                         ->columnSpanFull(),
                 ])->columnSpanFull(),
-            Section::make('Informazioni aggiuntive')
+            Section::make('Informazioni Aggiuntive')
                 ->schema(self::creationActivityFields())
                 ->columns(2)
                 ->visible(fn (Get $get): bool => self::hasInitialActual($get) && self::hasSelectedContainer($get))
@@ -204,7 +204,7 @@ class ExpenseForm
             TextInput::make('note')->label('Nota')
                 ->columnSpan(['default' => 12, 'md' => 9, 'xl' => 4]),
             Hidden::make('suggested_amount')->dehydrated(false),
-            DecimalInput::make('unit_amount', 14, 6)->label('Importo unitario')->suffix('EUR')->live(onBlur: true)
+            DecimalInput::make('unit_amount', 14, 6)->label('Importo Unitario')->suffix('EUR')->live(onBlur: true)
                 ->afterStateUpdated(function (Get $get, Set $set): void {
                     self::syncSuggestedAmount($get, $set);
                 })
@@ -276,7 +276,7 @@ class ExpenseForm
                 ->dehydrated(fn (Get $get): bool => self::requiresTerminalDeclaration($get))
                 ->columnSpanFull(),
             Textarea::make('overspend_note')
-                ->label('Nota di sovraspesa')
+                ->label('Nota di Sovraspesa')
                 ->helperText('Richiesta dal dominio solo se questo Effettivo porta il Progetto oltre lo stanziamento annuale.')
                 ->visible(fn (Get $get): bool => self::creationRequiresOverspendNote($get))
                 ->required(fn (Get $get): bool => self::creationRequiresOverspendNote($get))
@@ -298,9 +298,9 @@ class ExpenseForm
     public static function lineFormSections(bool $contractActualOnly = false, bool|\Closure $requiresBudgetReason = false): array
     {
         return [
-            Section::make('Valore economico')->description('Il Totale è l’Importo autoritativo; importo unitario e quantità propongono automaticamente il valore, che resta modificabile.')
+            Section::make('Valore Economico')->description('Il Totale è l’Importo autoritativo; importo unitario e quantità propongono automaticamente il valore, che resta modificabile.')
                 ->schema(self::economicLineFields($contractActualOnly))->columns(4),
-            Section::make('Nota e verifica')->schema(self::lineNoteFields($requiresBudgetReason)),
+            Section::make('Nota e Verifica')->schema(self::lineNoteFields($requiresBudgetReason)),
         ];
     }
 
@@ -311,7 +311,7 @@ class ExpenseForm
 
     public static function containerActivitySection(bool $project, bool $contract): Section
     {
-        return Section::make('Dichiarazione attività del contenitore')
+        return Section::make('Dichiarazione Attività del Contenitore')
             ->description('Richiesta quando la Riga Effettivo dipende dallo stato del Progetto o del Contratto.')
             ->schema(self::containerActivityFields($project, $contract))
             ->columns(2)
@@ -334,13 +334,13 @@ class ExpenseForm
                 ->placeholder('Ordinario (predefinito)')
                 ->visible($project || $contract),
             Checkbox::make('open_project')
-                ->label('Conferma apertura atomica se il Progetto è Pianificato')
+                ->label('Conferma Apertura Atomica se il Progetto è Pianificato')
                 ->visible($project),
             Textarea::make('activity_note')
-                ->label('Nota attività tardiva, rimborso o correzione')
+                ->label('Nota Attività Tardiva, Rimborso o Correzione')
                 ->visible($project || $contract),
             Textarea::make('overspend_note')
-                ->label('Nota di sovraspesa')
+                ->label('Nota di Sovraspesa')
                 ->visible($project),
         ];
     }
@@ -356,7 +356,7 @@ class ExpenseForm
                 ->default($contractActualOnly ? ExpenseLineType::Actual->value : null)
                 ->required()->native(false)->live(),
             Hidden::make('suggested_amount')->dehydrated(false),
-            DecimalInput::make('unit_amount', 14, 6)->label('Importo unitario')->suffix('EUR')->live(onBlur: true)
+            DecimalInput::make('unit_amount', 14, 6)->label('Importo Unitario')->suffix('EUR')->live(onBlur: true)
                 ->afterStateUpdated(function (Get $get, Set $set): void {
                     self::syncSuggestedAmount($get, $set);
                 }),
@@ -376,13 +376,13 @@ class ExpenseForm
             Textarea::make('note')->label('Nota')->live(onBlur: true)
                 ->helperText('Obbligatoria per un Effettivo negativo e normalmente richiesta per una nuova Riga a zero.'),
             Textarea::make('change_reason')
-                ->label('Motivo della modifica della Stima')
+                ->label('Motivo della Modifica della Stima')
                 ->helperText('Richiesto perché l’Esercizio ha già un Budget approvato.')
                 ->visible($requiresBudgetReason)
                 ->required($requiresBudgetReason)
                 ->dehydrated($requiresBudgetReason),
             Checkbox::make('amount_warning_acknowledged')
-                ->label('Salva comunque il Totale indicato')
+                ->label('Salva Comunque il Totale Indicato')
                 ->helperText(fn (Get $get): string => self::amountMismatchMessage($get))
                 ->visible(fn (Get $get): bool => self::hasAmountMismatch($get)),
         ];

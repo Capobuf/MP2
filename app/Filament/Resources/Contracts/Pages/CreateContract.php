@@ -25,7 +25,7 @@ class CreateContract extends CreateRecord
 
     protected static bool $canCreateAnother = false;
 
-    protected static ?string $title = 'Nuovo contratto';
+    protected static ?string $title = 'Nuovo Contratto';
 
     public string $operationId;
 
@@ -109,7 +109,7 @@ class CreateContract extends CreateRecord
 
     protected function getCreateFormAction(): Action
     {
-        return parent::getCreateFormAction()->label('Crea contratto');
+        return parent::getCreateFormAction()->label('Crea Contratto');
     }
 
     private function costCenterId(mixed $value, bool $allowNull = false): ?int

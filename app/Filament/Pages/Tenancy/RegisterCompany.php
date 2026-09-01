@@ -27,7 +27,7 @@ class RegisterCompany extends RegisterTenant
                 ->required()
                 ->maxLength(255),
             Select::make('timezone')
-                ->label('Fuso orario')
+                ->label('Fuso Orario')
                 ->options(array_combine(
                     DateTimeZone::listIdentifiers(),
                     DateTimeZone::listIdentifiers(),

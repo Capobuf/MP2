@@ -26,7 +26,7 @@ class ContractRenewalsRelationManager extends RelationManager
 {
     protected static string $relationship = 'renewalConfigurations';
 
-    protected static ?string $title = 'Rinnovi e scadenze';
+    protected static ?string $title = 'Rinnovi e Scadenze';
 
     public function isReadOnly(): bool
     {
@@ -37,40 +37,40 @@ class ContractRenewalsRelationManager extends RelationManager
     {
         return $table->columns([
             TextColumn::make('effective_from')->label('Efficace dal')->date('d/m/Y'),
-            IconColumn::make('automatic_renewal')->label('Rinnovo automatico')->boolean(),
-            TextColumn::make('expiry_anchor_date')->label('Scadenza approvata')->date('d/m/Y')->placeholder('Scadenza non definita'),
-            TextColumn::make('renewal_duration_months')->label('Durata mesi')->placeholder('—'),
-            TextColumn::make('notice_days')->label('Preavviso giorni')->placeholder('—'),
+            IconColumn::make('automatic_renewal')->label('Rinnovo Automatico')->boolean(),
+            TextColumn::make('expiry_anchor_date')->label('Scadenza Approvata')->date('d/m/Y')->placeholder('Scadenza non definita'),
+            TextColumn::make('renewal_duration_months')->label('Durata Mesi')->placeholder('—'),
+            TextColumn::make('notice_days')->label('Preavviso Giorni')->placeholder('—'),
             TextColumn::make('creator.name')->label('Autore')->placeholder('Autore originale non disponibile'),
         ])->headerActions([
-            Action::make('updateRenewal')->label('Modifica rinnovo')->visible(fn (): bool => $this->canMutate())->form([
+            Action::make('updateRenewal')->label('Modifica Rinnovo')->visible(fn (): bool => $this->canMutate())->form([
                 DatePicker::make('effective_from')->label('Efficace dal')->required()->live()
                     ->afterStateUpdated(fn (Set $set) => $set('impact_confirmed', false)),
-                Toggle::make('automatic_renewal')->label('Rinnovo automatico')->required()->live()
+                Toggle::make('automatic_renewal')->label('Rinnovo Automatico')->required()->live()
                     ->afterStateUpdated(function (Set $set, mixed $state): void {
                         if (! $state) {
                             $set('renewal_duration_months', null);
                         }
                         $set('impact_confirmed', false);
                     }),
-                DatePicker::make('expiry_anchor_date')->label('Prossima scadenza')->live()
+                DatePicker::make('expiry_anchor_date')->label('Prossima Scadenza')->live()
                     ->afterStateUpdated(function (Set $set, mixed $state): void {
                         if (blank($state)) {
                             $set('renewal_duration_months', null);
                         }
                         $set('impact_confirmed', false);
                     }),
-                TextInput::make('renewal_duration_months')->label('Durata rinnovo in mesi')->integer()->minValue(1)
+                TextInput::make('renewal_duration_months')->label('Durata Rinnovo in Mesi')->integer()->minValue(1)
                     ->visible(fn (Get $get): bool => (bool) $get('automatic_renewal') && filled($get('expiry_anchor_date')))
                     ->required(fn (Get $get): bool => (bool) $get('automatic_renewal') && filled($get('expiry_anchor_date')))
                     ->live(onBlur: true)->afterStateUpdated(fn (Set $set) => $set('impact_confirmed', false)),
-                TextInput::make('notice_days')->label('Preavviso in giorni')->integer()->minValue(0)
+                TextInput::make('notice_days')->label('Preavviso in Giorni')->integer()->minValue(0)
                     ->live(onBlur: true)->afterStateUpdated(fn (Set $set) => $set('impact_confirmed', false)),
-                Textarea::make('reason')->label('Nota della modifica')
+                Textarea::make('reason')->label('Nota della Modifica')
                     ->helperText('Richiesta perché esiste un Budget approvato in un Esercizio Aperto.')
                     ->visible(fn (): bool => $this->renewalReasonRequired())
                     ->required(fn (): bool => $this->renewalReasonRequired()),
-                Placeholder::make('impact_preview')->label('Anteprima impatto')
+                Placeholder::make('impact_preview')->label('Anteprima Impatto')
                     ->content(fn (Get $get): string => $this->renewalPreview($get)),
                 Checkbox::make('impact_confirmed')->label('Confermo l’anteprima corrente')->accepted()->required(),
                 Hidden::make('expected_revision')->default(fn (): int => $this->ownerContract()->revision),

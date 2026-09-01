@@ -18,7 +18,6 @@ use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -29,11 +28,11 @@ class CostCenterResource extends Resource
 {
     protected static ?string $model = CostCenter::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
+    protected static string|BackedEnum|null $navigationIcon = null;
 
     protected static ?string $navigationLabel = 'Centri di Costo';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Anagrafiche';
+    protected static string|\UnitEnum|null $navigationGroup = 'Pianificazione';
 
     protected static ?string $modelLabel = 'centro di costo';
 
@@ -41,7 +40,7 @@ class CostCenterResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 50;
 
     public static function getTitleCaseModelLabel(): string
     {
@@ -119,10 +118,10 @@ class CostCenterResource extends Resource
             ->label('Archivia')
             ->color('warning')
             ->requiresConfirmation()
-            ->modalHeading('Archivia centro di costo')
+            ->modalHeading('Archivia Centro di Costo')
             ->modalDescription('Il centro di costo resterà consultabile nello storico, ma non sarà disponibile per nuove selezioni.')
             ->modalSubmitActionLabel('Archivia')
-            ->successNotificationTitle('Centro di costo archiviato')
+            ->successNotificationTitle('Centro di Costo Archiviato')
             ->visible(fn (CostCenter $record): bool => ! $record->isArchived() && static::canEdit($record))
             ->action(function (CostCenter $record): void {
                 $actor = auth()->user();
@@ -139,10 +138,10 @@ class CostCenterResource extends Resource
             ->label('Ripristina')
             ->color('success')
             ->requiresConfirmation()
-            ->modalHeading('Ripristina centro di costo')
+            ->modalHeading('Ripristina Centro di Costo')
             ->modalDescription('Il centro di costo tornerà disponibile per nuove selezioni.')
             ->modalSubmitActionLabel('Ripristina')
-            ->successNotificationTitle('Centro di costo ripristinato')
+            ->successNotificationTitle('Centro di Costo Ripristinato')
             ->visible(fn (CostCenter $record): bool => $record->isArchived() && static::canEdit($record))
             ->action(function (CostCenter $record): void {
                 $actor = auth()->user();

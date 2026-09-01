@@ -1,5 +1,5 @@
 <?php
 
 return [
-    'label' => 'Percorso di navigazione',
+    'label' => 'Percorso di Navigazione',
 ];

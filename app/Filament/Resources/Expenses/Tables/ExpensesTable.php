@@ -137,7 +137,7 @@ class ExpensesTable
             ->defaultSort('updated_at', 'desc')
             ->paginationPageOptions([25, 50, 100])
             ->defaultPaginationPageOption(25)
-            ->emptyStateHeading('Nessuna spesa nell’Esercizio selezionato')
+            ->emptyStateHeading('Nessuna Spesa nell’Esercizio Selezionato')
             ->emptyStateDescription('Crea una Spesa autonoma oppure apri un Progetto per consultarne le Spese associate.');
     }
 }

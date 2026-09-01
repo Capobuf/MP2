@@ -31,7 +31,7 @@ class ExpenseInfolist
                     ->badge()->color(fn (string $state): string => $state === 'Attiva' ? 'success' : 'gray'),
                 TextEntry::make('origin_key')->label('OriginKey')->state(fn (Expense $record): string => $record->originKey())->copyable(),
             ])->columns(2),
-            Section::make('Riepilogo economico')->schema([
+            Section::make('Riepilogo Economico')->schema([
                 TextEntry::make('allocation')->label('Totale Stima')->state(fn (Expense $record): string => $record->allocation())
                     ->money('EUR', locale: 'it')->color('primary'),
                 TextEntry::make('actual')->label('Totale Effettivo')->state(fn (Expense $record): string => $record->actual())
@@ -39,7 +39,7 @@ class ExpenseInfolist
                 TextEntry::make('variance')->label('Scostamento Operativo')->state(fn (Expense $record): string => $record->operationalVariance())
                     ->money('EUR', locale: 'it'),
             ])->columns(3),
-            Section::make('Dati principali')->schema([
+            Section::make('Dati Principali')->schema([
                 TextEntry::make('exercise.year')->label('Esercizio'),
                 TextEntry::make('container')->label('Contenitore')
                     ->state(fn (Expense $record): string => $record->containerLabel())
@@ -63,7 +63,7 @@ class ExpenseInfolist
                 ->schema([
                     RepeatableEntry::make('lines')->hiddenLabel()->table([
                         TableColumn::make('Tipo'),
-                        TableColumn::make('Importo unitario')->alignment(Alignment::End),
+                        TableColumn::make('Importo Unitario')->alignment(Alignment::End),
                         TableColumn::make('Quantità'),
                         TableColumn::make('Totale')->alignment(Alignment::End),
                         TableColumn::make('Stato'),
@@ -73,7 +73,7 @@ class ExpenseInfolist
                         TextEntry::make('type')->label('Tipo')->formatStateUsing(
                             fn (mixed $state): string => ($state instanceof ExpenseLineType ? $state : ExpenseLineType::from((string) $state))->label(),
                         )->badge()->color(fn (mixed $state): string => ($state instanceof ExpenseLineType ? $state : ExpenseLineType::from((string) $state)) === ExpenseLineType::Estimate ? 'primary' : 'success'),
-                        TextEntry::make('unit_amount')->label('Importo unitario')
+                        TextEntry::make('unit_amount')->label('Importo Unitario')
                             ->state(fn (ExpenseLine $record): ?string => self::formatUnitAmount($record))
                             ->placeholder('—'),
                         TextEntry::make('quantity')->label('Quantità')->placeholder('—'),
@@ -82,13 +82,13 @@ class ExpenseInfolist
                             ->state(fn (ExpenseLine $record): string => $record->isAnnulled() ? 'Annullata' : 'Attiva')
                             ->badge()->color(fn (string $state): string => $state === 'Attiva' ? 'success' : 'gray'),
                         TextEntry::make('note')->label('Nota')->placeholder('—')->wrap(),
-                        TextEntry::make('updated_at')->label('Ultima modifica')
+                        TextEntry::make('updated_at')->label('Ultima Modifica')
                             ->formatStateUsing(fn (mixed $state, ExpenseLine $record): string => $record->updated_at
                                 ->timezone($record->expense->company->timezone)
                                 ->format('d/m/Y H:i')),
                     ])->columnSpanFull(),
                 ])->columnSpanFull(),
-            Section::make('Timeline recente')->description('Ultimi eventi della Spesa e delle sue Righe.')
+            Section::make('Timeline Recente')->description('Ultimi Eventi della Spesa e delle Sue Righe.')
                 ->schema([
                     RepeatableEntry::make('recent_timeline')->hiddenLabel()
                         ->state(fn (Expense $record): Collection => self::recentEvents($record))

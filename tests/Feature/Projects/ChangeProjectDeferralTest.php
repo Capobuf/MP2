@@ -121,7 +121,7 @@ it('supports carryover to none idempotently and marks affected Drafts to realign
     Filament::setTenant(($fixture['company'])->tenantCompany);
     Livewire::withQueryParams(['project' => $fixture['project']->id])
         ->test(CompanyAudit::class)
-        ->assertSee('Rinvio progetto modificato')
+        ->assertSee('Rinvio Progetto Modificato')
         ->assertTableColumnStateSet('previous_value', 'Modalità: Riporto · Riporto: € 50.00 · Riprogrammato: € 0.00 · Esercizio origine: — · Esercizio destinazione: —', $event)
         ->assertTableColumnStateSet('new_value', 'Modalità: Nessuna · Riporto: € 0.00 · Riprogrammato: € 0.00 · Esercizio origine: '.$fixture['source']->id.' · Esercizio destinazione: '.$fixture['destination']->id, $event);
 });

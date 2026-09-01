@@ -12,7 +12,7 @@ class ListSuppliers extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Anagrafica dei Fornitori utilizzati nelle attività operative.';
+        return 'Anagrafica dei Fornitori Utilizzati nelle Attività Operative.';
     }
 
     protected function getHeaderActions(): array

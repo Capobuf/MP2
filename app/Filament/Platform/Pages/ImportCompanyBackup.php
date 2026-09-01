@@ -30,11 +30,13 @@ use Throwable;
 /** @property-read Schema $form */
 final class ImportCompanyBackup extends Page
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowUpTray;
 
-    protected static ?string $navigationLabel = 'Importa Azienda da backup';
+    protected static ?string $navigationLabel = 'Importa Azienda da Backup';
 
-    protected static ?string $title = 'Importa Azienda da backup';
+    protected static ?string $title = 'Importa Azienda da Backup';
 
     /** @var array<string, mixed>|null */
     public ?array $data = [];
@@ -83,9 +85,9 @@ final class ImportCompanyBackup extends Page
             Form::make([EmbeddedSchema::make('form')])
                 ->id('business-backup-import-form')
                 ->footer([Actions::make([
-                    Action::make('validate')->label('Valida e mostra anteprima')->action('validateBackup'),
+                    Action::make('validate')->label('Valida e Mostra Anteprima')->action('validateBackup'),
                 ])]),
-            Section::make('Anteprima del ripristino')
+            Section::make('Anteprima del Ripristino')
                 ->description('Il backup è valido e può essere ripristinato come una nuova Azienda.')
                 ->visible(fn (): bool => $this->previewData !== null)
                 ->schema([
@@ -98,11 +100,11 @@ final class ImportCompanyBackup extends Page
                         TextEntry::make('backup_company_name')->label('Azienda')->state(fn (): string => $this->previewString('company_name')),
                         TextEntry::make('backup_exported_at')->label('Esportato il')->state(fn (): string => $this->formattedExportDate()),
                         TextEntry::make('backup_format')->label('Formato')->state(fn (): string => 'MP2 Business Data Backup · V'.$this->previewInt('format_version')),
-                        TextEntry::make('backup_timezone')->label('Fuso orario')->state(fn (): string => $this->previewString('company_timezone')),
+                        TextEntry::make('backup_timezone')->label('Fuso Orario')->state(fn (): string => $this->previewString('company_timezone')),
                     ])->columns(['sm' => 2, 'lg' => 4]),
                     Section::make('Esercizi')->schema([
                         RepeatableEntry::make('preview_exercises')
-                            ->label('Esercizi inclusi')
+                            ->label('Esercizi Inclusi')
                             ->hiddenLabel()
                             ->state(fn (): array => $this->previewArray('exercises'))
                             ->table([
@@ -130,10 +132,10 @@ final class ImportCompanyBackup extends Page
                         TextEntry::make('budget_count')->label('Budget')->state(fn (): int => $this->previewCount('_MP2_budgets')),
                         TextEntry::make('closing_count')->label('Chiusure')->state(fn (): int => $this->previewCount('_MP2_closings')),
                     ])->columns(['sm' => 2, 'lg' => 3]),
-                    Section::make('Valori economici inclusi')->schema([
-                        TextEntry::make('budget_total')->label('Totale degli snapshot Budget inclusi')
+                    Section::make('Valori Economici Inclusi')->schema([
+                        TextEntry::make('budget_total')->label('Totale degli Snapshot Budget Inclusi')
                             ->state(fn (): string => $this->previewString('budget_total', '0.00'))->money('EUR', locale: 'it'),
-                        TextEntry::make('closing_actual_total')->label('Effettivi delle Chiusure incluse')
+                        TextEntry::make('closing_actual_total')->label('Effettivi delle Chiusure Incluse')
                             ->state(fn (): string => $this->previewString('closing_actual_total', '0.00'))->money('EUR', locale: 'it'),
                     ])->columns(2),
                     Callout::make(fn (): string => $this->attachmentWarning())
@@ -145,7 +147,7 @@ final class ImportCompanyBackup extends Page
                         ->visible(fn (): bool => $this->previewBool('name_collision')),
                     Actions::make([
                         Action::make('confirmImport')
-                            ->label('Ripristina come nuova Azienda')
+                            ->label('Ripristina come Nuova Azienda')
                             ->color('success')
                             ->requiresConfirmation()
                             ->modalHeading(fn (): string => 'Ripristinare “'.$this->previewString('company_name').'” come nuova Azienda?')
@@ -174,7 +176,7 @@ final class ImportCompanyBackup extends Page
         }
         $this->previewData = $this->serializePreview($validated['preview']);
         $this->validatedPackageId = $validated['manifest']['package_id'];
-        Notification::make()->success()->title('Backup valido')->body('Nessun dato è stato ancora scritto.')->send();
+        Notification::make()->success()->title('Backup Valido')->body('Nessun dato è stato ancora scritto.')->send();
     }
 
     public function confirmImport(): void
@@ -210,7 +212,7 @@ final class ImportCompanyBackup extends Page
             report($exception);
             Notification::make()
                 ->danger()
-                ->title('Ripristino non riuscito')
+                ->title('Ripristino Non Riuscito')
                 ->body('Non è stata creata alcuna Azienda. Puoi riprovare oppure consultare i log applicativi.')
                 ->send();
 
@@ -221,7 +223,7 @@ final class ImportCompanyBackup extends Page
         $this->form->fill();
         $this->invalidateValidatedBackup();
 
-        Notification::make()->success()->title('Azienda ripristinata')->body($company->name)->send();
+        Notification::make()->success()->title('Azienda Ripristinata')->body($company->name)->send();
         $this->redirect(TenantCompanyResource::getUrl('index', panel: 'platform'));
     }
 

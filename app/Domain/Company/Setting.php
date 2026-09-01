@@ -11,9 +11,9 @@ enum Setting: string
     public function label(): string
     {
         return match ($this) {
-            self::OverspendNoteRequired => 'Nota di sovraspesa obbligatoria',
-            self::UnclassifiedClosingPolicy => 'Policy Non classificato alla Chiusura',
-            self::Timezone => 'Fuso orario aziendale',
+            self::OverspendNoteRequired => 'Nota di Sovraspesa Obbligatoria',
+            self::UnclassifiedClosingPolicy => 'Policy Non Classificato alla Chiusura',
+            self::Timezone => 'Fuso Orario Aziendale',
         };
     }
 }

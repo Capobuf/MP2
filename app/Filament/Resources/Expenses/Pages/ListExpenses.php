@@ -28,14 +28,14 @@ class ListExpenses extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Elenco e dettaglio delle Spese dell’Esercizio selezionato.';
+        return 'Elenco e Dettaglio delle Spese dell’Esercizio Selezionato.';
     }
 
     protected function getHeaderActions(): array
     {
         return [
             CreateAction::make()
-                ->label('Nuova spesa')
+                ->label('Nuova Spesa')
                 ->disabled(fn (): bool => $this->createDisabledReason() !== null)
                 ->tooltip(fn (): ?string => $this->createDisabledReason()),
         ];

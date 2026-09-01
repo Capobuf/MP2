@@ -23,9 +23,9 @@ enum HistoricalErrorKind: string
             self::Contract => 'Contratto',
             self::Container => 'Contenitore',
             self::Exercise => 'Esercizio',
-            self::HistoricalState => 'Stato storico',
+            self::HistoricalState => 'Stato Storico',
             self::Carryover => 'Riporto',
-            self::AccidentalClosing => 'Chiusura accidentale',
+            self::AccidentalClosing => 'Chiusura Accidentale',
         };
     }
 

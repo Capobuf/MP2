@@ -23,7 +23,7 @@ class ProjectContractLinksRelationManager extends RelationManager
 {
     protected static string $relationship = 'contractLinks';
 
-    protected static ?string $title = 'Contratti collegati';
+    protected static ?string $title = 'Contratti Collegati';
 
     public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
     {
@@ -55,10 +55,10 @@ class ProjectContractLinksRelationManager extends RelationManager
                     );
                 }),
         ])->recordActions([
-            Action::make('archive')->label('Archivia collegamento')->requiresConfirmation()
+            Action::make('archive')->label('Archivia Collegamento')->requiresConfirmation()
                 ->visible(fn (ProjectContractLink $record): bool => ! $record->isArchived() && $this->canManage())
                 ->action(fn (ProjectContractLink $record) => $this->setArchived($record, true)),
-            Action::make('restore')->label('Ripristina collegamento')->requiresConfirmation()
+            Action::make('restore')->label('Ripristina Collegamento')->requiresConfirmation()
                 ->visible(fn (ProjectContractLink $record): bool => $record->isArchived() && $this->canManage())
                 ->action(fn (ProjectContractLink $record) => $this->setArchived($record, false)),
         ]);

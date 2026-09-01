@@ -3,7 +3,7 @@
 return [
     'actions' => [
         'close' => [
-            'label' => 'Chiudi notifica',
+            'label' => 'Chiudi Notifica',
         ],
     ],
 ];

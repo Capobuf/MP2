@@ -17,7 +17,7 @@ class CreateExercise extends CreateRecord
 {
     protected static string $resource = ExerciseResource::class;
 
-    protected static ?string $title = 'Nuovo esercizio';
+    protected static ?string $title = 'Nuovo Esercizio';
 
     public string $operationId;
 

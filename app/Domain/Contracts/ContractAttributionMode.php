@@ -10,8 +10,8 @@ enum ContractAttributionMode: string
     public function label(): string
     {
         return match ($this) {
-            self::CycleStart => 'Inizio ciclo',
-            self::CycleEnd => 'Fine ciclo',
+            self::CycleStart => 'Inizio Ciclo',
+            self::CycleEnd => 'Fine Ciclo',
         };
     }
 

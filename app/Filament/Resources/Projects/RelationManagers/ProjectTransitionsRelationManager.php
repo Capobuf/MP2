@@ -45,16 +45,16 @@ class ProjectTransitionsRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('from_state')->label('Da')->formatStateUsing(fn ($state): string => $state instanceof ProjectState ? $state->label() : ProjectState::from($state)->label()),
                 TextColumn::make('to_state')->label('A')->formatStateUsing(fn ($state): string => $state instanceof ProjectState ? $state->label() : ProjectState::from($state)->label()),
-                TextColumn::make('effective_date')->label('Data efficacia')->date('d/m/Y')->sortable(),
+                TextColumn::make('effective_date')->label('Data Efficacia')->date('d/m/Y')->sortable(),
                 TextColumn::make('status')->label('Stato')->state(fn (ProjectTransition $record): string => $record->status($this->today())->label())->badge(),
                 TextColumn::make('reason')->label('Motivo')->placeholder('—')->wrap(),
                 TextColumn::make('creator.name')->label('Autore')->placeholder('Autore originale non disponibile'),
             ])
             ->headerActions([
                 Action::make('createTransition')
-                    ->label('Pianifica transizione')
-                    ->modalHeading('Pianifica transizione di Progetto')
-                    ->modalSubmitActionLabel('Registra transizione')
+                    ->label('Pianifica Transizione')
+                    ->modalHeading('Pianifica Transizione di Progetto')
+                    ->modalSubmitActionLabel('Registra Transizione')
                     ->visible(fn (): bool => $this->canMutateOwner())
                     ->form($this->transitionFields())
                     ->action(function (array $data): void {
@@ -72,11 +72,11 @@ class ProjectTransitionsRelationManager extends RelationManager
                 Action::make('annul')
                     ->label('Annulla')
                     ->color('warning')
-                    ->modalHeading('Annulla transizione futura')
-                    ->modalSubmitActionLabel('Annulla transizione')
+                    ->modalHeading('Annulla Transizione Futura')
+                    ->modalSubmitActionLabel('Annulla Transizione')
                     ->visible(fn (ProjectTransition $record): bool => $this->canChangeFuture($record))
                     ->form([
-                        Textarea::make('reason')->label('Motivo annullamento')->required(),
+                        Textarea::make('reason')->label('Motivo Annullamento')->required(),
                         Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
                     ])
                     ->action(function (ProjectTransition $record, array $data): void {
@@ -92,12 +92,12 @@ class ProjectTransitionsRelationManager extends RelationManager
                     }),
                 Action::make('replace')
                     ->label('Sostituisci')
-                    ->modalHeading('Sostituisci transizione futura')
-                    ->modalSubmitActionLabel('Sostituisci transizione')
+                    ->modalHeading('Sostituisci Transizione Futura')
+                    ->modalSubmitActionLabel('Sostituisci Transizione')
                     ->visible(fn (ProjectTransition $record): bool => $this->canChangeFuture($record))
                     ->form([
                         ...$this->transitionFields(),
-                        Textarea::make('replacement_reason')->label('Motivo sostituzione')->required(),
+                        Textarea::make('replacement_reason')->label('Motivo Sostituzione')->required(),
                     ])
                     ->action(function (ProjectTransition $record, array $data): void {
                         $actor = auth()->user();
@@ -110,7 +110,7 @@ class ProjectTransitionsRelationManager extends RelationManager
                     }),
             ])
             ->defaultSort('effective_date')
-            ->emptyStateHeading('Nessuna transizione')
+            ->emptyStateHeading('Nessuna Transizione')
             ->emptyStateDescription('Le transizioni pianificate ed efficaci compariranno qui.');
     }
 
@@ -118,9 +118,9 @@ class ProjectTransitionsRelationManager extends RelationManager
     private function transitionFields(): array
     {
         return [
-            DatePicker::make('effective_date')->label('Data di efficacia')->required()->live(),
+            DatePicker::make('effective_date')->label('Data di Efficacia')->required()->live(),
             Placeholder::make('state_before')
-                ->label('Stato immediatamente precedente')
+                ->label('Stato Immediatamente Precedente')
                 ->content(function (Get $get, ?ProjectTransition $record): string {
                     $state = $this->stateImmediatelyBefore($get('effective_date'), $record);
 
@@ -129,7 +129,7 @@ class ProjectTransitionsRelationManager extends RelationManager
             Hidden::make('from_state')
                 ->dehydrateStateUsing(fn (mixed $state, Get $get, ?ProjectTransition $record): ?string => $this
                     ->stateImmediatelyBefore($get('effective_date'), $record)?->value),
-            Select::make('to_state')->label('Nuovo stato')
+            Select::make('to_state')->label('Nuovo Stato')
                 ->options(function (Get $get, ?ProjectTransition $record): array {
                     $from = $this->stateImmediatelyBefore($get('effective_date'), $record);
 

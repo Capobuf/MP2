@@ -21,7 +21,6 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Validation\ValidationException;
 
 /** @property-read Schema $form */
@@ -29,15 +28,15 @@ class CompanySettings extends Page
 {
     use HasPageShield;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
+    protected static string|BackedEnum|null $navigationIcon = null;
 
-    protected static ?string $navigationLabel = 'Impostazioni';
+    protected static ?string $navigationLabel = 'Azienda';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Amministrazione';
+    protected static string|\UnitEnum|null $navigationGroup = 'Impostazioni';
 
     protected static ?string $title = 'Impostazioni Azienda';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 10;
 
     /** @var array<string, mixed>|null */
     public ?array $data = [];
@@ -56,13 +55,13 @@ class CompanySettings extends Page
             ->statePath('data')
             ->components([
                 Toggle::make('overspend_note_required')
-                    ->label('Nota di sovraspesa obbligatoria'),
+                    ->label('Nota di Sovraspesa Obbligatoria'),
                 Select::make('unclassified_closing_policy')
-                    ->label('Policy Non classificato alla Chiusura')
+                    ->label('Policy Non Classificato alla Chiusura')
                     ->options(ClosingUnclassifiedPolicy::options())
                     ->required(),
                 Select::make('timezone')
-                    ->label('Fuso orario aziendale')
+                    ->label('Fuso Orario Aziendale')
                     ->options(array_combine(
                         DateTimeZone::listIdentifiers(),
                         DateTimeZone::listIdentifiers(),
@@ -72,7 +71,7 @@ class CompanySettings extends Page
                     ->live()
                     ->afterStateUpdated(fn (): mixed => $this->previewedTimezone = null),
                 Placeholder::make('timezone_preview')
-                    ->label('Anteprima impatto')
+                    ->label('Anteprima Impatto')
                     ->content(fn (): string => $this->previewedTimezone
                         ? 'Nessun evento pianificato rappresentabile in S1 è interessato nella data locale corrente.'
                         : 'Richiedi l’anteprima prima di confermare un nuovo fuso orario.'),
@@ -88,10 +87,10 @@ class CompanySettings extends Page
                 ->footer([
                     Actions::make([
                         Action::make('previewTimezone')
-                            ->label('Anteprima fuso orario')
+                            ->label('Anteprima Fuso Orario')
                             ->action('previewTimezone'),
                         Action::make('save')
-                            ->label('Salva impostazioni')
+                            ->label('Salva Impostazioni')
                             ->submit('save'),
                     ]),
                 ]),
@@ -108,8 +107,8 @@ class CompanySettings extends Page
         Notification::make()
             ->info()
             ->title($data['timezone'] === $this->company()->timezone
-                ? 'Il fuso orario non cambia'
-                : 'Anteprima completata: nessun evento interessato')
+                ? 'Il Fuso Orario Non Cambia'
+                : 'Anteprima Completata: Nessun Evento Interessato')
             ->send();
     }
 
@@ -143,7 +142,7 @@ class CompanySettings extends Page
 
         Notification::make()
             ->success()
-            ->title($changes === 0 ? 'Impostazioni già aggiornate' : 'Impostazioni aggiornate')
+            ->title($changes === 0 ? 'Impostazioni Già Aggiornate' : 'Impostazioni Aggiornate')
             ->send();
     }
 

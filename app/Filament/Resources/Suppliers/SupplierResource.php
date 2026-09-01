@@ -19,7 +19,6 @@ use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -30,11 +29,11 @@ class SupplierResource extends Resource
 {
     protected static ?string $model = Supplier::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingStorefront;
+    protected static string|BackedEnum|null $navigationIcon = null;
 
     protected static ?string $navigationLabel = 'Fornitori';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Anagrafiche';
+    protected static string|\UnitEnum|null $navigationGroup = 'Pianificazione';
 
     protected static ?string $modelLabel = 'fornitore';
 
@@ -42,7 +41,7 @@ class SupplierResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'legal_name';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 40;
 
     public static function form(Schema $schema): Schema
     {
@@ -110,10 +109,10 @@ class SupplierResource extends Resource
             ->label('Archivia')
             ->color('warning')
             ->requiresConfirmation()
-            ->modalHeading('Archivia fornitore')
+            ->modalHeading('Archivia Fornitore')
             ->modalDescription('Il fornitore resterà consultabile nello storico, ma non sarà disponibile per nuove selezioni.')
             ->modalSubmitActionLabel('Archivia')
-            ->successNotificationTitle('Fornitore archiviato')
+            ->successNotificationTitle('Fornitore Archiviato')
             ->visible(fn (Supplier $record): bool => ! $record->isArchived() && static::canEdit($record))
             ->action(function (Supplier $record): void {
                 $actor = auth()->user();
@@ -130,10 +129,10 @@ class SupplierResource extends Resource
             ->label('Ripristina')
             ->color('success')
             ->requiresConfirmation()
-            ->modalHeading('Ripristina fornitore')
+            ->modalHeading('Ripristina Fornitore')
             ->modalDescription('Il fornitore tornerà disponibile per nuove selezioni.')
             ->modalSubmitActionLabel('Ripristina')
-            ->successNotificationTitle('Fornitore ripristinato')
+            ->successNotificationTitle('Fornitore Ripristinato')
             ->visible(fn (Supplier $record): bool => $record->isArchived() && static::canEdit($record))
             ->action(function (Supplier $record): void {
                 $actor = auth()->user();

@@ -12,7 +12,7 @@ class ListExercises extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Gestione degli Esercizi aziendali e del loro stato.';
+        return 'Gestione degli Esercizi Aziendali e del Loro Stato.';
     }
 
     protected function getHeaderActions(): array

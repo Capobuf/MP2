@@ -3,14 +3,14 @@
         <div class="fi-section border p-6">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Chiusura annuale</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Chiusura Annuale</p>
                     <h2 class="mt-2 text-2xl font-semibold tracking-tight text-gray-950 dark:text-white">Esercizio {{ $this->getRecord()->year }}</h2>
                     <p class="mt-2 max-w-2xl text-sm leading-6 text-gray-600 dark:text-gray-300">
                         Lo stato economico viene valutato al 31 dicembre. La Chiusura crea una Snapshot immutabile. L’Esercizio non potrà essere riaperto.
                     </p>
                 </div>
                 <div class="mp2-closing-frame px-4 py-3 text-sm">
-                    <span class="text-gray-500 dark:text-gray-400">Esercizio successivo</span>
+                    <span class="text-gray-500 dark:text-gray-400">Esercizio Successivo</span>
                     <div class="mt-1 font-medium text-gray-950 dark:text-white">
                         {{ $nextExerciseExists ? 'Già esistente' : 'Non ancora creato' }}
                     </div>
@@ -20,7 +20,7 @@
 
         @if (! $nextExerciseExists)
             <div class="fi-section border p-6">
-                <h3 class="text-base font-semibold text-gray-950 dark:text-white">Esercizio successivo</h3>
+                <h3 class="text-base font-semibold text-gray-950 dark:text-white">Esercizio Successivo</h3>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">La scelta determina soltanto se creare N+1. Non crea Budget o copie di Effettivi.</p>
                 <div class="mt-4 grid gap-3 sm:grid-cols-2">
                     <label class="mp2-closing-frame flex cursor-pointer gap-3 p-4">
@@ -33,7 +33,7 @@
                     <label class="mp2-closing-frame flex cursor-pointer gap-3 p-4">
                         <x-filament::input.radio wire:model.live="closing.create_next_exercise" value="0" class="mt-1" />
                         <span>
-                            <span class="block font-medium text-gray-950 dark:text-white">Non creare N+1</span>
+                            <span class="block font-medium text-gray-950 dark:text-white">Non Creare N+1</span>
                             <span class="mt-1 block text-sm text-gray-500 dark:text-gray-400">N+1 non viene creato e ogni trasferimento deve essere zero.</span>
                         </span>
                     </label>
@@ -59,15 +59,15 @@
                         <div>
                             <h3 class="text-base font-semibold text-gray-950 dark:text-white">{{ $project['title'] }}</h3>
                             <div class="mt-2 flex flex-wrap gap-2 text-xs">
-                                <span class="mp2-closing-badge">Stato attuale: {{ match($project['current_state']) { 'planned' => 'Pianificato', 'open' => 'Aperto', default => $project['current_state'] } }}</span>
-                                <span class="mp2-closing-badge">Rinvio attuale: {{ match($project['current_mode']) { 'carryover' => 'Riporto', 'reprogramming' => 'Riprogrammazione', default => 'Nessuna' } }}</span>
+                                <span class="mp2-closing-badge">Stato Attuale: {{ match($project['current_state']) { 'planned' => 'Pianificato', 'open' => 'Aperto', default => $project['current_state'] } }}</span>
+                                <span class="mp2-closing-badge">Rinvio Attuale: {{ match($project['current_mode']) { 'carryover' => 'Riporto', 'reprogramming' => 'Riprogrammazione', default => 'Nessuna' } }}</span>
                             </div>
                         </div>
                     </div>
 
                     <div class="mt-5 grid gap-4 lg:grid-cols-2">
                         <label class="space-y-1.5">
-                            <span class="text-sm font-medium text-gray-700 dark:text-gray-200">Stato al 31 dicembre</span>
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-200">Stato al 31 Dicembre</span>
                             @include('filament.resources.exercises.components.closing-select', [
                                 'model' => "closing.projects.{$projectId}.final_state",
                                 'value' => $project['final_state'],
@@ -77,7 +77,7 @@
                         </label>
 
                         <label class="space-y-1.5">
-                            <span class="text-sm font-medium text-gray-700 dark:text-gray-200">Modalità di rinvio</span>
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-200">Modalità di Rinvio</span>
                             @include('filament.resources.exercises.components.closing-select', [
                                 'model' => "closing.projects.{$projectId}.mode",
                                 'value' => $mode,
@@ -92,7 +92,7 @@
 
                     @if ($mode === 'carryover')
                         <label class="mt-4 block max-w-sm space-y-1.5">
-                            <span class="text-sm font-medium text-gray-700 dark:text-gray-200">Riporto da consolidare</span>
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-200">Riporto da Consolidare</span>
                             <x-filament::input.wrapper>
                                 <x-filament::input type="number" min="0" step="0.01" wire:model.live.debounce.400ms="closing.projects.{{ $projectId }}.carryover_amount" />
                             </x-filament::input.wrapper>
@@ -103,14 +103,14 @@
                     @if ($mode === 'reprogramming')
                         @if ($isExecutedReprogramming)
                             <div class="mp2-closing-muted mt-4 p-4 text-sm">
-                                <span class="font-medium text-gray-950 dark:text-white">Riprogrammazione già eseguita</span>
+                                <span class="font-medium text-gray-950 dark:text-white">Riprogrammazione Già Eseguita</span>
                                 <p class="mt-1 text-gray-600 dark:text-gray-300">Alla Chiusura verranno verificati gli esatti ID ed effetti già persistiti; non verrà applicata una seconda volta.</p>
                             </div>
                         @else
                             <div class="mt-5">
                                 <div class="flex items-end justify-between gap-4">
                                     <div>
-                                        <h4 class="text-sm font-semibold text-gray-950 dark:text-white">Stime origine da riprogrammare</h4>
+                                        <h4 class="text-sm font-semibold text-gray-950 dark:text-white">Stime Origine da Riprogrammare</h4>
                                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">La destinazione viene generata dal server con nuove identità e lineage.</p>
                                     </div>
                                 </div>
@@ -150,7 +150,7 @@
                     @endif
 
                     <label class="mt-4 block space-y-1.5">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">Nota della decisione</span>
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">Nota della Decisione</span>
                         <x-filament::input.wrapper class="mp2-closing-textarea">
                             <textarea rows="2" wire:model.live.debounce.400ms="closing.projects.{{ $projectId }}.reason" class="mp2-closing-textarea-input" placeholder="Obbligatoria per Chiusura/Cancellazione, rinvio o cambio modalità"></textarea>
                         </x-filament::input.wrapper>
@@ -182,8 +182,8 @@
             <div class="fi-section space-y-5 border p-6">
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Riepilogo finale</p>
-                        <h3 class="mt-1 text-lg font-semibold text-gray-950 dark:text-white">Valori che verranno congelati</h3>
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Riepilogo Finale</p>
+                        <h3 class="mt-1 text-lg font-semibold text-gray-950 dark:text-white">Valori che Verranno Congelati</h3>
                     </div>
                     <div class="grid grid-cols-3 gap-4 text-right">
                         <div><span class="block text-xs text-gray-500">Allocato</span><span class="font-semibold text-gray-950 dark:text-white">{{ number_format((float) $review['totals']['final_allocation'], 2, ',', '.') }} €</span></div>
@@ -194,7 +194,7 @@
 
                 @if ($review['blocks'])
                     <div class="rounded-xl border border-danger-300 bg-danger-50 p-4 dark:border-danger-500/30 dark:bg-danger-500/10">
-                        <h4 class="text-sm font-semibold text-danger-800 dark:text-danger-200">Controlli bloccanti</h4>
+                        <h4 class="text-sm font-semibold text-danger-800 dark:text-danger-200">Controlli Bloccanti</h4>
                         <ul class="mt-2 space-y-1 text-sm text-danger-700 dark:text-danger-200">
                             @foreach ($review['blocks'] as $block)
                                 <li>• {{ $block['message'] }}</li>
@@ -205,7 +205,7 @@
 
                 @if ($review['warnings'])
                     <div class="rounded-xl border border-warning-300 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
-                        <h4 class="text-sm font-semibold text-warning-800 dark:text-warning-200">Avvisi non bloccanti</h4>
+                        <h4 class="text-sm font-semibold text-warning-800 dark:text-warning-200">Avvisi Non Bloccanti</h4>
                         <ul class="mt-2 space-y-1 text-sm text-warning-700 dark:text-warning-200">
                             @foreach ($review['warnings'] as $warning)
                                 <li>• {{ $warning['message'] }}</li>

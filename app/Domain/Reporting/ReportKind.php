@@ -18,7 +18,7 @@ enum ReportKind: string
     public function label(): string
     {
         return match ($this) {
-            self::AnnualExecutive => 'Vista annuale esecutiva',
+            self::AnnualExecutive => 'Vista Annuale Esecutiva',
             self::BudgetActual => 'Budget vs Actual',
             self::BudgetCurrentAllocation => 'Budget vs Allocato Corrente',
             self::OperationalVariance => 'Scostamento Operativo',

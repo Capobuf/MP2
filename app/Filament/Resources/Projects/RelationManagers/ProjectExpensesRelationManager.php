@@ -36,14 +36,14 @@ class ProjectExpensesRelationManager extends RelationManager
                 TextColumn::make('description')->label('Descrizione')->searchable(),
                 TextColumn::make('exercise.year')->label('Esercizio')->sortable(),
                 TextColumn::make('supplier.legal_name')->label('Fornitore')->placeholder('—'),
-                TextColumn::make('cost_center')->label('Centro di Costo ereditato')->state(fn (Expense $record): string => $record->costCenterLabel()),
+                TextColumn::make('cost_center')->label('Centro di Costo Ereditato')->state(fn (Expense $record): string => $record->costCenterLabel()),
                 TextColumn::make('state')->label('Stato')->state(fn (Expense $record): string => $record->isReversed() ? 'Stornata' : 'Attiva')->badge(),
                 TextColumn::make('allocation')->label('Allocato')->state(fn (Expense $record): string => $record->allocation())->money('EUR', locale: 'it'),
                 TextColumn::make('actual')->label('Effettivo')->state(fn (Expense $record): string => $record->actual())->money('EUR', locale: 'it'),
             ])
             ->headerActions([
                 Action::make('createProjectExpense')
-                    ->label('Nuova spesa di progetto')
+                    ->label('Nuova Spesa di Progetto')
                     ->url(fn (): string => ExpenseResource::getUrl('create', [
                         'project' => $this->getOwnerRecord()->getKey(),
                     ]))
@@ -54,7 +54,7 @@ class ProjectExpensesRelationManager extends RelationManager
                 ExpenseResource::reverseAction(),
                 ExpenseResource::restoreAction(),
             ])
-            ->emptyStateHeading('Nessuna spesa di Progetto')
+            ->emptyStateHeading('Nessuna Spesa di Progetto')
             ->emptyStateDescription('Aggiungi una Spesa per alimentare Allocato ed Effettivo del Progetto.');
     }
 

@@ -19,7 +19,7 @@ class Dashboard extends BaseDashboard
 {
     protected static ?string $title = 'Panoramica';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Panoramica';
+    protected static ?string $navigationLabel = 'Panoramica';
 
     public static function canAccess(): bool
     {

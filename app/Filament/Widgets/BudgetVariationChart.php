@@ -9,7 +9,7 @@ class BudgetVariationChart extends EconomicChartWidget
 {
     protected ?string $heading = 'Variazioni vs Budget';
 
-    protected ?string $emptyStateHeading = 'Confronto Budget non disponibile';
+    protected ?string $emptyStateHeading = 'Confronto Budget Non Disponibile';
 
     protected function getType(): string
     {
@@ -21,7 +21,7 @@ class BudgetVariationChart extends EconomicChartWidget
         $data = $this->economicData();
 
         return ($data['has_budget'] ?? false)
-            ? ($data['comparison_source_count'] ?? 0).' sorgenti primarie · Budget selezionato → Situazione Corrente.'
+            ? ($data['comparison_source_count'] ?? 0).' Sorgenti Primarie · Budget Selezionato → Situazione Corrente.'
             : 'Seleziona una versione di Budget nel contesto globale per classificare le variazioni.';
     }
 

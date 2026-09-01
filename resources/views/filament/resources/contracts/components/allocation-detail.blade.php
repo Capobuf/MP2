@@ -1,15 +1,15 @@
 <div class="mp2-allocation-detail">
     <dl class="mp2-allocation-detail-summary">
         <div>
-            <dt>Cicli inclusi</dt>
+            <dt>Cicli Inclusi</dt>
             <dd>{{ $detail['composition_count'] }}</dd>
         </div>
         <div>
-            <dt>Primo ciclo incluso</dt>
+            <dt>Primo Ciclo Incluso</dt>
             <dd>{{ $detail['first_cycle_start'] ?? '—' }}</dd>
         </div>
         <div>
-            <dt>Ultimo ciclo incluso</dt>
+            <dt>Ultimo Ciclo Incluso</dt>
             <dd>{{ $detail['last_cycle_start'] ?? '—' }}</dd>
         </div>
         <div>
@@ -23,8 +23,8 @@
             <table class="mp2-allocation-detail-table">
                 <thead>
                     <tr>
-                        <th scope="col">Inizio ciclo</th>
-                        <th scope="col">Data di attribuzione</th>
+                        <th scope="col">Inizio Ciclo</th>
+                        <th scope="col">Data di Attribuzione</th>
                         <th scope="col" class="mp2-object-number">Importo</th>
                     </tr>
                 </thead>

@@ -67,7 +67,7 @@ class ViewContract extends ViewRecord
             ])),
             EditAction::make()->label('Modifica')->icon('heroicon-m-pencil-square')->color('gray')->outlined()
                 ->visible(fn (): bool => ! $this->contract()->isArchived()),
-            Action::make('createContractActual')->label('Nuova spesa')->icon('heroicon-m-plus')
+            Action::make('createContractActual')->label('Nuova Spesa')->icon('heroicon-m-plus')
                 ->extraAttributes(['class' => 'mp2-contract-primary-action'])
                 ->url(fn (): string => ExpenseResource::getUrl('create', ['contract' => $this->contract()->getKey()]))
                 ->visible(fn (): bool => $this->canCreateActual()),
@@ -84,7 +84,7 @@ class ViewContract extends ViewRecord
                         Hidden::make('contract_revision')->default(fn (): int => $this->contract()->revision),
                         Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
                     ])->action(fn (array $data) => $this->setArchived(false, $data)),
-            ])->label('Altre azioni')->icon('heroicon-m-ellipsis-horizontal')->color('gray')->button()->outlined(),
+            ])->label('Altre Azioni')->icon('heroicon-m-ellipsis-horizontal')->color('gray')->button()->outlined(),
         ];
     }
 
@@ -92,8 +92,8 @@ class ViewContract extends ViewRecord
     {
         return Action::make('allocationDetail')
             ->label(fn (array $arguments): string => isset($arguments['count'])
-                ? 'Vedi tutti i '.((int) $arguments['count']).' cicli'
-                : 'Dettaglio allocato '.((int) ($arguments['year'] ?? 0)))
+                ? 'Vedi Tutti i '.((int) $arguments['count']).' Cicli'
+                : 'Dettaglio Allocato '.((int) ($arguments['year'] ?? 0)))
             ->icon('heroicon-m-list-bullet')
             ->color('gray')
             ->link()
@@ -167,6 +167,6 @@ class ViewContract extends ViewRecord
             (string) $data['operation_id'],
             (int) $data['contract_revision'],
         );
-        Notification::make()->success()->title($archived ? 'Contratto archiviato' : 'Contratto ripristinato')->send();
+        Notification::make()->success()->title($archived ? 'Contratto Archiviato' : 'Contratto Ripristinato')->send();
     }
 }

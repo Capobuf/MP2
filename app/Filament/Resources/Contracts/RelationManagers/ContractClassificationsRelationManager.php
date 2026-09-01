@@ -64,11 +64,11 @@ class ContractClassificationsRelationManager extends RelationManager
                             )->id;
                         })
                         ->createOptionAction(fn (Action $action): Action => $action
-                            ->label('Crea centro di costo')
-                            ->modalHeading('Nuovo centro di costo')
+                            ->label('Crea Centro di Costo')
+                            ->modalHeading('Nuovo Centro di Costo')
                             ->visible(fn (): bool => $this->canManageMasterData()))
                         ->live(),
-                    Placeholder::make('impact_preview')->label('Anteprima esatta')->content(function (Get $get, ContractExerciseClassification $record): string {
+                    Placeholder::make('impact_preview')->label('Anteprima Esatta')->content(function (Get $get, ContractExerciseClassification $record): string {
                         $actor = auth()->user();
                         if (! $actor instanceof User) {
                             return 'Anteprima non disponibile.';
@@ -84,7 +84,7 @@ class ContractClassificationsRelationManager extends RelationManager
                             .' di Allocato ed € '.$plan->actual.' di Effettivo cambiano insieme classificazione annuale.';
                     }),
                     Textarea::make('reason')
-                        ->label('Nota della riclassificazione')
+                        ->label('Nota della Riclassificazione')
                         ->helperText('Richiesta quando la riclassificazione interessa Effettivi o un Budget approvato.')
                         ->visible(fn (ContractExerciseClassification $record): bool => $this->classificationReasonRequired($record))
                         ->required(fn (ContractExerciseClassification $record): bool => $this->classificationReasonRequired($record))

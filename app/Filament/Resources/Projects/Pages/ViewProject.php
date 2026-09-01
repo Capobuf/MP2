@@ -29,9 +29,11 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -93,7 +95,7 @@ class ViewProject extends ViewRecord
                 ])),
             EditAction::make()->label('Modifica')->icon('heroicon-m-pencil-square')->color('gray')->outlined(),
             Action::make('createProjectExpense')
-                ->label('Nuova spesa')
+                ->label('Nuova Spesa')
                 ->icon('heroicon-m-plus')
                 ->extraAttributes(['class' => 'mp2-object-primary-action'])
                 ->url(fn (): string => ExpenseResource::getUrl('create', [
@@ -101,57 +103,32 @@ class ViewProject extends ViewRecord
                 ]))
                 ->visible(fn (): bool => $this->canCreateExpense()),
             Action::make('reclassify')
-                ->label('Riclassifica annualità')
+                ->label('Riclassifica Annualità')
                 ->icon('heroicon-m-arrows-right-left')
                 ->color('gray')
                 ->outlined()
                 ->modalHeading('Riclassifica il Progetto')
                 ->modalDescription('L’anteprima riclassifica tutte le Spese figlie dell’Esercizio senza modificarne identità o importi.')
-                ->modalSubmitActionLabel('Conferma riclassificazione')
+                ->modalSubmitActionLabel('Conferma Riclassificazione')
                 ->visible(fn (): bool => $this->record instanceof Project && ! $this->record->isArchived() && auth()->user()?->can('update', $this->record) === true)
                 ->form([
                     Select::make('exercise_id')
                         ->label('Esercizio Aperto')
                         ->options(fn (): array => Exercise::query()->where('company_id', $this->projectRecord()->company_id)->open()->orderByDesc('year')->pluck('year', 'id')->all())
                         ->live()
+                        ->afterStateUpdated(fn (Set $set) => $set('impact_confirmed', false))
                         ->required(),
                     Select::make('cost_center_id')
                         ->label('Nuovo Centro di Costo')
                         ->options(fn (): array => CostCenter::query()->where('company_id', $this->projectRecord()->company_id)->active()->orderBy('name')->pluck('name', 'id')->all())
                         ->live()
+                        ->afterStateUpdated(fn (Set $set) => $set('impact_confirmed', false))
                         ->placeholder('Non classificato'),
                     Placeholder::make('impact_preview')
-                        ->label('Anteprima esatta')
-                        ->content(function (Get $get): string {
-                            $actor = auth()->user();
-                            $exerciseId = $get('exercise_id');
-                            if (! $actor instanceof User || blank($exerciseId)) {
-                                return 'Selezionare l’Esercizio per calcolare l’anteprima.';
-                            }
-                            try {
-                                $exercise = Exercise::query()->findOrFail((int) $exerciseId);
-                                $costCenterId = filled($get('cost_center_id')) ? (int) $get('cost_center_id') : null;
-                                $plan = app(UpdateProjectClassification::class)->preview($actor, $this->projectRecord(), $exercise, $costCenterId);
-                            } catch (ValidationException $exception) {
-                                return collect($exception->errors())->flatten()->first() ?? 'Anteprima non disponibile.';
-                            }
-
-                            $previous = $this->classificationLabel($plan->oldCostCenterId);
-                            $next = $this->classificationLabel($plan->newCostCenterId);
-                            $expenses = $this->projectRecord()->expenses()
-                                ->whereIn('id', $plan->expenseIds)
-                                ->orderBy('id')
-                                ->get()
-                                ->map(fn ($expense): string => $expense->originKey())
-                                ->implode(', ');
-
-                            return "Centro di Costo: {$previous} → {$next}. "
-                                .count($plan->expenseIds).' Spese conservano identità e importi'
-                                .($expenses === '' ? '' : " ({$expenses})")
-                                .'; € '.$plan->allocation.' di Allocato ed € '.$plan->actual.' di Effettivo passano integralmente alla nuova classificazione annuale.';
-                        }),
+                        ->hiddenLabel()
+                        ->content(fn (Get $get): View => $this->reclassificationPreview($get)),
                     Textarea::make('reason')
-                        ->label('Nota della riclassificazione')
+                        ->label('Nota della Riclassificazione')
                         ->helperText('Richiesta quando la riclassificazione interessa Effettivi o un Budget approvato.')
                         ->visible(fn (Get $get): bool => $this->reclassificationReasonRequired($get))
                         ->required(fn (Get $get): bool => $this->reclassificationReasonRequired($get))
@@ -176,13 +153,13 @@ class ViewProject extends ViewRecord
                     $this->record->refresh();
                 }),
             Action::make('manage_deferral')
-                ->label('Gestisci rinvio')
+                ->label('Gestisci Rinvio')
                 ->icon('heroicon-m-arrow-right-circle')
                 ->color('gray')
                 ->outlined()
-                ->modalHeading('Gestisci rinvio del Progetto')
+                ->modalHeading('Gestisci Rinvio del Progetto')
                 ->modalDescription('Sostituisce o rimuove un rinvio già applicato. I Budget esistenti restano invariati e i Draft interessati saranno da riallineare.')
-                ->modalSubmitActionLabel('Conferma cambio rinvio')
+                ->modalSubmitActionLabel('Conferma Cambio Rinvio')
                 ->visible(fn (): bool => $this->canManageDeferral())
                 ->form([
                     Select::make('deferral_id')
@@ -193,7 +170,7 @@ class ViewProject extends ViewRecord
                         ->live()
                         ->required(),
                     Select::make('mode')
-                        ->label('Nuova modalità')
+                        ->label('Nuova Modalità')
                         ->options(function (Get $get): array {
                             $deferral = ProjectDeferral::query()->find($get('deferral_id'));
 
@@ -212,14 +189,14 @@ class ViewProject extends ViewRecord
                         ->live()
                         ->required(),
                     TextInput::make('carryover_amount')
-                        ->label('Riporto provvisorio')
+                        ->label('Riporto Provvisorio')
                         ->numeric()
                         ->minValue(0.01)
                         ->prefix('€')
                         ->visible(fn (Get $get): bool => $get('mode') === ProjectDeferralMode::Carryover->value)
                         ->required(fn (Get $get): bool => $get('mode') === ProjectDeferralMode::Carryover->value),
                     Repeater::make('source_estimate_reductions')
-                        ->label('Stime origine da ridurre')
+                        ->label('Stime Origine da Ridurre')
                         ->schema([
                             Select::make('source_line_id')
                                 ->label('Riga Stima')
@@ -227,7 +204,7 @@ class ViewProject extends ViewRecord
                                 ->required(),
                             TextInput::make('reduction_amount')->label('Riduzione')->numeric()->minValue(0.01)->prefix('€')->required(),
                             Select::make('destination_supplier_id')
-                                ->label('Fornitore destinazione')
+                                ->label('Fornitore Destinazione')
                                 ->options(fn (): array => ['none' => 'Nessun Fornitore'] + Supplier::query()->where('company_id', $this->projectRecord()->company_id)->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all())
                                 ->required(),
                         ])
@@ -237,7 +214,7 @@ class ViewProject extends ViewRecord
                         ->required(fn (Get $get): bool => $get('mode') === ProjectDeferralMode::Reprogramming->value),
                     Textarea::make('reason')->label('Motivazione')->required()->maxLength(2000),
                     Placeholder::make('deferral_preview')
-                        ->label('Anteprima esatta')
+                        ->label('Anteprima Esatta')
                         ->content(fn (Get $get): string => $this->deferralPreviewText($get)),
                     Checkbox::make('impact_confirmed')
                         ->label('Confermo l’impatto corrente, il riallineamento dei Draft e l’immutabilità dei Budget esistenti')
@@ -267,7 +244,7 @@ class ViewProject extends ViewRecord
                         $preview['fingerprint'],
                     );
                     $this->record->refresh();
-                    Notification::make()->title('Rinvio del Progetto modificato')->success()->send();
+                    Notification::make()->title('Rinvio del Progetto Modificato')->success()->send();
                 }),
             Action::make('archive')
                 ->label('Archivia')
@@ -317,8 +294,43 @@ class ViewProject extends ViewRecord
         $costCenter = CostCenter::query()->find($costCenterId);
 
         return $costCenter === null
-            ? 'Centro di Costo #'.$costCenterId
+            ? 'Centro di Costo non disponibile'
             : $costCenter->name.($costCenter->isArchived() ? ' · Archiviato' : '');
+    }
+
+    private function reclassificationPreview(Get $get): View
+    {
+        $actor = auth()->user();
+        $exerciseId = $get('exercise_id');
+        if (! $actor instanceof User || blank($exerciseId)) {
+            return view('filament.resources.projects.components.classification-impact-preview', [
+                'error' => 'Selezionare l’Esercizio per calcolare l’anteprima.',
+                'summary' => null,
+            ]);
+        }
+
+        try {
+            $exercise = Exercise::query()->findOrFail((int) $exerciseId);
+            $costCenterId = filled($get('cost_center_id')) ? (int) $get('cost_center_id') : null;
+            $plan = app(UpdateProjectClassification::class)->preview($actor, $this->projectRecord(), $exercise, $costCenterId);
+        } catch (ValidationException $exception) {
+            return view('filament.resources.projects.components.classification-impact-preview', [
+                'error' => collect($exception->errors())->flatten()->first() ?? 'Anteprima non disponibile.',
+                'summary' => null,
+            ]);
+        }
+
+        return view('filament.resources.projects.components.classification-impact-preview', [
+            'error' => null,
+            'summary' => [
+                'before' => $this->classificationLabel($plan->oldCostCenterId),
+                'after' => $this->classificationLabel($plan->newCostCenterId),
+                'changed' => $plan->oldCostCenterId !== $plan->newCostCenterId,
+                'expense_count' => count($plan->expenseIds),
+                'allocation' => Number::currency((float) $plan->allocation, in: 'EUR', locale: 'it'),
+                'actual' => Number::currency((float) $plan->actual, in: 'EUR', locale: 'it'),
+            ],
+        ]);
     }
 
     private function canArchive(): bool
@@ -482,7 +494,7 @@ class ViewProject extends ViewRecord
         $this->record = $project->refresh();
 
         Notification::make()
-            ->title($archived ? 'Progetto archiviato' : 'Progetto ripristinato')
+            ->title($archived ? 'Progetto Archiviato' : 'Progetto Ripristinato')
             ->success()
             ->send();
     }

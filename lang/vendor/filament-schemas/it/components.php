@@ -14,7 +14,7 @@ return [
             'step' => [
                 'statuses' => [
                     'completed' => 'Completato',
-                    'upcoming' => 'Non completato',
+                    'upcoming' => 'Non Completato',
                 ],
             ],
         ],

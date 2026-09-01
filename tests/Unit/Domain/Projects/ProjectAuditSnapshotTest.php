@@ -58,8 +58,8 @@ it('materializes stable Project facts and exact overspend consequences', functio
 });
 
 it('defines the bounded S4 audit vocabulary with Italian labels', function () {
-    expect(AuditEventType::ProjectCreated->label())->toBe('Progetto creato')
-        ->and(AuditEventType::ProjectTransitionPlanned->label())->toBe('Transizione progetto pianificata')
-        ->and(AuditEventType::ProjectOverspendCreated->label())->toBe('Sovraspesa progetto creata')
-        ->and(AuditEventType::ProjectRestored->label())->toBe('Progetto ripristinato');
+    expect(AuditEventType::ProjectCreated->label())->toBe('Progetto Creato')
+        ->and(AuditEventType::ProjectTransitionPlanned->label())->toBe('Transizione Progetto Pianificata')
+        ->and(AuditEventType::ProjectOverspendCreated->label())->toBe('Sovraspesa Progetto Creata')
+        ->and(AuditEventType::ProjectRestored->label())->toBe('Progetto Ripristinato');
 });

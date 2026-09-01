@@ -733,12 +733,17 @@ html.fi {
     box-shadow: inset 0 1px rgb(255 255 255 / 4%), 0 8px 22px rgb(0 0 0 / 12%);
 }
 
+.mp2-operational-context {
+    display: contents;
+}
+
 .mp2-context-selector > .fi-dropdown,
-.mp2-context-selector > .mp2-context-control {
+.mp2-operational-context > .fi-dropdown,
+.mp2-operational-context > .mp2-context-control {
     position: relative;
 }
 
-.mp2-context-selector > :not(:first-child)::before {
+.mp2-operational-context > *::before {
     position: absolute;
     z-index: 1;
     inset-block: 8px;
@@ -748,8 +753,51 @@ html.fi {
     content: '';
 }
 
-.mp2-context-menu-group-divided {
-    border-top: 1px solid var(--border);
+.mp2-context-selector > .fi-tenant-menu {
+    display: block;
+    width: 184px;
+    flex: none;
+}
+
+.mp2-context-selector .fi-tenant-menu-trigger {
+    height: 44px;
+    justify-content: flex-start;
+    gap: 8px;
+    border: 1px solid transparent;
+    border-radius: calc(var(--mp2-shell-radius) - 2px);
+    padding: 4px 10px;
+    color: var(--text-primary);
+}
+
+.mp2-context-selector .fi-tenant-menu-trigger:hover,
+.mp2-context-selector .fi-tenant-menu-trigger:focus-visible {
+    border-color: rgb(91 224 209 / 16%);
+    background: linear-gradient(180deg, rgb(255 255 255 / 6%), rgb(57 213 196 / 5%));
+}
+
+.mp2-context-selector .fi-tenant-menu-trigger:focus-visible {
+    box-shadow: inset 0 0 0 1px rgb(105 231 216 / 42%), 0 0 0 2px rgb(57 213 196 / 10%);
+}
+
+.mp2-context-selector .fi-tenant-avatar {
+    width: 16px;
+    height: 16px;
+}
+
+.mp2-context-selector .fi-tenant-menu-trigger-current-tenant-label {
+    font-size: 0.625rem;
+    line-height: 0.75rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.mp2-context-selector .fi-tenant-menu-trigger-tenant-name {
+    overflow: hidden;
+    max-width: 100%;
+    color: var(--text-primary);
+    line-height: 1rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .mp2-row-select-action {
@@ -1191,10 +1239,6 @@ html.fi {
     box-shadow: inset 0 0 0 1px rgb(105 231 216 / 42%), 0 0 0 2px rgb(57 213 196 / 10%);
 }
 
-.mp2-context-company {
-    width: 184px;
-}
-
 .mp2-context-control .mp2-context-copy {
     flex-direction: column;
     align-items: flex-start;
@@ -1265,8 +1309,12 @@ html.fi {
 }
 
 @media (max-width: 1180px) {
-    .mp2-context-company {
+    .mp2-context-selector > .fi-tenant-menu {
         width: 150px;
+    }
+
+    .mp2-context-selector .fi-tenant-menu-trigger-current-tenant-label {
+        display: none;
     }
 
     .mp2-context-exercise {
@@ -1300,7 +1348,12 @@ html.fi {
         padding-inline: 7px;
     }
 
-    .mp2-context-company {
+    .mp2-context-selector .fi-tenant-menu-trigger {
+        height: 36px;
+        padding-inline: 7px;
+    }
+
+    .mp2-context-selector > .fi-tenant-menu {
         width: 116px;
     }
 
@@ -1328,7 +1381,7 @@ html.fi {
         padding-block: 20px;
     }
 
-    .mp2-context-company {
+    .mp2-context-selector > .fi-tenant-menu {
         width: 80px;
     }
 
@@ -1349,11 +1402,66 @@ html.fi {
     }
 }
 
+.mp2-sidebar-platform {
+    flex: none;
+    border-block-start: 1px solid rgb(255 255 255 / 7%);
+    padding: 10px 12px 2px;
+}
+
+.mp2-sidebar-platform-link {
+    display: flex;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid rgb(255 255 255 / 8%);
+    border-radius: 10px;
+    padding: 8px 10px;
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.mp2-sidebar-platform-link:hover,
+.mp2-sidebar-platform-link:focus-visible {
+    border-color: rgb(57 213 196 / 20%);
+    background: rgb(57 213 196 / 7%);
+    color: var(--text-primary);
+}
+
+.mp2-sidebar-platform-link:focus-visible {
+    outline: 2px solid rgb(105 231 216 / 45%);
+    outline-offset: 2px;
+}
+
+.mp2-sidebar-platform-icon {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    color: var(--primary);
+}
+
+.fi-sidebar:not(.fi-sidebar-open) .mp2-sidebar-platform {
+    padding-inline: 16px;
+}
+
+.fi-sidebar:not(.fi-sidebar-open) .mp2-sidebar-platform-link {
+    width: 40px;
+    justify-content: center;
+    padding: 8px;
+}
+
 .mp2-sidebar-collapse {
     flex: none;
     border-block-start: 1px solid rgb(255 255 255 / 7%);
     padding: 10px 12px 12px;
     background: linear-gradient(0deg, rgb(0 0 0 / 12%), transparent);
+}
+
+.mp2-sidebar-collapse-after-platform {
+    border-block-start: 0;
+    padding-block-start: 2px;
 }
 
 .mp2-sidebar-collapse-button {
@@ -1402,7 +1510,7 @@ html.fi {
 }
 
 @media (max-width: 480px) {
-    .mp2-context-company {
+    .mp2-context-selector > .fi-tenant-menu {
         width: 56px;
     }
 
@@ -1412,6 +1520,10 @@ html.fi {
 
     .mp2-context-budget {
         width: 50px;
+    }
+
+    .mp2-context-selector .fi-tenant-menu-trigger-text {
+        display: none;
     }
 }
 

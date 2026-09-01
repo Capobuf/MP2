@@ -151,7 +151,7 @@ it('notifies the operator when a Line creates Project overspend', function () {
         'amount_warning_acknowledged' => false,
         'operation_id' => (string) Str::uuid(),
     ])->assertHasNoTableActionErrors()
-        ->assertNotified('Sovraspesa creata');
+        ->assertNotified('Sovraspesa Creata');
 
     $line = ExpenseLine::query()->sole();
     $component->callTableAction('edit', record: $line, data: [
@@ -164,5 +164,5 @@ it('notifies the operator when a Line creates Project overspend', function () {
         'amount_warning_acknowledged' => false,
         'operation_id' => (string) Str::uuid(),
     ])->assertHasNoTableActionErrors()
-        ->assertNotified('Sovraspesa aumentata');
+        ->assertNotified('Sovraspesa Aumentata');
 });

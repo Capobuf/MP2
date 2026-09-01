@@ -61,7 +61,7 @@ it('exposes the profile, navigation, home link and MFA inside an accessible tena
     $this->actingAs($user)
         ->get($profileUrl)
         ->assertOk()
-        ->assertSee('Vai alla pagina principale')
+        ->assertSee('Vai alla Pagina Principale')
         ->assertSee('Autenticazione a due fattori (2FA)');
 });
 

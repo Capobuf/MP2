@@ -27,7 +27,7 @@ class CostCentersTable
                     ->badge()
                     ->color(fn (string $state): string => $state === 'Attivo' ? 'success' : 'gray'),
                 TextColumn::make('updated_at')
-                    ->label('Ultima modifica')
+                    ->label('Ultima Modifica')
                     ->dateTime('d/m/Y H:i')
                     ->sortable(),
             ])
@@ -44,7 +44,7 @@ class CostCentersTable
                         blank: fn (Builder $query): Builder => $query,
                     ),
             ])
-            ->emptyStateHeading('Nessun centro di costo')
+            ->emptyStateHeading('Nessun Centro di Costo')
             ->emptyStateDescription('Non sono presenti centri di costo per il filtro selezionato.')
             ->recordActions([
                 ViewAction::make(),

@@ -6,7 +6,7 @@
 @if (is_array($lines) && $lines !== [])
     <div class="mp2-report-lines-wrap">
         <table class="mp2-report-lines">
-            <thead><tr><th>Tipo Riga</th><th class="mp2-report-number">Importo</th><th>Nota</th><th>Stato annullamento</th><th>Allegati</th></tr></thead>
+            <thead><tr><th>Tipo Riga</th><th class="mp2-report-number">Importo</th><th>Nota</th><th>Stato Annullamento</th><th>Allegati</th></tr></thead>
             <tbody>
                 @foreach ($lines as $line)
                     <tr>

@@ -33,7 +33,7 @@ it('exposes the complete Line edit form separately from impact-confirmed classif
         ->assertActionExists('moveOrReclassify');
 
     $detail = Livewire::test(ExpenseDetail::class, ['expenseId' => $expense->id, 'compact' => false])
-        ->assertSee('Vedi Timeline completa');
+        ->assertSee('Vedi Timeline Completa');
 
     expect($detail->instance()->timelineUrl())->toBe(CompanyAudit::getUrl([
         'tenant' => $company,
@@ -73,5 +73,5 @@ it('hides every expense mutation from a read-only viewer', function () {
         ->assertActionHidden('restore');
 
     Livewire::test(ExpenseDetail::class, ['expenseId' => $expense->id, 'compact' => false])
-        ->assertSee('Vedi Timeline completa');
+        ->assertSee('Vedi Timeline Completa');
 });

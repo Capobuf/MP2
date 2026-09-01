@@ -34,7 +34,7 @@ class ContractConditionsRelationManager extends RelationManager
 {
     protected static string $relationship = 'conditions';
 
-    protected static ?string $title = 'Condizioni economiche';
+    protected static ?string $title = 'Condizioni Economiche';
 
     public function isReadOnly(): bool
     {
@@ -58,7 +58,7 @@ class ContractConditionsRelationManager extends RelationManager
             TextColumn::make('creator.name')->label('Autore')->placeholder('Autore originale non disponibile'),
             TextColumn::make('reason')->label('Motivo')->placeholder('—')->wrap(),
         ])->headerActions([
-            Action::make('createCondition')->label('Nuova condizione')->visible(fn (): bool => $this->canMutate())
+            Action::make('createCondition')->label('Nuova Condizione')->visible(fn (): bool => $this->canMutate())
                 ->form($this->fields())
                 ->action(function (array $data): void {
                     $actor = auth()->user();
@@ -70,9 +70,9 @@ class ContractConditionsRelationManager extends RelationManager
                     $contract->refresh();
                 }),
         ])->recordActions([
-            Action::make('changeAgreement')->label('Modifica accordo')
+            Action::make('changeAgreement')->label('Modifica Accordo')
                 ->visible(fn (ContractCondition $record): bool => $this->canMutate() && ! $record->isAnnulled())
-                ->modalSubmitActionLabel('Conferma modifica economica')
+                ->modalSubmitActionLabel('Conferma Modifica Economica')
                 ->fillForm(fn (ContractCondition $record): array => [
                     'requested_date' => now($record->company->timezone)->toDateString(),
                     'amount' => $record->amount,
@@ -96,9 +96,9 @@ class ContractConditionsRelationManager extends RelationManager
                     );
                     $contract->refresh();
                 }),
-            Action::make('correctMaterialError')->label('Correggi errore materiale')
+            Action::make('correctMaterialError')->label('Correggi Errore Materiale')
                 ->visible(fn (ContractCondition $record): bool => $this->canMutate() && ! $record->isAnnulled())
-                ->color('warning')->modalSubmitActionLabel('Conferma correzione')
+                ->color('warning')->modalSubmitActionLabel('Conferma Correzione')
                 ->fillForm(fn (ContractCondition $record): array => [
                     'amount' => $record->amount,
                     'cycle' => $record->cycle,
@@ -136,7 +136,7 @@ class ContractConditionsRelationManager extends RelationManager
                     $this->getOwnerRecord()->refresh();
                 }),
         ])->defaultSort('valid_from')
-            ->emptyStateHeading('Nessuna condizione')
+            ->emptyStateHeading('Nessuna Condizione')
             ->emptyStateDescription('Ogni Contratto nasce con una prima condizione valida; verifica i filtri se non è visibile.');
     }
 
@@ -144,7 +144,7 @@ class ContractConditionsRelationManager extends RelationManager
     private function fields(): array
     {
         return [
-            DecimalInput::make('amount')->label('Importo netto IVA')->minValue(0)->required(),
+            DecimalInput::make('amount')->label('Importo Netto IVA')->minValue(0)->required(),
             Select::make('cycle')->label('Ciclo')->options(ContractCycleType::options())->required(),
             Select::make('attribution_mode')->label('Attribuzione Stima')->options(ContractAttributionMode::options())->required(),
             DatePicker::make('valid_from')->label('Valida dal')->required(),
@@ -169,12 +169,12 @@ class ContractConditionsRelationManager extends RelationManager
         $invalidate = fn (Set $set): mixed => $set('effective_date_confirmed', false);
 
         return [
-            DatePicker::make('requested_date')->label('Data richiesta')->required()->live()->afterStateUpdated($invalidate),
-            DecimalInput::make('amount')->label('Nuovo importo netto IVA')->minValue(0)->required()->live()->afterStateUpdated($invalidate),
-            Select::make('cycle')->label('Nuovo ciclo')->options(ContractCycleType::options())->required()->live()->afterStateUpdated($invalidate),
-            Select::make('attribution_mode')->label('Nuova attribuzione')->options(ContractAttributionMode::options())->required()->live()->afterStateUpdated($invalidate),
-            Textarea::make('reason')->label('Nota accordo')->live()->afterStateUpdated($invalidate),
-            Placeholder::make('impact_preview')->label('Anteprima economica')
+            DatePicker::make('requested_date')->label('Data Richiesta')->required()->live()->afterStateUpdated($invalidate),
+            DecimalInput::make('amount')->label('Nuovo Importo Netto IVA')->minValue(0)->required()->live()->afterStateUpdated($invalidate),
+            Select::make('cycle')->label('Nuovo Ciclo')->options(ContractCycleType::options())->required()->live()->afterStateUpdated($invalidate),
+            Select::make('attribution_mode')->label('Nuova Attribuzione')->options(ContractAttributionMode::options())->required()->live()->afterStateUpdated($invalidate),
+            Textarea::make('reason')->label('Nota Accordo')->live()->afterStateUpdated($invalidate),
+            Placeholder::make('impact_preview')->label('Anteprima Economica')
                 ->content(function (Get $get, ContractCondition $record): string {
                     $contract = $this->getOwnerRecord();
                     if (! $contract instanceof Contract || blank($get('requested_date')) || blank($get('amount')) || blank($get('cycle')) || blank($get('attribution_mode'))) {
@@ -207,13 +207,13 @@ class ContractConditionsRelationManager extends RelationManager
         $invalidate = fn (Set $set): mixed => $set('impact_confirmed', false);
 
         return [
-            DecimalInput::make('amount')->label('Importo corretto')->minValue(0)->required()->live()->afterStateUpdated($invalidate),
-            Select::make('cycle')->label('Ciclo corretto')->options(ContractCycleType::options())->required()->live()->afterStateUpdated($invalidate),
-            Select::make('attribution_mode')->label('Attribuzione corretta')->options(ContractAttributionMode::options())->required()->live()->afterStateUpdated($invalidate),
-            Textarea::make('reason')->label('Motivo della correzione')->required()->live()->afterStateUpdated($invalidate),
+            DecimalInput::make('amount')->label('Importo Corretto')->minValue(0)->required()->live()->afterStateUpdated($invalidate),
+            Select::make('cycle')->label('Ciclo Corretto')->options(ContractCycleType::options())->required()->live()->afterStateUpdated($invalidate),
+            Select::make('attribution_mode')->label('Attribuzione Corretta')->options(ContractAttributionMode::options())->required()->live()->afterStateUpdated($invalidate),
+            Textarea::make('reason')->label('Motivo della Correzione')->required()->live()->afterStateUpdated($invalidate),
             Checkbox::make('declared_input_error')->label('Dichiaro che il valore originario era un errore di inserimento')->accepted()->required()->live()->afterStateUpdated($invalidate),
             Checkbox::make('declared_no_new_agreement')->label('Dichiaro che non è iniziato un nuovo accordo')->accepted()->required()->live()->afterStateUpdated($invalidate),
-            Placeholder::make('impact_preview')->label('Anteprima correzione')
+            Placeholder::make('impact_preview')->label('Anteprima Correzione')
                 ->content(function (Get $get, ContractCondition $record): string {
                     $contract = $this->getOwnerRecord();
                     if (! $contract instanceof Contract || blank($get('amount')) || blank($get('cycle')) || blank($get('attribution_mode')) || blank($get('reason'))) {

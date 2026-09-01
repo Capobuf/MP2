@@ -1,6 +1,6 @@
-<div class="mp2-report-context" aria-label="Riferimenti e filtri del report">
+<div class="mp2-report-context" aria-label="Riferimenti e Filtri del Report">
     <div class="mp2-report-context-heading">
-        <p class="mp2-report-kicker">Riferimenti e filtri</p>
+        <p class="mp2-report-kicker">Riferimenti e Filtri</p>
         <x-filament::button color="gray" outlined wire:click="toggleFilters" icon="heroicon-m-funnel">
             Filtri @if ($this->activeFilterCount() > 0) ({{ $this->activeFilterCount() }}) @endif
         </x-filament::button>
@@ -11,11 +11,11 @@
     </div>
 
     @if ($this->activeFilterLabels() !== [])
-        <div class="mp2-report-active-filters" role="list" aria-label="Filtri attivi">
+        <div class="mp2-report-active-filters" role="list" aria-label="Filtri Attivi">
             @foreach ($this->activeFilterLabels() as $label)
                 <span role="listitem">{{ $label }}</span>
             @endforeach
-            <button type="button" wire:click="clearFilters">Azzera filtri</button>
+            <button type="button" wire:click="clearFilters">Azzera Filtri</button>
         </div>
     @endif
 
@@ -23,7 +23,7 @@
         <div class="mp2-report-filter-panel">
             <div class="mp2-report-filter-panel-heading">
                 <div>
-                    <h4>Filtri opzionali</h4>
+                    <h4>Filtri Opzionali</h4>
                     <p>Ogni modifica aggiorna automaticamente il report.</p>
                 </div>
                 @if ($this->activeFilterCount() > 0)

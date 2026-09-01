@@ -16,7 +16,7 @@ final class ProjectOverspendNotifier
         }
 
         $increased = collect($occurrences)->contains(fn (array $occurrence): bool => $occurrence['result'] === 'increased');
-        $title = $increased ? 'Sovraspesa aumentata' : 'Sovraspesa creata';
+        $title = $increased ? 'Sovraspesa Aumentata' : 'Sovraspesa Creata';
         $body = collect($occurrences)->map(function (array $occurrence): string {
             $project = $occurrence['project_id'] === null ? 'Progetto' : 'Progetto #'.$occurrence['project_id'];
 

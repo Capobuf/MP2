@@ -10,7 +10,7 @@
         <span class="mp2-object-meta-separator" aria-hidden="true"></span>
         <span>Approvato il <strong>{{ $budget->approved_at->timezone($budget->company->timezone)->format('d/m/Y') }}</strong></span>
         <span class="mp2-object-state-badge mp2-object-state-success">Approvato</span>
-        <span class="mp2-object-state-badge mp2-object-state-neutral">Snapshot immutabile</span>
+        <span class="mp2-object-state-badge mp2-object-state-neutral">Snapshot Immutabile</span>
     </x-slot:meta>
 
     <x-slot:actions>

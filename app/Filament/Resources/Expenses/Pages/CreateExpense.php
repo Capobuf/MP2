@@ -25,7 +25,7 @@ class CreateExpense extends CreateRecord
 {
     protected static string $resource = ExpenseResource::class;
 
-    protected static ?string $title = 'Nuova spesa';
+    protected static ?string $title = 'Nuova Spesa';
 
     public string $operationId;
 
@@ -40,10 +40,10 @@ class CreateExpense extends CreateRecord
         $exercise = $this->currentExercise();
 
         if (! $exercise instanceof Exercise) {
-            return 'Nessun Esercizio globale selezionato.';
+            return 'Nessun Esercizio Globale Selezionato.';
         }
 
-        return "Esercizio globale: {$exercise->year} · {$exercise->status()->label()}";
+        return "Esercizio Globale: {$exercise->year} · {$exercise->status()->label()}";
     }
 
     /** @param array<string, mixed> $data */

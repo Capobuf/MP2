@@ -67,8 +67,8 @@ it('starts with the report chooser and no implicit references or generate action
         ->assertSet('exerciseId', null)
         ->assertSet('kind', null)
         ->assertSet('report', null)
-        ->assertSee('Scegli il report')
-        ->assertSee('Vista annuale esecutiva')
+        ->assertSee('Scegli il Report')
+        ->assertSee('Vista Annuale Esecutiva')
         ->assertDontSee('Genera report');
 });
 
@@ -84,11 +84,11 @@ it('generates the annual report automatically when explicit inputs become comple
         ->set('exerciseId', $exercise->id)
         ->set('kind', 'annual_executive')
         ->assertSet('report', null)
-        ->assertSee('Completa i riferimenti')
+        ->assertSee('Completa i Riferimenti')
         ->set('actualReference', 'current')
         ->assertHasNoErrors()
         ->assertSet('definition.actual_reference', 'current')
-        ->assertSee('Vista annuale esecutiva')
+        ->assertSee('Vista Annuale Esecutiva')
         ->assertSee('Effettivo Corrente')
         ->assertSee('Servizio UI')
         ->assertSee('Esporta PDF')
@@ -160,7 +160,7 @@ it('refreshes supplier filtering automatically and keeps the active filter visib
         ->assertSee('Inclusa')
         ->assertDontSee('Esclusa')
         ->assertSee('Fornitore: Fornitore selezionato')
-        ->assertSee('Azzera filtri');
+        ->assertSee('Azzera Filtri');
 });
 
 it('switches directly while preserving compatible references and filters', function (): void {
@@ -188,7 +188,7 @@ it('switches directly while preserving compatible references and filters', funct
         ->assertSet('definition.kind', 'budget_current_allocation')
         ->assertSet('definition.filters.supplier_id', $supplier->id)
         ->assertSet('report', fn (?array $report): bool => $report !== null)
-        ->assertDontSee('Scegli il report');
+        ->assertDontSee('Scegli il Report');
 });
 
 it('preserves annual references when switching to budget actual', function (): void {
@@ -280,8 +280,8 @@ it('keeps one budget and requests the second when switching to budget versions',
         ->assertSet('secondBudgetId', null)
         ->assertSet('report', null)
         ->assertSet('definition', null)
-        ->assertSee('Completa i riferimenti')
-        ->assertSee('Budget finale');
+        ->assertSee('Completa i Riferimenti')
+        ->assertSee('Budget Finale');
 });
 
 it('does not generate a new contracts report from a partial date interval', function (): void {
@@ -362,7 +362,7 @@ it('renders canonical classification and structured detail without raw json or f
         ->set('exerciseId', $noBudgetExercise->id)
         ->set('kind', 'annual_executive')
         ->set('actualReference', 'current')
-        ->assertSee('Budget approvato corrente')
+        ->assertSee('Budget Approvato Corrente')
         ->assertSee('Non disponibile');
 });
 
@@ -402,11 +402,11 @@ it('renders contract drill-down across the full row without technical persistenc
         ->set('actualReference', 'current')
         ->assertHasNoErrors()
         ->assertSee('Dettaglio Contratto')
-        ->assertSee('Condizioni economiche')
-        ->assertSee('Configurazioni di rinnovo')
-        ->assertSee('Eventi contrattuali')
+        ->assertSee('Condizioni Economiche')
+        ->assertSee('Configurazioni di Rinnovo')
+        ->assertSee('Eventi Contrattuali')
         ->assertSee('Annuale')
-        ->assertSee('Inizio ciclo')
+        ->assertSee('Inizio Ciclo')
         ->assertSee('24 mesi')
         ->assertSee('Avvio del servizio')
         ->assertSeeHtml('class="mp2-report-detail-row"')
@@ -437,8 +437,8 @@ it('shows only budget references and their variation in budget versions KPIs', f
         ->assertSee('Budget v1')
         ->assertSee('Budget v2')
         ->assertSee('Variazione fra Budget')
-        ->assertDontSee('Effettivo del riferimento')
-        ->assertDontSee('Scostamento Operativo del riferimento');
+        ->assertDontSee('Effettivo del Riferimento')
+        ->assertDontSee('Scostamento Operativo del Riferimento');
 });
 
 it('names the selected budget actual references and variance in its KPIs', function (): void {
@@ -500,7 +500,7 @@ it('names the selected measure in exercise comparison KPIs', function (): void {
         ->assertSee('Misura: Situazione Corrente')
         ->assertSee('Esercizio 2025')
         ->assertSee('Esercizio 2026')
-        ->assertSee('Delta complessivo');
+        ->assertSee('Delta Complessivo');
 });
 
 it('denies the report page without visualizza', function (): void {

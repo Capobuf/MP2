@@ -2,6 +2,7 @@
 
 use App\Domain\Projects\ProjectClassificationImpactPlan;
 use App\Models\Company;
+use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -16,14 +17,20 @@ it('captures immutable exact annual classification impact and identity', functio
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create(['revision' => 3]);
     $project = Project::factory()->for($company)->create(['revision' => 4]);
-    $classification = ProjectExerciseClassification::factory()->forProjectAndExercise($project, $exercise)->create();
+    $oldCostCenter = CostCenter::factory()->for($company)->create();
+    $newCostCenter = CostCenter::factory()->for($company)->create();
+    $classification = ProjectExerciseClassification::factory()->forProjectAndExercise($project, $exercise)->create([
+        'cost_center_id' => $oldCostCenter->id,
+    ]);
     $expense = Expense::factory()->forExercise($exercise)->for($project)->create(['direct_cost_center_id' => null]);
     ExpenseLine::factory()->for($expense)->create(['type' => 'estimate', 'amount' => '12.30']);
     ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '4.20']);
 
-    $plan = ProjectClassificationImpactPlan::build($project, $exercise, 99);
+    $plan = ProjectClassificationImpactPlan::build($project, $exercise, $newCostCenter->id);
 
     expect($plan->classificationId)->toBe($classification->id)
+        ->and($plan->oldCostCenterId)->toBe($oldCostCenter->id)
+        ->and($plan->newCostCenterId)->toBe($newCostCenter->id)
         ->and($plan->expenseIds)->toBe([$expense->id])
         ->and($plan->allocation)->toBe('12.30')
         ->and($plan->actual)->toBe('4.20')

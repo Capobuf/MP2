@@ -31,7 +31,7 @@
 @if ($conditions !== [])
     <section class="mp2-report-detail-group">
         <div class="mp2-report-detail-group-heading">
-            <h5>Condizioni economiche</h5>
+            <h5>Condizioni Economiche</h5>
             <span>{{ count($conditions) }}</span>
         </div>
         <div class="mp2-report-record-grid">
@@ -58,7 +58,7 @@
 @if ($renewals !== [])
     <section class="mp2-report-detail-group">
         <div class="mp2-report-detail-group-heading">
-            <h5>Configurazioni di rinnovo</h5>
+            <h5>Configurazioni di Rinnovo</h5>
             <span>{{ count($renewals) }}</span>
         </div>
         <div class="mp2-report-record-grid">
@@ -69,8 +69,8 @@
                         <span class="mp2-report-state">{{ ($renewal['automatic_renewal'] ?? false) ? 'Automatico' : 'Manuale' }}</span>
                     </div>
                     <dl class="mp2-report-record-facts">
-                        <div><dt>Scadenza di riferimento</dt><dd>{{ $date($renewal['expiry_anchor_date'] ?? null) }}</dd></div>
-                        <div><dt>Durata rinnovo</dt><dd>{{ filled($renewal['renewal_duration_months'] ?? null) ? $renewal['renewal_duration_months'].' mesi' : '—' }}</dd></div>
+                        <div><dt>Scadenza di Riferimento</dt><dd>{{ $date($renewal['expiry_anchor_date'] ?? null) }}</dd></div>
+                        <div><dt>Durata Rinnovo</dt><dd>{{ filled($renewal['renewal_duration_months'] ?? null) ? $renewal['renewal_duration_months'].' mesi' : '—' }}</dd></div>
                         <div><dt>Preavviso</dt><dd>{{ filled($renewal['notice_days'] ?? null) ? $renewal['notice_days'].' giorni' : '—' }}</dd></div>
                     </dl>
                 </article>
@@ -82,12 +82,12 @@
 @if ($composition !== [])
     <section class="mp2-report-detail-group">
         <div class="mp2-report-detail-group-heading">
-            <h5>Composizione annuale</h5>
+            <h5>Composizione Annuale</h5>
             <span>{{ count($composition) }} quote</span>
         </div>
         <div class="mp2-report-lines-wrap">
             <table class="mp2-report-lines">
-                <thead><tr><th>Inizio ciclo</th><th>Data di attribuzione</th><th class="mp2-report-number">Importo</th></tr></thead>
+                <thead><tr><th>Inizio Ciclo</th><th>Data di Attribuzione</th><th class="mp2-report-number">Importo</th></tr></thead>
                 <tbody>
                     @foreach ($composition as $item)
                         <tr>
@@ -105,7 +105,7 @@
 @if ($events !== [])
     <section class="mp2-report-detail-group">
         <div class="mp2-report-detail-group-heading">
-            <h5>Eventi contrattuali</h5>
+            <h5>Eventi Contrattuali</h5>
             <span>{{ count($events) }}</span>
         </div>
         <div class="mp2-report-timeline">

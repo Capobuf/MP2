@@ -19,17 +19,17 @@ enum ModificationDimension: string
     public function label(): string
     {
         return match ($this) {
-            self::AllocationOrEstimate => 'Allocato o stima',
+            self::AllocationOrEstimate => 'Allocato o Stima',
             self::Actual => 'Effettivo',
             self::Carryover => 'Riporto',
             self::CostCenter => 'Centro di Costo',
             self::Supplier => 'Fornitore',
             self::Container => 'Contenitore',
-            self::StateOrTransitions => 'Stato o transizioni',
-            self::ContractEconomics => 'Economica contrattuale',
-            self::DeadlineRenewalTermination => 'Scadenza, rinnovo o cessazione',
-            self::ArchiveOrReversal => 'Archivio o storno',
-            self::InformativeRelations => 'Relazioni informative',
+            self::StateOrTransitions => 'Stato o Transizioni',
+            self::ContractEconomics => 'Economica Contrattuale',
+            self::DeadlineRenewalTermination => 'Scadenza, Rinnovo o Cessazione',
+            self::ArchiveOrReversal => 'Archivio o Storno',
+            self::InformativeRelations => 'Relazioni Informative',
         };
     }
 }

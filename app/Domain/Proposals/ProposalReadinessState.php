@@ -13,8 +13,8 @@ enum ProposalReadinessState: string
     {
         return match ($this) {
             self::Aligned => 'Allineato',
-            self::ToReview => 'Da prendere in visione',
-            self::ToRealign => 'Da riallineare',
+            self::ToReview => 'Da Prendere in Visione',
+            self::ToRealign => 'Da Riallineare',
             self::Inconsistent => 'Incoerente',
         };
     }

@@ -39,13 +39,13 @@ class ContractDeadlines extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCalendarDays;
 
-    protected static ?string $navigationLabel = 'Scadenze contratti';
+    protected static ?string $navigationLabel = 'Scadenze';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Operatività';
+    protected static ?string $navigationParentItem = 'Contratti';
 
-    protected static ?string $title = 'Scadenze contratti';
+    protected static ?string $title = 'Scadenze Contratti';
 
-    protected static ?int $navigationSort = 50;
+    protected static ?int $navigationSort = 10;
 
     /** @var array<int, ContractDeadline> */
     protected array $deadlineCache = [];
@@ -66,26 +66,26 @@ class ContractDeadlines extends Page implements HasTable
                     ->url(fn (Contract $record): string => SupplierResource::getUrl('view', ['record' => $record->supplier])),
                 TextColumn::make('current_state')->label('Stato')->state(fn (Contract $record): string => $this->deadline($record)->state->label())->badge(),
                 TextColumn::make('contractual_start_date')->label('Inizio')->date('d/m/Y'),
-                TextColumn::make('next_expiry_date')->label('Prossima scadenza')->date('d/m/Y')->placeholder('Scadenza non definita'),
-                TextColumn::make('automatic_renewal')->label('Rinnovo automatico')->formatStateUsing(fn (bool $state): string => $state ? 'Sì' : 'No'),
-                TextColumn::make('renewal_duration_months')->label('Durata rinnovo')->suffix(' mesi')->placeholder('—'),
+                TextColumn::make('next_expiry_date')->label('Prossima Scadenza')->date('d/m/Y')->placeholder('Scadenza non definita'),
+                TextColumn::make('automatic_renewal')->label('Rinnovo Automatico')->formatStateUsing(fn (bool $state): string => $state ? 'Sì' : 'No'),
+                TextColumn::make('renewal_duration_months')->label('Durata Rinnovo')->suffix(' mesi')->placeholder('—'),
                 TextColumn::make('notice_days')->label('Preavviso')->suffix(' giorni')->placeholder('—'),
-                TextColumn::make('notice_limit_date')->label('Limite disdetta')->state(fn (Contract $record): ?string => $this->deadline($record)->noticeLimitDate)->date('d/m/Y')->placeholder('—'),
-                TextColumn::make('planned_cessation_date')->label('Cessazione pianificata')->state(fn (Contract $record): ?string => $this->deadline($record)->plannedCessationDate)->date('d/m/Y')->placeholder('—'),
-                TextColumn::make('days_remaining')->label('Giorni alla scadenza')->state(fn (Contract $record): ?int => $this->deadline($record)->daysUntilExpiry)->placeholder('—'),
-                TextColumn::make('notice_days_remaining')->label('Giorni al limite')->state(fn (Contract $record): ?int => $this->deadline($record)->daysUntilNoticeLimit)->placeholder('—'),
+                TextColumn::make('notice_limit_date')->label('Limite Disdetta')->state(fn (Contract $record): ?string => $this->deadline($record)->noticeLimitDate)->date('d/m/Y')->placeholder('—'),
+                TextColumn::make('planned_cessation_date')->label('Cessazione Pianificata')->state(fn (Contract $record): ?string => $this->deadline($record)->plannedCessationDate)->date('d/m/Y')->placeholder('—'),
+                TextColumn::make('days_remaining')->label('Giorni alla Scadenza')->state(fn (Contract $record): ?int => $this->deadline($record)->daysUntilExpiry)->placeholder('—'),
+                TextColumn::make('notice_days_remaining')->label('Giorni al Limite')->state(fn (Contract $record): ?int => $this->deadline($record)->daysUntilNoticeLimit)->placeholder('—'),
                 TextColumn::make('cost_center')->label('Centro di Costo')->state(fn (Contract $record): string => $this->costCenterLabel($record)),
                 TextColumn::make('renewal_warning')->label('Avviso')->state(fn (Contract $record): ?string => $this->deadline($record)->renewalWithoutCondition ? 'Rinnovo senza condizione economica' : null)->placeholder('—')->wrap(),
                 TextColumn::make('timeline')->label('Timeline')->state('Apri Timeline')->url(fn (Contract $record): string => CompanyAudit::getUrl(['tenant' => $record->company, 'contract' => $record->id])),
             ])
             ->filters([
-                Filter::make('expiry_interval')->label('Intervallo scadenza')->schema([
+                Filter::make('expiry_interval')->label('Intervallo Scadenza')->schema([
                     DatePicker::make('from')->label('Scadenza dal'),
                     DatePicker::make('until')->label('Scadenza al'),
                 ])->query(fn (Builder $query, array $data): Builder => $query
                     ->when($data['from'] ?? null, fn (Builder $query, mixed $date): Builder => $query->whereDate('next_expiry_date', '>=', $date))
                     ->when($data['until'] ?? null, fn (Builder $query, mixed $date): Builder => $query->whereDate('next_expiry_date', '<=', $date))),
-                Filter::make('notice_interval')->label('Intervallo limite disdetta')->schema([
+                Filter::make('notice_interval')->label('Intervallo Limite Disdetta')->schema([
                     DatePicker::make('from')->label('Limite dal'),
                     DatePicker::make('until')->label('Limite al'),
                 ])->query(function (Builder $query, array $data): Builder {
@@ -102,8 +102,8 @@ class ContractDeadlines extends Page implements HasTable
 
                     return $query;
                 }),
-                TernaryFilter::make('automatic_renewal')->label('Rinnovo automatico'),
-                TernaryFilter::make('undefined_expiry')->label('Scadenza non definita')->queries(
+                TernaryFilter::make('automatic_renewal')->label('Rinnovo Automatico'),
+                TernaryFilter::make('undefined_expiry')->label('Scadenza Non Definita')->queries(
                     true: fn (Builder $query): Builder => $query->whereNull('next_expiry_date'),
                     false: fn (Builder $query): Builder => $query->whereNotNull('next_expiry_date'),
                     blank: fn (Builder $query): Builder => $query,

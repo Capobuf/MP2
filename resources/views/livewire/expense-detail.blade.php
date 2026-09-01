@@ -13,7 +13,7 @@
             <x-filament::icon-button
                 wire:click="close"
                 icon="heroicon-m-x-mark"
-                label="Chiudi dettaglio"
+                label="Chiudi Dettaglio"
                 color="gray"
             />
         </header>
@@ -42,7 +42,7 @@
 
     @if ($compact)
         <section class="mp2-detail-section" aria-labelledby="expense-summary-{{ $expense->id }}">
-            <h3 id="expense-summary-{{ $expense->id }}">Riepilogo economico</h3>
+            <h3 id="expense-summary-{{ $expense->id }}">Riepilogo Economico</h3>
             <dl class="mp2-economic-summary">
                 <div>
                     <dt>Stima</dt>
@@ -61,7 +61,7 @@
     @endif
 
     <section class="mp2-detail-section" aria-labelledby="expense-data-{{ $expense->id }}">
-        <h3 id="expense-data-{{ $expense->id }}">Dati principali</h3>
+        <h3 id="expense-data-{{ $expense->id }}">Dati Principali</h3>
         <dl class="mp2-detail-list">
             <div><dt>Esercizio</dt><dd>{{ $expense->exercise->year }}</dd></div>
             <div><dt>Contenitore</dt><dd>{{ $expense->containerLabel() }}</dd></div>
@@ -129,7 +129,7 @@
     </section>
 
     <section class="mp2-detail-section" aria-labelledby="expense-timeline-{{ $expense->id }}">
-        <h3 id="expense-timeline-{{ $expense->id }}">Timeline recente</h3>
+        <h3 id="expense-timeline-{{ $expense->id }}">Timeline Recente</h3>
         @include('components.expenses.timeline', [
             'events' => $events,
             'timezone' => $expense->company->timezone,
@@ -147,7 +147,7 @@
     @if ($compact)
         <footer class="mp2-expense-panel-footer">
             <x-filament::button :href="$this->fullDetailUrl()" tag="a" color="gray" icon="heroicon-m-arrow-top-right-on-square">
-                Apri dettaglio completo
+                Apri Dettaglio Completo
             </x-filament::button>
         </footer>
     @endif

@@ -7,7 +7,7 @@
     <section class="mp2-report-table-section" aria-labelledby="report-section-{{ $loop->index }}">
         <div class="mp2-report-section-heading">
             <div>
-                <p class="mp2-report-kicker">Report specialistico</p>
+                <p class="mp2-report-kicker">Report Specialistico</p>
                 <h3 id="report-section-{{ $loop->index }}">{{ $section['title'] }}</h3>
             </div>
         </div>
@@ -46,7 +46,7 @@
                                 <td><div class="mp2-report-chip-list">@forelse ($row['labels'] as $label)<span>{{ $label }}</span>@empty<span>—</span>@endforelse</div></td>
                                 <td>
                                     <button type="button" class="mp2-report-drilldown-trigger" x-on:click="expanded = ! expanded" x-bind:aria-expanded="expanded">
-                                        <span x-text="expanded ? 'Chiudi dettaglio' : 'Apri dettaglio'">Apri dettaglio</span>
+                                        <span x-text="expanded ? 'Chiudi Dettaglio' : 'Apri Dettaglio'">Apri Dettaglio</span>
                                         <x-filament::icon icon="heroicon-m-chevron-down" x-bind:class="{ 'is-expanded': expanded }" />
                                     </button>
                                 </td>
@@ -69,7 +69,7 @@
         @elseif (in_array($report['header']['kind'], ['projects', 'carryovers'], true))
             <div class="mp2-report-table-wrap" tabindex="0">
                 <table class="mp2-report-table">
-                    <thead><tr><th>Progetto</th><th>Stato</th><th class="mp2-report-number">Allocato</th><th class="mp2-report-number">Effettivo</th><th class="mp2-report-number">Residuo</th><th class="mp2-report-number">Risparmio</th><th class="mp2-report-number">Non utilizzato</th><th class="mp2-report-number">Riporto</th><th>Drill-down</th></tr></thead>
+                    <thead><tr><th>Progetto</th><th>Stato</th><th class="mp2-report-number">Allocato</th><th class="mp2-report-number">Effettivo</th><th class="mp2-report-number">Residuo</th><th class="mp2-report-number">Risparmio</th><th class="mp2-report-number">Non Utilizzato</th><th class="mp2-report-number">Riporto</th><th>Drill-down</th></tr></thead>
                     @foreach ($section['rows'] as $row)
                         <tbody x-data="{ expanded: false }" class="mp2-report-row-group">
                             <tr>
@@ -83,7 +83,7 @@
                                 <td class="mp2-report-number">{{ $money($row['carryover']) }}</td>
                                 <td>
                                     <button type="button" class="mp2-report-drilldown-trigger" x-on:click="expanded = ! expanded" x-bind:aria-expanded="expanded">
-                                        <span x-text="expanded ? 'Chiudi dettaglio' : 'Apri dettaglio'">Apri dettaglio</span>
+                                        <span x-text="expanded ? 'Chiudi Dettaglio' : 'Apri Dettaglio'">Apri Dettaglio</span>
                                         <x-filament::icon icon="heroicon-m-chevron-down" x-bind:class="{ 'is-expanded': expanded }" />
                                     </button>
                                 </td>

@@ -7,11 +7,11 @@ use Filament\Support\RawJs;
 
 class OperationalVarianceBySourceChart extends EconomicChartWidget
 {
-    protected ?string $heading = 'Scostamento Operativo per sorgente';
+    protected ?string $heading = 'Scostamento Operativo per Sorgente';
 
-    protected ?string $description = 'Effettivo meno Allocato Corrente; valori positivi e negativi si sviluppano dai lati opposti dello zero.';
+    protected ?string $description = 'Effettivo Meno Allocato Corrente; Valori Positivi e Negativi si Sviluppano dai Lati Opposti dello Zero.';
 
-    protected ?string $emptyStateHeading = 'Nessuno scostamento disponibile';
+    protected ?string $emptyStateHeading = 'Nessuno Scostamento Disponibile';
 
     public function chartSurfaceClass(): string
     {

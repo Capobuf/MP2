@@ -19,17 +19,17 @@ enum SecondaryLabel: string
     public function label(): string
     {
         return match ($this) {
-            self::Unplanned => 'Non previsto',
-            self::PlannedNotOccurred => 'Previsto e non avvenuto',
+            self::Unplanned => 'Non Previsto',
+            self::PlannedNotOccurred => 'Previsto e Non Avvenuto',
             self::WithoutActuals => 'Senza Effettivi',
             self::Reversed => 'Stornato',
             self::Cancelled => 'Annullato',
             self::Deferred => 'Rinviato',
-            self::LateCorrection => 'Correzione tardiva',
-            self::CarryoverChanged => 'Riporto variato',
-            self::HistoricalAttributionDisputed => 'Imputazione storica contestata',
-            self::ContractExpiryInSelectedInterval => 'Scadenza contrattuale entro l’intervallo selezionato',
-            self::UndefinedExpiry => 'Scadenza non definita',
+            self::LateCorrection => 'Correzione Tardiva',
+            self::CarryoverChanged => 'Riporto Variato',
+            self::HistoricalAttributionDisputed => 'Imputazione Storica Contestata',
+            self::ContractExpiryInSelectedInterval => 'Scadenza Contrattuale entro l’Intervallo Selezionato',
+            self::UndefinedExpiry => 'Scadenza Non Definita',
         };
     }
 }

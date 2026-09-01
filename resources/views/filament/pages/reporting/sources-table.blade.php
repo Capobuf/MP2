@@ -7,7 +7,7 @@
     <div class="mp2-report-section-heading">
         <div>
             <p class="mp2-report-kicker">Dettaglio</p>
-            <h3 id="report-sources-title">Sorgenti economiche</h3>
+            <h3 id="report-sources-title">Sorgenti Economiche</h3>
         </div>
         <p>{{ count($report['sources']) }} sorgenti</p>
     </div>
@@ -44,7 +44,7 @@
                                 x-on:click="expanded = ! expanded"
                                 x-bind:aria-expanded="expanded"
                             >
-                                <span x-text="expanded ? 'Chiudi dettaglio' : 'Apri dettaglio'">Apri dettaglio</span>
+                                <span x-text="expanded ? 'Chiudi Dettaglio' : 'Apri Dettaglio'">Apri Dettaglio</span>
                                 <x-filament::icon icon="heroicon-m-chevron-down" x-bind:class="{ 'is-expanded': expanded }" />
                             </button>
                         </td>

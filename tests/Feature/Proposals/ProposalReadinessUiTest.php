@@ -29,8 +29,8 @@ it('shows all canonical readiness labels, impacts and S7 resolution controls', f
         ->assertActionExists('manualRealignment')
         ->assertActionExists('acknowledgeSource')
         ->assertSee('Allineato')
-        ->assertSee('Da prendere in visione')
-        ->assertSee('Da riallineare')
+        ->assertSee('Da Prendere in Visione')
+        ->assertSee('Da Riallineare')
         ->assertSee('Incoerente')
-        ->assertSee('Esercizi interessati');
+        ->assertSee('Esercizi Interessati');
 });

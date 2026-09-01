@@ -47,11 +47,11 @@ class Reports extends Page
 
     protected static ?string $navigationLabel = 'Report';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Controllo';
+    protected static ?string $navigationParentItem = 'Panoramica';
 
     protected static ?string $title = 'Reportistica';
 
-    protected static ?int $navigationSort = 30;
+    protected static ?int $navigationSort = 10;
 
     #[Url]
     public ?int $exerciseId = null;
@@ -146,7 +146,7 @@ class Reports extends Page
                         ReportKind::BudgetVersions->value,
                     ], true)),
                 Select::make('secondBudgetId')
-                    ->label('Budget finale')
+                    ->label('Budget Finale')
                     ->placeholder('Seleziona il secondo Budget')
                     ->options(fn (): array => $this->budgetOptions())
                     ->native(false)
@@ -170,7 +170,7 @@ class Reports extends Page
                     ->live()
                     ->visible(fn (): bool => $this->kind === ReportKind::Exercises->value),
                 ToggleButtons::make('exerciseMeasure')
-                    ->label('Stessa misura')
+                    ->label('Stessa Misura')
                     ->options($this->exerciseMeasureOptions())
                     ->grouped()
                     ->live()
@@ -193,7 +193,7 @@ class Reports extends Page
                 Select::make('contractId')->label('Contratto')
                     ->placeholder('Tutti')->options(fn (): array => $this->contractOptions())
                     ->native(false)->searchable()->live(),
-                Select::make('expenseId')->label('Spesa autonoma')
+                Select::make('expenseId')->label('Spesa Autonoma')
                     ->placeholder('Tutte')->options(fn (): array => $this->expenseOptions())
                     ->native(false)->searchable()->live(),
                 Select::make('supplierId')->label('Fornitore')
@@ -511,33 +511,33 @@ class Reports extends Page
     public function totalLabel(string $key): string
     {
         return [
-            'source_count' => 'Sorgenti primarie',
-            'allocation' => 'Allocato del riferimento',
-            'actual' => 'Effettivo del riferimento',
-            'operational_variance' => 'Scostamento Operativo del riferimento',
+            'source_count' => 'Sorgenti Primarie',
+            'allocation' => 'Allocato del Riferimento',
+            'actual' => 'Effettivo del Riferimento',
+            'operational_variance' => 'Scostamento Operativo del Riferimento',
             'carryover' => 'Riporto',
-            'unclassified' => 'Non classificato',
-            'initial_budget' => 'Budget iniziale approvato',
-            'current_budget' => 'Budget approvato corrente',
+            'unclassified' => 'Non Classificato',
+            'initial_budget' => 'Budget Iniziale Approvato',
+            'current_budget' => 'Budget Approvato Corrente',
             'current_allocation' => 'Allocato Corrente',
             'current_actual' => 'Effettivo Corrente',
             'current_operational_variance' => 'Scostamento Operativo',
             'closing_actual' => 'Effettivo alla Chiusura',
-            'late_corrections_positive' => 'Correzioni tardive positive',
-            'late_corrections_negative' => 'Correzioni tardive negative',
-            'late_corrections_net' => 'Correzioni tardive nette',
+            'late_corrections_positive' => 'Correzioni Tardive Positive',
+            'late_corrections_negative' => 'Correzioni Tardive Negative',
+            'late_corrections_net' => 'Correzioni Tardive Nette',
             'current_knowledge_actual' => 'Effettivo a Conoscenza Corrente',
-            'annotation_count' => 'Annotazioni di errore storico',
-            'selected_budget' => 'Budget selezionato',
-            'selected_actual' => 'Effettivo selezionato',
-            'allocation_vs_selected_budget' => 'Variazione Allocato vs Budget selezionato',
-            'selected_budget_actual_variance' => 'Varianza Budget vs Actual selezionato',
+            'annotation_count' => 'Annotazioni di Errore Storico',
+            'selected_budget' => 'Budget Selezionato',
+            'selected_actual' => 'Effettivo Selezionato',
+            'allocation_vs_selected_budget' => 'Variazione Allocato vs Budget Selezionato',
+            'selected_budget_actual_variance' => 'Varianza Budget vs Actual Selezionato',
         ][$key] ?? str_replace('_', ' ', $key);
     }
 
     public function sourceTypeLabel(string $type): string
     {
-        return ['expense' => 'Spesa autonoma', 'project' => 'Progetto', 'contract' => 'Contratto'][$type] ?? $type;
+        return ['expense' => 'Spesa Autonoma', 'project' => 'Progetto', 'contract' => 'Contratto'][$type] ?? $type;
     }
 
     public function stateLabel(?string $state): string
@@ -671,8 +671,8 @@ class Reports extends Page
             $values = [];
             $availability = $result->header['availability'];
             foreach ([
-                ['initial_budget', 'Budget iniziale', (bool) $availability['initial_budget']],
-                ['current_budget', 'Budget corrente', (bool) $availability['current_budget']],
+                ['initial_budget', 'Budget Iniziale', (bool) $availability['initial_budget']],
+                ['current_budget', 'Budget Corrente', (bool) $availability['current_budget']],
                 ['current_allocation', 'Allocato Corrente', true],
                 ['selected_actual', (string) $result->header['actual_reference'], true],
             ] as [$key, $label, $available]) {
@@ -682,8 +682,8 @@ class Reports extends Page
                 }
             }
             $charts[] = $this->currencyBarChart(
-                'annual-summary', 'Sintesi economica',
-                'Riferimenti economici esplicitamente disponibili per l’Esercizio.', $labels, $values,
+                'annual-summary', 'Sintesi Economica',
+                'Riferimenti Economici Esplicitamente Disponibili per l’Esercizio.', $labels, $values,
             );
 
             $costCenters = [];
@@ -696,7 +696,7 @@ class Reports extends Page
             if ($costCenters !== []) {
                 $charts[] = $this->groupedBarChart(
                     'annual-cost-centers', 'Allocato ed Effettivo per Centro di Costo',
-                    'Tutte le sorgenti del risultato; Non classificato resta un bucket esplicito.',
+                    'Tutte le Sorgenti del Risultato; Non Classificato Resta un Bucket Esplicito.',
                     array_column($costCenters, 'label'),
                     [
                         ['label' => 'Allocato', 'data' => array_map('floatval', array_column($costCenters, 'allocation')), 'color' => '#39D5C4'],
@@ -713,8 +713,8 @@ class Reports extends Page
             ReportKind::BudgetVersions, ReportKind::Exercises,
         ], true)) {
             $charts[] = $this->currencyBarChart(
-                'comparison-totals', 'Confronto complessivo',
-                'Somma esatta dei valori iniziali e finali delle sorgenti confrontate.',
+                'comparison-totals', 'Confronto Complessivo',
+                'Somma Esatta dei Valori Iniziali e Finali delle Sorgenti Confrontate.',
                 [
                     (string) ($result->header['initial_reference_label'] ?? $result->header['initial_reference']),
                     (string) ($result->header['final_reference_label'] ?? $result->header['final_reference']),
@@ -730,7 +730,7 @@ class Reports extends Page
             }
         } elseif ($kind === ReportKind::OperationalVariance && $result->sources !== []) {
             $charts[] = [
-                'id' => 'operational-variance', 'heading' => 'Scostamento Operativo per sorgente',
+                'id' => 'operational-variance', 'heading' => 'Scostamento Operativo per Sorgente',
                 'description' => 'Effettivo Corrente meno Allocato Corrente.',
                 'type' => 'bar', 'variant' => 'variance-horizontal',
                 'data' => [
@@ -751,7 +751,7 @@ class Reports extends Page
             if ($sources !== []) {
                 $charts[] = $this->groupedBarChart(
                     $type.'-values', ($kind === ReportKind::Projects ? 'Progetti' : 'Contratti').' · Allocato ed Effettivo',
-                    'Valori delle sorgenti pertinenti presenti nel risultato.',
+                    'Valori delle Sorgenti Pertinenti Presenti nel Risultato.',
                     array_map(fn (ReportSource $source): string => $source->label, $sources),
                     [
                         ['label' => 'Allocato', 'data' => array_map(fn (ReportSource $source): float => (float) $source->allocation, $sources), 'color' => '#39D5C4'],
@@ -763,7 +763,7 @@ class Reports extends Page
             $rows = $result->sections[0]['rows'];
             $charts[] = $this->groupedBarChart(
                 'supplier-values', 'Allocato ed Effettivo per Fornitore',
-                'Aggregazione canonica già prodotta dal report Fornitori.', array_column($rows, 'label'),
+                'Aggregazione Canonica Già Prodotta dal Report Fornitori.', array_column($rows, 'label'),
                 [
                     ['label' => 'Allocato', 'data' => array_map('floatval', array_column($rows, 'allocation')), 'color' => '#39D5C4'],
                     ['label' => 'Effettivo', 'data' => array_map('floatval', array_column($rows, 'actual')), 'color' => '#60A5FA'],
@@ -774,7 +774,7 @@ class Reports extends Page
             if ($sources !== []) {
                 $charts[] = $this->groupedBarChart(
                     'carryover-values', 'Riporti per Progetto',
-                    'Riporto insieme ad Allocato ed Effettivo già disponibili nel risultato.',
+                    'Riporto Insieme ad Allocato ed Effettivo Già Disponibili nel Risultato.',
                     array_map(fn (ReportSource $source): string => $source->label, $sources),
                     [
                         ['label' => 'Riporto', 'data' => array_map(fn (ReportSource $source): float => (float) $source->carryover, $sources), 'color' => '#F59E0B'],
@@ -833,8 +833,8 @@ class Reports extends Page
         $categories = ComparisonCategory::cases();
 
         return [
-            'id' => 'comparison-categories', 'heading' => 'Classificazione delle variazioni',
-            'description' => count($result->comparisons).' sorgenti primarie confrontate.',
+            'id' => 'comparison-categories', 'heading' => 'Classificazione delle Variazioni',
+            'description' => count($result->comparisons).' Sorgenti Primarie Confrontate.',
             'type' => 'doughnut', 'variant' => 'category-doughnut',
             'data' => [
                 'labels' => array_map(fn (ComparisonCategory $category): string => $category->label(), $categories),

@@ -29,5 +29,5 @@
         <p class="mp2-empty-copy">Nessun evento recente.</p>
     @endforelse
 
-    <a class="mp2-timeline-link" href="{{ $timelineUrl }}">Vedi Timeline completa</a>
+    <a class="mp2-timeline-link" href="{{ $timelineUrl }}">Vedi Timeline Completa</a>
 </div>

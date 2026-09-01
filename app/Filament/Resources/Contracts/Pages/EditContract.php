@@ -54,7 +54,7 @@ class EditContract extends EditRecord
                 ->schema([
                     ...$storedAttachments,
                     AttachmentUpload::make('attachments')
-                        ->label('Aggiungi allegati')
+                        ->label('Aggiungi Allegati')
                         ->multiple()
                         ->storeFiles(false)
                         ->visible(! $contract->isArchived())

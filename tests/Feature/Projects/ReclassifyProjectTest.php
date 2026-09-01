@@ -81,6 +81,21 @@ it('supports Unclassified and rejects stale archived cross-company and closed-ye
     expect(fn () => $action->preview($actor, $project, $exercise->refresh(), null))->toThrow(ValidationException::class);
 });
 
+it('treats the current Cost Center as an idempotent no-op', function () {
+    [$actor, $company, $exercise, $project, $classification] = reclassificationContext();
+    $costCenter = CostCenter::factory()->for($company)->create();
+    $classification->update(['cost_center_id' => $costCenter->id]);
+    $action = app(UpdateProjectClassification::class);
+    $preview = $action->preview($actor, $project, $exercise, $costCenter->id);
+
+    $result = $action->confirm($actor, $project, $preview, (string) Str::uuid());
+
+    expect($result->is($classification))->toBeTrue()
+        ->and($project->refresh()->revision)->toBe(0)
+        ->and($exercise->refresh()->revision)->toBe(0)
+        ->and(AuditEvent::query()->count())->toBe(0);
+});
+
 it('rolls classification revisions and audit back together', function () {
     [$actor, $company, $exercise, $project, $classification] = reclassificationContext();
     $target = CostCenter::factory()->for($company)->create();

@@ -10,7 +10,7 @@ enum ProposalPurpose: string
     public function label(): string
     {
         return match ($this) {
-            self::InitialBudget => 'Budget iniziale',
+            self::InitialBudget => 'Budget Iniziale',
             self::Revision => 'Revisione',
         };
     }

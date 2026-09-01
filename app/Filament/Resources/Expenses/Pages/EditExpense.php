@@ -46,7 +46,7 @@ class EditExpense extends EditRecord
 {
     protected static string $resource = ExpenseResource::class;
 
-    protected static ?string $title = 'Modifica spesa';
+    protected static ?string $title = 'Modifica Spesa';
 
     public string $operationId;
 
@@ -117,7 +117,7 @@ class EditExpense extends EditRecord
                     ->columnSpanFull(),
                 Textarea::make('notes')->label('Note')->columnSpanFull(),
                 Textarea::make('change_reason')
-                    ->label('Motivo della modifica')
+                    ->label('Motivo della Modifica')
                     ->helperText('Richiesto dopo un Budget approvato quando cambia la Descrizione o viene aggiunta o modificata una Stima.')
                     ->visible(fn (Get $get): bool => $this->changeReasonRequired($get))
                     ->required(fn (Get $get): bool => $this->changeReasonRequired($get))
@@ -147,7 +147,7 @@ class EditExpense extends EditRecord
                         }))
                         ->deletable()
                         ->deleteAction(fn (Action $action): Action => $action
-                            ->label('Rimuovi riga')
+                            ->label('Rimuovi Riga')
                             ->visible(function (array $arguments, Repeater $component): bool {
                                 $item = $component->getRawState()[$arguments['item']] ?? null;
 
@@ -163,14 +163,14 @@ class EditExpense extends EditRecord
                 ->schema([
                     ...$storedAttachments,
                     AttachmentUpload::make('attachments')
-                        ->label('Aggiungi allegati')
+                        ->label('Aggiungi Allegati')
                         ->multiple()
                         ->storeFiles(false)
                         ->visible($expense->contract === null || ! $expense->contract->isArchived())
                         ->columnSpanFull(),
                 ])
                 ->columnSpanFull(),
-            Section::make('Informazioni aggiuntive')
+            Section::make('Informazioni Aggiuntive')
                 ->description('Sono richieste soltanto quando le modifiche alle Righe Effettivo incidono sullo stato del contenitore o sulla sovraspesa.')
                 ->schema([
                     Select::make('actual_kind')
@@ -186,13 +186,13 @@ class EditExpense extends EditRecord
                         ->required(fn (Get $get): bool => $this->requiresProjectOpening($get))
                         ->dehydrated(fn (Get $get): bool => $this->requiresProjectOpening($get)),
                     Textarea::make('activity_note')
-                        ->label('Motivo dell’attività tardiva o correttiva')
+                        ->label('Motivo dell’Attività Tardiva o Correttiva')
                         ->visible(fn (Get $get): bool => $this->requiresTerminalDeclaration($get))
                         ->required(fn (Get $get): bool => $this->requiresTerminalDeclaration($get))
                         ->dehydrated(fn (Get $get): bool => $this->requiresTerminalDeclaration($get))
                         ->columnSpanFull(),
                     Textarea::make('overspend_note')
-                        ->label('Nota di sovraspesa')
+                        ->label('Nota di Sovraspesa')
                         ->visible(fn (Get $get): bool => $this->requiresOverspendNote($get))
                         ->required(fn (Get $get): bool => $this->requiresOverspendNote($get))
                         ->dehydrated(fn (Get $get): bool => $this->requiresOverspendNote($get))

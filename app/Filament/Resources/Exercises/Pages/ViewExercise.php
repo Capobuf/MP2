@@ -57,7 +57,7 @@ class ViewExercise extends ViewRecord
                 ]))
                 ->visible(fn (): bool => ClosingSnapshot::query()->where('exercise_id', $this->exerciseRecord()->id)->exists()),
             Action::make('closeExercise')
-                ->label('Chiudi esercizio')
+                ->label('Chiudi Esercizio')
                 ->color('danger')
                 ->url(fn (): string => ExerciseResource::getUrl('close', ['record' => $this->exerciseRecord()]))
                 ->visible(fn (): bool => $this->canCloseExercise()),
@@ -84,17 +84,17 @@ class ViewExercise extends ViewRecord
                     $this->redirect(ProposalResource::getUrl('view', ['record' => $proposal], tenant: $company));
                 }),
             Action::make('lateCorrection')
-                ->label('Registra correzione tardiva')
+                ->label('Registra Correzione Tardiva')
                 ->requiresConfirmation()
-                ->modalHeading('Registra correzione tardiva')
+                ->modalHeading('Registra Correzione Tardiva')
                 ->modalDescription('L’importo apparteneva realmente a questo Esercizio Chiuso. L’Esercizio non verrà riaperto: la correzione aggiunge un solo Effettivo e lascia invariati Snapshot, Budget, Riporto, stato e imputazioni storiche.')
-                ->modalSubmitActionLabel('Registra correzione')
+                ->modalSubmitActionLabel('Registra Correzione')
                 ->visible(fn (): bool => $this->canCorrectClosedExercise())
                 ->disabled(fn (): bool => ! ClosingSnapshot::query()->where('exercise_id', $this->exerciseRecord()->id)->exists())
                 ->tooltip(fn (): ?string => ClosingSnapshot::query()->where('exercise_id', $this->exerciseRecord()->id)->exists() ? null : 'La Snapshot di Chiusura canonica non è disponibile.')
                 ->form([
                     Select::make('source_type')
-                        ->label('Sorgente economica storica')
+                        ->label('Sorgente Economica Storica')
                         ->options([
                             'expense' => 'Spesa autonoma',
                             'project' => 'Progetto',
@@ -116,7 +116,7 @@ class ViewExercise extends ViewRecord
                             $set('expected_source_revision', $this->lateCorrectionSourceRevision((string) $get('source_type'), $get('source_origin_id')));
                         }),
                     Select::make('historical_expense_id')
-                        ->label('Spesa storica (opzionale)')
+                        ->label('Spesa Storica (Opzionale)')
                         ->placeholder('Nuova Spesa tardiva')
                         ->options(fn (): array => Expense::query()
                             ->where('company_id', $this->exerciseRecord()->company_id)
@@ -133,11 +133,11 @@ class ViewExercise extends ViewRecord
                         })
                         ->helperText(fn (Get $get): ?string => $this->lateCorrectionSelectionMessage($get)),
                     TextInput::make('description')
-                        ->label('Descrizione nuova Spesa')
+                        ->label('Descrizione Nuova Spesa')
                         ->maxLength(255)
                         ->required(fn (Get $get): bool => $this->lateCorrectionDescriptionRequired($get)),
                     Select::make('supplier_id')
-                        ->label('Fornitore storico (opzionale)')
+                        ->label('Fornitore Storico (Opzionale)')
                         ->placeholder('Nessun Fornitore')
                         ->options(fn (): array => $this->lateCorrectionSupplierOptions())
                         ->visible(fn (Get $get): bool => $this->lateCorrectionSupplierVisible($get)),
@@ -146,7 +146,7 @@ class ViewExercise extends ViewRecord
                         ->numeric()
                         ->required(),
                     Select::make('original_expense_line_id')
-                        ->label('Riga originaria (opzionale)')
+                        ->label('Riga Originaria (Opzionale)')
                         ->placeholder('Non indicata')
                         ->options(fn (Get $get): array => $this->lateCorrectionLineOptions($get('historical_expense_id')))
                         ->searchable(),
@@ -155,14 +155,14 @@ class ViewExercise extends ViewRecord
                         ->required()
                         ->maxLength(65535),
                     Textarea::make('notes')
-                        ->label('Note aggiuntive (opzionali)')
+                        ->label('Note Aggiuntive (Opzionali)')
                         ->maxLength(65535),
                     Checkbox::make('belongs_to_closed_exercise')
                         ->label('L’importo apparteneva realmente a questo Esercizio')
                         ->accepted()
                         ->required(),
                     AttachmentUpload::make('evidence')
-                        ->label('Evidenza conservata (opzionale)')
+                        ->label('Evidenza Conservata (Opzionale)')
                         ->storeFiles(false),
                     Hidden::make('expected_exercise_revision')->default(fn (): int => $this->exerciseRecord()->revision),
                     Hidden::make('expected_source_revision'),
@@ -203,9 +203,9 @@ class ViewExercise extends ViewRecord
                 }),
 
             Action::make('historicalErrorAnnotation')
-                ->label('Annota errore storico')
+                ->label('Annota Errore Storico')
                 ->requiresConfirmation()
-                ->modalHeading('Annota errore storico')
+                ->modalHeading('Annota Errore Storico')
                 ->modalDescription('L’Annotazione conserva i dati storici senza riclassificare o modificare alcun valore: ha Nessun impatto economico e non riapre l’Esercizio.')
                 ->modalSubmitActionLabel('Registra Annotazione')
                 ->visible(fn (): bool => $this->canAnnotateHistoricalError())
@@ -213,19 +213,19 @@ class ViewExercise extends ViewRecord
                 ->tooltip(fn (): ?string => ClosingSnapshot::query()->where('exercise_id', $this->exerciseRecord()->id)->exists() ? null : 'La Snapshot di Chiusura canonica non è disponibile.')
                 ->form([
                     Select::make('kind')
-                        ->label('Tipo di errore storico')
+                        ->label('Tipo di Errore Storico')
                         ->options(HistoricalErrorKind::options())
                         ->required(),
                     Textarea::make('recorded_fact')
-                        ->label('Dato registrato')
+                        ->label('Dato Registrato')
                         ->helperText('Descrivere il dato memorizzato, senza usare JSON o identificativi tecnici.')
                         ->required(),
                     Textarea::make('believed_correct_fact')
-                        ->label('Dato ritenuto corretto')
+                        ->label('Dato Ritenuto Corretto')
                         ->helperText('Descrivere il dato che si ritiene corretto, senza modificare lo storico.')
                         ->required(),
                     Select::make('affected_source_selector')
-                        ->label('Sorgenti storiche interessate')
+                        ->label('Sorgenti Storiche Interessate')
                         ->options(fn (): array => $this->historicalAnnotationSourceOptions())
                         ->multiple()
                         ->searchable()
@@ -235,7 +235,7 @@ class ViewExercise extends ViewRecord
                         ->required()
                         ->maxLength(65535),
                     AttachmentUpload::make('evidence')
-                        ->label('Evidenza conservata (opzionale)')
+                        ->label('Evidenza Conservata (Opzionale)')
                         ->storeFiles(false),
                     Hidden::make('expected_exercise_revision')->default(fn (): int => $this->exerciseRecord()->revision),
                     Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
@@ -277,7 +277,7 @@ class ViewExercise extends ViewRecord
                 }),
 
             Action::make('createExpense')
-                ->label('Nuova spesa')
+                ->label('Nuova Spesa')
                 ->url(ExpenseResource::getUrl('create'))
                 ->visible(fn (): bool => $this->exerciseRecord()->isOpen()),
         ];

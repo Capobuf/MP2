@@ -6,7 +6,7 @@
                     <x-filament::icon icon="heroicon-o-briefcase" />
                 </span>
                 <div>
-                    <p class="mp2-object-eyebrow">Profilo operativo</p>
+                    <p class="mp2-object-eyebrow">Profilo Operativo</p>
                     <h2 id="project-profile-title">Dati del Progetto</h2>
                 </div>
             </div>
@@ -17,15 +17,15 @@
                     <dd>{{ $overview['profile']['description'] }}</dd>
                 </div>
                 <div>
-                    <dt>Stato iniziale</dt>
+                    <dt>Stato Iniziale</dt>
                     <dd>{{ $overview['profile']['initial_state'] }}</dd>
                 </div>
                 <div>
-                    <dt>Data efficacia iniziale</dt>
+                    <dt>Data Efficacia Iniziale</dt>
                     <dd>{{ $overview['profile']['initial_effective_date'] }}</dd>
                 </div>
                 <div>
-                    <dt>Stato attuale</dt>
+                    <dt>Stato Attuale</dt>
                     <dd>{{ $overview['profile']['current_state'] }}</dd>
                 </div>
                 <div>
@@ -63,11 +63,11 @@
                         <dd>{{ $overview['selected']['year'] }}</dd>
                     </div>
                     <div>
-                        <dt>Data di riferimento</dt>
+                        <dt>Data di Riferimento</dt>
                         <dd>{{ $overview['selected']['reference_date'] }}</dd>
                     </div>
                     <div>
-                        <dt>Stato alla data</dt>
+                        <dt>Stato alla Data</dt>
                         <dd>{{ $overview['selected']['state'] }}</dd>
                     </div>
                     <div class="mp2-object-cost-center">
@@ -82,11 +82,11 @@
                         <dd>{{ $overview['selected']['estimates'] }}</dd>
                     </div>
                     <div>
-                        <dt>Riporto ricevuto</dt>
+                        <dt>Riporto Ricevuto</dt>
                         <dd>{{ $overview['selected']['received_carryover'] }}</dd>
                     </div>
                     <div>
-                        <dt>Allocato corrente</dt>
+                        <dt>Allocato Corrente</dt>
                         <dd>{{ $overview['selected']['allocation'] }}</dd>
                     </div>
                     <div>
@@ -94,7 +94,7 @@
                         <dd>{{ $overview['selected']['actual'] }}</dd>
                     </div>
                     <div>
-                        <dt>Scostamento operativo</dt>
+                        <dt>Scostamento Operativo</dt>
                         <dd>{{ $overview['selected']['variance'] }}</dd>
                     </div>
                     <div>
@@ -102,11 +102,11 @@
                         <dd>{{ $overview['selected']['residual'] }}</dd>
                     </div>
                     <div>
-                        <dt>Disponibilità massima riportabile</dt>
+                        <dt>Disponibilità Massima Riportabile</dt>
                         <dd>{{ $overview['selected']['maximum_transferable'] }}</dd>
                     </div>
                     <div>
-                        <dt>Rinvio ricevuto</dt>
+                        <dt>Rinvio Ricevuto</dt>
                         <dd>{{ $overview['selected']['incoming_deferral_mode'] }} · {{ $overview['selected']['incoming_deferral_amount'] }}</dd>
                     </div>
                 </dl>
@@ -125,13 +125,13 @@
     <section class="mp2-object-annual-section" aria-labelledby="project-annual-title">
         <div class="mp2-object-annual-heading">
             <div>
-                <p class="mp2-object-eyebrow">Andamento pluriennale</p>
-                <h2 id="project-annual-title">Situazioni annuali</h2>
+                <p class="mp2-object-eyebrow">Andamento Pluriennale</p>
+                <h2 id="project-annual-title">Situazioni Annuali</h2>
             </div>
             <p>Stato, classificazione e valori calcolati alla data di riferimento di ciascun Esercizio.</p>
         </div>
 
-        <div class="mp2-object-annual-table-wrap" tabindex="0" role="region" aria-label="Situazioni annuali del Progetto">
+        <div class="mp2-object-annual-table-wrap" tabindex="0" role="region" aria-label="Situazioni Annuali del Progetto">
             <table class="mp2-object-annual-table mp2-project-annual-table">
                 <thead>
                     <tr>
@@ -140,14 +140,14 @@
                         <th scope="col">Stato</th>
                         <th scope="col">Centro di Costo</th>
                         <th scope="col" class="mp2-object-number">Stime</th>
-                        <th scope="col" class="mp2-object-number">Riporto ricevuto</th>
-                        <th scope="col" class="mp2-object-number">Allocato corrente</th>
+                        <th scope="col" class="mp2-object-number">Riporto Ricevuto</th>
+                        <th scope="col" class="mp2-object-number">Allocato Corrente</th>
                         <th scope="col" class="mp2-object-number">Effettivo</th>
-                        <th scope="col" class="mp2-object-number">Scostamento operativo</th>
+                        <th scope="col" class="mp2-object-number">Scostamento Operativo</th>
                         <th scope="col" class="mp2-object-number">Residuo</th>
-                        <th scope="col" class="mp2-object-number">Massimo riportabile</th>
-                        <th scope="col">Rinvio ricevuto</th>
-                        <th scope="col">Transizioni pianificate</th>
+                        <th scope="col" class="mp2-object-number">Massimo Riportabile</th>
+                        <th scope="col">Rinvio Ricevuto</th>
+                        <th scope="col">Transizioni Pianificate</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -156,7 +156,7 @@
                             <th scope="row">
                                 <span>{{ $row['year'] }}</span>
                                 @if ($row['selected'])
-                                    <small>Esercizio selezionato</small>
+                                    <small>Esercizio Selezionato</small>
                                 @endif
                             </th>
                             <td>

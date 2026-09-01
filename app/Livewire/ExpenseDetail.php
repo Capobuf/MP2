@@ -114,7 +114,7 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
     public function addLineAction(): Action
     {
         return Action::make('addLine')
-            ->label('Aggiungi riga')
+            ->label('Aggiungi Riga')
             ->icon('heroicon-m-plus')
             ->color('primary')
             ->visible(fn (): bool => $this->canMutate())
@@ -141,12 +141,12 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
             ->icon('heroicon-m-no-symbol')
             ->color('warning')
             ->requiresConfirmation()
-            ->modalHeading('Annulla riga')
+            ->modalHeading('Annulla Riga')
             ->modalDescription('La Riga sarà esclusa dai totali correnti, senza essere eliminata.')
-            ->modalSubmitActionLabel('Annulla riga')
+            ->modalSubmitActionLabel('Annulla Riga')
             ->schema([
                 Textarea::make('change_reason')
-                    ->label('Motivo della modifica della Stima')
+                    ->label('Motivo della Modifica della Stima')
                     ->visible(fn (Get $get): bool => $this->lineEstimateReasonRequired($get))
                     ->required(fn (Get $get): bool => $this->lineEstimateReasonRequired($get))
                     ->dehydrated(fn (Get $get): bool => $this->lineEstimateReasonRequired($get)),
@@ -169,12 +169,12 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
             ->icon('heroicon-m-arrow-uturn-left')
             ->color('success')
             ->requiresConfirmation()
-            ->modalHeading('Ripristina riga')
+            ->modalHeading('Ripristina Riga')
             ->modalDescription('La Riga tornerà a contribuire ai totali correnti.')
-            ->modalSubmitActionLabel('Ripristina riga')
+            ->modalSubmitActionLabel('Ripristina Riga')
             ->schema([
                 Textarea::make('change_reason')
-                    ->label('Motivo della modifica della Stima')
+                    ->label('Motivo della Modifica della Stima')
                     ->visible(fn (Get $get): bool => $this->lineEstimateReasonRequired($get))
                     ->required(fn (Get $get): bool => $this->lineEstimateReasonRequired($get))
                     ->dehydrated(fn (Get $get): bool => $this->lineEstimateReasonRequired($get)),
@@ -203,14 +203,14 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
     {
         return ExpenseResource::reverseAction()
             ->record(fn (): Expense => $this->expense())
-            ->after(fn () => $this->afterMutation('Spesa stornata.'));
+            ->after(fn () => $this->afterMutation('Spesa Stornata.'));
     }
 
     public function restoreExpenseAction(): Action
     {
         return ExpenseResource::restoreAction()
             ->record(fn (): Expense => $this->expense())
-            ->after(fn () => $this->afterMutation('Spesa ripristinata.'));
+            ->after(fn () => $this->afterMutation('Spesa Ripristinata.'));
     }
 
     /** @return Collection<int, AuditEvent> */
@@ -306,7 +306,7 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
             $data,
         );
         ProjectOverspendNotifier::sendForOperation($operationId);
-        $this->afterMutation($active ? 'Riga ripristinata.' : 'Riga annullata.');
+        $this->afterMutation($active ? 'Riga Ripristinata.' : 'Riga Annullata.');
     }
 
     private function line(int $lineId): ExpenseLine
@@ -316,7 +316,7 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
 
     private function lineActivitySection(): Section
     {
-        return Section::make('Dichiarazioni richieste')
+        return Section::make('Dichiarazioni Richieste')
             ->description('Sono mostrate soltanto le dichiarazioni necessarie per la Riga corrente.')
             ->schema([
                 Select::make('actual_kind')
@@ -334,12 +334,12 @@ class ExpenseDetail extends Component implements HasActions, HasSchemas
                     ->required(fn (Get $get): bool => $this->lineRequiresProjectOpening($get))
                     ->dehydrated(fn (Get $get): bool => $this->lineRequiresProjectOpening($get)),
                 Textarea::make('activity_note')
-                    ->label('Motivo dell’attività tardiva o correttiva')
+                    ->label('Motivo dell’Attività Tardiva o Correttiva')
                     ->visible(fn (Get $get): bool => $this->lineRequiresTerminalDeclaration($get))
                     ->required(fn (Get $get): bool => $this->lineRequiresTerminalDeclaration($get))
                     ->dehydrated(fn (Get $get): bool => $this->lineRequiresTerminalDeclaration($get)),
                 Textarea::make('overspend_note')
-                    ->label('Nota di sovraspesa')
+                    ->label('Nota di Sovraspesa')
                     ->visible(fn (Get $get): bool => $this->lineRequiresOverspendNote($get))
                     ->required(fn (Get $get): bool => $this->lineRequiresOverspendNote($get))
                     ->dehydrated(fn (Get $get): bool => $this->lineRequiresOverspendNote($get)),

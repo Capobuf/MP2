@@ -1,12 +1,13 @@
 <?php
 
 use App\Domain\Expenses\ExerciseStatus;
-use App\Filament\Pages\CompanySettings;
-use App\Filament\Resources\Exercises\ExerciseResource;
+use App\Filament\Pages\Dashboard;
 use App\Filament\Widgets\EconomicSummary;
 use App\Livewire\ExerciseContextSelector;
+use App\Models\BudgetSnapshot;
 use App\Models\Company;
 use App\Models\Exercise;
+use App\Models\Proposal;
 use App\Models\User;
 use App\Support\ExerciseContext;
 use Carbon\CarbonImmutable;
@@ -68,45 +69,20 @@ it('renders the Blade and Livewire global context for the current tenant', funct
 
     Livewire::test(ExerciseContextSelector::class)
         ->assertSet('exerciseId', $exercise->id)
-        ->assertSee('Azienda Demo')
         ->assertSee('2026 · Aperto')
-        ->assertSeeHtml('aria-label="Apri selettore e azioni Esercizio"')
-        ->assertSee('Gestisci Esercizi')
-        ->assertDontSee('Crea Esercizio')
-        ->assertSeeHtml('href="'.ExerciseResource::getUrl('index', tenant: $company).'"');
+        ->assertSeeHtml('aria-label="Seleziona Esercizio"')
+        ->assertDontSee('Gestisci Esercizi')
+        ->assertDontSee('Crea Esercizio');
 
     Livewire::test(EconomicSummary::class)
-        ->assertSee('Quadro economico')
-        ->assertSee('Budget selezionato')
+        ->assertSee('Quadro Economico')
+        ->assertSee('Budget Selezionato')
         ->assertSee('Allocato Corrente')
         ->assertSee('Effettivo')
         ->assertSee('Scostamento Operativo');
 });
 
-it('exposes authorized Exercise actions in the global context menu', function () {
-    $manager = User::factory()->create();
-    $company = Company::factory()->create(['name' => 'Azienda Demo']);
-
-    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
-        grantTestPermissions([
-            'company_id' => $company->id,
-            'user' => $manager,
-            'permissions' => $capability,
-        ]);
-    }
-
-    $this->actingAs($manager);
-    Filament::setCurrentPanel('admin');
-    Filament::setTenant(($company)->tenantCompany);
-
-    Livewire::test(ExerciseContextSelector::class)
-        ->assertSee('Gestisci Esercizi')
-        ->assertSee('Crea Esercizio')
-        ->assertSeeHtml('href="'.ExerciseResource::getUrl('index', tenant: $company).'"')
-        ->assertSeeHtml('href="'.ExerciseResource::getUrl('create', tenant: $company).'"');
-});
-
-it('exposes authorized Company actions in the global context menu', function () {
+it('renders only the native tenant switcher for the Company context', function () {
     $administrator = User::factory()->platformAdmin()->create();
     $company = Company::factory()->create(['name' => 'Azienda Demo']);
 
@@ -122,16 +98,20 @@ it('exposes authorized Company actions in the global context menu', function () 
     Filament::setCurrentPanel('admin');
     Filament::setTenant(($company)->tenantCompany);
 
-    Livewire::test(ExerciseContextSelector::class)
-        ->assertSee('Impostazioni Azienda')
-        ->assertSee('Crea Azienda')
-        ->assertSeeHtml('href="'.CompanySettings::getUrl(['tenant' => $company]).'"')
-        ->assertSeeHtml('href="'.Filament::getCurrentPanel()->getTenantRegistrationUrl().'"');
+    $this->get(Dashboard::getUrl(tenant: $company->tenantCompany))
+        ->assertOk()
+        ->assertSee('Azienda Demo')
+        ->assertSee('fi-tenant-menu', escape: false)
+        ->assertSee('Piattaforma')
+        ->assertSee('href="'.Filament::getPanel('platform')->getUrl().'"', escape: false)
+        ->assertDontSee('Impostazioni Azienda')
+        ->assertDontSee('Crea Azienda')
+        ->assertDontSee('Gestisci Esercizi');
 });
 
-it('does not expose unauthorized Company actions', function () {
+it('does not expose the Platform link to a tenant user', function (): void {
     $user = User::factory()->create();
-    $company = Company::factory()->create(['name' => 'Azienda Demo']);
+    $company = Company::factory()->create();
     grantTestPermissions([
         'company_id' => $company->id,
         'user' => $user,
@@ -140,12 +120,66 @@ it('does not expose unauthorized Company actions', function () {
 
     $this->actingAs($user);
     Filament::setCurrentPanel('admin');
-    Filament::setTenant(($company)->tenantCompany);
+    Filament::setTenant($company->tenantCompany);
+
+    $this->get(Dashboard::getUrl(tenant: $company->tenantCompany))
+        ->assertOk()
+        ->assertDontSee('Piattaforma');
+});
+
+it('orders Exercises by descending year in the selector', function (): void {
+    $user = User::factory()->create();
+    $company = Company::factory()->create();
+    Exercise::factory()->for($company)->create(['year' => 2024]);
+    Exercise::factory()->for($company)->create(['year' => 2026]);
+    Exercise::factory()->for($company)->create(['year' => 2025]);
+    grantTestPermissions([
+        'company_id' => $company->id,
+        'user' => $user,
+        'permissions' => TestPermissions::VIEW,
+    ]);
+
+    $this->actingAs($user);
+    Filament::setCurrentPanel('admin');
+    Filament::setTenant($company->tenantCompany);
 
     Livewire::test(ExerciseContextSelector::class)
-        ->assertSeeHtml('aria-label="Azienda corrente"')
-        ->assertDontSee('Impostazioni Azienda')
-        ->assertDontSee('Accessi e capacità')
-        ->assertDontSee('Crea Azienda')
-        ->assertDontSeeHtml('aria-label="Apri selettore e azioni Azienda"');
+        ->assertSeeInOrder(['2026 · Aperto', '2025 · Aperto', '2024 · Aperto']);
+});
+
+it('selects and clears the current Budget from the selector', function (): void {
+    $user = User::factory()->create();
+    $company = Company::factory()->create();
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $proposal = Proposal::factory()->for($company)->create([
+        'exercise_id' => $exercise->id,
+        'created_by_id' => $user->id,
+    ]);
+    $budget = BudgetSnapshot::factory()->for($proposal)->create([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'approved_by_id' => $user->id,
+    ]);
+    grantTestPermissions([
+        'company_id' => $company->id,
+        'user' => $user,
+        'permissions' => TestPermissions::VIEW,
+    ]);
+
+    $this->actingAs($user);
+    Filament::setCurrentPanel('admin');
+    Filament::setTenant($company->tenantCompany);
+
+    Livewire::test(ExerciseContextSelector::class)
+        ->assertSeeHtml('aria-label="Seleziona Budget"')
+        ->call('selectBudget', $budget->id)
+        ->assertSet('budgetId', $budget->id);
+
+    expect(session("mp2.budget_context.{$company->id}.{$exercise->id}"))->toBe($budget->id);
+
+    Livewire::test(ExerciseContextSelector::class)
+        ->call('clearBudget')
+        ->assertSet('budgetId', null);
+
+    expect(session()->has("mp2.budget_context.{$company->id}.{$exercise->id}"))->toBeFalse();
 });

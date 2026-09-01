@@ -1,6 +1,6 @@
 @if ($error !== null)
     <div class="mp2-impact-preview mp2-impact-preview-error" role="alert">
-        <strong>Anteprima non disponibile</strong>
+        <strong>Anteprima Non Disponibile</strong>
         <p>{{ $error }}</p>
     </div>
 @else
@@ -64,7 +64,7 @@
                         <strong>{{ $impact['label'] }}</strong>
                         <p>Allocato: {{ $impact['allocation_before'] }} → {{ $impact['allocation_after'] }}</p>
                         <p>Effettivo: {{ $impact['actual_before'] }} → {{ $impact['actual_after'] }}</p>
-                        <p>Scostamento operativo: {{ $impact['variance_before'] }} → {{ $impact['variance_after'] }}</p>
+                        <p>Scostamento Operativo: {{ $impact['variance_before'] }} → {{ $impact['variance_after'] }}</p>
                         @if ($impact['warning'] !== null)
                             <span class="mp2-impact-preview-warning">{{ $impact['warning'] }}</span>
                         @endif

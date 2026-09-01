@@ -22,7 +22,7 @@ it('shows tenant backup only to a viewer and hides Drive when unconfigured', fun
 
     Livewire::test(BusinessDataBackup::class)
         ->assertSuccessful()
-        ->assertSee('Un file, tutto il patrimonio business')
+        ->assertSee('Un File, Tutto il Patrimonio Business')
         ->assertActionVisible('download')
         ->assertActionHidden('importCompany')
         ->assertActionHidden('drive');
@@ -33,7 +33,7 @@ it('shows tenant backup only to a viewer and hides Drive when unconfigured', fun
     Livewire::test(BusinessDataBackup::class)
         ->assertActionVisible('download')
         ->assertActionVisible('importCompany')
-        ->assertActionHasLabel('importCompany', 'Importa nuova Azienda')
+        ->assertActionHasLabel('importCompany', 'Importa Nuova Azienda')
         ->assertActionHasUrl('importCompany', ImportCompanyBackup::getUrl(panel: 'platform'));
 
     $outsider = User::factory()->create();

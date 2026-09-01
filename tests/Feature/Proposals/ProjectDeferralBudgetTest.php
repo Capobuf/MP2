@@ -65,12 +65,12 @@ it('materializes Estimates and provisional Carryover separately without double c
     $this->actingAs($fixture['actor']);
     Filament::setTenant(($fixture['company'])->tenantCompany);
     Livewire::test(ViewBudget::class, ['record' => $fixture['budget']->id])
-        ->assertSee('Stime approvate')
-        ->assertSee('Riporto approvato')
+        ->assertSee('Stime Approvate')
+        ->assertSee('Riporto Approvato')
         ->assertSee('Stato Riporto')
         ->assertSee('Provvisorio')
-        ->assertSee('Modalità rinvio')
-        ->assertSee('Allocato approvato');
+        ->assertSee('Modalità Rinvio')
+        ->assertSee('Allocato Approvato');
 });
 
 it('materializes Reprogramming once with exact lineage and zero Carryover', function (): void {

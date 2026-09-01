@@ -32,7 +32,7 @@ it('requires and uses a timezone preview from the settings page', function () {
         ->assertSet('previewedTimezone', 'Europe/Paris')
         ->call('save')
         ->assertHasNoFormErrors()
-        ->assertNotified('Impostazioni aggiornate')
+        ->assertNotified('Impostazioni Aggiornate')
         ->assertFormSet([
             'overspend_note_required' => true,
             'unclassified_closing_policy' => ClosingUnclassifiedPolicy::Blocking->value,

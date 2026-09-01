@@ -33,7 +33,7 @@ class SuppliersTable
                     ->badge()
                     ->color(fn (string $state): string => $state === 'Attivo' ? 'success' : 'gray'),
                 TextColumn::make('updated_at')
-                    ->label('Ultima modifica')
+                    ->label('Ultima Modifica')
                     ->dateTime('d/m/Y H:i')
                     ->sortable(),
             ])
@@ -50,7 +50,7 @@ class SuppliersTable
                         blank: fn (Builder $query): Builder => $query,
                     ),
             ])
-            ->emptyStateHeading('Nessun fornitore')
+            ->emptyStateHeading('Nessun Fornitore')
             ->emptyStateDescription('Non sono presenti fornitori per il filtro selezionato.')
             ->recordActions([
                 ViewAction::make(),

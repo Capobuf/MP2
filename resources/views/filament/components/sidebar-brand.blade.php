@@ -2,7 +2,7 @@
     <a
         class="mp2-sidebar-brand-link"
         href="{{ \Filament\Facades\Filament::getCurrentPanel()->getUrl(\Filament\Facades\Filament::getTenant()) }}"
-        aria-label="Vai alla pagina principale"
+        aria-label="Vai alla Pagina Principale"
         wire:navigate
     >
         @include('filament.components.brand-logo')

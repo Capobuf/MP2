@@ -7,7 +7,6 @@ use App\Filament\Pages\Tenancy\RegisterCompany;
 use App\Filament\Pages\UserProfile;
 use App\Http\Middleware\EnsureTenantCompanyIsActive;
 use App\Models\TenantCompany;
-use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Enums\ThemeMode;
@@ -16,6 +15,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -45,12 +45,6 @@ class AdminPanelProvider extends PanelProvider
             ->login()
             ->profile(null)
             ->userMenuItems([
-                Action::make('platform')
-                    ->label('Piattaforma')
-                    ->icon('heroicon-m-command-line')
-                    ->url(fn (): ?string => Filament::getPanel('platform')->getUrl())
-                    ->visible(fn (): bool => auth()->user() instanceof User
-                        && auth()->user()->hasRole('super_admin')),
                 'profile' => fn (Action $action): Action => $action
                     ->label('Profilo')
                     ->url(fn (): ?string => Filament::getTenant()
@@ -63,6 +57,10 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->tenant(TenantCompany::class, ownershipRelationship: 'tenantCompany')
             ->tenantRegistration(RegisterCompany::class)
+            ->tenantMenu(false)
+            ->tenantMenuItems([
+                'register' => fn (Action $action): Action => $action->hidden(),
+            ])
             ->tenantMiddleware([
                 EnsureTenantCompanyIsActive::class,
             ], isPersistent: true)
@@ -100,11 +98,10 @@ class AdminPanelProvider extends PanelProvider
                 UserProfile::class,
             ])
             ->navigationGroups([
-                'Panoramica',
-                'Operatività',
-                'Anagrafiche',
-                'Controllo',
-                'Amministrazione',
+                NavigationGroup::make('Pianificazione')
+                    ->icon('heroicon-o-calendar-days'),
+                NavigationGroup::make('Impostazioni')
+                    ->icon('heroicon-o-cog-6-tooth'),
             ])
             ->sidebarCollapsibleOnDesktop()
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
