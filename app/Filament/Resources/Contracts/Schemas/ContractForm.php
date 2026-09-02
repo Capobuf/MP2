@@ -8,6 +8,7 @@ use App\Domain\Contracts\ContractAttributionMode;
 use App\Domain\Contracts\ContractCycle;
 use App\Domain\Contracts\ContractCycleType;
 use App\Filament\Forms\AttachmentUpload;
+use App\Filament\Forms\DateInput;
 use App\Filament\Forms\DecimalInput;
 use App\Models\Company;
 use App\Models\CostCenter;
@@ -89,7 +90,7 @@ class ContractForm
                             DecimalInput::make('amount')->label('Importo per Ciclo')->minValue(0)->prefix('€')->required(),
                             Select::make('cycle')->label('Frequenza')->options(ContractCycleType::options())->native(false)->required(),
                             Select::make('attribution_mode')->label('Attribuzione')->options(ContractAttributionMode::options())->native(false)->required(),
-                            self::dateInput('valid_from', 'Valida dal')->required()
+                            DateInput::make('valid_from')->label('Valida dal')->required()
                                 ->afterStateUpdated(function (Get $get, Set $set, mixed $state): void {
                                     self::syncSuggestedContractualStart(
                                         $get,
@@ -100,7 +101,7 @@ class ContractForm
                                     );
                                     self::syncSuggestedContractualTerms($get, $set, $get('../../conditions'), '../../');
                                 }),
-                            self::dateInput('valid_to', 'Valida fino al')
+                            DateInput::make('valid_to')->label('Valida fino al')
                                 ->placeholder('Fino a variazione')
                                 ->afterStateUpdated(fn (Get $get, Set $set) => self::syncSuggestedContractualTerms($get, $set, $get('../../conditions'), '../../')),
                         ])
@@ -133,10 +134,10 @@ class ContractForm
                     Grid::make(['default' => 1, 'md' => 2])
                         ->schema([
                             Group::make([
-                                self::dateInput('contractual_start_date', 'Data di inizio')->required()
+                                DateInput::make('contractual_start_date')->label('Data di inizio')->required()
                                     ->helperText('Compilata con il “Valida dal” più antico. Anticipala solo se il Contratto è iniziato prima della prima condizione economica.')
-                                    ->afterStateUpdated(fn (Set $set, mixed $state): mixed => filled($state) ? $set('renewal_effective_from', self::dateToIso($state)) : null),
-                                self::dateInput('next_expiry_date', 'Prossima scadenza contrattuale')
+                                    ->afterStateUpdated(fn (Set $set, mixed $state): mixed => filled($state) ? $set('renewal_effective_from', DateInput::toIso($state)) : null),
+                                DateInput::make('next_expiry_date')->label('Prossima scadenza contrattuale')
                                     ->required(fn (Get $get): bool => $get('duration_type') === 'fixed')
                                     ->visible(fn (Get $get): bool => $get('duration_type') === 'fixed')
                                     ->helperText('Data in cui il periodo contrattuale corrente termina o si rinnova; non è la fine di validità di un importo.'),
@@ -285,19 +286,6 @@ class ContractForm
             && $actor->can('create', [CostCenter::class, $company]);
     }
 
-    private static function dateInput(string $name, string $label): TextInput
-    {
-        return TextInput::make($name)
-            ->label($label)
-            ->mask('99/99/9999')
-            ->inputMode('numeric')
-            ->placeholder('gg/mm/aaaa')
-            ->maxLength(10)
-            ->rule('date_format:d/m/Y')
-            ->dehydrateStateUsing(fn (mixed $state): mixed => self::dateToIso($state))
-            ->live(onBlur: true);
-    }
-
     private static function syncSuggestedContractualStart(
         Get $get,
         Set $set,
@@ -413,33 +401,11 @@ class ContractForm
 
     private static function dateString(mixed $value): ?string
     {
-        $date = self::dateToIso($value);
+        $date = DateInput::toIso($value);
 
         return is_string($date) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1
             ? $date
             : null;
-    }
-
-    private static function dateToIso(mixed $value): ?string
-    {
-        if (blank($value)) {
-            return null;
-        }
-
-        if ($value instanceof \DateTimeInterface) {
-            return $value->format('Y-m-d');
-        }
-
-        $date = (string) $value;
-        if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $date) !== 1) {
-            return $date;
-        }
-
-        $parsed = CarbonImmutable::createFromFormat('!d/m/Y', $date);
-
-        return $parsed === null || $parsed->format('d/m/Y') !== $date
-            ? $date
-            : $parsed->toDateString();
     }
 
     private static function company(): ?Company

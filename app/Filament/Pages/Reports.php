@@ -11,6 +11,7 @@ use App\Domain\Reporting\ReportKind;
 use App\Domain\Reporting\ReportResult;
 use App\Domain\Reporting\ReportSource;
 use App\Domain\Reporting\SecondaryLabel;
+use App\Filament\Forms\DateInput;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
 use App\Models\Contract;
@@ -24,7 +25,6 @@ use App\Models\User;
 use BackedEnum;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Pages\Page;
@@ -199,11 +199,11 @@ class Reports extends Page
                 Select::make('supplierId')->label('Fornitore')
                     ->placeholder('Tutti')->options(fn (): array => $this->supplierOptions())
                     ->native(false)->searchable()->live(),
-                DatePicker::make('dateFrom')->label('Intervallo dal')
-                    ->native(false)->live()
+                DateInput::make('dateFrom')->label('Intervallo dal')
+                    ->live()
                     ->visible(fn (): bool => $this->kind === ReportKind::Contracts->value),
-                DatePicker::make('dateTo')->label('Intervallo al')
-                    ->native(false)->live()
+                DateInput::make('dateTo')->label('Intervallo al')
+                    ->live()
                     ->visible(fn (): bool => $this->kind === ReportKind::Contracts->value),
             ]);
     }
@@ -562,8 +562,8 @@ class Reports extends Page
             'company_id' => $this->company()->id,
             'exercise_id' => $this->exerciseId,
             'kind' => $this->kind,
-            'date_from' => $this->dateFrom,
-            'date_to' => $this->dateTo,
+            'date_from' => DateInput::toIso($this->dateFrom),
+            'date_to' => DateInput::toIso($this->dateTo),
             'filters' => array_filter([
                 'cost_center_id' => $this->costCenterId,
                 'project_id' => $this->projectId,

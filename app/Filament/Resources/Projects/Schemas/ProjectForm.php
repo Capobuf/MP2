@@ -4,13 +4,13 @@ namespace App\Filament\Resources\Projects\Schemas;
 
 use App\Actions\MasterData\CreateCostCenter;
 use App\Domain\Projects\ProjectState;
+use App\Filament\Forms\DateInput;
 use App\Models\Company;
 use App\Models\CostCenter;
 use App\Models\TenantCompany;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -36,11 +36,8 @@ class ProjectForm
                         ->options(ProjectState::options())
                         ->native(false)
                         ->required(),
-                    DatePicker::make('initial_effective_date')
+                    DateInput::make('initial_effective_date')
                         ->label('Data di Efficacia Iniziale')
-                        ->native(false)
-                        ->displayFormat('d/m/Y')
-                        ->placeholder('gg/mm/aaaa')
                         ->required(),
                     Select::make('cost_center_id')
                         ->label('Centro di Costo')

@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Domain\Contracts\ContractDeadline;
 use App\Domain\Contracts\ContractState;
+use App\Filament\Forms\DateInput;
 use App\Filament\Resources\Contracts\ContractResource;
 use App\Filament\Resources\Suppliers\SupplierResource;
 use App\Models\Company;
@@ -17,7 +18,6 @@ use BackedEnum;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\DatePicker;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -80,14 +80,14 @@ class ContractDeadlines extends Page implements HasTable
             ])
             ->filters([
                 Filter::make('expiry_interval')->label('Intervallo Scadenza')->schema([
-                    DatePicker::make('from')->label('Scadenza dal'),
-                    DatePicker::make('until')->label('Scadenza al'),
+                    DateInput::make('from')->label('Scadenza dal'),
+                    DateInput::make('until')->label('Scadenza al'),
                 ])->query(fn (Builder $query, array $data): Builder => $query
                     ->when($data['from'] ?? null, fn (Builder $query, mixed $date): Builder => $query->whereDate('next_expiry_date', '>=', $date))
                     ->when($data['until'] ?? null, fn (Builder $query, mixed $date): Builder => $query->whereDate('next_expiry_date', '<=', $date))),
                 Filter::make('notice_interval')->label('Intervallo Limite Disdetta')->schema([
-                    DatePicker::make('from')->label('Limite dal'),
-                    DatePicker::make('until')->label('Limite al'),
+                    DateInput::make('from')->label('Limite dal'),
+                    DateInput::make('until')->label('Limite al'),
                 ])->query(function (Builder $query, array $data): Builder {
                     if (blank($data['from'] ?? null) && blank($data['until'] ?? null)) {
                         return $query;

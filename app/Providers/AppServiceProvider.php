@@ -12,7 +12,6 @@ use App\Policies\ContractPolicy;
 use App\Support\BudgetContext;
 use App\Support\ExerciseContext;
 use App\Support\Reporting\EconomicDashboardReadModel;
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Support\Facades\Gate;
@@ -54,15 +53,6 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->environment('production')) {
             config(['app.debug' => false]);
         }
-
-        DatePicker::configureUsing(fn (DatePicker $picker): DatePicker => $picker
-            ->native(false)
-            ->locale('it')
-            ->displayFormat('d/m/Y')
-            ->placeholder('gg/mm/aaaa')
-            ->weekStartsOnMonday()
-            ->closeOnDateSelection()
-            ->extraTriggerAttributes(['data-mp2-date-picker-trigger' => true]));
 
         Select::configureUsing(fn (Select $select): Select => $select->native(false));
 

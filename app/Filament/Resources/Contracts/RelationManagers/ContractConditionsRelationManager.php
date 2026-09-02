@@ -10,13 +10,13 @@ use App\Domain\Contracts\ContractAttributionMode;
 use App\Domain\Contracts\ContractCycleType;
 use App\Domain\Contracts\ContractEconomicChangePlan;
 use App\Domain\Expenses\Decimal;
+use App\Filament\Forms\DateInput;
 use App\Filament\Forms\DecimalInput;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Checkbox;
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -147,8 +147,8 @@ class ContractConditionsRelationManager extends RelationManager
             DecimalInput::make('amount')->label('Importo Netto IVA')->minValue(0)->required(),
             Select::make('cycle')->label('Ciclo')->options(ContractCycleType::options())->required(),
             Select::make('attribution_mode')->label('Attribuzione Stima')->options(ContractAttributionMode::options())->required(),
-            DatePicker::make('valid_from')->label('Valida dal')->required(),
-            DatePicker::make('valid_to')->label('Valida fino al'),
+            DateInput::make('valid_from')->label('Valida dal')->required(),
+            DateInput::make('valid_to')->label('Valida fino al'),
             Textarea::make('reason')->label('Nota')->nullable(),
             Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
         ];
@@ -169,7 +169,7 @@ class ContractConditionsRelationManager extends RelationManager
         $invalidate = fn (Set $set): mixed => $set('effective_date_confirmed', false);
 
         return [
-            DatePicker::make('requested_date')->label('Data Richiesta')->required()->live()->afterStateUpdated($invalidate),
+            DateInput::make('requested_date')->label('Data Richiesta')->required()->live()->afterStateUpdated($invalidate),
             DecimalInput::make('amount')->label('Nuovo Importo Netto IVA')->minValue(0)->required()->live()->afterStateUpdated($invalidate),
             Select::make('cycle')->label('Nuovo Ciclo')->options(ContractCycleType::options())->required()->live()->afterStateUpdated($invalidate),
             Select::make('attribution_mode')->label('Nuova Attribuzione')->options(ContractAttributionMode::options())->required()->live()->afterStateUpdated($invalidate),
@@ -182,7 +182,7 @@ class ContractConditionsRelationManager extends RelationManager
                     }
                     try {
                         $plan = app(ChangeContractCondition::class)->preview($contract, $record, [
-                            'requested_date' => $get('requested_date'),
+                            'requested_date' => DateInput::toIso($get('requested_date')),
                             'amount' => Decimal::normalizeInput($get('amount')),
                             'cycle' => $get('cycle'),
                             'attribution_mode' => $get('attribution_mode'),

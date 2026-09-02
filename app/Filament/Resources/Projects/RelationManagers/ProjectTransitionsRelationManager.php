@@ -6,12 +6,12 @@ use App\Actions\Operations\AnnulProjectTransition;
 use App\Actions\Operations\CreateProjectTransition;
 use App\Actions\Operations\ReplaceProjectTransition;
 use App\Domain\Projects\ProjectState;
+use App\Filament\Forms\DateInput;
 use App\Models\Project;
 use App\Models\ProjectTransition;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -118,7 +118,7 @@ class ProjectTransitionsRelationManager extends RelationManager
     private function transitionFields(): array
     {
         return [
-            DatePicker::make('effective_date')->label('Data di Efficacia')->required()->live(),
+            DateInput::make('effective_date')->label('Data di Efficacia')->required()->live(),
             Placeholder::make('state_before')
                 ->label('Stato Immediatamente Precedente')
                 ->content(function (Get $get, ?ProjectTransition $record): string {
@@ -164,7 +164,7 @@ class ProjectTransitionsRelationManager extends RelationManager
             ->get();
         $project->setRelation('transitions', $transitions);
 
-        return $project->stateAtDate(CarbonImmutable::parse($effectiveDate)->subDay()->toDateString());
+        return $project->stateAtDate(CarbonImmutable::parse(DateInput::toIso($effectiveDate))->subDay()->toDateString());
     }
 
     private function canMutateOwner(): bool

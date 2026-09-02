@@ -9,12 +9,12 @@ use App\Actions\Operations\ReactivateContract;
 use App\Actions\Operations\ReplaceContractLifecycleFact;
 use App\Domain\Contracts\ContractAttributionMode;
 use App\Domain\Contracts\ContractCycleType;
+use App\Filament\Forms\DateInput;
 use App\Filament\Forms\DecimalInput;
 use App\Models\Contract;
 use App\Models\ContractLifecycleFact;
 use App\Models\User;
 use Filament\Actions\Action;
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -49,18 +49,18 @@ class ContractLifecycleRelationManager extends RelationManager
             TextColumn::make('creator.name')->label('Autore')->placeholder('Autore originale non disponibile'),
         ])->headerActions([
             Action::make('cease')->label('Cessa')->visible(fn (): bool => $this->canMutate())->form([
-                DatePicker::make('date')->label('Ultimo Giorno Attivo')->required(), Textarea::make('reason')->label('Nota')->required(),
+                DateInput::make('date')->label('Ultimo Giorno Attivo')->required(), Textarea::make('reason')->label('Nota')->required(),
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
             ])->action(function (array $data): void {
                 [$actor, $contract] = $this->context();
                 app(CeaseContract::class)->execute($actor, $contract, (string) $data['date'], (string) $data['reason'], $contract->revision, (string) $data['operation_id']);
             }),
             Action::make('reactivate')->label('Riattiva')->visible(fn (): bool => $this->canMutate())->form([
-                DatePicker::make('start_date')->label('Nuovo Inizio')->required(), DatePicker::make('next_expiry_date')->label('Prossima Scadenza'),
+                DateInput::make('start_date')->label('Nuovo Inizio')->required(), DateInput::make('next_expiry_date')->label('Prossima Scadenza'),
                 DecimalInput::make('condition.amount')->label('Importo')->minValue(0)->required(),
                 Select::make('condition.cycle')->label('Ciclo')->options(ContractCycleType::options())->required(),
                 Select::make('condition.attribution_mode')->label('Attribuzione')->options(ContractAttributionMode::options())->required(),
-                DatePicker::make('condition.valid_from')->label('Condizione Valida dal')->required(), DatePicker::make('condition.valid_to')->label('Valida fino al'),
+                DateInput::make('condition.valid_from')->label('Condizione Valida dal')->required(), DateInput::make('condition.valid_to')->label('Valida fino al'),
                 Textarea::make('reason')->label('Nota')->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
             ])->action(function (array $data): void {
                 [$actor, $contract] = $this->context();
@@ -83,7 +83,7 @@ class ContractLifecycleRelationManager extends RelationManager
             Action::make('replaceFuture')->label('Sostituisci Fatto Futuro')->visible(fn (ContractLifecycleFact $record): bool => $this->canMutate() && $record->annulledAt() === null && $record->stateChangeDate()?->isFuture() === true)
                 ->form([
                     Select::make('type')->label('Evento')->options(['activation' => 'Attivazione', 'cessation' => 'Cessazione', 'reactivation' => 'Riattivazione', 'cancellation' => 'Annullamento'])->required(),
-                    DatePicker::make('declared_contractual_date')->label('Data Contrattuale')->required(), Textarea::make('reason')->label('Nota'),
+                    DateInput::make('declared_contractual_date')->label('Data Contrattuale')->required(), Textarea::make('reason')->label('Nota'),
                     Textarea::make('replacement_reason')->label('Motivo Sostituzione')->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
                 ])->action(function (ContractLifecycleFact $record, array $data): void {
                     [$actor, $contract] = $this->context();

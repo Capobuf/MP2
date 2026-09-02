@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Support\ExerciseContext;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\TextInput;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\Support\TestPermissions;
@@ -59,7 +60,7 @@ it('creates a Project from the tenant UI without future-slice or destructive fie
         ->assertFormFieldExists('description')
         ->assertFormFieldExists('notes')
         ->assertFormFieldExists('initial_state')
-        ->assertFormFieldExists('initial_effective_date')
+        ->assertFormFieldExists('initial_effective_date', fn ($field): bool => $field instanceof TextInput && $field->getMask() === '99/99/9999')
         ->assertFormFieldDoesNotExist('exercise_id')
         ->assertFormFieldExists('cost_center_id')
         ->assertFormComponentActionHidden('cost_center_id', 'createOption')
@@ -84,7 +85,7 @@ it('creates a Project from the tenant UI without future-slice or destructive fie
             'title' => 'Nuovo laboratorio',
             'description' => 'Allestimento',
             'initial_state' => ProjectState::Planned->value,
-            'initial_effective_date' => '2027-01-01',
+            'initial_effective_date' => '01/01/2027',
             'cost_center_id' => $costCenter->id,
         ])
         ->call('create')

@@ -3,12 +3,12 @@
 namespace App\Filament\Resources\Contracts\RelationManagers;
 
 use App\Actions\Operations\UpdateContractRenewal;
+use App\Filament\Forms\DateInput;
 use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Checkbox;
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Textarea;
@@ -44,7 +44,7 @@ class ContractRenewalsRelationManager extends RelationManager
             TextColumn::make('creator.name')->label('Autore')->placeholder('Autore originale non disponibile'),
         ])->headerActions([
             Action::make('updateRenewal')->label('Modifica Rinnovo')->visible(fn (): bool => $this->canMutate())->form([
-                DatePicker::make('effective_from')->label('Efficace dal')->required()->live()
+                DateInput::make('effective_from')->label('Efficace dal')->required()->live()
                     ->afterStateUpdated(fn (Set $set) => $set('impact_confirmed', false)),
                 Toggle::make('automatic_renewal')->label('Rinnovo Automatico')->required()->live()
                     ->afterStateUpdated(function (Set $set, mixed $state): void {
@@ -53,7 +53,7 @@ class ContractRenewalsRelationManager extends RelationManager
                         }
                         $set('impact_confirmed', false);
                     }),
-                DatePicker::make('expiry_anchor_date')->label('Prossima Scadenza')->live()
+                DateInput::make('expiry_anchor_date')->label('Prossima Scadenza')->live()
                     ->afterStateUpdated(function (Set $set, mixed $state): void {
                         if (blank($state)) {
                             $set('renewal_duration_months', null);
