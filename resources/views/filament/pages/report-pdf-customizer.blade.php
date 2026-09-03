@@ -9,6 +9,28 @@
                 </div>
             </div>
 
+            <fieldset>
+                <legend>Orientamento pagina</legend>
+
+                <div class="mp2-pdf-orientation">
+                    <label>
+                        <input type="radio" value="landscape" wire:model.live="orientation">
+                        <span>
+                            <strong>Orizzontale</strong>
+                            <small>A4 landscape</small>
+                        </span>
+                    </label>
+
+                    <label>
+                        <input type="radio" value="portrait" wire:model.live="orientation">
+                        <span>
+                            <strong>Verticale</strong>
+                            <small>A4 portrait</small>
+                        </span>
+                    </label>
+                </div>
+            </fieldset>
+
             @foreach (['logo' => 'Identità', 'kpi' => 'Indicatori', 'chart' => 'Grafici', 'table' => 'Tabelle', 'detail' => 'Approfondimenti', 'section' => 'Sezioni'] as $group => $label)
                 @php($options = collect($availableBlocks)->where('group', $group))
                 @if ($options->isNotEmpty())
@@ -20,7 +42,7 @@
                 @endif
             @endforeach
 
-            @foreach (['sources' => 'Colonne · Dettaglio', 'comparisons' => 'Colonne · Confronto'] as $group => $label)
+            @foreach (['contracts' => 'Colonne · Contratti', 'sources' => 'Colonne · Dettaglio', 'comparisons' => 'Colonne · Confronto'] as $group => $label)
                 @php($options = collect($availableColumns)->where('group', $group))
                 @if ($options->isNotEmpty())
                     <fieldset><legend>{{ $label }}</legend>

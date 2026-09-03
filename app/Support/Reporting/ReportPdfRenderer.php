@@ -2,6 +2,7 @@
 
 namespace App\Support\Reporting;
 
+use App\Domain\Reporting\ReportKind;
 use App\Domain\Reporting\ReportResult;
 use App\Models\Company;
 use Illuminate\Process\Exceptions\ProcessTimedOutException;
@@ -23,7 +24,14 @@ final class ReportPdfRenderer
         }
 
         $document = $this->composer->compose($result, $company, $configuration);
-        $html = view('reports.pdf', ['document' => $document])->render();
+        $view = match ($result->definition->kind) {
+            ReportKind::Contracts => 'reports.contracts',
+            default => 'reports.pdf',
+        };
+
+        $html = view($view, [
+            'document' => $document,
+        ])->render();
 
         try {
             $process = Process::timeout((int) config('reporting.timeout'))

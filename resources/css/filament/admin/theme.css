@@ -124,6 +124,40 @@
     margin-top: 0.15rem;
 }
 
+.mp2-pdf-orientation {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+.mp2-pdf-orientation label {
+    min-height: 4rem;
+    padding: 0.75rem;
+    border: 1px solid var(--mp2-border);
+    border-radius: 0.65rem;
+    background: rgb(255 255 255 / 2%);
+}
+
+.mp2-pdf-orientation label:has(input:checked) {
+    border-color: rgb(57 213 196 / 55%);
+    background: var(--mp2-brand-soft);
+}
+
+.mp2-pdf-orientation span {
+    display: grid;
+    gap: 0.15rem;
+}
+
+.mp2-pdf-orientation strong {
+    color: var(--mp2-text-primary);
+    font-size: 0.85rem;
+}
+
+.mp2-pdf-orientation small {
+    color: var(--mp2-text-muted);
+    font-size: 0.72rem;
+}
+
 .mp2-pdf-preview {
     min-width: 0;
     padding: 1rem;

@@ -4,6 +4,12 @@ use App\Actions\Reporting\BuildReport;
 use App\Domain\Reporting\ReportDefinition;
 use App\Filament\Pages\ReportPdfCustomizer;
 use App\Models\Company;
+use App\Models\Contract;
+use App\Models\ContractCondition;
+use App\Models\ContractExerciseClassification;
+use App\Models\ContractLifecycleFact;
+use App\Models\ContractRenewalConfiguration;
+use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -131,6 +137,382 @@ it('opens the ephemeral customizer with only applicable choices', function (): v
         ->call('selectNone')
         ->assertSet('selectedBlocks', [])
         ->assertSet('selectedColumns', []);
+});
+
+it('composes the dedicated contracts document with validated orientation and specialist data', function (): void {
+    $this->travelTo('2026-06-01 10:00:00');
+    $company = Company::factory()->create(['name' => 'Azienda Contratti']);
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $supplier = Supplier::factory()->for($company)->create(['legal_name' => 'Fornitore Contratti']);
+    $costCenter = CostCenter::factory()->for($company)->create(['name' => 'Centro Servizi']);
+    $contract = Contract::factory()->for($company)->for($supplier)->create([
+        'title' => 'Contratto Connettività',
+        'contractual_start_date' => '2026-01-01',
+        'next_expiry_date' => '2026-12-31',
+        'automatic_renewal' => true,
+        'notice_days' => 30,
+    ]);
+    ContractExerciseClassification::factory()->forContractAndExercise($contract, $exercise)->create([
+        'cost_center_id' => $costCenter->id,
+    ]);
+    $expense = Expense::factory()->forExercise($exercise)->create([
+        'contract_id' => $contract->id,
+        'supplier_id' => $supplier->id,
+    ]);
+    ExpenseLine::factory()->for($expense)->create(['amount' => '120.00']);
+    ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '45.00']);
+    $result = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'kind' => 'contracts',
+    ]));
+    $composer = app(ReportPdfComposer::class);
+    $landscape = $composer->compose($result, $company);
+    $portrait = $composer->compose($result, $company, ['orientation' => 'portrait']);
+    $row = $landscape['contracts'][0];
+
+    expect($landscape['orientation'])->toBe('landscape')
+        ->and($portrait['orientation'])->toBe('portrait')
+        ->and(array_column($landscape['available_columns'], 'id'))->toBe([
+            'column:contracts:supplier',
+            'column:contracts:state',
+            'column:contracts:cost_center',
+            'column:contracts:deadline',
+            'column:contracts:notice_limit_date',
+            'column:contracts:renewal',
+            'column:contracts:allocation',
+            'column:contracts:actual',
+            'column:contracts:operational_variance',
+        ])
+        ->and(array_column($landscape['available_blocks'], 'id'))->toContain('table:contracts', 'details:contracts')
+        ->and(array_column($landscape['available_blocks'], 'id'))->not->toContain('table:sources', 'details:sources', 'section:contratti')
+        ->and($row)->toMatchArray([
+            'supplier' => 'Fornitore Contratti',
+            'state' => 'active',
+            'state_label' => 'Attivo',
+            'cost_center' => 'Centro Servizi',
+            'deadline' => '2026-12-31',
+            'notice_limit_date' => '2026-12-01',
+            'automatic_renewal' => true,
+            'allocation' => '120.00',
+            'actual' => '45.00',
+            'operational_variance' => '-75.00',
+        ])
+        ->and($landscape['contract_state_counts'])->toBe([
+            ['state' => 'planned', 'label' => 'Pianificato', 'count' => 0],
+            ['state' => 'active', 'label' => 'Attivo', 'count' => 1],
+            ['state' => 'cessated', 'label' => 'Cessato', 'count' => 0],
+            ['state' => 'cancelled', 'label' => 'Annullato', 'count' => 0],
+        ])
+        ->and(array_column($landscape['kpis'], 'label'))->toBe([
+            'Contratti', 'Allocato', 'Effettivo', 'Scostamento operativo', 'Contratti in scadenza',
+        ])
+        ->and($landscape['selected_blocks'])->not->toContain('details:contracts')
+        ->and($landscape['selected_blocks'])->toContain('chart:contract-values', 'chart:contract-states', 'table:contracts');
+
+    expect(fn (): array => $composer->compose($result, $company, ['orientation' => 'diagonal']))
+        ->toThrow(InvalidArgumentException::class, 'Invalid PDF orientation.');
+});
+
+it('limits the contracts chart to the eight highest allocations without truncating the table', function (): void {
+    $this->travelTo('2026-06-01 10:00:00');
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+
+    foreach (range(1, 9) as $index) {
+        $contract = Contract::factory()->for($company)->create([
+            'title' => 'Contratto '.$index,
+            'contractual_start_date' => '2026-01-01',
+        ]);
+        $expense = Expense::factory()->forExercise($exercise)->create(['contract_id' => $contract->id]);
+        ExpenseLine::factory()->for($expense)->create(['amount' => number_format($index * 10, 2, '.', '')]);
+    }
+
+    $result = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'kind' => 'contracts',
+    ]));
+    $document = app(ReportPdfComposer::class)->compose($result, $company);
+    $chart = collect(app(ReportPdfComposer::class)->chartDefinitions($result))->firstWhere('id', 'contract-values');
+    $portraitChart = collect(app(ReportPdfComposer::class)->chartDefinitions($result, 'portrait'))->firstWhere('id', 'contract-values');
+
+    expect($document['contracts'])->toHaveCount(9)
+        ->and($chart['data']['labels'])->toHaveCount(8)
+        ->and($chart['data']['labels'])->toBe([
+            'Contratto 9', 'Contratto 8', 'Contratto 7', 'Contratto 6',
+            'Contratto 5', 'Contratto 4', 'Contratto 3', 'Contratto 2',
+        ])
+        ->and($portraitChart['data']['labels'])->toBe([
+            'Contratto 9', 'Contratto 8', 'Contratto 7', 'Contratto 6', 'Contratto 5',
+        ]);
+});
+
+it('counts deadlines in the inclusive next 90 days from the report reference date', function (): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+
+    foreach (['2026-02-28', '2026-03-01', '2026-05-30', '2026-05-31', null] as $index => $deadline) {
+        Contract::factory()->for($company)->create([
+            'title' => 'Scadenza '.$index,
+            'contractual_start_date' => '2026-01-01',
+            'next_expiry_date' => $deadline,
+            'renewal_anchor_date' => $deadline,
+            'automatic_renewal' => false,
+        ]);
+    }
+
+    $result = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'kind' => 'contracts',
+        'final_reference' => [
+            'type' => 'current',
+            'exercise_id' => $exercise->id,
+            'reference_date' => '2026-03-01',
+        ],
+    ]));
+    $document = app(ReportPdfComposer::class)->compose($result, $company);
+    $kpi = collect($document['kpis'])->firstWhere('id', 'kpi:contracts_expiring');
+
+    expect($result->header['reference_date'])->toBe('2026-03-01')
+        ->and($kpi)->toMatchArray([
+            'label' => 'Contratti in scadenza',
+            'value' => 2,
+            'formatted' => '2',
+            'description' => 'nei prossimi 90 giorni',
+        ]);
+});
+
+it('uses only the four canonical contract states in the static donut', function (): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    Contract::factory()->for($company)->create(['contractual_start_date' => '2026-01-01']);
+    $result = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'kind' => 'contracts',
+    ]));
+    $composer = app(ReportPdfComposer::class);
+    $definition = collect($composer->chartDefinitions($result))->firstWhere('id', 'contract-states');
+    $document = $composer->compose($result, $company);
+    $rendered = collect($document['charts'])->firstWhere('id', 'contract-states');
+    $svg = base64_decode(explode(',', $rendered['image'], 2)[1], true);
+
+    expect($definition['type'])->toBe('doughnut')
+        ->and($definition['data']['labels'])->toBe(['Pianificato', 'Attivo', 'Cessato', 'Annullato'])
+        ->and($definition['data']['labels'])->not->toContain('In scadenza')
+        ->and($svg)->toContain('<circle', 'Pianificato', 'Attivo', 'Cessato', 'Annullato');
+});
+
+it('renders opt-in contract details as curated user-facing information only', function (): void {
+    $this->travelTo('2026-06-01 10:00:00');
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $contract = Contract::factory()->for($company)->create([
+        'title' => 'Contratto editoriale',
+        'notes' => 'Servizio infrastrutturale',
+        'contractual_start_date' => '2026-01-01',
+        'next_expiry_date' => '2026-12-31',
+        'renewal_anchor_date' => '2026-12-31',
+        'automatic_renewal' => true,
+        'renewal_duration_months' => 12,
+        'notice_days' => 60,
+    ]);
+    ContractCondition::factory()->forContract($contract)->create([
+        'cycle' => 'monthly',
+        'attribution_mode' => 'cycle_start',
+        'amount' => '1200.00',
+        'valid_from' => '2026-01-01',
+        'created_by_id' => $viewer->id,
+    ]);
+    ContractRenewalConfiguration::factory()->forContract($contract)->create([
+        'effective_from' => '2026-01-01',
+        'automatic_renewal' => true,
+        'expiry_anchor_date' => '2026-12-31',
+        'renewal_duration_months' => 12,
+        'notice_days' => 60,
+        'created_by_id' => $viewer->id,
+    ]);
+    ContractLifecycleFact::factory()->forContract($contract)->create([
+        'type' => 'activation',
+        'declared_contractual_date' => '2026-01-01',
+        'state_change_date' => '2026-01-01',
+        'created_by_id' => $viewer->id,
+    ]);
+    $expense = Expense::factory()->forExercise($exercise)->create([
+        'contract_id' => $contract->id,
+        'description' => 'Stima di sistema · Contratto editoriale',
+    ]);
+    ExpenseLine::factory()->for($expense)->create(['amount' => '14400.00']);
+    ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '3000.00']);
+
+    $result = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'kind' => 'contracts',
+    ]));
+    $composer = app(ReportPdfComposer::class);
+    $default = $composer->compose($result, $company);
+    $document = $composer->compose($result, $company, ['blocks' => ['details:contracts']]);
+    $html = view('reports.contracts', compact('document'))->render();
+
+    expect($default['selected_blocks'])->not->toContain('details:contracts')
+        ->and($html)->toContain(
+            'Approfondimenti contratti',
+            'Contratto editoriale',
+            'Servizio infrastrutturale',
+            'Condizioni economiche',
+            'Mensile',
+            'Inizio Ciclo',
+            'Configurazione rinnovo',
+            'Eventi contrattuali',
+            'Attivazione',
+            'Spese dell’esercizio',
+            'Stima di sistema · Contratto editoriale',
+        )
+        ->and($html)->not->toContain(
+            'company_id',
+            'contract_id',
+            'created_by_id',
+            'created_at',
+            'updated_at',
+            'origin_key',
+            'archived_or_reversed',
+            'cycle_start',
+            'monthly',
+            'Expenses:',
+            'Id:',
+        );
+});
+
+it('validates PDF orientation in the controller and defaults to landscape', function (): void {
+    fakeWeasyPrintSuccess();
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $definition = [
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'kind' => 'suppliers',
+        'filters' => [],
+    ];
+
+    $this->actingAs($viewer)
+        ->getJson(route('reports.pdf.preview', ['definition' => $definition, 'orientation' => 'portrait']))
+        ->assertOk();
+    $this->getJson(route('reports.pdf.preview', ['definition' => $definition, 'orientation' => 'landscape']))
+        ->assertOk();
+    $this->getJson(route('reports.pdf.preview', ['definition' => $definition]))
+        ->assertOk();
+    $this->getJson(route('reports.pdf.preview', ['definition' => $definition, 'orientation' => 'square']))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('orientation');
+
+    Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['weasyprint', '-', '-']
+        && str_contains((string) $process->input, 'size: A4 portrait;'));
+    Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['weasyprint', '-', '-']
+        && str_contains((string) $process->input, 'size: A4 landscape;'));
+});
+
+it('keeps the same selected orientation in customizer preview and download URLs', function (): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $definition = [
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'kind' => 'contracts',
+        'filters' => [],
+    ];
+    $this->actingAs($viewer);
+    Filament::setTenant($company->tenantCompany);
+
+    $component = Livewire::withQueryParams(['definition' => $definition])
+        ->test(ReportPdfCustomizer::class)
+        ->assertSet('orientation', 'landscape')
+        ->assertSee('Orizzontale')
+        ->assertSee('Verticale')
+        ->set('orientation', 'portrait')
+        ->assertSet('orientation', 'portrait');
+
+    expect($component->instance()->previewUrl())->toContain('orientation=portrait')
+        ->and($component->instance()->downloadUrl())->toContain('orientation=portrait');
+});
+
+it('renders contracts through the dedicated template in portrait and landscape', function (): void {
+    fakeWeasyPrintSuccess();
+    $this->travelTo('2026-06-01 10:00:00');
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    Contract::factory()->for($company)->create([
+        'title' => 'Contratto dedicato',
+        'contractual_start_date' => '2026-01-01',
+    ]);
+    $contracts = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'kind' => 'contracts',
+    ]));
+    $generic = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'kind' => 'suppliers',
+        'filters' => [],
+    ]));
+    $renderer = app(ReportPdfRenderer::class);
+
+    expect($renderer->render($contracts, $company, ['orientation' => 'portrait']))->toStartWith('%PDF-')
+        ->and($renderer->render($contracts, $company, ['orientation' => 'landscape']))->toStartWith('%PDF-')
+        ->and($renderer->render($generic, $company))->toStartWith('%PDF-');
+
+    Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['weasyprint', '-', '-']
+        && str_contains((string) $process->input, '<h1>Report Contratti</h1>')
+        && str_contains((string) $process->input, 'size: A4 portrait;')
+        && ! str_contains((string) $process->input, 'Definizioni del confronto'));
+    Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['weasyprint', '-', '-']
+        && str_contains((string) $process->input, '<h1>Report Contratti</h1>')
+        && str_contains((string) $process->input, 'size: A4 landscape;'));
+    Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['weasyprint', '-', '-']
+        && str_contains((string) $process->input, 'Definizioni del confronto'));
+});
+
+it('renders the contracts template with only the configured company logo and approved terminology', function (): void {
+    $this->travelTo('2026-06-01 10:00:00');
+    $company = Company::factory()->create(['name' => 'Azienda Logo']);
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    Contract::factory()->for($company)->create([
+        'title' => 'Contratto Template',
+        'contractual_start_date' => '2026-01-01',
+    ]);
+    $result = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'kind' => 'contracts',
+    ]));
+    $composer = app(ReportPdfComposer::class);
+    $withoutLogo = view('reports.contracts', ['document' => $composer->compose($result, $company)])->render();
+
+    Storage::fake('local');
+    Storage::disk('local')->put('company-logos/'.$company->id.'/logo.png', 'company-logo');
+    $company->update([
+        'logo_disk' => 'local',
+        'logo_path' => 'company-logos/'.$company->id.'/logo.png',
+        'logo_media_type' => 'image/png',
+    ]);
+    $withLogo = view('reports.contracts', ['document' => $composer->compose($result, $company->refresh())])->render();
+
+    expect($withoutLogo)->toContain('Report Contratti', 'Esercizio 2026', 'Allocato', 'Effettivo', 'Scostamento')
+        ->and($withoutLogo)->not->toContain('class="header-logo"', 'data:image/', 'footer')
+        ->and($withLogo)->toContain('class="header-logo"', 'data:image/png;base64,')
+        ->and($withLogo)->not->toContain('linear-gradient', 'radial-gradient', 'background: #06121c');
 });
 
 it('reports missing, non executable, unsupported and failed runtimes', function (): void {

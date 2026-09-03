@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <style>
-        @page { size: A4 landscape; margin: 14mm 12mm 16mm; @bottom-left { content: "MP2 · EUR · importi netti IVA"; color: #667b7d; font-size: 7.5pt; } @bottom-right { content: "Pagina " counter(page) " di " counter(pages); color: #667b7d; font-size: 7.5pt; } }
+        @page { size: A4 {{ $document['orientation'] }}; margin: 14mm 12mm 16mm; @bottom-left { content: "MP2 · EUR · importi netti IVA"; color: #667b7d; font-size: 7.5pt; } @bottom-right { content: "Pagina " counter(page) " di " counter(pages); color: #667b7d; font-size: 7.5pt; } }
         * { box-sizing: border-box; }
         body { color: #172126; font-family: sans-serif; font-size: 8.5pt; line-height: 1.35; margin: 0; }
         header { border-bottom: 2px solid #0e8a80; display: table; margin-bottom: 9mm; padding-bottom: 4mm; width: 100%; }

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Reporting;
 
+use App\Domain\Contracts\ContractState;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Projects\ProjectAnnualReferenceDate;
 use App\Domain\Projects\ProjectDeferralMode;
@@ -475,7 +476,8 @@ final class BuildReport
                 'closing' => $closingExists,
             ],
             'actual_reference' => $definition->actualReference?->label(),
-            'reference_date' => ProjectAnnualReferenceDate::forYear($exercise->year, CarbonImmutable::now($company->timezone))->toDateString(),
+            'reference_date' => ($definition->finalReference->referenceDate
+                ?? ProjectAnnualReferenceDate::forYear($exercise->year, CarbonImmutable::now($company->timezone)))->toDateString(),
             'generated_at' => $definition->generatedAt->setTimezone($company->timezone)->toDateTimeString(),
             'date_from' => $definition->dateFrom?->toDateString(),
             'date_to' => $definition->dateTo?->toDateString(),
@@ -551,11 +553,23 @@ final class BuildReport
 
                 return [
                     'label' => $source->label,
+                    'summary' => $source->summary,
                     'origin_key' => $source->originKey,
+
+                    'supplier' => $source->supplierLabel ?? 'Senza fornitore',
+                    'cost_center' => $source->costCenterLabel ?? 'Non classificato',
+
                     'state' => $source->state,
+                    'state_label' => ContractState::from($source->state)->label(),
+
+                    'deadline' => $source->detail['deadline'] ?? null,
+                    'notice_limit_date' => $source->detail['notice_limit_date'] ?? null,
+                    'automatic_renewal' => (bool) ($source->detail['automatic_renewal'] ?? false),
+
                     'allocation' => $source->allocation,
                     'actual' => $source->actual,
                     'operational_variance' => Decimal::subtract($source->actual, $source->allocation),
+
                     'labels' => $labels,
                     'detail' => $source->detail,
                 ];

@@ -2,12 +2,16 @@
 
 namespace App\Support\Reporting;
 
+use App\Domain\Contracts\ContractAttributionMode;
+use App\Domain\Contracts\ContractCycleType;
+use App\Domain\Contracts\ContractState;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Reporting\ComparisonCategory;
 use App\Domain\Reporting\ReportKind;
 use App\Domain\Reporting\ReportResult;
 use App\Domain\Reporting\ReportSource;
 use App\Models\Company;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Number;
 use Illuminate\Support\Str;
@@ -20,6 +24,7 @@ final class ReportPdfComposer
      */
     public function compose(ReportResult $result, Company $company, array $configuration = []): array
     {
+        $orientation = $this->orientation($configuration);
         $sources = array_map(fn (ReportSource $source): array => $this->source($source), $result->sources);
         $comparisons = array_map(fn (array $row): array => $this->comparison($row), $result->comparisons);
         $sections = array_map(fn (array $section): array => [
@@ -27,8 +32,20 @@ final class ReportPdfComposer
             'title' => (string) $section['title'],
             'rows' => array_map(fn (mixed $row): mixed => $row instanceof ReportSource ? $this->source($row) : $this->normalizeValue($row), $section['rows']),
         ], $result->sections);
+        $isContracts = $result->definition->kind === ReportKind::Contracts;
+        $contracts = $isContracts
+            ? array_map(fn (array $row): array => $this->contract($row), $sections[0]['rows'] ?? [])
+            : [];
+        $stateCounts = collect($contracts)->countBy('state');
+        $contractStateCounts = $isContracts
+            ? array_map(fn (ContractState $state): array => [
+                'state' => $state->value,
+                'label' => $state->label(),
+                'count' => (int) $stateCounts->get($state->value, 0),
+            ], ContractState::cases())
+            : [];
         $kpis = $this->kpiDefinitions($result, $sections);
-        $charts = $this->staticCharts($this->chartDefinitions($result));
+        $charts = $this->staticCharts($this->chartDefinitions($result, $orientation));
         $logo = $this->logoDataUri($company);
 
         $availableBlocks = [];
@@ -41,7 +58,10 @@ final class ReportPdfComposer
         foreach ($charts as $chart) {
             $availableBlocks[] = $this->option('chart:'.$chart['id'], $chart['heading'], 'chart');
         }
-        if ($sources !== []) {
+        if ($isContracts && $contracts !== []) {
+            $availableBlocks[] = $this->option('table:contracts', 'Elenco contratti', 'table');
+            $availableBlocks[] = $this->option('details:contracts', 'Approfondimenti contratti', 'detail');
+        } elseif (! $isContracts && $sources !== []) {
             $availableBlocks[] = $this->option('table:sources', 'Dettaglio e riconciliazione', 'table');
             $availableBlocks[] = $this->option('details:sources', 'Approfondimenti delle sorgenti', 'detail');
         }
@@ -49,13 +69,27 @@ final class ReportPdfComposer
             $availableBlocks[] = $this->option('table:comparisons', 'Confronto', 'table');
         }
         foreach ($sections as $section) {
-            if ($section['rows'] !== []) {
+            if (! $isContracts && $section['rows'] !== []) {
                 $availableBlocks[] = $this->option($section['id'], $section['title'], 'section');
             }
         }
 
         $availableColumns = [];
-        if ($sources !== []) {
+        if ($isContracts) {
+            foreach ([
+                'supplier' => 'Fornitore',
+                'state' => 'Stato',
+                'cost_center' => 'Centro di costo',
+                'deadline' => 'Scadenza',
+                'notice_limit_date' => 'Limite preavviso',
+                'renewal' => 'Rinnovo',
+                'allocation' => 'Allocato',
+                'actual' => 'Effettivo',
+                'operational_variance' => 'Scostamento',
+            ] as $key => $label) {
+                $availableColumns[] = $this->option('column:contracts:'.$key, $label, 'contracts');
+            }
+        } elseif ($sources !== []) {
             foreach ([
                 'cost_center' => 'Centro di costo', 'supplier' => 'Fornitore', 'state' => 'Stato',
                 'allocation' => 'Allocato', 'actual' => 'Effettivo', 'operational_variance' => 'Scostamento',
@@ -73,10 +107,15 @@ final class ReportPdfComposer
             }
         }
 
-        $selectedBlocks = $this->selection($configuration, 'blocks', array_column($availableBlocks, 'id'));
+        $blockIds = array_column($availableBlocks, 'id');
+        $defaultBlocks = $isContracts
+            ? array_values(array_diff($blockIds, ['details:contracts']))
+            : $blockIds;
+        $selectedBlocks = $this->selection($configuration, 'blocks', $blockIds, $defaultBlocks);
         $selectedColumns = $this->selection($configuration, 'columns', array_column($availableColumns, 'id'));
 
         return [
+            'orientation' => $orientation,
             'definition' => $result->definition->toArray(),
             'header' => $result->header,
             'category_definitions' => array_map(fn (ComparisonCategory $category): array => [
@@ -87,12 +126,28 @@ final class ReportPdfComposer
             'sources' => $sources,
             'comparisons' => $comparisons,
             'sections' => $sections,
+            'contracts' => $contracts,
+            'contract_state_counts' => $contractStateCounts,
             'logo' => $logo,
             'available_blocks' => $availableBlocks,
             'available_columns' => $availableColumns,
             'selected_blocks' => $selectedBlocks,
             'selected_columns' => $selectedColumns,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $configuration
+     */
+    private function orientation(array $configuration): string
+    {
+        $orientation = $configuration['orientation'] ?? 'landscape';
+
+        if (! is_string($orientation) || ! in_array($orientation, ['portrait', 'landscape'], true)) {
+            throw new \InvalidArgumentException('Invalid PDF orientation.');
+        }
+
+        return $orientation;
     }
 
     /** @return array{id: string, label: string, group: string} */
@@ -103,12 +158,13 @@ final class ReportPdfComposer
 
     /** @param array<string, mixed> $configuration
      * @param  array<int, string>  $available
+     * @param  array<int, string>|null  $default
      * @return array<int, string>
      */
-    private function selection(array $configuration, string $key, array $available): array
+    private function selection(array $configuration, string $key, array $available, ?array $default = null): array
     {
         if (! array_key_exists($key, $configuration) || $configuration[$key] === null) {
-            return $available;
+            return $default ?? $available;
         }
 
         if (! is_array($configuration[$key])) {
@@ -210,12 +266,32 @@ final class ReportPdfComposer
                     ['specialist_variance', 'Scostamento Operativo', $specialist['operational_variance'], true],
                     ['specialist_count', 'Bucket Fornitore', $specialist['item_count'], false],
                 ];
-            } elseif (in_array($kind, [ReportKind::Projects, ReportKind::Contracts], true)) {
+            } elseif ($kind === ReportKind::Contracts) {
+                $referenceDate = $result->definition->finalReference->referenceDate
+                    ?? CarbonImmutable::parse((string) $result->header['reference_date']);
+                $expiringBy = $referenceDate->addDays(90);
+                /** @var array<int, array<string, mixed>> $contractRows */
+                $contractRows = $sections[0]['rows'] ?? [];
+                $expiring = count(array_filter($contractRows, function (array $row) use ($referenceDate, $expiringBy): bool {
+                    $deadline = $row['deadline'] ?? null;
+
+                    return is_string($deadline)
+                        && $deadline !== ''
+                        && CarbonImmutable::parse($deadline)->betweenIncluded($referenceDate, $expiringBy);
+                }));
+                $items = [
+                    ['specialist_count', 'Contratti', $specialist['item_count'], false],
+                    ['specialist_allocation', 'Allocato', $specialist['allocation'], true],
+                    ['specialist_actual', 'Effettivo', $specialist['actual'], true],
+                    ['specialist_variance', 'Scostamento operativo', $specialist['operational_variance'], true],
+                    ['contracts_expiring', 'Contratti in scadenza', $expiring, false, 'nei prossimi 90 giorni'],
+                ];
+            } elseif ($kind === ReportKind::Projects) {
                 $items = [
                     ['specialist_allocation', 'Allocato', $specialist['allocation'], true],
                     ['specialist_actual', 'Effettivo', $specialist['actual'], true],
                     ['specialist_variance', 'Scostamento Operativo', $specialist['operational_variance'], true],
-                    ['specialist_count', $kind === ReportKind::Projects ? 'Progetti' : 'Contratti', $specialist['item_count'], false],
+                    ['specialist_count', 'Progetti', $specialist['item_count'], false],
                 ];
             } elseif ($kind === ReportKind::Carryovers) {
                 $items = [
@@ -234,6 +310,7 @@ final class ReportPdfComposer
             'formatted' => $item[3] && is_numeric($item[2])
                 ? Number::currency((float) $item[2], in: 'EUR', locale: 'it')
                 : (string) $item[2],
+            'description' => $item[4] ?? null,
         ], $items);
     }
 
@@ -291,7 +368,7 @@ final class ReportPdfComposer
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function chartDefinitions(ReportResult $result): array
+    public function chartDefinitions(ReportResult $result, string $orientation = 'landscape'): array
     {
         $charts = [];
         $kind = $result->definition->kind;
@@ -374,12 +451,50 @@ final class ReportPdfComposer
                     ]],
                 ],
             ];
-        } elseif (in_array($kind, [ReportKind::Projects, ReportKind::Contracts], true)) {
-            $type = $kind === ReportKind::Projects ? 'project' : 'contract';
-            $sources = array_values(array_filter($result->sources, fn (ReportSource $source): bool => $source->sourceType === $type));
+        } elseif ($kind === ReportKind::Contracts) {
+            $sources = collect($result->sources)
+                ->filter(fn (ReportSource $source): bool => $source->sourceType === 'contract')
+                ->sortByDesc(fn (ReportSource $source): float => (float) $source->allocation)
+                ->take($orientation === 'portrait' ? 5 : 8)
+                ->values()
+                ->all();
             if ($sources !== []) {
                 $charts[] = $this->groupedBarChart(
-                    $type.'-values', ($kind === ReportKind::Projects ? 'Progetti' : 'Contratti').' · Allocato ed Effettivo',
+                    'contract-values', 'Allocato vs Effettivo per contratto',
+                    'Contratti ordinati per Allocato decrescente.',
+                    array_map(fn (ReportSource $source): string => $source->label, $sources),
+                    [
+                        ['label' => 'Allocato', 'data' => array_map(fn (ReportSource $source): float => (float) $source->allocation, $sources), 'color' => '#15323B'],
+                        ['label' => 'Effettivo', 'data' => array_map(fn (ReportSource $source): float => (float) $source->actual, $sources), 'color' => '#39D5C4'],
+                    ],
+                );
+
+                $counts = collect(array_values(array_filter(
+                    $result->sources,
+                    fn (ReportSource $source): bool => $source->sourceType === 'contract',
+                )))->countBy(fn (ReportSource $source): string => (string) $source->state);
+                $states = ContractState::cases();
+                $charts[] = [
+                    'id' => 'contract-states',
+                    'heading' => 'Distribuzione per stato',
+                    'description' => 'Stati canonici MP2 alla data economica del report.',
+                    'type' => 'doughnut',
+                    'variant' => 'contract-state-doughnut',
+                    'data' => [
+                        'labels' => array_map(fn (ContractState $state): string => $state->label(), $states),
+                        'datasets' => [[
+                            'label' => 'Contratti',
+                            'data' => array_map(fn (ContractState $state): int => (int) $counts->get($state->value, 0), $states),
+                            'backgroundColor' => ['#60A5FA', '#39D5C4', '#91A3A8', '#EF4444'],
+                        ]],
+                    ],
+                ];
+            }
+        } elseif ($kind === ReportKind::Projects) {
+            $sources = array_values(array_filter($result->sources, fn (ReportSource $source): bool => $source->sourceType === 'project'));
+            if ($sources !== []) {
+                $charts[] = $this->groupedBarChart(
+                    'project-values', 'Progetti · Allocato ed Effettivo',
                     'Valori delle Sorgenti Pertinenti Presenti nel Risultato.',
                     array_map(fn (ReportSource $source): string => $source->label, $sources),
                     [
@@ -494,13 +609,21 @@ final class ReportPdfComposer
                 ];
             }, $chart['data']['datasets']);
 
-            return $this->chart(
-                (string) $chart['id'],
-                (string) $chart['heading'],
-                (string) $chart['description'],
-                array_map('strval', $chart['data']['labels']),
-                $datasets,
-            );
+            return $chart['variant'] === 'contract-state-doughnut'
+                ? $this->donutChart(
+                    (string) $chart['id'],
+                    (string) $chart['heading'],
+                    (string) $chart['description'],
+                    array_map('strval', $chart['data']['labels']),
+                    $datasets[0],
+                )
+                : $this->chart(
+                    (string) $chart['id'],
+                    (string) $chart['heading'],
+                    (string) $chart['description'],
+                    array_map('strval', $chart['data']['labels']),
+                    $datasets,
+                );
         }, $definitions);
     }
 
@@ -511,32 +634,203 @@ final class ReportPdfComposer
      */
     private function chart(string $id, string $heading, string $description, array $labels, array $series): array
     {
-        $rowHeight = 34;
-        $height = max(130, 58 + count($labels) * $rowHeight);
-        $plotX = 190;
-        $plotWidth = 520;
+        $rowHeight = 25;
+        $height = max(105, 48 + count($labels) * $rowHeight);
+        $plotX = 178;
+        $plotWidth = 552;
         $max = max(1.0, ...array_map('abs', array_merge(...array_column($series, 'values'))));
         $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 '.$height.'">';
         $svg .= '<rect width="760" height="'.$height.'" fill="#ffffff"/>';
         foreach ($series as $index => $dataset) {
-            $svg .= '<rect x="'.($plotX + $index * 125).'" y="12" width="12" height="12" rx="2" fill="'.$dataset['colors'][0].'"/>';
-            $svg .= '<text x="'.($plotX + 18 + $index * 125).'" y="22" font-family="sans-serif" font-size="11" fill="#33484b">'.$this->escape($dataset['label']).'</text>';
+            $svg .= '<rect x="'.($plotX + $index * 120).'" y="8" width="11" height="11" rx="1" fill="'.$dataset['colors'][0].'"/>';
+            $svg .= '<text x="'.($plotX + 17 + $index * 120).'" y="17" font-family="sans-serif" font-size="10" fill="#33484b">'.$this->escape($dataset['label']).'</text>';
         }
         foreach ($labels as $row => $label) {
-            $y = 44 + $row * $rowHeight;
-            $svg .= '<text x="6" y="'.($y + 13).'" font-family="sans-serif" font-size="10" fill="#33484b">'.$this->escape(mb_strimwidth($label, 0, 30, '…')).'</text>';
+            $y = 34 + $row * $rowHeight;
+            $svg .= '<text x="4" y="'.($y + 10).'" font-family="sans-serif" font-size="9" fill="#33484b">'.$this->escape(mb_strimwidth($label, 0, 28, '…')).'</text>';
             foreach ($series as $index => $dataset) {
                 $value = $dataset['values'][$row] ?? 0.0;
-                $width = abs($value) / $max * ($plotWidth - 145);
-                $barY = $y + $index * 13;
+                $width = abs($value) / $max * ($plotWidth - 112);
+                $barY = $y + $index * 10;
                 $color = $dataset['colors'][$row] ?? $dataset['colors'][0];
-                $svg .= '<rect x="'.$plotX.'" y="'.$barY.'" width="'.round($width, 2).'" height="10" rx="2" fill="'.$color.'"/>';
-                $svg .= '<text x="'.($plotX + $width + 5).'" y="'.($barY + 9).'" font-family="sans-serif" font-size="9" fill="#33484b">'.$this->escape((string) $value).'</text>';
+                $svg .= '<rect x="'.$plotX.'" y="'.$barY.'" width="'.round($width, 2).'" height="8" rx="1" fill="'.$color.'"/>';
+                $svg .= '<text x="'.($plotX + $width + 5).'" y="'.($barY + 7).'" font-family="sans-serif" font-size="8" fill="#33484b">'.$this->escape(Number::currency($value, in: 'EUR', locale: 'it')).'</text>';
             }
         }
         $svg .= '</svg>';
 
         return compact('id', 'heading', 'description') + ['image' => 'data:image/svg+xml;base64,'.base64_encode($svg)];
+    }
+
+    /**
+     * @param  array<int, string>  $labels
+     * @param  array{label: string, values: array<int, float>, colors: array<int, string>}  $series
+     * @return array{id: string, heading: string, description: string, image: string}
+     */
+    private function donutChart(string $id, string $heading, string $description, array $labels, array $series): array
+    {
+        $total = array_sum($series['values']);
+        $radius = 54;
+        $circumference = 2 * M_PI * $radius;
+        $offset = 0.0;
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 190">';
+        $svg .= '<rect width="700" height="190" fill="#ffffff"/>';
+        $svg .= '<circle cx="95" cy="95" r="'.$radius.'" fill="none" stroke="#edf2f1" stroke-width="28"/>';
+
+        foreach ($labels as $index => $label) {
+            $value = $series['values'][$index] ?? 0.0;
+            if ($value <= 0 || $total <= 0) {
+                continue;
+            }
+            $length = ($value / $total) * $circumference;
+            $visibleLength = max(0, $length - 2.4);
+            $color = $series['colors'][$index] ?? '#91A3A8';
+            $svg .= '<circle cx="95" cy="95" r="'.$radius.'" fill="none" stroke="'.$color.'" stroke-width="28" '
+                .'stroke-dasharray="'.round($visibleLength, 2).' '.round($circumference - $visibleLength, 2).'" '
+                .'stroke-dashoffset="'.round(-$offset, 2).'" transform="rotate(-90 95 95)"/>';
+
+            $percentage = ($value / $total) * 100;
+            if ($percentage >= 9) {
+                $angle = (($offset + ($length / 2)) / $circumference) * 2 * M_PI - M_PI / 2;
+                $x = 95 + cos($angle) * $radius;
+                $y = 95 + sin($angle) * $radius;
+                $svg .= '<text x="'.round($x, 2).'" y="'.round($y + 3, 2).'" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="#0B1D25">'.round($percentage).'%</text>';
+            }
+            $offset += $length;
+        }
+
+        $svg .= '<circle cx="95" cy="95" r="34" fill="#ffffff"/>';
+        $svg .= '<text x="95" y="92" text-anchor="middle" font-family="sans-serif" font-size="24" font-weight="700" fill="#0B1D25">'.$total.'</text>';
+        $svg .= '<text x="95" y="108" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#667B7D">CONTRATTI</text>';
+
+        foreach ($labels as $index => $label) {
+            $y = 42 + $index * 34;
+            $value = (int) ($series['values'][$index] ?? 0);
+            $percentage = $total > 0 ? round(($value / $total) * 100) : 0;
+            $color = $series['colors'][$index] ?? '#91A3A8';
+            $svg .= '<rect x="190" y="'.($y - 10).'" width="14" height="14" rx="2" fill="'.$color.'" stroke="#526762" stroke-width="0.6"/>';
+            $svg .= '<text x="216" y="'.$y.'" font-family="sans-serif" font-size="12" font-weight="700" fill="#15323B">'.$this->escape($label).'</text>';
+            $svg .= '<text x="430" y="'.$y.'" font-family="sans-serif" font-size="11" fill="#526762">'.$value.' · '.$percentage.'%</text>';
+        }
+        $svg .= '</svg>';
+
+        return compact('id', 'heading', 'description') + ['image' => 'data:image/svg+xml;base64,'.base64_encode($svg)];
+    }
+
+    /** @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function contract(array $row): array
+    {
+        $detail = is_array($row['detail'] ?? null) ? $row['detail'] : [];
+
+        return [
+            'label' => (string) $row['label'],
+            'summary' => is_string($row['summary'] ?? null) ? $row['summary'] : null,
+            'supplier' => (string) $row['supplier'],
+            'cost_center' => (string) $row['cost_center'],
+            'state' => (string) $row['state'],
+            'state_label' => (string) $row['state_label'],
+            'deadline' => $row['deadline'] ?? null,
+            'notice_limit_date' => $row['notice_limit_date'] ?? null,
+            'automatic_renewal' => (bool) ($row['automatic_renewal'] ?? false),
+            'allocation' => (string) $row['allocation'],
+            'actual' => (string) $row['actual'],
+            'operational_variance' => (string) $row['operational_variance'],
+            'conditions' => $this->contractConditions($detail['conditions'] ?? []),
+            'renewal_configurations' => $this->contractRenewalConfigurations($detail['cycles'] ?? []),
+            'events' => $this->contractEvents($detail['events'] ?? []),
+            'expenses' => $this->contractExpenses($detail['expenses'] ?? []),
+        ];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function contractConditions(mixed $conditions): array
+    {
+        if (! is_array($conditions)) {
+            return [];
+        }
+
+        return collect($conditions)
+            ->filter(fn (mixed $condition): bool => is_array($condition) && empty($condition['annulled_at']))
+            ->map(function (array $condition): array {
+                $cycle = ContractCycleType::tryFrom((string) ($condition['cycle'] ?? ''));
+                $attribution = ContractAttributionMode::tryFrom((string) ($condition['attribution_mode'] ?? ''));
+
+                return [
+                    'amount' => (string) ($condition['amount'] ?? '0.00'),
+                    'cycle' => $cycle?->label() ?? '—',
+                    'attribution' => $attribution?->label() ?? '—',
+                    'valid_from' => $condition['valid_from'] ?? null,
+                    'valid_to' => $condition['valid_to'] ?? null,
+                    'reason' => is_string($condition['reason'] ?? null) ? $condition['reason'] : null,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function contractRenewalConfigurations(mixed $configurations): array
+    {
+        if (! is_array($configurations)) {
+            return [];
+        }
+
+        return collect($configurations)
+            ->filter(fn (mixed $configuration): bool => is_array($configuration))
+            ->map(fn (array $configuration): array => [
+                'effective_from' => $configuration['effective_from'] ?? null,
+                'automatic_renewal' => (bool) ($configuration['automatic_renewal'] ?? false),
+                'expiry_anchor_date' => $configuration['expiry_anchor_date'] ?? null,
+                'renewal_duration_months' => isset($configuration['renewal_duration_months']) ? (int) $configuration['renewal_duration_months'] : null,
+                'notice_days' => isset($configuration['notice_days']) ? (int) $configuration['notice_days'] : null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function contractEvents(mixed $events): array
+    {
+        if (! is_array($events)) {
+            return [];
+        }
+
+        return collect($events)
+            ->filter(fn (mixed $event): bool => is_array($event) && empty($event['annulled_at']))
+            ->map(fn (array $event): array => [
+                'date' => $event['state_change_date'] ?? $event['renewed_expiry_date'] ?? $event['declared_contractual_date'] ?? null,
+                'label' => match ((string) ($event['type'] ?? '')) {
+                    'activation' => 'Attivazione',
+                    'cessation', 'expiry_cessation' => 'Cessazione',
+                    'reactivation' => 'Riattivazione',
+                    'cancellation' => 'Annullamento',
+                    'renewal' => 'Rinnovo',
+                    default => 'Evento contrattuale',
+                },
+                'reason' => is_string($event['reason'] ?? null) ? $event['reason'] : null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /** @return array<int, array<string, string>> */
+    private function contractExpenses(mixed $expenses): array
+    {
+        if (! is_array($expenses)) {
+            return [];
+        }
+
+        return collect($expenses)
+            ->filter(fn (mixed $expense): bool => is_array($expense))
+            ->map(fn (array $expense): array => [
+                'description' => (string) ($expense['source'] ?? 'Spesa'),
+                'allocation' => (string) ($expense['allocation'] ?? '0.00'),
+                'actual' => (string) ($expense['actual'] ?? '0.00'),
+            ])
+            ->values()
+            ->all();
     }
 
     private function logoDataUri(Company $company): ?string

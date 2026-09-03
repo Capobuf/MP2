@@ -13,6 +13,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 final class ReportPdfController
@@ -36,7 +37,14 @@ final class ReportPdfController
         $company = Str::slug((string) $report->header['company_name']);
         $kind = Str::slug($definition->kind->value);
         $filename = sprintf('report-%s-%s-%s-%s.pdf', $company, $report->header['exercise_year'], $kind, now()->format('Ymd-His'));
-        $selection = Validator::make($request->only(['blocks_configured', 'columns_configured', 'blocks', 'columns']), [
+        $selection = Validator::make($request->only([
+            'orientation',
+            'blocks_configured',
+            'columns_configured',
+            'blocks',
+            'columns',
+        ]), [
+            'orientation' => ['sometimes', 'string', Rule::in(['portrait', 'landscape'])],
             'blocks_configured' => ['sometimes', 'boolean'],
             'columns_configured' => ['sometimes', 'boolean'],
             'blocks' => ['sometimes', 'array', 'max:200'],
@@ -44,7 +52,9 @@ final class ReportPdfController
             'columns' => ['sometimes', 'array', 'max:100'],
             'columns.*' => ['string', 'max:100'],
         ])->validate();
-        $configuration = [];
+        $configuration = [
+            'orientation' => $selection['orientation'] ?? 'landscape',
+        ];
         if ($selection['blocks_configured'] ?? false) {
             $configuration['blocks'] = $selection['blocks'] ?? [];
         }

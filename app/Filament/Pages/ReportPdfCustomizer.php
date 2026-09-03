@@ -37,6 +37,8 @@ final class ReportPdfCustomizer extends Page
     /** @var array<int, string> */
     public array $selectedColumns = [];
 
+    public string $orientation = 'landscape';
+
     public static function canAccess(): bool
     {
         return Reports::canAccess();
@@ -58,7 +60,11 @@ final class ReportPdfCustomizer extends Page
 
         $user = auth()->user();
         abort_unless($user instanceof User, 401);
-        $document = $composer->compose($buildReport->execute($user, $definition), $this->company());
+        $document = $composer->compose(
+            $buildReport->execute($user, $definition),
+            $this->company(),
+            ['orientation' => $this->orientation],
+        );
 
         $this->definition = $definition->toArray();
         $this->availableBlocks = $document['available_blocks'];
@@ -94,6 +100,7 @@ final class ReportPdfCustomizer extends Page
     {
         return [
             'definition' => $this->definition,
+            'orientation' => $this->orientation,
             'blocks_configured' => true,
             'columns_configured' => true,
             'blocks' => array_values($this->selectedBlocks),
