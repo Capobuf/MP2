@@ -10,6 +10,8 @@ use App\Models\Company;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
@@ -127,4 +129,46 @@ it('rolls back settings when audit persistence fails', function () {
         ->and(AuditEvent::query()->count())->toBe($initialEventCount);
 
     AuditEvent::flushEventListeners();
+});
+
+it('stores replaces and removes a private company logo with audited cleanup', function (): void {
+    Storage::fake('local');
+    $administrator = User::factory()->platformAdmin()->create();
+    $company = app(CreateCompany::class)->execute($administrator, ['name' => 'Azienda', 'timezone' => 'Europe/Rome']);
+    $base = [
+        'overspend_note_required' => false,
+        'unclassified_closing_policy' => ClosingUnclassifiedPolicy::Warning->value,
+        'timezone' => 'Europe/Rome',
+    ];
+
+    expect(app(UpdateCompanySettings::class)->execute($administrator, $company, $base + [
+        'logo' => UploadedFile::fake()->image('logo.png', 240, 80),
+    ]))->toBe(1);
+    $firstPath = $company->refresh()->logo_path;
+    expect($company->logo_disk)->toBe('local')->and($company->logo_media_type)->toBe('image/png');
+    Storage::disk('local')->assertExists($firstPath);
+
+    app(UpdateCompanySettings::class)->execute($administrator, $company, $base + [
+        'logo' => UploadedFile::fake()->image('logo.jpg', 240, 80),
+    ]);
+    $secondPath = $company->refresh()->logo_path;
+    Storage::disk('local')->assertMissing($firstPath)->assertExists($secondPath);
+
+    app(UpdateCompanySettings::class)->execute($administrator, $company, $base + ['logo' => null]);
+    expect($company->refresh()->logo_path)->toBeNull()
+        ->and(AuditEvent::query()->where('setting', Setting::CompanyLogo)->count())->toBe(3);
+    Storage::disk('local')->assertMissing($secondPath);
+});
+
+it('rejects unsupported logo content', function (): void {
+    Storage::fake('local');
+    $administrator = User::factory()->platformAdmin()->create();
+    $company = app(CreateCompany::class)->execute($administrator, ['name' => 'Azienda', 'timezone' => 'Europe/Rome']);
+
+    expect(fn () => app(UpdateCompanySettings::class)->execute($administrator, $company, [
+        'overspend_note_required' => false,
+        'unclassified_closing_policy' => ClosingUnclassifiedPolicy::Warning->value,
+        'timezone' => 'Europe/Rome',
+        'logo' => UploadedFile::fake()->createWithContent('logo.svg', '<svg><script>alert(1)</script></svg>'),
+    ]))->toThrow(ValidationException::class);
 });

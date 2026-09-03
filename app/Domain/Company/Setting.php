@@ -7,6 +7,7 @@ enum Setting: string
     case OverspendNoteRequired = 'overspend_note_required';
     case UnclassifiedClosingPolicy = 'unclassified_closing_policy';
     case Timezone = 'timezone';
+    case CompanyLogo = 'company_logo';
 
     public function label(): string
     {
@@ -14,6 +15,7 @@ enum Setting: string
             self::OverspendNoteRequired => 'Nota di Sovraspesa Obbligatoria',
             self::UnclassifiedClosingPolicy => 'Policy Non Classificato alla Chiusura',
             self::Timezone => 'Fuso Orario Aziendale',
+            self::CompanyLogo => 'Logo Aziendale',
         };
     }
 }

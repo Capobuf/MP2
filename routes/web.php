@@ -22,6 +22,10 @@ Route::get('/budget-evidence/{evidence}/download', BudgetEvidenceDownloadControl
     ->middleware('auth')
     ->name('budget-evidence.download');
 
-Route::get('/reports/pdf', ReportPdfController::class)
+Route::get('/reports/pdf/preview', ReportPdfController::class)
     ->middleware('auth')
-    ->name('reports.pdf');
+    ->name('reports.pdf.preview');
+
+Route::get('/reports/pdf/download', ReportPdfController::class)
+    ->middleware('auth')
+    ->name('reports.pdf.download');

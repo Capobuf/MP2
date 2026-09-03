@@ -1,5 +1,7 @@
 # Contract: Release Artifact
 
+Il pacchetto include il codice/configurazione del renderer ma non il binario esterno WeasyPrint: la versione 69.0 appartiene al contratto runtime shared-hosting ed è verificata dal wizard.
+
 **Feature**: `014-shared-hosting-installer`
 
 ## Trigger

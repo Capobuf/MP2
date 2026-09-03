@@ -127,6 +127,7 @@ A ogni push nel repository, dopo il superamento dei controlli di qualità, il pr
 - **FR-SH-012**: Il wizard MUST NOT dipendere da risorse JavaScript o CSS esterne non necessarie per completare l'installazione.
 - **FR-SH-013**: Quando Laravel può fare bootstrap, il wizard MUST verificare almeno la versione PHP minima richiesta da MP2, le estensioni runtime effettivamente necessarie e la scrivibilità delle directory/file necessari; MUST trattare `memory_limit=-1` come memoria illimitata valida.
 - **FR-SH-014**: La versione PHP minima dichiarata dal wizard MUST essere 8.3; il controllo MUST accettare versioni successive compatibili.
+- **FR-SH-014A**: Il wizard MUST bloccare l'installazione se WeasyPrint 69.0 è mancante, non eseguibile o di versione diversa e MUST distinguere questi stati nella diagnosi.
 - **FR-SH-015**: Il wizard MUST configurare solo le impostazioni necessarie alla prima istanza: URL pubblico, connessione MySQL e primo amministratore; MUST NOT introdurre configurazioni premature per SMTP, Redis, S3, queue worker o servizi non richiesti.
 - **FR-SH-016**: Il wizard MUST supportare MySQL come database di installazione e MUST NOT presentare motori non certificati da questa slice.
 - **FR-SH-017**: La CI MUST verificare l'installabilità contro MySQL 8.4; il wizard MUST NOT imporre un confronto rigido con la versione `8.4` come condizione per procedere.

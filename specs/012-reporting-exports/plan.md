@@ -12,7 +12,7 @@ S11 aggiunge una pagina Filament aziendale di sola lettura che richiede riferime
 
 **Language/Version**: PHP 8.3
 
-**Primary Dependencies**: Laravel 13.17+, Filament 5, Eloquent; aggiunta pianificata di `dompdf/dompdf:^3.1.6` per il solo rendering PDF
+**Primary Dependencies**: Laravel 13.17+, Filament 5, Eloquent; WeasyPrint 69.0 come unico renderer PDF esterno
 
 **Storage**: MySQL 8.4 esistente; nessuna nuova tabella o persistenza di report/export
 
@@ -35,7 +35,7 @@ S11 aggiunge una pagina Filament aziendale di sola lettura che richiede riferime
 - **I — Autorità canonica**: PASS. Le regole derivano dai §§6.4, 6.10-6.12, 9.2, 13.7, 14.9, 22-25, 26.5-26.6, 28.47-28.53 e 32. `Sostituito` è assente per decisione canonica permanente; FR-095/INV-28.60 sono verificati in S5 per `Collegato a`.
 - **II — Semplicità**: PASS. Una pagina, un builder Eloquent, strutture dati dirette, calcoli deterministici e un renderer PDF; nessun repository layer, CQRS, cache, queue, Redis o feature flag.
 - **III — Slice e tracciabilità**: PASS. Il piano copre solo S11 e riconcilia FR-014, FR-043, FR-087-FR-089 e FR-096 con INV-28.50-28.52.
-- **IV — Dipendenze**: PASS. `dompdf/dompdf:^3.1.6` è giustificato in [research.md](research.md); non verrà modificato codice sotto `vendor/` e il lockfile sarà aggiornato tramite Composer.
+- **IV — Dipendenze**: PASS. WeasyPrint 69.0 è giustificato in [research.md](research.md); non viene modificato codice sotto `vendor/`.
 - **V — Operazioni esplicite**: PASS. La UI raccoglie input; caricamento/normalizzazione e calcoli restano separati e testabili. Non esistono nuove mutazioni di dominio.
 - **VI — Test proporzionali**: PASS. Unit per classificazione/formule; Feature/Livewire per riferimenti, tenant, PDF e MUST NOT; regressioni autorevoli per INV-28.50-28.52.
 - **VII — Sviluppo ispezionabile**: PASS. Si riusa Sail e il gate CI; ogni fase termina con superficie autenticata bootabile.
@@ -127,7 +127,7 @@ Creare una pagina `Report` accessibile solo con `visualizza`, senza selezioni im
 
 ### Phase D — PDF immediato
 
-Aggiungere `dompdf/dompdf:^3.1.6`, renderer controllato e controller autenticato. Ricostruire server-side lo stesso report dagli stessi parametri validati; non fidarsi di dati calcolati dal client. Il PDF include tutto il dettaglio e i metadati del contratto, usa DejaVu Sans, HTML escapato, risorse remote disabilitate e nessun HTML utente interpretato.
+Installare WeasyPrint 69.0 in Sail e CI, verificare il prerequisito nello shared hosting, quindi usare un renderer controllato e un controller autenticato. Ricostruire server-side lo stesso report dagli stessi parametri validati; non fidarsi di dati calcolati dal client. Il PDF include i blocchi applicabili selezionati, metadati obbligatori, HTML escapato e soli asset incorporati.
 
 ### Phase E — Verifica e tracciabilità
 

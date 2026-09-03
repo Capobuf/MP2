@@ -67,6 +67,15 @@ jobs:
       - name: Install locked dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      - name: Install WeasyPrint 69.0
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0 libharfbuzz-subset0 python3-venv
+          python3 -m venv "$RUNNER_TEMP/weasyprint"
+          "$RUNNER_TEMP/weasyprint/bin/pip" install --disable-pip-version-check weasyprint==69.0
+          echo "$RUNNER_TEMP/weasyprint/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/weasyprint/bin/weasyprint" --version | grep -F '69.0'
+
       - name: Provision installer test database
         run: |
           mysql --host=127.0.0.1 --user=root --password=password --execute="CREATE DATABASE IF NOT EXISTS \`${INSTALLER_TEST_DATABASE}\`; GRANT ALL PRIVILEGES ON \`${INSTALLER_TEST_DATABASE}\`.* TO 'sail'@'%'; FLUSH PRIVILEGES;"
@@ -167,6 +176,15 @@ jobs:
 
       - name: Install production Composer dependencies
         run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress
+
+      - name: Install WeasyPrint 69.0
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0 libharfbuzz-subset0 python3-venv
+          python3 -m venv "$RUNNER_TEMP/weasyprint"
+          "$RUNNER_TEMP/weasyprint/bin/pip" install --disable-pip-version-check weasyprint==69.0
+          echo "$RUNNER_TEMP/weasyprint/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/weasyprint/bin/weasyprint" --version | grep -F '69.0'
 
       - name: Set up Node.js 24
         uses: actions/setup-node@v7

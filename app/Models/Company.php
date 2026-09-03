@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['name', 'timezone', 'overspend_note_required', 'unclassified_closing_policy'])]
+#[Fillable(['name', 'timezone', 'overspend_note_required', 'unclassified_closing_policy', 'logo_disk', 'logo_path', 'logo_media_type'])]
 class Company extends Model implements HasName
 {
     /** @use HasFactory<CompanyFactory> */

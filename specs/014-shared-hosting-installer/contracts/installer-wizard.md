@@ -17,6 +17,7 @@
 Mostra in italiano:
 
 - PHP >= 8.3;
+- WeasyPrint 69.0 disponibile ed eseguibile (con errore distinto per binario mancante, non eseguibile o versione non supportata);
 - estensioni runtime MP2 riconciliate con il lockfile: `bcmath`, `ctype`, `dom`, `fileinfo`, `filter`, `hash`, `iconv`, `intl`, `json`, `libxml`, `mbstring`, `openssl`, `pcre`, `pdo`, `pdo_mysql`, `session`, `tokenizer`, `xmlreader`, `zip`;
 - permessi/scrivibilità necessari.
 

@@ -4027,6 +4027,8 @@ Un'esportazione **MUST** conservare:
 
 Un'esportazione **MUST NOT** omettere queste informazioni rendendo ambiguo il significato dei valori.
 
+La personalizzazione del PDF può selezionare soltanto blocchi e colonne realmente applicabili ricostruiti lato server. Anteprima e download devono rappresentare lo stesso documento; la configurazione resta effimera e non può introdurre HTML, CSS, URL, path o JavaScript utente.
+
 
 ---
 

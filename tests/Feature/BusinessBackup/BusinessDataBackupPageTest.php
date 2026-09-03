@@ -23,6 +23,7 @@ it('shows tenant backup only to a viewer and hides Drive when unconfigured', fun
     Livewire::test(BusinessDataBackup::class)
         ->assertSuccessful()
         ->assertSee('Un File, Tutto il Patrimonio Business')
+        ->assertSee('logo deve essere configurato nuovamente')
         ->assertActionVisible('download')
         ->assertActionHidden('importCompany')
         ->assertActionHidden('drive');

@@ -50,13 +50,13 @@
 
 ## Decision 5 — PDF con dipendenza diretta minimale
 
-**Decision**: aggiungere `dompdf/dompdf:^3.1.6` come dipendenza Composer diretta e usare la sua API senza wrapper Laravel.
+**Decisione aggiornata**: usare esclusivamente WeasyPrint 69.0 come prerequisito esterno, invocato tramite Laravel Process API con HTML su stdin e PDF su stdout.
 
 **Current slice requirement**: la chiarificazione richiede un singolo PDF scaricato immediatamente con tabelle, metadati e drill-down multipagina.
 
 **Why core is insufficient**: Laravel produce risposte/download ma non converte HTML in PDF; Filament esporta CSV/XLSX tramite un sottosistema asincrono, non PDF.
 
-**Compatibility**: dompdf 3.1.6 dichiara PHP `^7.1 || ^8.0`, `ext-dom` e `ext-mbstring`; l'immagine Sail PHP 8.3 corrente include DOM, mbstring, GD, Imagick e zlib. Un `composer require --dry-run` ha risolto 3.1.6 senza conflitti.
+**Compatibilità**: WeasyPrint 69.0 richiede Python >= 3.10 e le librerie native documentate; Sail e CI installano la stessa versione esatta, mentre lo shared hosting la espone come prerequisito verificato dal wizard.
 
 **Maintenance**: il progetto è attivo e 3.1.6 è una release disponibile nel 2026.
 
@@ -71,7 +71,7 @@
 **Alternatives considered**:
 
 - FPDF già transitivo: rifiutato perché non è dipendenza diretta, richiede impaginazione manuale e font Unicode aggiuntivi;
-- wrapper `barryvdh/laravel-dompdf`: rifiutato perché aggiunge un ulteriore layer non necessario;
+- wrapper PHP del renderer: rifiutato perché aggiunge un ulteriore layer non necessario;
 - browser print/PDF: rifiutato perché non produce il download PDF server-side richiesto e rende la verifica dipendente dal browser;
 - wkhtmltopdf/headless Chrome: rifiutati perché richiedono binari o infrastruttura esterna sproporzionata.
 

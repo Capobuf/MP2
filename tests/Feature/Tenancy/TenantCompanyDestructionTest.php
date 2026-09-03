@@ -90,8 +90,11 @@ it('deletes the full Tenant graph while preserving shared Users, another Tenant 
 
     $exclusivePath = 'attachments/target-exclusive.pdf';
     $sharedPath = 'attachments/shared.pdf';
+    $logoPath = 'company-logos/target.png';
     Storage::disk('tenant-destruction')->put($exclusivePath, 'exclusive');
     Storage::disk('tenant-destruction')->put($sharedPath, 'shared');
+    Storage::disk('tenant-destruction')->put($logoPath, 'logo');
+    $company->update(['logo_disk' => 'tenant-destruction', 'logo_path' => $logoPath, 'logo_media_type' => 'image/png']);
 
     createTenantDestructionGraph($company, $actor, $exclusivePath, $sharedPath);
     Contract::factory()->create(['company_id' => $otherCompany->id]);
@@ -133,7 +136,7 @@ it('deletes the full Tenant graph while preserving shared Users, another Tenant 
     $result = app(DestroyTenantCompany::class)->execute($actor, $company->tenantCompany, true, true);
 
     expect($result->isComplete())->toBeTrue()
-        ->and($result->filesProcessed)->toBe(2)
+        ->and($result->filesProcessed)->toBe(3)
         ->and(Company::query()->find($company->id))->toBeNull()
         ->and(User::query()->whereKey($actor->id)->exists())->toBeTrue()
         ->and(Company::query()->whereKey($otherCompany->id)->exists())->toBeTrue()
@@ -146,6 +149,7 @@ it('deletes the full Tenant graph while preserving shared Users, another Tenant 
     expect(SupplierContact::query()->whereIn('supplier_id', fn ($query) => $query->select('id')->from('suppliers')->where('company_id', $company->id))->count())->toBe(0)
         ->and(ExpenseLine::query()->whereIn('expense_id', fn ($query) => $query->select('id')->from('expenses')->where('company_id', $company->id))->count())->toBe(0);
     Storage::disk('tenant-destruction')->assertMissing($exclusivePath);
+    Storage::disk('tenant-destruction')->assertMissing($logoPath);
     Storage::disk('tenant-destruction')->assertExists($sharedPath);
 });
 

@@ -3,25 +3,42 @@
 namespace App\Support\Reporting;
 
 use App\Domain\Reporting\ReportResult;
-use Dompdf\Dompdf;
-use Dompdf\Options;
+use App\Models\Company;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
+use Illuminate\Support\Facades\Process;
 
 final class ReportPdfRenderer
 {
-    public function render(ReportResult $result): string
+    public function __construct(
+        private readonly WeasyPrintRuntime $runtime,
+        private readonly ReportPdfComposer $composer,
+    ) {}
+
+    /** @param array<string, mixed> $configuration */
+    public function render(ReportResult $result, Company $company, array $configuration = []): string
     {
-        $options = new Options;
-        $options->set('defaultFont', 'DejaVu Sans');
-        $options->set('isRemoteEnabled', false);
-        $options->set('isPhpEnabled', false);
-        $options->set('isJavascriptEnabled', false);
-        $options->set('chroot', [resource_path('views/reports'), public_path()]);
+        $status = $this->runtime->status();
+        if (! $status['available']) {
+            throw new ReportPdfException($status['reason'] ?? 'unavailable', $status['message']);
+        }
 
-        $dompdf = new Dompdf($options);
-        $dompdf->setPaper('a4', 'landscape');
-        $dompdf->loadHtml(view('reports.pdf', ['report' => $result])->render(), 'UTF-8');
-        $dompdf->render();
+        $document = $this->composer->compose($result, $company, $configuration);
+        $html = view('reports.pdf', ['document' => $document])->render();
 
-        return $dompdf->output(['compress' => 0]);
+        try {
+            $process = Process::timeout((int) config('reporting.timeout'))
+                ->input($html)
+                ->run([(string) config('reporting.weasyprint_binary'), '-', '-']);
+        } catch (ProcessTimedOutException $exception) {
+            throw new ReportPdfException('timeout', 'WeasyPrint ha superato il tempo massimo di rendering.', $exception);
+        } catch (\Throwable $exception) {
+            throw new ReportPdfException('render_failed', 'Impossibile avviare WeasyPrint.', $exception);
+        }
+
+        if (! $process->successful() || ! str_starts_with($process->output(), '%PDF-')) {
+            throw new ReportPdfException('render_failed', 'WeasyPrint non ha prodotto un PDF valido. '.$process->errorOutput());
+        }
+
+        return $process->output();
     }
 }

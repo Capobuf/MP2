@@ -247,13 +247,14 @@ Per MP2 l'operatore crea già il database nel pannello hosting. Ridurre l'interf
 
 ## Decisione 14 - Requisiti server proporzionati
 
-**Decision**: usare il controllo requisiti del package con un'estensione MP2 minima che corregge esclusivamente la gestione di `memory_limit=-1`, configurato sulla baseline MP2 reale e con OPcache non bloccante.
+**Decisione aggiornata**: usare il controllo requisiti del package con un'estensione MP2 minima che corregge `memory_limit=-1` e verifica tramite il checker runtime condiviso che WeasyPrint 69.0 sia presente, eseguibile e compatibile; OPcache resta non bloccante.
 
 **Rationale**: non tutti i requisiti generici del package sono requisiti reali di MP2. Prima dell'implementazione la lista deve essere riconciliata con i platform requirements bloccati da `composer.lock`.
 
 **Minimum**:
 
 - PHP >= 8.3;
+- WeasyPrint 69.0 come binario esterno disponibile al processo PHP web;
 - estensioni runtime richieste dal lock/app: `bcmath`, `ctype`, `dom`, `fileinfo`, `filter`, `hash`, `iconv`, `intl`, `json`, `libxml`, `mbstring`, `openssl`, `pcre`, `pdo`, `pdo_mysql`, `session`, `tokenizer`, `xmlreader`, `zip`;
 - scrivibilità di `.env`, `storage/**`, `bootstrap/cache`.
 

@@ -135,6 +135,7 @@ Come utente autorizzato posso salvare sul disco Google Drive configurato lo stes
 - **FR-BDB-024**: La Snapshot di Chiusura MUST essere ripristinata come fotografia originale materializzata, inclusi riferimenti Budget portabili, valori, righe, warning, impostazioni e decisione N+1; MUST NOT essere ricalcolata dalla realtà viva.
 - **FR-BDB-025**: Correzioni tardive e Annotazioni di errore storico MUST essere preservate anche a impatto zero, mantenendo distinzione fra Chiusura e Conoscenza Corrente e remappando soltanto riferimenti esplicitamente portabili.
 - **FR-BDB-026**: Gli allegati binari MUST NOT essere ripristinati; il workbook MUST inventariarne proprietario, nome, media type, dimensione, SHA-256 e stato, escludendo disk, path, uploader e detacher.
+- **FR-BDB-026A**: Il logo aziendale, dato binario di presentazione, MUST NOT essere incluso né ripristinato dal formato V1; l'interfaccia MUST dichiarare che va riconfigurato dopo il restore.
 - **FR-BDB-027**: Le informazioni business di BudgetEvidence non legate al file MUST essere preservate quando applicabili, senza creare Attachment fittizi.
 - **FR-BDB-028**: Le FK autore dei record importabili MAY essere assenti soltanto per fatti importati; le normali operazioni locali MUST continuare a valorizzare l'autore e la UI MUST rappresentarne neutralmente l'assenza.
 - **FR-BDB-029**: Soltanto un Platform Admin MUST poter validare, vedere l'anteprima e confermare l'import.

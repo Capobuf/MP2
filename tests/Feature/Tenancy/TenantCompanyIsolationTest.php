@@ -141,7 +141,7 @@ it('returns no tenant-owned file or report metadata after the Tenant is archived
     $this->get(route('budget-evidence.download', $evidence))
         ->assertNotFound()
         ->assertDontSee('evidenza-riservata.pdf');
-    $this->get(route('reports.pdf', ['definition' => [
+    $this->get(route('reports.pdf.download', ['definition' => [
         'company_id' => $company->id,
         'kind' => 'suppliers',
         'exercise_id' => $exercise->id,
@@ -193,7 +193,7 @@ it('denies every former Tenant URL after destruction while another Tenant remain
 
     $this->get(route('attachments.download', ['attachment' => $attachment->id]))->assertNotFound();
     $this->get(route('budget-evidence.download', ['evidence' => $evidence->id]))->assertNotFound();
-    $this->get(route('reports.pdf', ['definition' => [
+    $this->get(route('reports.pdf.download', ['definition' => [
         'company_id' => $target->id,
         'kind' => 'suppliers',
         'exercise_id' => $exercise->id,

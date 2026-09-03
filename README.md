@@ -11,6 +11,9 @@ dominio autorevoli sono raccolte nella
 - Docker Engine con Docker Compose v2.
 
 PHP, Composer, Node e MySQL non sono richiesti sull'host.
+L'immagine Sail del progetto installa e verifica WeasyPrint 69.0, usato come unico renderer PDF.
+Per il prerequisito shared-hosting e la configurazione del binario vedere
+[`docs/deployment/pdf-rendering.md`](docs/deployment/pdf-rendering.md).
 
 ## Primo avvio
 

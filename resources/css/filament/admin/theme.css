@@ -48,6 +48,120 @@
     color-scheme: dark;
 }
 
+.mp2-pdf-customizer {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(17rem, 22rem) minmax(0, 1fr);
+}
+
+.mp2-pdf-controls,
+.mp2-pdf-preview {
+    background: var(--mp2-surface, rgb(255 255 255 / 4%));
+    border: 1px solid var(--mp2-border, rgb(145 163 168 / 22%));
+    border-radius: 0.75rem;
+}
+
+.mp2-pdf-controls {
+    align-self: start;
+    max-height: calc(100vh - 9rem);
+    overflow-y: auto;
+    padding: 1rem;
+    position: sticky;
+    top: 5rem;
+}
+
+.mp2-pdf-controls-heading,
+.mp2-pdf-preview-heading {
+    align-items: center;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+}
+
+.mp2-pdf-controls h2,
+.mp2-pdf-preview h2 {
+    font-size: 1.1rem;
+    font-weight: 650;
+    margin: 0.15rem 0 0;
+}
+
+.mp2-pdf-selection-actions {
+    display: flex;
+    gap: 0.6rem;
+}
+
+.mp2-pdf-selection-actions button {
+    color: var(--mp2-brand, #39d5c4);
+    font-size: 0.78rem;
+}
+
+.mp2-pdf-controls fieldset {
+    border-top: 1px solid var(--mp2-border, rgb(145 163 168 / 20%));
+    display: grid;
+    gap: 0.55rem;
+    margin-top: 1rem;
+    padding-top: 0.8rem;
+}
+
+.mp2-pdf-controls legend {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.6rem;
+    text-transform: uppercase;
+}
+
+.mp2-pdf-controls label {
+    align-items: flex-start;
+    cursor: pointer;
+    display: flex;
+    font-size: 0.87rem;
+    gap: 0.55rem;
+}
+
+.mp2-pdf-controls input {
+    accent-color: var(--mp2-brand, #39d5c4);
+    margin-top: 0.15rem;
+}
+
+.mp2-pdf-preview {
+    min-width: 0;
+    padding: 1rem;
+}
+
+.mp2-pdf-frame-wrap {
+    background: #687579;
+    border-radius: 0.45rem;
+    height: calc(100vh - 12rem);
+    margin-top: 1rem;
+    min-height: 38rem;
+    overflow: hidden;
+    position: relative;
+}
+
+.mp2-pdf-frame-wrap iframe {
+    border: 0;
+    height: 100%;
+    width: 100%;
+}
+
+.mp2-pdf-loading {
+    align-items: center;
+    background: rgb(11 29 37 / 78%);
+    color: white;
+    gap: 0.55rem;
+    inset: 0;
+    justify-content: center;
+    position: absolute;
+    z-index: 2;
+}
+
+@media (max-width: 900px) {
+    .mp2-pdf-customizer { grid-template-columns: 1fr; }
+    .mp2-pdf-controls { max-height: none; position: static; }
+    .mp2-pdf-frame-wrap { height: 70vh; min-height: 30rem; }
+}
+
 .dark {
     color-scheme: dark;
 }

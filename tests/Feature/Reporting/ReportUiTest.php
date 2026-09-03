@@ -91,7 +91,7 @@ it('generates the annual report automatically when explicit inputs become comple
         ->assertSee('Vista Annuale Esecutiva')
         ->assertSee('Effettivo Corrente')
         ->assertSee('Servizio UI')
-        ->assertSee('Esporta PDF')
+        ->assertSee('Personalizza PDF')
         ->assertDontSee('Genera report');
 });
 

@@ -84,7 +84,7 @@ Una differenza non spiegata mostra esattamente `Variazione non sufficientemente 
 
 ## Export action
 
-- Label: `Esporta PDF`.
+- Label nel report: `Personalizza PDF`; apre la composizione effimera con anteprima reale. Il download nella pagina di composizione usa `Esporta PDF`.
 - Visibile solo dopo un report generato con successo.
 - Trasmette soltanto i parametri di definizione, non totali o righe client-side.
 - Produce download immediato secondo [pdf-export.md](pdf-export.md).
@@ -96,4 +96,3 @@ Una differenza non spiegata mostra esattamente `Variazione non sufficientemente 
 - Durante generazione: azione disabilitata e stato busy annunciabile.
 - Errori: nessun report parziale.
 - Campi con label associate, navigazione tastiera, tabelle leggibili e contrasto coerente con il tema.
-

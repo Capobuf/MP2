@@ -112,8 +112,13 @@ class DestroyTenantCompany
             ->whereNotNull('storage_disk')
             ->whereNotNull('storage_path')
             ->get(['storage_disk', 'storage_path']);
+        $logo = DB::table('companies')
+            ->where('id', $companyId)
+            ->whereNotNull('logo_disk')
+            ->whereNotNull('logo_path')
+            ->get(['logo_disk as storage_disk', 'logo_path as storage_path']);
 
-        return $attachments->concat($evidence)
+        return $attachments->concat($evidence)->concat($logo)
             ->map(fn (object $file): array => [
                 'storage_disk' => $this->requiredFileValue($file->storage_disk),
                 'storage_path' => $this->requiredFileValue($file->storage_path),
@@ -135,6 +140,14 @@ class DestroyTenantCompany
                 ->exists()) {
                 return true;
             }
+        }
+
+        if (DB::table('companies')
+            ->where('id', '<>', $companyId)
+            ->where('logo_disk', $file['storage_disk'])
+            ->where('logo_path', $file['storage_path'])
+            ->exists()) {
+            return true;
         }
 
         return false;

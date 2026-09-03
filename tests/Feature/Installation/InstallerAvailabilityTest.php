@@ -4,6 +4,9 @@ use App\Installer\Http\Livewire\Installer;
 use App\Installer\Steps\CheckRequirements;
 use App\Installer\Support\Mp2InstallationStateManager;
 use App\Providers\AppServiceProvider;
+use Illuminate\Process\Factory;
+use Illuminate\Process\PendingProcess;
+use Illuminate\Support\Facades\Process;
 use Livewire\Livewire;
 use RelayerCore\LaravelInstaller\Contracts\InstallationStateManager;
 use RelayerCore\LaravelInstaller\Contracts\InstallerStep;
@@ -72,6 +75,21 @@ it('accepts an unlimited memory limit', function () {
     };
 
     expect($step->convertMemory('-1'))->toBe(PHP_INT_MAX);
+});
+
+it('blocks installation when the WeasyPrint version is unsupported', function () {
+    config(['reporting.weasyprint_binary' => 'weasyprint']);
+    Process::fake(fn (PendingProcess $process) => $process->command === ['weasyprint', '--version']
+        ? Process::result('WeasyPrint version 68.0')
+        : Process::result());
+
+    try {
+        $requirements = app(CheckRequirements::class)->check();
+
+        expect($requirements)->toHaveKey('WeasyPrint 69.0 — versione installata non supportata', false);
+    } finally {
+        Process::swap(new Factory);
+    }
 });
 
 it('clears a completed step password before rendering the next step', function (string $completed, string $next) {

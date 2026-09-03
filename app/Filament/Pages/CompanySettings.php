@@ -12,6 +12,7 @@ use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use DateTimeZone;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
@@ -56,6 +57,16 @@ class CompanySettings extends Page
             ->components([
                 Toggle::make('overspend_note_required')
                     ->label('Nota di Sovraspesa Obbligatoria'),
+                FileUpload::make('logo')
+                    ->label('Logo Aziendale')
+                    ->helperText('PNG o JPEG, massimo 2 MB. Il logo viene usato nei PDF aziendali.')
+                    ->disk('local')
+                    ->visibility('private')
+                    ->image()
+                    ->acceptedFileTypes(['image/png', 'image/jpeg'])
+                    ->maxSize(2048)
+                    ->storeFiles(false)
+                    ->preventFilePathTampering(false),
                 Select::make('unclassified_closing_policy')
                     ->label('Policy Non Classificato alla Chiusura')
                     ->options(ClosingUnclassifiedPolicy::options())
@@ -115,11 +126,15 @@ class CompanySettings extends Page
     public function save(): void
     {
         abort_unless(static::canAccess(), 403);
-        /** @var array{overspend_note_required: bool, unclassified_closing_policy: string, timezone: string} $data */
+        /** @var array{overspend_note_required: bool, unclassified_closing_policy: string, timezone: string, logo?: mixed} $data */
         $data = $this->form->getState();
         /** @var User $actor */
         $actor = auth()->user();
         $company = $this->company();
+
+        if (($data['logo'] ?? null) === $company->logo_path) {
+            unset($data['logo']);
+        }
 
         try {
             $changes = app(UpdateCompanySettings::class)->execute(
@@ -153,6 +168,7 @@ class CompanySettings extends Page
             'overspend_note_required' => $company->overspend_note_required,
             'unclassified_closing_policy' => $company->closingUnclassifiedPolicy()->value,
             'timezone' => $company->timezone,
+            'logo' => $company->logo_path,
         ]);
     }
 

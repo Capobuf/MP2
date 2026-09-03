@@ -56,6 +56,7 @@ it('does not expose fixed domain behavior as settings', function () {
 
     Livewire::test(CompanySettings::class)
         ->assertFormFieldExists('overspend_note_required')
+        ->assertFormFieldExists('logo')
         ->assertFormFieldExists('unclassified_closing_policy')
         ->assertFormFieldExists('timezone')
         ->assertFormFieldDoesNotExist('currency')

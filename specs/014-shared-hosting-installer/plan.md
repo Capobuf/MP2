@@ -18,7 +18,7 @@ Integrare `relayercore/laravel-installer` `1.5.0` come wizard di prima installaz
 
 **Testing**: Pest 4 / PHPUnit 12, feature tests mirati, MySQL 8.4 CI con schema distruttivo `testing_installer` separato da `testing`, smoke HTTP su release estratta con `testing_installer_smoke`
 
-**Target Platform**: shared hosting Linux con web server configurabile verso `public/`, PHP web/CLI >=8.3, cron, MySQL
+**Target Platform**: shared hosting Linux con web server configurabile verso `public/`, PHP web/CLI >=8.3, WeasyPrint 69.0, cron, MySQL
 
 **Project Type**: Laravel web application monorepo
 

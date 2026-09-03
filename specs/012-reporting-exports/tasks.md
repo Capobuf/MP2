@@ -17,7 +17,7 @@
 
 **Purpose**: Add only the dependency and directories justified by the approved PDF decision.
 
-- [X] T001 Add `dompdf/dompdf:^3.1.6` through Composer, update `composer.json`/`composer.lock`, run strict validation and locked audit, and create the Reporting namespaces under `app/Domain/Reporting/`, `app/Actions/Reporting/`, and `app/Support/Reporting/`
+- [X] T001 Use WeasyPrint 69.0 as the sole external renderer, remove the obsolete PHP renderer dependency, and create the Reporting namespaces under `app/Domain/Reporting/`, `app/Actions/Reporting/`, and `app/Support/Reporting/`
 
 **Checkpoint**: Dependency resolves without advisories or framework conflicts; no dependency source is modified.
 
@@ -142,9 +142,9 @@
 ### Implementation for User Story 5
 
 - [X] T034 [P] [US5] Implement a project-owned escaped A4 PDF template with complete header, definitions, rows, drill-down, corrections and annotations in `resources/views/reports/pdf.blade.php`
-- [X] T035 [US5] Implement one-document Dompdf rendering with DejaVu Sans, remote resources disabled and restricted chroot in `app/Support/Reporting/ReportPdfRenderer.php`
+- [X] T035 [US5] Implement one-document WeasyPrint rendering through structured Laravel Process arguments, stdin/stdout and a finite timeout in `app/Support/Reporting/ReportPdfRenderer.php`
 - [X] T036 [US5] Implement authenticated server-side report reconstruction and sanitized attachment response in `app/Http/Controllers/ReportPdfController.php` and register the guarded route in `routes/web.php`
-- [X] T037 [US5] Add the `Esporta PDF` action to `app/Filament/Pages/Reports.php` and `resources/views/filament/pages/reports.blade.php` using definition parameters only
+- [X] T037 [US5] Add the `Personalizza PDF` action and the ephemeral real-PDF preview page using only definition and server-owned block/column identifiers
 - [X] T038 [US5] Run US5 focused tests, download/open the PDF and inspect required semantics and absence of persisted artifacts
 
 **Checkpoint**: US5 independently fulfills the clarified PDF contract and §25.24.

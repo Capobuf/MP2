@@ -12,7 +12,7 @@
 
 ### Session 2026-08-24
 
-- Q: Quale formato e modalità di consegna deve usare S11 per le esportazioni? → A: Singolo PDF con download immediato.
+- Q: Quale formato e modalità di consegna deve usare S11 per le esportazioni? → A: Singolo PDF con anteprima reale e download immediato dalla personalizzazione.
 - Q: Come deve comportarsi S11 con l'etichetta `Sostituito`? → A: S11 non la assegna né la espone perché la §32 l'ha rimossa permanentemente dal dominio.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -85,7 +85,7 @@ Un utente apre i report annuali e specialistici per Budget vs Actual, Budget vs 
 
 ### User Story 5 - Esportare un report semanticamente completo (Priority: P2)
 
-Un utente esporta il report selezionato e scarica immediatamente un singolo PDF che conserva riferimenti, definizioni e dettaglio sufficienti a interpretare ogni valore fuori dall'applicazione.
+Un utente apre `Personalizza PDF`, seleziona i soli blocchi e colonne applicabili al report, vede l'anteprima del PDF reale e scarica lo stesso singolo documento.
 
 **Why this priority**: Un'esportazione priva di metadati renderebbe ambiguo il significato economico dei valori e violerebbe il §25.24.
 
@@ -150,6 +150,9 @@ Un utente esporta il report selezionato e scarica immediatamente un singolo PDF 
 - **FR-S11-034**: Lettura, drill-down ed esportazione MUST richiedere `visualizza` per la specifica Azienda e MUST mantenere isolamento tenant su ogni riferimento e record.
 - **FR-S11-035**: La data annuale di riferimento MUST seguire il §9.2; una data tecnica di approvazione o Chiusura MUST NOT sostituire la data economica.
 - **FR-S11-036**: Tutti gli importi MUST essere espressi in EUR e netti IVA, preservando calcolo decimale esatto e semantica di `HaEffettivi`.
+- **FR-S11-037**: La configurazione PDF MUST essere effimera e limitata a blocchi/colonne realmente disponibili ricostruiti lato server; MUST NOT accettare HTML, CSS, URL, path o JavaScript dall'utente.
+- **FR-S11-038**: Anteprima e download MUST usare lo stesso composer e lo stesso renderer WeasyPrint 69.0, senza fallback, file PDF temporanei, code o rendering browser.
+- **FR-S11-039**: I grafici PDF MUST essere SVG statici server-side derivati dagli stessi dati canonici e con la stessa semantica della UI.
 
 ### Canonical Requirement Reconciliation
 

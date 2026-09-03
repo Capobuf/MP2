@@ -6,6 +6,8 @@ Questo documento è una guida di verifica per sviluppatori/agent. Non è un file
 
 ## Prerequisiti
 
+- WeasyPrint 69.0 eseguibile dal processo PHP web (`WEASYPRINT_BINARY` può indicare un percorso assoluto);
+
 - repository MP2 pulito;
 - Docker/Sail dev funzionante secondo il bootstrap esistente;
 - GitHub Actions disponibile per la verifica artefatto;

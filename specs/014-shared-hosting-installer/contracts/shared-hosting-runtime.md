@@ -10,6 +10,7 @@ L'hosting deve offrire:
 - PHP web >= 8.3 compatibile con la release;
 - PHP CLI >= 8.3 disponibile ai cron;
 - estensioni PHP runtime richieste da MP2;
+- binario WeasyPrint 69.0 eseguibile dal processo PHP web, con le sue dipendenze native;
 - MySQL raggiungibile con database e credenziali già create;
 - possibilità di impostare il document root del dominio alla directory `public`;
 - permessi di scrittura per `.env`, `storage/**` e `bootstrap/cache`;
@@ -36,6 +37,7 @@ Non sono richiesti:
 - scrivibilità di `.env`, `storage/**` e `bootstrap/cache`;
 - connessione allo specifico database MySQL già configurato;
 - presenza di tabelle/view prima delle migrazioni.
+- presenza, eseguibilità e versione supportata del binario WeasyPrint configurato da `WEASYPRINT_BINARY`.
 
 ### Il wizard non può configurare o garantire genericamente
 
@@ -43,6 +45,7 @@ Non sono richiesti:
 - scelta della versione PHP nel pannello provider;
 - condizioni PHP/estensioni che impediscono a Composer/Laravel di fare bootstrap;
 - presenza, versione o nome del PHP CLI usato dal cron;
+- installazione o aggiornamento di WeasyPrint e delle sue librerie native;
 - creazione di database e utente MySQL;
 - creazione o reale esecuzione del cron;
 - emissione e configurazione del certificato HTTPS.
