@@ -128,27 +128,33 @@
             break-after: avoid;
         }
 
-        .kpi-row {
-            display: table;
-            width: calc(100% + 2mm);
-            margin: 0 -1mm 1.2mm;
+        .kpi-table {
+            width: 100%;
+            margin: 0 0 1.2mm;
+            border-collapse: collapse;
             table-layout: fixed;
-            border-spacing: 1mm 0;
         }
 
-        .kpi {
-            display: table-cell;
+        .kpi-cell {
             width: 20%;
+            padding: 0 0.5mm;
+            vertical-align: top;
+        }
+
+        .kpi-cell:first-child { padding-left: 0; }
+        .kpi-cell:last-child { padding-right: 0; }
+
+        .kpi {
             height: 18mm;
             padding: 2mm 2.2mm;
             border: 0.55pt solid #d6e1df;
             border-radius: 1.4mm;
             background: #ffffff;
-            vertical-align: top;
         }
 
-        .portrait .kpi { width: 33.333%; height: 18.5mm; }
-        .portrait .kpi-row.count-2 .kpi { width: 50%; }
+        .portrait .kpi-cell { width: 33.333%; }
+        .portrait .kpi-table.count-2 .kpi-cell { width: 50%; }
+        .portrait .kpi { height: 18.5mm; }
 
         .kpi-icon {
             float: right;
@@ -181,30 +187,38 @@
 
         .kpi-description { margin-top: 0.5mm; color: #667b7d; font-size: 5.8pt; }
 
-        .analysis-grid {
-            display: table;
-            width: calc(100% + 2mm);
-            margin: 0 -1mm;
+        .analysis-table {
+            width: 100%;
+            margin: 0;
+            border-collapse: collapse;
             table-layout: fixed;
-            border-spacing: 1mm 0;
+        }
+
+        .analysis-cell {
+            padding: 0 0.5mm;
+            vertical-align: top;
+        }
+
+        .analysis-cell:first-child { padding-left: 0; }
+        .analysis-cell:last-child { padding-right: 0; }
+        .analysis-cell.bars { width: 60%; }
+        .analysis-cell.donut { width: 40%; }
+        .analysis-cell.only { width: 100%; }
+
+        .analysis-grid {
+            width: 100%;
+            margin: 0;
         }
 
         .analysis-panel {
-            display: table-cell;
             padding: 2mm 2.4mm;
             border: 0.55pt solid #d6e1df;
             border-radius: 1.4mm;
             background: #ffffff;
-            vertical-align: top;
             break-inside: avoid;
         }
 
-        .analysis-panel.bars { width: 61%; }
-        .analysis-panel.donut { width: 39%; }
-        .analysis-panel.only { width: 100%; }
-
-        .portrait .analysis-grid { display: block; width: 100%; margin: 0; }
-        .portrait .analysis-panel { display: block; width: 100%; margin-bottom: 1.8mm; }
+        .portrait .analysis-panel { width: 100%; margin-bottom: 1.8mm; }
 
         .panel-title {
             margin: 0 0 1mm;
@@ -215,11 +229,7 @@
             text-transform: uppercase;
         }
 
-        .chart-image { display: block; width: 100%; object-fit: contain; }
-        .landscape .bars .chart-image { height: 50mm; }
-        .landscape .donut .chart-image { height: 50mm; }
-        .portrait .donut .chart-image { height: 43mm; }
-        .portrait .bars .chart-image { height: 39mm; }
+        .chart-image { display: block; width: 100%; height: auto; }
 
         table.contracts,
         table.detail-table {
@@ -398,52 +408,66 @@
 
     @if ($selectedKpis !== [])
         @foreach (array_chunk($selectedKpis, $portrait ? 3 : 5) as $row)
-            <div class="kpi-row count-{{ count($row) }}">
-                @foreach ($row as $kpi)
-                    <div class="kpi">
-                        <span class="kpi-icon" aria-hidden="true">
-                            @switch($kpi['id'])
-                                @case('kpi:specialist_count')
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3.5h10a2 2 0 0 1 2 2v15H5v-15a2 2 0 0 1 2-2Z"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/></svg>
-                                    @break
-                                @case('kpi:specialist_allocation')
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7.5 12 3l8 4.5-8 4.5-8-4.5Z"/><path d="m4 12 8 4.5 8-4.5M4 16.5 12 21l8-4.5"/></svg>
-                                    @break
-                                @case('kpi:specialist_actual')
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16.5 8"/></svg>
-                                    @break
-                                @case('kpi:specialist_variance')
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 17h16M6 14l4-4 3 3 5-6"/><path d="M15 7h3v3"/></svg>
-                                    @break
-                                @default
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M8 3v5M16 3v5M4 10h16M12 13v3M10.5 14.5h3"/></svg>
-                            @endswitch
-                        </span>
-                        <div class="kpi-label">{{ $kpi['label'] }}</div>
-                        <div class="kpi-value">{{ $kpi['formatted'] }}</div>
-                        @if ($kpi['description'])<div class="kpi-description">{{ $kpi['description'] }}</div>@endif
-                    </div>
-                @endforeach
-            </div>
+            <table class="kpi-table count-{{ count($row) }}" role="presentation">
+                <tbody>
+                    <tr>
+                        @foreach ($row as $kpi)
+                            <td class="kpi-cell">
+                                <div class="kpi">
+                                    <span class="kpi-icon" aria-hidden="true">
+                                        @switch($kpi['id'])
+                                            @case('kpi:specialist_count')
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3.5h10a2 2 0 0 1 2 2v15H5v-15a2 2 0 0 1 2-2Z"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/></svg>
+                                                @break
+                                            @case('kpi:specialist_allocation')
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7.5 12 3l8 4.5-8 4.5-8-4.5Z"/><path d="m4 12 8 4.5 8-4.5M4 16.5 12 21l8-4.5"/></svg>
+                                                @break
+                                            @case('kpi:specialist_actual')
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16.5 8"/></svg>
+                                                @break
+                                            @case('kpi:specialist_variance')
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 17h16M6 14l4-4 3 3 5-6"/><path d="M15 7h3v3"/></svg>
+                                                @break
+                                            @default
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M8 3v5M16 3v5M4 10h16M12 13v3M10.5 14.5h3"/></svg>
+                                        @endswitch
+                                    </span>
+                                    <div class="kpi-label">{{ $kpi['label'] }}</div>
+                                    <div class="kpi-value">{{ $kpi['formatted'] }}</div>
+                                    @if ($kpi['description'])<div class="kpi-description">{{ $kpi['description'] }}</div>@endif
+                                </div>
+                            </td>
+                        @endforeach
+                    </tr>
+                </tbody>
+            </table>
         @endforeach
     @endif
 
     @if ($showStateChart || $showContractChart)
         @if (! $portrait)
-            <div class="analysis-grid">
-                @if ($showContractChart)
-                    <section class="analysis-panel bars {{ ! $showStateChart ? 'only' : '' }}">
-                        <p class="panel-title">Allocato vs Effettivo per contratto</p>
-                        <img class="chart-image" src="{{ $contractChart['image'] }}" alt="Grafico Allocato vs Effettivo per contratto">
-                    </section>
-                @endif
-                @if ($showStateChart)
-                    <section class="analysis-panel donut {{ ! $showContractChart ? 'only' : '' }}">
-                        <p class="panel-title">Distribuzione per stato</p>
-                        <img class="chart-image" src="{{ $stateChart['image'] }}" alt="Grafico a ciambella della distribuzione per stato">
-                    </section>
-                @endif
-            </div>
+            <table class="analysis-table" role="presentation">
+                <tbody>
+                    <tr>
+                        @if ($showContractChart)
+                            <td class="analysis-cell bars {{ ! $showStateChart ? 'only' : '' }}">
+                                <section class="analysis-panel">
+                                    <p class="panel-title">Allocato vs Effettivo per contratto</p>
+                                    <img class="chart-image" src="{{ $contractChart['image'] }}" alt="Grafico Allocato vs Effettivo per contratto">
+                                </section>
+                            </td>
+                        @endif
+                        @if ($showStateChart)
+                            <td class="analysis-cell donut {{ ! $showContractChart ? 'only' : '' }}">
+                                <section class="analysis-panel">
+                                    <p class="panel-title">Distribuzione per stato</p>
+                                    <img class="chart-image" src="{{ $stateChart['image'] }}" alt="Grafico a ciambella della distribuzione per stato">
+                                </section>
+                            </td>
+                        @endif
+                    </tr>
+                </tbody>
+            </table>
         @else
             <div class="analysis-grid">
                 @if ($showStateChart)

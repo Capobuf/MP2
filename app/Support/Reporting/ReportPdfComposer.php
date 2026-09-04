@@ -45,7 +45,7 @@ final class ReportPdfComposer
             ], ContractState::cases())
             : [];
         $kpis = $this->kpiDefinitions($result, $sections);
-        $charts = $this->staticCharts($this->chartDefinitions($result, $orientation));
+        $charts = $this->staticCharts($this->chartDefinitions($result, $orientation), $orientation);
         $logo = $this->logoDataUri($company);
 
         $availableBlocks = [];
@@ -596,9 +596,9 @@ final class ReportPdfComposer
      * @param  array<int, array<string, mixed>>  $definitions
      * @return array<int, array{id: string, heading: string, description: string, image: string}>
      */
-    private function staticCharts(array $definitions): array
+    private function staticCharts(array $definitions, string $orientation): array
     {
-        return array_map(function (array $chart): array {
+        return array_map(function (array $chart) use ($orientation): array {
             $datasets = array_map(function (array $dataset): array {
                 $colors = $dataset['backgroundColor'];
 
@@ -609,22 +609,71 @@ final class ReportPdfComposer
                 ];
             }, $chart['data']['datasets']);
 
-            return $chart['variant'] === 'contract-state-doughnut'
-                ? $this->donutChart(
+            if ($chart['variant'] === 'contract-state-doughnut') {
+                return $this->donutChart(
                     (string) $chart['id'],
                     (string) $chart['heading'],
                     (string) $chart['description'],
                     array_map('strval', $chart['data']['labels']),
                     $datasets[0],
-                )
-                : $this->chart(
+                    $orientation,
+                );
+            }
+
+            if ($chart['id'] === 'contract-values') {
+                return $this->contractBarChart(
                     (string) $chart['id'],
                     (string) $chart['heading'],
                     (string) $chart['description'],
                     array_map('strval', $chart['data']['labels']),
                     $datasets,
                 );
+            }
+
+            return $this->chart(
+                (string) $chart['id'],
+                (string) $chart['heading'],
+                (string) $chart['description'],
+                array_map('strval', $chart['data']['labels']),
+                $datasets,
+            );
         }, $definitions);
+    }
+
+    /**
+     * @param  array<int, string>  $labels
+     * @param  array<int, array{label: string, values: array<int, float>, colors: array<int, string>}>  $series
+     * @return array{id: string, heading: string, description: string, image: string}
+     */
+    private function contractBarChart(string $id, string $heading, string $description, array $labels, array $series): array
+    {
+        $rowHeight = 28;
+        $height = 50 + count($labels) * $rowHeight;
+        $plotX = 250;
+        $maxBarWidth = 600;
+        $max = max(1.0, ...array_map('abs', array_merge(...array_column($series, 'values'))));
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 '.$height.'">';
+        $svg .= '<rect width="1000" height="'.$height.'" fill="#ffffff"/>';
+        foreach ($series as $index => $dataset) {
+            $legendX = $plotX + $index * 150;
+            $svg .= '<rect x="'.$legendX.'" y="5" width="14" height="14" rx="2" fill="'.$dataset['colors'][0].'"/>';
+            $svg .= '<text x="'.($legendX + 21).'" y="17" font-family="sans-serif" font-size="15" fill="#33484b">'.$this->escape($dataset['label']).'</text>';
+        }
+        foreach ($labels as $row => $label) {
+            $y = 38 + $row * $rowHeight;
+            $svg .= '<text x="4" y="'.($y + 14).'" font-family="sans-serif" font-size="14" fill="#33484b">'.$this->escape(mb_strimwidth($label, 0, 28, '…')).'</text>';
+            foreach ($series as $index => $dataset) {
+                $value = $dataset['values'][$row] ?? 0.0;
+                $width = abs($value) / $max * $maxBarWidth;
+                $barY = $y + $index * 12;
+                $color = $dataset['colors'][$row] ?? $dataset['colors'][0];
+                $svg .= '<rect x="'.$plotX.'" y="'.$barY.'" width="'.round($width, 2).'" height="10" rx="2" fill="'.$color.'"/>';
+                $svg .= '<text x="'.($plotX + $width + 8).'" y="'.($barY + 9).'" font-family="sans-serif" font-size="12.5" fill="#33484b">'.$this->escape(Number::currency($value, in: 'EUR', locale: 'it')).'</text>';
+            }
+        }
+        $svg .= '</svg>';
+
+        return compact('id', 'heading', 'description') + ['image' => 'data:image/svg+xml;base64,'.base64_encode($svg)];
     }
 
     /**
@@ -667,15 +716,21 @@ final class ReportPdfComposer
      * @param  array{label: string, values: array<int, float>, colors: array<int, string>}  $series
      * @return array{id: string, heading: string, description: string, image: string}
      */
-    private function donutChart(string $id, string $heading, string $description, array $labels, array $series): array
+    private function donutChart(string $id, string $heading, string $description, array $labels, array $series, string $orientation): array
     {
         $total = array_sum($series['values']);
-        $radius = 54;
+        $portrait = $orientation === 'portrait';
+        $viewBoxWidth = $portrait ? 780 : 460;
+        $centerX = $portrait ? 170 : 88;
+        $legendX = $portrait ? 320 : 184;
+        $legendLabelX = $legendX + 27;
+        $legendValueX = $portrait ? 660 : 382;
+        $radius = 63;
         $circumference = 2 * M_PI * $radius;
         $offset = 0.0;
-        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 190">';
-        $svg .= '<rect width="700" height="190" fill="#ffffff"/>';
-        $svg .= '<circle cx="95" cy="95" r="'.$radius.'" fill="none" stroke="#edf2f1" stroke-width="28"/>';
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '.$viewBoxWidth.' 190">';
+        $svg .= '<rect width="'.$viewBoxWidth.'" height="190" fill="#ffffff"/>';
+        $svg .= '<circle cx="'.$centerX.'" cy="95" r="'.$radius.'" fill="none" stroke="#edf2f1" stroke-width="30"/>';
 
         foreach ($labels as $index => $label) {
             $value = $series['values'][$index] ?? 0.0;
@@ -685,32 +740,32 @@ final class ReportPdfComposer
             $length = ($value / $total) * $circumference;
             $visibleLength = max(0, $length - 2.4);
             $color = $series['colors'][$index] ?? '#91A3A8';
-            $svg .= '<circle cx="95" cy="95" r="'.$radius.'" fill="none" stroke="'.$color.'" stroke-width="28" '
+            $svg .= '<circle cx="'.$centerX.'" cy="95" r="'.$radius.'" fill="none" stroke="'.$color.'" stroke-width="30" '
                 .'stroke-dasharray="'.round($visibleLength, 2).' '.round($circumference - $visibleLength, 2).'" '
-                .'stroke-dashoffset="'.round(-$offset, 2).'" transform="rotate(-90 95 95)"/>';
+                .'stroke-dashoffset="'.round(-$offset, 2).'" transform="rotate(-90 '.$centerX.' 95)"/>';
 
             $percentage = ($value / $total) * 100;
             if ($percentage >= 9) {
                 $angle = (($offset + ($length / 2)) / $circumference) * 2 * M_PI - M_PI / 2;
-                $x = 95 + cos($angle) * $radius;
+                $x = $centerX + cos($angle) * $radius;
                 $y = 95 + sin($angle) * $radius;
-                $svg .= '<text x="'.round($x, 2).'" y="'.round($y + 3, 2).'" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="#0B1D25">'.round($percentage).'%</text>';
+                $svg .= '<text x="'.round($x, 2).'" y="'.round($y + 4, 2).'" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="700" fill="#0B1D25">'.round($percentage).'%</text>';
             }
             $offset += $length;
         }
 
-        $svg .= '<circle cx="95" cy="95" r="34" fill="#ffffff"/>';
-        $svg .= '<text x="95" y="92" text-anchor="middle" font-family="sans-serif" font-size="24" font-weight="700" fill="#0B1D25">'.$total.'</text>';
-        $svg .= '<text x="95" y="108" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#667B7D">CONTRATTI</text>';
+        $svg .= '<circle cx="'.$centerX.'" cy="95" r="45" fill="#ffffff"/>';
+        $svg .= '<text x="'.$centerX.'" y="92" text-anchor="middle" font-family="sans-serif" font-size="28" font-weight="700" fill="#0B1D25">'.$total.'</text>';
+        $svg .= '<text x="'.$centerX.'" y="111" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#667B7D">CONTRATTI</text>';
 
         foreach ($labels as $index => $label) {
-            $y = 42 + $index * 34;
+            $y = 39 + $index * 39;
             $value = (int) ($series['values'][$index] ?? 0);
             $percentage = $total > 0 ? round(($value / $total) * 100) : 0;
             $color = $series['colors'][$index] ?? '#91A3A8';
-            $svg .= '<rect x="190" y="'.($y - 10).'" width="14" height="14" rx="2" fill="'.$color.'" stroke="#526762" stroke-width="0.6"/>';
-            $svg .= '<text x="216" y="'.$y.'" font-family="sans-serif" font-size="12" font-weight="700" fill="#15323B">'.$this->escape($label).'</text>';
-            $svg .= '<text x="430" y="'.$y.'" font-family="sans-serif" font-size="11" fill="#526762">'.$value.' · '.$percentage.'%</text>';
+            $svg .= '<rect x="'.$legendX.'" y="'.($y - 13).'" width="17" height="17" rx="2" fill="'.$color.'" stroke="#526762" stroke-width="0.7"/>';
+            $svg .= '<text x="'.$legendLabelX.'" y="'.$y.'" font-family="sans-serif" font-size="14" font-weight="700" fill="#15323B">'.$this->escape($label).'</text>';
+            $svg .= '<text x="'.$legendValueX.'" y="'.$y.'" font-family="sans-serif" font-size="13" fill="#526762">'.$value.' · '.$percentage.'%</text>';
         }
         $svg .= '</svg>';
 

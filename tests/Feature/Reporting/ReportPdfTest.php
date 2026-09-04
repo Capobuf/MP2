@@ -170,6 +170,11 @@ it('composes the dedicated contracts document with validated orientation and spe
     $composer = app(ReportPdfComposer::class);
     $landscape = $composer->compose($result, $company);
     $portrait = $composer->compose($result, $company, ['orientation' => 'portrait']);
+    $landscapeHtml = view('reports.contracts', ['document' => $landscape])->render();
+    $portraitHtml = view('reports.contracts', ['document' => $portrait])->render();
+    $landscapeBarSvg = base64_decode(explode(',', collect($landscape['charts'])->firstWhere('id', 'contract-values')['image'], 2)[1], true);
+    $landscapeDonutSvg = base64_decode(explode(',', collect($landscape['charts'])->firstWhere('id', 'contract-states')['image'], 2)[1], true);
+    $portraitDonutSvg = base64_decode(explode(',', collect($portrait['charts'])->firstWhere('id', 'contract-states')['image'], 2)[1], true);
     $row = $landscape['contracts'][0];
 
     expect($landscape['orientation'])->toBe('landscape')
@@ -208,6 +213,26 @@ it('composes the dedicated contracts document with validated orientation and spe
         ->and(array_column($landscape['kpis'], 'label'))->toBe([
             'Contratti', 'Allocato', 'Effettivo', 'Scostamento operativo', 'Contratti in scadenza',
         ])
+        ->and($landscapeHtml)->toContain(
+            '<table class="kpi-table count-5" role="presentation">',
+            '<table class="analysis-table" role="presentation">',
+            '.analysis-cell.bars { width: 60%; }',
+            '.analysis-cell.donut { width: 40%; }',
+            '.chart-image { display: block; width: 100%; height: auto; }',
+        )
+        ->and($landscapeHtml)->not->toContain(
+            'class="kpi-row',
+            '.landscape .bars .chart-image { height:',
+            '.landscape .donut .chart-image { height:',
+        )
+        ->and($portraitHtml)->toContain(
+            '<table class="kpi-table count-3" role="presentation">',
+            '<table class="kpi-table count-2" role="presentation">',
+            '<div class="analysis-grid">',
+        )
+        ->and($landscapeBarSvg)->toContain('viewBox="0 0 1000 78"', 'font-size="15"', 'height="10"')
+        ->and($landscapeDonutSvg)->toContain('viewBox="0 0 460 190"', 'font-size="28"', 'width="17" height="17"')
+        ->and($portraitDonutSvg)->toContain('viewBox="0 0 780 190"')
         ->and($landscape['selected_blocks'])->not->toContain('details:contracts')
         ->and($landscape['selected_blocks'])->toContain('chart:contract-values', 'chart:contract-states', 'table:contracts');
 
