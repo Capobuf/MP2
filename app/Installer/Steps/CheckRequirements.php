@@ -12,8 +12,8 @@ class CheckRequirements extends \RelayerCore\LaravelInstaller\Steps\CheckRequire
         $requirements = parent::check();
         $status = app(WeasyPrintRuntime::class)->status();
         $label = $status['available']
-            ? 'WeasyPrint '.$status['version'].' (versione supportata)'
-            : 'WeasyPrint 69.0 — '.$this->failureLabel($status['reason']);
+            ? 'WeasyPrint'.($status['version'] === null ? '' : ' '.$status['version']).' — '.$status['binary']
+            : 'WeasyPrint — '.$this->failureLabel($status['reason']);
         $requirements[$label] = $status['available'];
 
         return $requirements;
@@ -32,7 +32,6 @@ class CheckRequirements extends \RelayerCore\LaravelInstaller\Steps\CheckRequire
     {
         return match ($reason) {
             'not_executable' => 'binario non eseguibile',
-            'unsupported_version' => 'versione installata non supportata',
             'timeout' => 'verifica scaduta',
             default => 'binario mancante',
         };
