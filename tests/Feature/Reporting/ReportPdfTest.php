@@ -516,6 +516,8 @@ it('renders the contracts template with only the configured company logo and app
 });
 
 it('reports missing, non executable and failed runtimes while accepting installed versions', function (): void {
+    Process::fake(fn (): mixed => Process::result('', 'not found', 1));
+
     config(['reporting.weasyprint_binary' => '/missing/weasyprint']);
     expect(app(WeasyPrintRuntime::class)->status()['reason'])->toBe('missing');
 
