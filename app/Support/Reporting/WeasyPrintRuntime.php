@@ -97,7 +97,7 @@ final class WeasyPrintRuntime
 
         if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')) {
             $user = posix_getpwuid(posix_geteuid());
-            if (is_array($user) && is_string($user['dir'] ?? null) && $user['dir'] !== '') {
+            if (is_array($user) && $user['dir'] !== '') {
                 return rtrim($user['dir'], DIRECTORY_SEPARATOR);
             }
         }
