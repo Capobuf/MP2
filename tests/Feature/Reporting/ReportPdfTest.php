@@ -515,7 +515,7 @@ it('renders the contracts template with only the configured company logo and app
         ->and($withLogo)->not->toContain('linear-gradient', 'radial-gradient', 'background: #06121c');
 });
 
-it('reports missing, non executable, unsupported and failed runtimes', function (): void {
+it('reports missing, non executable and failed runtimes while accepting installed versions', function (): void {
     config(['reporting.weasyprint_binary' => '/missing/weasyprint']);
     expect(app(WeasyPrintRuntime::class)->status()['reason'])->toBe('missing');
 
@@ -527,7 +527,11 @@ it('reports missing, non executable, unsupported and failed runtimes', function 
 
     config(['reporting.weasyprint_binary' => 'weasyprint']);
     Process::fake(fn (): mixed => Process::result('WeasyPrint version 68.0'));
-    expect(app(WeasyPrintRuntime::class)->status()['reason'])->toBe('unsupported_version');
+    expect(app(WeasyPrintRuntime::class)->status())->toMatchArray([
+        'available' => true,
+        'reason' => null,
+        'version' => '68.0',
+    ]);
 
     Process::fake(fn (PendingProcess $process) => $process->command === ['weasyprint', '--version']
         ? Process::result('WeasyPrint version 69.0')
@@ -580,7 +584,7 @@ it('rejects missing authentication and cross tenant PDF definitions', function (
 it('renders a valid document with the installed WeasyPrint baseline', function (): void {
     $status = app(WeasyPrintRuntime::class)->status();
     if (! $status['available']) {
-        $this->markTestSkipped('WeasyPrint 69.0 is not installed in this runtime.');
+        $this->markTestSkipped('WeasyPrint is not installed in this runtime.');
     }
     $company = Company::factory()->create();
     $viewer = s11ReportingViewer($company);
