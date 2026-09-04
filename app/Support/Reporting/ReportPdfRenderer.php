@@ -19,7 +19,7 @@ final class ReportPdfRenderer
     public function render(ReportResult $result, Company $company, array $configuration = []): string
     {
         $status = $this->runtime->status();
-        if (! $status['available']) {
+        if (! $status['available'] || $status['binary'] === null) {
             throw new ReportPdfException($status['reason'] ?? 'unavailable', $status['message']);
         }
 
@@ -36,7 +36,7 @@ final class ReportPdfRenderer
         try {
             $process = Process::timeout((int) config('reporting.timeout'))
                 ->input($html)
-                ->run([(string) config('reporting.weasyprint_binary'), '-', '-']);
+                ->run([$status['binary'], '-', '-']);
         } catch (ProcessTimedOutException $exception) {
             throw new ReportPdfException('timeout', 'WeasyPrint ha superato il tempo massimo di rendering.', $exception);
         } catch (\Throwable $exception) {
