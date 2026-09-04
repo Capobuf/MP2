@@ -77,7 +77,7 @@ it('accepts an unlimited memory limit', function () {
     expect($step->convertMemory('-1'))->toBe(PHP_INT_MAX);
 });
 
-it('blocks installation when the WeasyPrint version is unsupported', function () {
+it('accepts any executable WeasyPrint version', function () {
     config(['reporting.weasyprint_binary' => 'weasyprint']);
     Process::fake(fn (PendingProcess $process) => $process->command === ['weasyprint', '--version']
         ? Process::result('WeasyPrint version 68.0')
@@ -86,7 +86,7 @@ it('blocks installation when the WeasyPrint version is unsupported', function ()
     try {
         $requirements = app(CheckRequirements::class)->check();
 
-        expect($requirements)->toHaveKey('WeasyPrint 69.0 — versione installata non supportata', false);
+        expect($requirements)->toHaveKey('WeasyPrint 68.0 — weasyprint', true);
     } finally {
         Process::swap(new Factory);
     }
