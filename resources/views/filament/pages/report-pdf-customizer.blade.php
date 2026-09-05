@@ -14,7 +14,7 @@
 
                 <div class="mp2-pdf-orientation">
                     <label>
-                        <input type="radio" value="landscape" wire:model.live="orientation">
+                        <input type="radio" name="orientation" value="landscape" wire:model.live="orientation">
                         <span>
                             <strong>Orizzontale</strong>
                             <small>A4 landscape</small>
@@ -22,7 +22,7 @@
                     </label>
 
                     <label>
-                        <input type="radio" value="portrait" wire:model.live="orientation">
+                        <input type="radio" name="orientation" value="portrait" wire:model.live="orientation">
                         <span>
                             <strong>Verticale</strong>
                             <small>A4 portrait</small>

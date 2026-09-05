@@ -77,3 +77,14 @@ WEASYPRINT_BINARY=/percorso/privato/weasyprint/bin/weasyprint
 Il wizard di installazione blocca il proseguimento solo se non riesce a trovare ed
 eseguire WeasyPrint. L'applicazione applica inoltre un timeout finito e mostra
 all'utente un errore generico, registrando il dettaglio tecnico nei log server.
+
+## Font del Report Contratti
+
+Il template Contratti incorpora Geist tramite `@font-face` e data URI, compresi i
+pesi usati dagli SVG. L’asset `resources/fonts/geist-latin-wght-normal.woff2` è una
+copia non modificata del font distribuito da `@fontsource-variable/geist` 5.3.0;
+la licenza OFL è conservata in `resources/fonts/Geist-OFL.txt`.
+
+La directory `resources` è già inclusa nello ZIP di release. La generazione non
+richiede Node, `node_modules`, connessioni remote o percorsi della macchina di
+sviluppo. Il font è un asset obbligatorio del template, senza percorso alternativo.

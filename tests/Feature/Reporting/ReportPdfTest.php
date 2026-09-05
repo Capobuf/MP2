@@ -24,6 +24,7 @@ use Illuminate\Process\Factory;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Number;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -173,8 +174,8 @@ it('composes the dedicated contracts document with validated orientation and spe
     $landscapeHtml = view('reports.contracts', ['document' => $landscape])->render();
     $portraitHtml = view('reports.contracts', ['document' => $portrait])->render();
     $landscapeBarSvg = base64_decode(explode(',', collect($landscape['charts'])->firstWhere('id', 'contract-values')['image'], 2)[1], true);
-    $landscapeDonutSvg = base64_decode(explode(',', collect($landscape['charts'])->firstWhere('id', 'contract-states')['image'], 2)[1], true);
-    $portraitDonutSvg = base64_decode(explode(',', collect($portrait['charts'])->firstWhere('id', 'contract-states')['image'], 2)[1], true);
+    $landscapeStateSvg = base64_decode(explode(',', collect($landscape['charts'])->firstWhere('id', 'contract-states')['image'], 2)[1], true);
+    $portraitStateSvg = base64_decode(explode(',', collect($portrait['charts'])->firstWhere('id', 'contract-states')['image'], 2)[1], true);
     $row = $landscape['contracts'][0];
 
     expect($landscape['orientation'])->toBe('landscape')
@@ -213,26 +214,11 @@ it('composes the dedicated contracts document with validated orientation and spe
         ->and(array_column($landscape['kpis'], 'label'))->toBe([
             'Contratti', 'Allocato', 'Effettivo', 'Scostamento operativo', 'Contratti in scadenza',
         ])
-        ->and($landscapeHtml)->toContain(
-            '<table class="kpi-table count-5" role="presentation">',
-            '<table class="analysis-table" role="presentation">',
-            '.analysis-cell.bars { width: 60%; }',
-            '.analysis-cell.donut { width: 40%; }',
-            '.chart-image { display: block; width: 100%; height: auto; }',
-        )
-        ->and($landscapeHtml)->not->toContain(
-            'class="kpi-row',
-            '.landscape .bars .chart-image { height:',
-            '.landscape .donut .chart-image { height:',
-        )
-        ->and($portraitHtml)->toContain(
-            '<table class="kpi-table count-3" role="presentation">',
-            '<table class="kpi-table count-2" role="presentation">',
-            '<div class="analysis-grid">',
-        )
-        ->and($landscapeBarSvg)->toContain('viewBox="0 0 1000 78"', 'font-size="15"', 'height="10"')
-        ->and($landscapeDonutSvg)->toContain('viewBox="0 0 460 190"', 'font-size="28"', 'width="17" height="17"')
-        ->and($portraitDonutSvg)->toContain('viewBox="0 0 780 190"')
+        ->and($landscapeHtml)->toContain('class="portfolio-summary"', 'class="economic-summary"', 'Registro contratti')
+        ->and($portraitHtml)->toContain('class="portfolio-summary"', 'class="economic-summary"', 'class="contract-secondary"')
+        ->and($landscapeBarSvg)->toContain('Contratto Connettività', '120,00', '45,00')
+        ->and($landscapeStateSvg)->toContain('Pianificato', 'Attivo', 'Cessato', 'Annullato')
+        ->and($portraitStateSvg)->toBe($landscapeStateSvg)
         ->and($landscape['selected_blocks'])->not->toContain('details:contracts')
         ->and($landscape['selected_blocks'])->toContain('chart:contract-values', 'chart:contract-states', 'table:contracts');
 
@@ -263,6 +249,17 @@ it('limits the contracts chart to the eight highest allocations without truncati
     $document = app(ReportPdfComposer::class)->compose($result, $company);
     $chart = collect(app(ReportPdfComposer::class)->chartDefinitions($result))->firstWhere('id', 'contract-values');
     $portraitChart = collect(app(ReportPdfComposer::class)->chartDefinitions($result, 'portrait'))->firstWhere('id', 'contract-values');
+
+    $html = view('reports.contracts', compact('document'))->render();
+    $svg = base64_decode(explode(',', collect($document['charts'])->firstWhere('id', 'contract-values')['image'], 2)[1], true);
+    preg_match_all('/<text[^>]*>(.*?)<\/text>/s', $svg, $texts);
+
+    expect($chart['description'])->toBe('Visualizzati 8 di 9 contratti · ordinati per Allocato decrescente.')
+        ->and($portraitChart['description'])->toBe('Visualizzati 5 di 9 contratti · ordinati per Allocato decrescente.')
+        ->and($html)->toContain($chart['description'], 'Contratto 1', 'Contratto 9')
+        ->and($texts[1])->not->toContain(Number::currency(0, in: 'EUR', locale: 'it'))
+        ->and($svg)->not->toContain('width="0"')
+        ->and($svg)->toContain('90,00', '20,00');
 
     expect($document['contracts'])->toHaveCount(9)
         ->and($chart['data']['labels'])->toHaveCount(8)
@@ -312,7 +309,7 @@ it('counts deadlines in the inclusive next 90 days from the report reference dat
         ]);
 });
 
-it('uses only the four canonical contract states in the static donut', function (): void {
+it('uses only the four canonical contract states in the static distribution', function (): void {
     $company = Company::factory()->create();
     $viewer = s11ReportingViewer($company);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
@@ -331,7 +328,8 @@ it('uses only the four canonical contract states in the static donut', function 
     expect($definition['type'])->toBe('doughnut')
         ->and($definition['data']['labels'])->toBe(['Pianificato', 'Attivo', 'Cessato', 'Annullato'])
         ->and($definition['data']['labels'])->not->toContain('In scadenza')
-        ->and($svg)->toContain('<circle', 'Pianificato', 'Attivo', 'Cessato', 'Annullato');
+        ->and($svg)->toContain('<rect', 'Pianificato', 'Attivo', 'Cessato', 'Annullato')
+        ->and($svg)->not->toContain('<circle');
 });
 
 it('renders opt-in contract details as curated user-facing information only', function (): void {
@@ -398,6 +396,7 @@ it('renders opt-in contract details as curated user-facing information only', fu
             'Configurazione rinnovo',
             'Eventi contrattuali',
             'Attivazione',
+            'class="event-timeline"',
             'Spese dell’esercizio',
             'Stima di sistema · Contratto editoriale',
         )
@@ -463,11 +462,18 @@ it('keeps the same selected orientation in customizer preview and download URLs'
         ->assertSet('orientation', 'landscape')
         ->assertSee('Orizzontale')
         ->assertSee('Verticale')
+        ->assertSeeHtml('<input type="radio" name="orientation" value="landscape" wire:model.live="orientation">')
+        ->assertSeeHtml('<input type="radio" name="orientation" value="portrait" wire:model.live="orientation">')
         ->set('orientation', 'portrait')
         ->assertSet('orientation', 'portrait');
 
     expect($component->instance()->previewUrl())->toContain('orientation=portrait')
         ->and($component->instance()->downloadUrl())->toContain('orientation=portrait');
+
+    $component->set('orientation', 'landscape')->assertSet('orientation', 'landscape');
+
+    expect($component->instance()->previewUrl())->toContain('orientation=landscape')
+        ->and($component->instance()->downloadUrl())->toContain('orientation=landscape');
 });
 
 it('renders contracts through the dedicated template in portrait and landscape', function (): void {
@@ -621,4 +627,83 @@ it('renders a valid document with the installed WeasyPrint baseline', function (
     ]));
 
     expect(app(ReportPdfRenderer::class)->render($result, $company))->toStartWith('%PDF-');
+});
+
+it('preserves the selected interval and its contract annotations in both PDF orientations', function (): void {
+    $company = Company::factory()->create(['name' => 'Azienda "Contratti" <sicura>']);
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    foreach (['2026-06-15', '2026-07-15', null] as $index => $deadline) {
+        Contract::factory()->for($company)->create([
+            'title' => 'Contratto <'.$index.'>',
+            'next_expiry_date' => $deadline,
+            'renewal_anchor_date' => $deadline,
+        ]);
+    }
+    $input = [
+        'company_id' => $company->id, 'exercise_id' => $exercise->id, 'kind' => 'contracts',
+        'date_from' => '2026-06-01', 'date_to' => '2026-06-30',
+    ];
+    $result = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray($input));
+    $composer = app(ReportPdfComposer::class);
+    foreach (['portrait', 'landscape'] as $orientation) {
+        $document = $composer->compose($result, $company, [
+            'orientation' => $orientation,
+            'blocks' => ['table:contracts'],
+            'columns' => [],
+        ]);
+        expect(array_column($document['contracts'], 'labels'))->toBe(array_column($result->sections[0]['rows'], 'labels'));
+        $html = view('reports.contracts', compact('document'))->render();
+        $dom = new DOMDocument;
+        @$dom->loadHTML($html);
+        $xpath = new DOMXPath($dom);
+        $rows = $xpath->query('//table[@class="contracts"]/tbody/tr');
+        expect($html)->toContain('Intervallo selezionato', '01/06/2026', '30/06/2026', 'Contratto &lt;0&gt;', '&lt;sicura&gt;')
+            ->and($rows->item(0)->textContent)->toContain('Scadenza Contrattuale entro l’Intervallo Selezionato')
+            ->and($rows->item(1)->textContent)->not->toContain('Intervallo Selezionato');
+    }
+    unset($input['date_from'], $input['date_to']);
+    $withoutInterval = $composer->compose(app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray($input)), $company);
+    expect(view('reports.contracts', ['document' => $withoutInterval])->render())->not->toContain('class="selected-interval"', 'Scadenza Contrattuale entro l’Intervallo Selezionato');
+});
+
+it('composes only selected KPI groups charts and columns without empty layout cells', function (): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    Contract::factory()->for($company)->create(['title' => 'Contratto configurabile']);
+    $result = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray([
+        'company_id' => $company->id, 'exercise_id' => $exercise->id, 'kind' => 'contracts',
+    ]));
+    $composer = app(ReportPdfComposer::class);
+    foreach (['portrait', 'landscape'] as $orientation) {
+        foreach ([[], ['chart:contract-values'], ['chart:contract-states'], ['chart:contract-values', 'chart:contract-states']] as $charts) {
+            foreach ([[], ['kpi:specialist_count'], ['kpi:specialist_actual'], ['kpi:contracts_expiring', 'kpi:specialist_variance']] as $kpis) {
+                $document = $composer->compose($result, $company, [
+                    'orientation' => $orientation,
+                    'blocks' => ['table:contracts', ...$charts, ...$kpis],
+                    'columns' => ['column:contracts:actual'],
+                ]);
+                $html = view('reports.contracts', compact('document'))->render();
+                $dom = new DOMDocument;
+                @$dom->loadHTML($html);
+                $xpath = new DOMXPath($dom);
+                expect($xpath->query('//section[@class="analysis-panel"]')->length)->toBe(count($charts))
+                    ->and($xpath->query('//div[@class="portfolio-metric" or @class="economic-metric"]')->length)->toBe(count($kpis))
+                    ->and($xpath->query('//table[@class="contracts"]/thead/tr/th')->length)->toBe(2)
+                    ->and($xpath->query('//table[@class="contracts"]/tbody/tr/td')->length)->toBe(2)
+                    ->and($xpath->query('//article[@class="detail"]')->length)->toBe(0)
+                    ->and($html)->not->toContain('class="analysis-cell', 'class="kpi-cell');
+                foreach ($charts as $chart) {
+                    expect($xpath->query('//section[@data-block="'.$chart.'"]')->length)->toBe(1);
+                }
+                if ($kpis === []) {
+                    expect($xpath->query('//section[@class="summary"]')->length)->toBe(0);
+                }
+            }
+        }
+    }
+    $document = $composer->compose($result, $company, ['blocks' => [], 'columns' => []]);
+    $html = view('reports.contracts', compact('document'))->render();
+    expect($html)->not->toContain('class="contracts"', 'class="analysis-panel"', 'class="summary"', 'class="detail"');
 });
