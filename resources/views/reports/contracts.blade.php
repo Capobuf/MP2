@@ -121,6 +121,7 @@
         .chart-description { margin: 0.5mm 0 2mm; color: #667b7d; font-size: 8pt; }
         .chart-image { display: block; width: 100%; height: auto; }
         table.contracts, table.detail-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .landscape table.contracts { table-layout: auto; }
         thead { display: table-header-group; }
         tr { break-inside: avoid; }
         th, td { padding: 2mm 1.3mm; border-bottom: 0.4pt solid #d6e1df; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
@@ -128,12 +129,8 @@
         td { font-size: 8pt; }
         th:first-child, td:first-child { padding-left: 0; }
         th:last-child, td:last-child { padding-right: 0; }
-        .col-contract { width: auto; }
-        .col-supplier, .col-cost_center { width: 8%; }
-        .col-state { width: 7%; }
-        .col-deadline, .col-notice_limit_date { width: 9%; }
-        .col-renewal { width: 8%; }
-        .col-allocation, .col-actual, .col-operational_variance { width: 10%; }
+        table.contracts th { overflow-wrap: normal; }
+        table.contracts th:last-child, table.contracts td:last-child { padding-right: 1.3mm; }
         .portrait .col-deadline { width: 17%; }
         .portrait .col-allocation, .portrait .col-actual, .portrait .col-operational_variance { width: 16%; }
         .contract-name { color: #0b1d25; font-weight: 650; }
@@ -142,7 +139,7 @@
         .contract-label { display: block; margin-top: 1mm; padding-left: 1.5mm; border-left: 1.5pt solid #39d5c4; color: #15323b; font-size: 7pt; }
         .money { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
         .date { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
-        .state { font-size: 7pt; white-space: nowrap; }
+        .state { display: inline-block; font-size: 7pt; white-space: nowrap; }
         .state::before { content: ""; display: inline-block; width: 1.5mm; height: 1.5mm; margin-right: 1mm; background: #15323b; }
         .state-active::before { background: #39d5c4; }
         .state-planned::before { background: #60a5fa; }

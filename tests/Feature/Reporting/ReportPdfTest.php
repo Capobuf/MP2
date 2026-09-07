@@ -32,6 +32,7 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Number;
 use Livewire\Livewire;
+use Symfony\Component\Process\ExecutableFinder;
 
 uses(RefreshDatabase::class);
 
@@ -277,6 +278,42 @@ it('limits the contracts chart to the eight highest allocations without truncati
             'Contratto 9', 'Contratto 8', 'Contratto 7', 'Contratto 6', 'Contratto 5',
         ]);
 });
+
+it('keeps contract PDF text inside its cells and preserves supplier words', function (string $orientation): void {
+    $status = app(WeasyPrintRuntime::class)->status();
+    if (! $status['available']) {
+        $this->markTestSkipped('WeasyPrint is not installed in this runtime.');
+    }
+
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create();
+    foreach (['FornitoreSpecializzato S.r.l.', 'Fornitore '.str_repeat('X', 200)] as $name) {
+        $supplier = Supplier::factory()->for($company)->create(['legal_name' => $name]);
+        $contract = Contract::factory()->for($company)->for($supplier)->create([
+            'title' => 'Contratto servizi applicativi',
+            'contractual_start_date' => '2026-01-01',
+            'next_expiry_date' => '2026-12-31',
+        ]);
+        $expense = Expense::factory()->forExercise($exercise)->for($contract)->for($supplier)->create();
+        ExpenseLine::factory()->for($expense)->create(['amount' => '9999999999.99']);
+    }
+
+    $result = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray([
+        'company_id' => $company->id, 'exercise_id' => $exercise->id, 'kind' => 'contracts',
+    ]));
+    $document = app(ReportPdfComposer::class)->compose($result, $company, [
+        'orientation' => $orientation, 'blocks' => ['table:contracts'],
+    ]);
+    $binary = (new ExecutableFinder)->find($status['binary']);
+    expect($binary)->not->toBeNull();
+    $python = dirname(realpath($binary)).'/python3';
+    $check = Process::input(view('reports.contracts', compact('document'))->render())
+        ->run([$python, base_path('tests/Support/check_contract_pdf_layout.py')]);
+
+    expect($check->errorOutput())->toBe('')
+        ->and($check->successful())->toBeTrue($check->output());
+})->with(['landscape', 'portrait']);
 
 it('counts deadlines in the inclusive next 90 days from the report reference date', function (): void {
     $company = Company::factory()->create();

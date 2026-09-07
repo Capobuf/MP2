@@ -32,11 +32,11 @@
             <x-filament::button
                 color="gray"
                 outlined
-                icon="heroicon-m-adjustments-horizontal"
+                icon="heroicon-m-arrow-down-tray"
                 tag="a"
                 :href="App\Filament\Pages\ReportPdfCustomizer::getUrl(['definition' => $definition], tenant: Filament\Facades\Filament::getTenant())"
             >
-                Personalizza PDF
+                Esporta PDF
             </x-filament::button>
         </div>
     @endif
