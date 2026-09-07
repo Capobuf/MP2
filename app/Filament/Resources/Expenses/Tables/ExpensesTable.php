@@ -125,7 +125,6 @@ class ExpensesTable
             ->recordClasses(fn (Expense $record, ListExpenses $livewire): string => $livewire->selectedExpenseId === $record->id
                 ? 'mp2-expense-row-selected'
                 : 'mp2-expense-row')
-            ->selectable()
             ->recordActions([
                 Action::make('selectExpense')
                     ->label('Seleziona')
