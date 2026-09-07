@@ -152,9 +152,10 @@ class Expense extends Model
                 : $this->directCostCenter->name.($this->directCostCenter->isArchived() ? ' · Archiviato' : '');
         }
 
-        $classification = $this->project_id !== null
-            ? $this->project?->classifications()->where('exercise_id', $this->exercise_id)->with('costCenter')->first()
-            : $this->contract?->classifications()->where('exercise_id', $this->exercise_id)->with('costCenter')->first();
+        $container = $this->project_id !== null ? $this->project : $this->contract;
+        $classification = $container?->relationLoaded('classifications')
+            ? $container->classifications->firstWhere('exercise_id', $this->exercise_id)
+            : $container?->classifications()->where('exercise_id', $this->exercise_id)->with('costCenter')->first();
         $costCenter = $classification?->costCenter;
 
         $owner = $this->project_id !== null ? 'Progetto' : 'Contratto';
