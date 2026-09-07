@@ -540,7 +540,13 @@ it('renders the contracts template with only the configured company logo and app
     ]);
     $withLogo = view('reports.contracts', ['document' => $composer->compose($result, $company->refresh())])->render();
 
+    $dom = new DOMDocument;
+    @$dom->loadHTML($withoutLogo);
+    $header = (new DOMXPath($dom))->query('//header[contains(concat(" ", normalize-space(@class), " "), " report-header ")]')->item(0);
+
     expect($withoutLogo)->toContain('Report Contratti', 'Esercizio 2026', 'Allocato', 'Effettivo', 'Scostamento')
+        ->and($withoutLogo)->toContain('Data di riferimento 01/06/2026 · EUR · Importi netti IVA · Generato il 01/06/2026')
+        ->and($header->textContent)->not->toContain('Esercizio 2026', 'Data di riferimento', 'Generato il')
         ->and($withoutLogo)->not->toContain('class="header-logo"', 'data:image/', 'footer')
         ->and($withLogo)->toContain('class="header-logo"', 'data:image/png;base64,')
         ->and($withLogo)->not->toContain('linear-gradient', 'radial-gradient', 'background: #06121c');

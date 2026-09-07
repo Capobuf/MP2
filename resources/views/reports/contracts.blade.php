@@ -58,10 +58,11 @@
             size: A4 {{ $orientation }};
             margin: 12mm 12mm 16mm;
             @bottom-left {
-                content: string(company) " · Esercizio {{ $document['header']['exercise_year'] }}";
+                content: "Esercizio {{ $document['header']['exercise_year'] }} · Data di riferimento {{ $formatDate($document['header']['reference_date']) }} · {{ $document['header']['currency'] }} · {{ $document['header']['amount_basis'] }} · Generato il {{ CarbonImmutable::parse($document['header']['generated_at'])->format('d/m/Y H:i') }}";
                 font-family: Geist;
                 color: #667b7d;
                 font-size: 7pt;
+                white-space: nowrap;
                 border-top: 0.4pt solid #d6e1df;
                 padding-top: 2mm;
             }
@@ -84,7 +85,7 @@
         .header-logo, .header-copy { display: table-cell; vertical-align: middle; }
         .header-logo { width: 27mm; padding-right: 5mm; }
         .header-logo img { display: block; max-width: 22mm; max-height: 15mm; }
-        .company-name { string-set: company content(); font-size: 10pt; margin-bottom: 1.5mm; overflow-wrap: anywhere; }
+        .company-name { font-size: 10pt; margin-bottom: 1.5mm; overflow-wrap: anywhere; }
         .header-meta { margin-top: 3mm; font-size: 8pt; color: #526762; }
         .header-meta p + p { margin-top: 1mm; }
         .header-meta strong { font-weight: 600; color: #15323b; }
@@ -183,16 +184,16 @@
                 </div>
             </div>
         </div>
-        <div class="header-meta">
-            <p><strong>Esercizio {{ $document['header']['exercise_year'] }}</strong> · Data di riferimento <strong>{{ $formatDate($document['header']['reference_date']) }}</strong> · {{ $document['header']['currency'] }} · {{ $document['header']['amount_basis'] }}</p>
-            <p>Generato il {{ CarbonImmutable::parse($document['header']['generated_at'])->format('d/m/Y H:i') }}</p>
-            @if ($document['header']['date_from'] !== null || $document['header']['date_to'] !== null)
-                <p class="selected-interval"><strong>Intervallo selezionato</strong>@if ($document['header']['date_from'] !== null) · dal {{ $formatDate($document['header']['date_from']) }}@endif @if ($document['header']['date_to'] !== null) al {{ $formatDate($document['header']['date_to']) }}@endif</p>
-            @endif
-            @if ($document['header']['filter_labels'] !== [])
-                <p><strong>Filtri</strong> · {{ implode(' · ', $document['header']['filter_labels']) }}</p>
-            @endif
-        </div>
+        @if ($document['header']['date_from'] !== null || $document['header']['date_to'] !== null || $document['header']['filter_labels'] !== [])
+            <div class="header-meta">
+                @if ($document['header']['date_from'] !== null || $document['header']['date_to'] !== null)
+                    <p class="selected-interval"><strong>Intervallo selezionato</strong>@if ($document['header']['date_from'] !== null) · dal {{ $formatDate($document['header']['date_from']) }}@endif @if ($document['header']['date_to'] !== null) al {{ $formatDate($document['header']['date_to']) }}@endif</p>
+                @endif
+                @if ($document['header']['filter_labels'] !== [])
+                    <p><strong>Filtri</strong> · {{ implode(' · ', $document['header']['filter_labels']) }}</p>
+                @endif
+            </div>
+        @endif
     </header>
 
     @if ($selectedKpis !== [])
