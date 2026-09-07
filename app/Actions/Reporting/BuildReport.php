@@ -2,10 +2,12 @@
 
 namespace App\Actions\Reporting;
 
+use App\Domain\Company\AuditEventType;
 use App\Domain\Contracts\ContractState;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Projects\ProjectAnnualReferenceDate;
 use App\Domain\Projects\ProjectDeferralMode;
+use App\Domain\Projects\ProjectState;
 use App\Domain\Reporting\ActualReference;
 use App\Domain\Reporting\ComparisonEngine;
 use App\Domain\Reporting\ReferenceType;
@@ -17,6 +19,7 @@ use App\Domain\Reporting\ReportResult;
 use App\Domain\Reporting\ReportSource;
 use App\Domain\Reporting\SecondaryLabel;
 use App\Models\Attachment;
+use App\Models\AuditEvent;
 use App\Models\BudgetSnapshot;
 use App\Models\BudgetSourceRow;
 use App\Models\ClosingSnapshot;
@@ -31,6 +34,7 @@ use App\Models\HistoricalErrorAnnotation;
 use App\Models\LateCorrection;
 use App\Models\Project;
 use App\Models\ProjectDeferral;
+use App\Models\ProjectTransition;
 use App\Models\Supplier;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -259,6 +263,24 @@ final class BuildReport
             $sources[] = $this->expenseSource($expense);
         }
 
+        $budgetProjectKeys = BudgetSourceRow::query()
+            ->where('company_id', $company->id)
+            ->where('source_type', 'project')
+            ->whereHas('budget', fn ($query) => $query->where('exercise_id', $exercise->id))
+            ->pluck('origin_key')->flip();
+        $restoredProjectIds = AuditEvent::query()
+            ->where('company_id', $company->id)
+            ->where('subject_type', Project::class)
+            ->where('event_type', AuditEventType::ProjectRestored)
+            ->whereBetween('effective_from', [$exercise->year.'-01-01', $exercise->year.'-12-31'])
+            ->pluck('subject_id')->flip();
+        $annotatedProjectKeys = HistoricalErrorAnnotation::query()
+            ->where('company_id', $company->id)
+            ->get(['affected_sources'])
+            ->flatMap(fn (HistoricalErrorAnnotation $annotation): array => $this->affectedSources($annotation))
+            ->where('type', 'project')
+            ->pluck('origin_key')->flip();
+
         $projects = Project::query()->where('company_id', $company->id)
             ->with(['transitions', 'deferrals', 'classifications.costCenter', 'expenses' => fn ($query) => $query->where('exercise_id', $exercise->id)->with(['lines.attachments', 'supplier', 'directCostCenter'])])
             ->orderBy('id')->get();
@@ -275,10 +297,14 @@ final class BuildReport
                     && $deferral->mode === ProjectDeferralMode::Carryover)
                 ->pluck('carryover_amount'));
             $state = $project->stateAtDate($date->toDateString());
-            if ($state === null
+            if (! in_array($state, [ProjectState::Planned, ProjectState::Open], true)
                 && Decimal::compare((string) $totals['allocation'], '0.00') === 0
                 && ! (bool) $totals['has_actuals']
-                && Decimal::compare($carryover, '0.00') === 0) {
+                && ! $budgetProjectKeys->has($project->originKey())
+                && ! $restoredProjectIds->has($project->id)
+                && ! $annotatedProjectKeys->has($project->originKey())
+                && ! $project->transitions->contains(fn (ProjectTransition $transition): bool => $transition->annulledAt() === null
+                    && $transition->effectiveDate()->year === $exercise->year)) {
                 continue;
             }
             $balance = Decimal::subtract((string) $totals['allocation'], (string) $totals['actual']);
