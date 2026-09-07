@@ -1,7 +1,13 @@
 <?php
 
 use App\Actions\Reporting\BuildReport;
+use App\Domain\Reporting\ComparisonCategory;
+use App\Domain\Reporting\ComparisonEngine;
+use App\Domain\Reporting\ReportAggregator;
 use App\Domain\Reporting\ReportDefinition;
+use App\Domain\Reporting\ReportKind;
+use App\Domain\Reporting\ReportResult;
+use App\Domain\Reporting\ReportSource;
 use App\Filament\Pages\ReportPdfCustomizer;
 use App\Models\Company;
 use App\Models\Contract;
@@ -70,7 +76,7 @@ it('downloads and previews the same authenticated PDF pipeline', function (): vo
         && str_contains((string) $process->input, 'Fornitore PDF')
         && $process->timeout === 30);
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['weasyprint', '-', '-']
-        && str_contains((string) $process->input, 'Definizioni del confronto')
+        && ! str_contains((string) $process->input, 'Definizioni del confronto')
         && ! str_contains((string) $process->input, 'Dettaglio e riconciliazione')
         && ! str_contains((string) $process->input, '<h2>Riepilogo</h2>'));
 });
@@ -511,7 +517,7 @@ it('renders contracts through the dedicated template in portrait and landscape',
         && str_contains((string) $process->input, '<h1>Report Contratti</h1>')
         && str_contains((string) $process->input, 'size: A4 landscape;'));
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['weasyprint', '-', '-']
-        && str_contains((string) $process->input, 'Definizioni del confronto'));
+        && ! str_contains((string) $process->input, 'Definizioni del confronto'));
 });
 
 it('renders the contracts template with only the configured company logo and approved terminology', function (): void {
@@ -712,4 +718,240 @@ it('composes only selected KPI groups charts and columns without empty layout ce
     $document = $composer->compose($result, $company, ['blocks' => [], 'columns' => []]);
     $html = view('reports.contracts', compact('document'))->render();
     expect($html)->not->toContain('class="contracts"', 'class="analysis-panel"', 'class="summary"', 'class="detail"');
+});
+
+function pdfFamilyFixture(string $kind, int $count = 12, bool $annualComparison = true): ReportResult
+{
+    $family = ReportKind::from($kind);
+    $definition = ['company_id' => 1, 'exercise_id' => 1, 'kind' => $kind];
+    $isComparison = $family->isComparison() || ($family === ReportKind::AnnualExecutive && $annualComparison);
+    if ($family->isComparison() || $family === ReportKind::AnnualExecutive) {
+        $definition['final_reference'] = ['type' => 'current', 'exercise_id' => 1];
+        if ($isComparison) {
+            $definition['initial_reference'] = ['type' => 'budget', 'exercise_id' => 1, 'budget_snapshot_id' => 1];
+        }
+        if (in_array($family, [ReportKind::AnnualExecutive, ReportKind::BudgetActual], true)) {
+            $definition['actual_reference'] = 'current';
+        } elseif ($family === ReportKind::BudgetVersions) {
+            $definition['final_reference'] = ['type' => 'budget', 'exercise_id' => 1, 'budget_snapshot_id' => 2];
+        } elseif ($family === ReportKind::Exercises) {
+            $definition['comparison_exercise_id'] = 2;
+            $definition['initial_reference'] = ['type' => 'current', 'exercise_id' => 1];
+            $definition['final_reference'] = ['type' => 'current', 'exercise_id' => 2];
+        }
+    }
+    $sources = [];
+    foreach (range(1, $count) as $index) {
+        $sources[] = new ReportSource(
+            sourceType: 'project', originId: $index, originKey: 'project:'.$index, copiedFromOriginKey: null,
+            label: 'Progetto '.$index.' · Infrastruttura e servizi applicativi', summary: 'Intervento sul sistema informativo',
+            supplierId: null, supplierLabel: null, costCenterId: $index, costCenterLabel: 'Centro '.$index,
+            state: 'open', allocation: (string) ($index * 1000), actual: (string) ($index * ($index === 1 ? 1000 : ($index % 2 ? 1250 : 750))),
+            hasActuals: true, carryover: (string) ((20 - $index) * 25), residual: '150.00',
+            detail: ['expenses' => [[
+                'id' => $index, 'source' => 'Spesa '.$index, 'supplier_id' => $index, 'supplier_label' => 'Fornitore '.$index,
+                'allocation' => (string) ($index * 1000), 'actual' => (string) ($index * 750),
+                'lines' => [['id' => $index, 'type' => 'actual', 'amount' => '25.00', 'note' => 'Nota verificabile', 'annulled' => false]],
+            ]]],
+        );
+    }
+    $aggregator = new ReportAggregator;
+    $totals = $aggregator->executive($sources);
+    $comparisons = $isComparison ? (new ComparisonEngine)->compare(
+        array_slice($sources, 1), array_slice($sources, 0, -1),
+        budgetComparison: $family !== ReportKind::Exercises,
+        initialMeasure: $family === ReportKind::Exercises ? 'actual' : 'allocation',
+        finalMeasure: in_array($family, [ReportKind::BudgetVersions, ReportKind::BudgetCurrentAllocation], true) ? 'allocation' : 'actual',
+    ) : [];
+    $sections = match ($family) {
+        ReportKind::Projects => [['title' => 'Progetti', 'rows' => $sources]],
+        ReportKind::Carryovers => [['title' => 'Riporti', 'rows' => $sources]],
+        ReportKind::Suppliers => [['title' => 'Aggregazione per Fornitore', 'rows' => $aggregator->suppliers($sources)]],
+        default => [],
+    };
+
+    return new ReportResult(
+        ReportDefinition::fromArray($definition),
+        [
+            'company_name' => 'MP2 · Azienda di verifica', 'exercise_year' => 2026, 'kind' => $kind, 'title' => $family->label(),
+            'initial_reference_label' => $isComparison ? ($family === ReportKind::Exercises ? 'Situazione Corrente · Esercizio 2026' : 'Budget v1 · Budget Iniziale · Esercizio 2026') : null,
+            'final_reference_label' => $family === ReportKind::BudgetVersions ? 'Budget v2 · Revisione · Esercizio 2026' : 'Situazione Corrente · Esercizio '.($family === ReportKind::Exercises ? 2027 : 2026),
+            'actual_reference' => isset($definition['actual_reference']) ? 'Effettivo Corrente' : null,
+            'reference_date' => '2026-09-07', 'generated_at' => '2026-09-07 10:30:00',
+            'currency' => 'EUR', 'amount_basis' => 'Importi netti IVA', 'date_from' => null, 'date_to' => null, 'filter_labels' => [],
+            'availability' => ['initial_budget' => true, 'current_budget' => true, 'selected_budget' => $isComparison, 'closing' => false],
+        ],
+        $totals + [
+            'current_budget' => '80000.00', 'initial_budget' => '75000.00', 'current_allocation' => $totals['allocation'],
+            'selected_actual' => $totals['actual'], 'current_actual' => $totals['actual'], 'current_operational_variance' => $totals['operational_variance'],
+            'allocation_vs_selected_budget' => '3000.00', 'selected_budget_actual_variance' => '-5000.00', 'annotation_count' => 0,
+        ],
+        $sources, $comparisons,
+        collect($comparisons)->countBy(fn (array $row): string => $row['category']->value)->all(),
+        [], $sections,
+    );
+}
+
+function pdfDocumentXPath(string $html): DOMXPath
+{
+    $dom = new DOMDocument;
+    @$dom->loadHTML($html);
+
+    return new DOMXPath($dom);
+}
+
+it('renders every non contract family with real WeasyPrint in both orientations', function (string $kind, string $orientation): void {
+    if (! app(WeasyPrintRuntime::class)->status()['available']) {
+        $this->markTestSkipped('WeasyPrint is not installed in this runtime.');
+    }
+    $result = pdfFamilyFixture($kind);
+    $company = Company::factory()->make();
+    $document = app(ReportPdfComposer::class)->compose($result, $company, compact('orientation'));
+    $html = view('reports.pdf', compact('document'))->render();
+    expect(app(ReportPdfRenderer::class)->render($result, $company, compact('orientation')))->toStartWith('%PDF-')
+        ->and($html)->toContain($result->header['title'], 'data:font/woff2;base64,', 'Importi netti IVA')
+        ->and($document['selected_blocks'])->not->toContain('details:sources');
+    expect(str_contains($html, 'Definizioni del confronto'))->toBe($result->comparisons !== []);
+})->with(array_map(fn (ReportKind $kind): string => $kind->value, array_filter(ReportKind::cases(), fn (ReportKind $kind): bool => $kind !== ReportKind::Contracts)))
+    ->with(['portrait', 'landscape']);
+
+it('prints category distributions as exact counts without currency', function (string $kind): void {
+    $result = pdfFamilyFixture($kind);
+    $document = app(ReportPdfComposer::class)->compose($result, Company::factory()->make());
+    $chart = collect($document['charts'])->firstWhere('id', 'comparison-categories');
+    $svg = base64_decode(explode(',', $chart['image'], 2)[1]);
+    $xml = simplexml_load_string($svg);
+    $xml->registerXPathNamespace('svg', 'http://www.w3.org/2000/svg');
+    $counts = array_map(fn (SimpleXMLElement $text): int => (int) (string) $text, $xml->xpath('//svg:text[@font-size="24"]'));
+    expect($counts)->toBe(array_map(fn ($category): int => $result->categoryCounts[$category->value] ?? 0, ComparisonCategory::cases()))
+        ->and($svg)->not->toContain('€', 'EUR', ',00');
+})->with(['annual_executive', 'budget_actual', 'budget_current_allocation', 'budget_versions', 'exercises']);
+
+it('draws signed operational variance on opposite sides of zero and orders by magnitude', function (string $orientation): void {
+    $result = pdfFamilyFixture('operational_variance', 5);
+    $composer = app(ReportPdfComposer::class);
+    $document = $composer->compose($result, Company::factory()->make(), compact('orientation'));
+    $svg = base64_decode(explode(',', $document['charts'][0]['image'], 2)[1]);
+    $xml = simplexml_load_string($svg);
+    $xml->registerXPathNamespace('svg', 'http://www.w3.org/2000/svg');
+    $zero = (float) $xml->xpath('//svg:line[@class="zero-axis"]')[0]['x1'];
+    $positive = $xml->xpath('//svg:rect[@class="positive"]');
+    $negative = $xml->xpath('//svg:rect[@class="negative"]');
+    expect($positive)->not->toBeEmpty()->and($negative)->not->toBeEmpty();
+    foreach ($positive as $bar) {
+        expect((float) $bar['x'])->toBe($zero)->and((float) $bar['width'])->toBeGreaterThan(0);
+    }
+    foreach ($negative as $bar) {
+        expect((float) $bar['x'])->toBeLessThan($zero)
+            ->and((float) $bar['x'] + (float) $bar['width'])->toEqualWithDelta($zero, 0.001);
+    }
+    expect($xml->xpath('//svg:circle[@class="zero-value"]'))->toHaveCount(1)
+        ->and($svg)->toContain('+1.250,00', '-1.000,00', '0,00')
+        ->and($composer->chartDefinitions($result, $orientation)[0]['data']['datasets'][0]['data'])->toBe([1250.0, -1000.0, 750.0, -500.0, 0.0]);
+})->with(['portrait', 'landscape']);
+
+it('limits dense charts by the declared measure while retaining complete tables', function (string $kind, string $chartId, string $block, string $orientation): void {
+    $result = pdfFamilyFixture($kind);
+    $composer = app(ReportPdfComposer::class);
+    $document = $composer->compose($result, Company::factory()->make(), compact('orientation'));
+    $definition = collect($composer->chartDefinitions($result, $orientation))->firstWhere('id', $chartId);
+    $limit = $orientation === 'portrait' ? 5 : 8;
+    $total = $kind === 'suppliers' ? 13 : 12;
+    $xpath = pdfDocumentXPath(view('reports.pdf', compact('document'))->render());
+    expect($definition['data']['labels'])->toHaveCount($limit)
+        ->and($definition['description'])->toContain('Visualizzati '.$limit.' di '.$total, 'decrescente')
+        ->and($xpath->query('//table[@data-block="'.$block.'"]/tbody/tr')->length)->toBe($total);
+    $values = $definition['data']['datasets'][0]['data'];
+    $rank = $kind === 'operational_variance' ? array_map('abs', $values) : $values;
+    $sorted = $rank;
+    rsort($sorted);
+    expect($rank)->toBe($sorted);
+    if ($kind === 'carryovers') {
+        expect($definition['data']['datasets'])->toHaveCount(1)
+            ->and($definition['data']['datasets'][0]['label'])->toBe('Riporto')
+            ->and($definition['data']['labels'][0])->toStartWith('Progetto 1 ·');
+    }
+    if ($kind === 'suppliers') {
+        expect($document['sections'][0]['rows'])->toBe($result->sections[0]['rows']);
+    }
+})->with([
+    ['annual_executive', 'annual-cost-centers', 'table:sources'],
+    ['operational_variance', 'operational-variance', 'table:sources'],
+    ['projects', 'project-values', 'section:progetti'],
+    ['suppliers', 'supplier-values', 'section:aggregazione-per-fornitore'],
+    ['carryovers', 'carryover-values', 'section:riporti'],
+])->with(['portrait', 'landscape']);
+
+it('recomposes all selected portrait metadata without dropping selected quantitative columns', function (string $group): void {
+    $result = pdfFamilyFixture('budget_actual');
+    $composer = app(ReportPdfComposer::class);
+    $company = Company::factory()->make();
+    foreach (['portrait', 'landscape'] as $orientation) {
+        $document = $composer->compose($result, $company, ['orientation' => $orientation, 'blocks' => ['table:'.$group]]);
+        $xpath = pdfDocumentXPath(view('reports.pdf', compact('document'))->render());
+        $columns = array_filter($document['available_columns'], fn (array $column): bool => $column['group'] === $group);
+        $count = count($group === 'sources' ? $document['sources'] : $document['comparisons']);
+        foreach ($columns as $column) {
+            $key = str($column['id'])->afterLast(':')->toString();
+            expect($xpath->query('//*[@data-column="'.$key.'"]')->length)->toBe($count);
+        }
+        expect($xpath->query('//thead/tr/th')->length)->toBe($orientation === 'landscape' ? count($columns) + 1 : ($group === 'sources' ? 5 : 4));
+    }
+})->with(['sources', 'comparisons']);
+
+it('collapses partial KPI chart and column selections and keeps generic details opt in', function (): void {
+    $result = pdfFamilyFixture('projects', 2);
+    $company = Company::factory()->make();
+    $composer = app(ReportPdfComposer::class);
+    foreach (['portrait', 'landscape'] as $orientation) {
+        foreach ([[], ['kpi:specialist_count'], ['kpi:specialist_actual'], ['kpi:specialist_actual', 'kpi:specialist_count']] as $kpis) {
+            foreach ([[], ['chart:project-values']] as $charts) {
+                $document = $composer->compose($result, $company, [
+                    'orientation' => $orientation, 'blocks' => ['table:sources', ...$kpis, ...$charts], 'columns' => ['column:sources:actual'],
+                ]);
+                $xpath = pdfDocumentXPath(view('reports.pdf', compact('document'))->render());
+                expect($xpath->query('//div[@class="metric"]')->length)->toBe(count($kpis))
+                    ->and($xpath->query('//section[@class="analysis-panel"]')->length)->toBe(count($charts))
+                    ->and($xpath->query('//thead/tr/th')->length)->toBe(2)
+                    ->and($xpath->query('//div[@class="metric" and not(normalize-space())]')->length)->toBe(0)
+                    ->and($xpath->query('//dl[not(*)]')->length)->toBe(0);
+            }
+        }
+    }
+    $default = $composer->compose($result, $company);
+    $document = $composer->compose($result, $company, ['blocks' => ['details:sources']]);
+    $html = view('reports.pdf', compact('document'))->render();
+    expect($default['selected_blocks'])->not->toContain('details:sources')
+        ->and(array_column($default['available_blocks'], 'id'))->toContain('details:sources', 'table:sources')
+        ->and($html)->toContain('Approfondimenti delle sorgenti', 'Nota verificabile', 'Fornitore 1', '25,00')
+        ->and($html)->not->toContain('origin_key', 'supplier_id', '<strong>id:', 'project:1');
+    $document = $composer->compose($result, $company, ['blocks' => [], 'columns' => []]);
+    $xpath = pdfDocumentXPath(view('reports.pdf', compact('document'))->render());
+    expect($xpath->query('//section|//table|//article')->length)->toBe(0);
+});
+
+it('omits comparison definitions in annual reports without a comparison', function (): void {
+    $document = app(ReportPdfComposer::class)->compose(pdfFamilyFixture('annual_executive', 3, false), Company::factory()->make());
+    expect($document['category_definitions'])->toBe([])
+        ->and(view('reports.pdf', compact('document'))->render())->not->toContain('Definizioni del confronto');
+});
+
+it('escapes source labels inside SVG and loads only embedded PDF resources', function (): void {
+    $base = pdfFamilyFixture('projects', 3);
+    $values = get_object_vars($base->sources[0]);
+    $values['label'] = '<script>unsafe</script><image href="https://example.com/a"/>';
+    $sources = [new ReportSource(...$values), ...array_slice($base->sources, 1)];
+    $result = new ReportResult($base->definition, $base->header, $base->totals, $sources, sections: [['title' => 'Progetti', 'rows' => $sources]]);
+    $document = app(ReportPdfComposer::class)->compose($result, Company::factory()->make());
+    $html = view('reports.pdf', compact('document'))->render();
+    $svg = base64_decode(explode(',', $document['charts'][0]['image'], 2)[1]);
+    $xml = simplexml_load_string($svg);
+    $xml->registerXPathNamespace('svg', 'http://www.w3.org/2000/svg');
+    expect($svg)->toContain('&lt;script&gt;unsafe&lt;/script&gt;')
+        ->and($xml->xpath('//svg:script|//svg:image'))->toBe([])
+        ->and($html)->toContain('&lt;script&gt;unsafe&lt;/script&gt;')
+        ->and($html)->not->toContain('<script>');
+    foreach (pdfDocumentXPath($html)->query('//*[@src]') as $element) {
+        expect($element->getAttribute('src'))->toStartWith('data:');
+    }
 });

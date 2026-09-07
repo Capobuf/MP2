@@ -6,6 +6,7 @@ use App\Domain\Contracts\ContractAttributionMode;
 use App\Domain\Contracts\ContractCycleType;
 use App\Domain\Contracts\ContractState;
 use App\Domain\Expenses\Decimal;
+use App\Domain\Projects\ProjectState;
 use App\Domain\Reporting\ComparisonCategory;
 use App\Domain\Reporting\ReportKind;
 use App\Domain\Reporting\ReportResult;
@@ -108,9 +109,10 @@ final class ReportPdfComposer
         }
 
         $blockIds = array_column($availableBlocks, 'id');
-        $defaultBlocks = $isContracts
-            ? array_values(array_diff($blockIds, ['details:contracts']))
-            : $blockIds;
+        $defaultBlocks = array_values(array_diff($blockIds, ['details:contracts', 'details:sources']));
+        if (in_array($result->definition->kind, [ReportKind::Projects, ReportKind::Carryovers, ReportKind::Suppliers], true)) {
+            $defaultBlocks = array_values(array_diff($defaultBlocks, ['table:sources']));
+        }
         $selectedBlocks = $this->selection($configuration, 'blocks', $blockIds, $defaultBlocks);
         $selectedColumns = $this->selection($configuration, 'columns', array_column($availableColumns, 'id'));
 
@@ -118,7 +120,7 @@ final class ReportPdfComposer
             'orientation' => $orientation,
             'definition' => $result->definition->toArray(),
             'header' => $result->header,
-            'category_definitions' => array_map(fn (ComparisonCategory $category): array => [
+            'category_definitions' => $comparisons === [] ? [] : array_map(fn (ComparisonCategory $category): array => [
                 'label' => $category->label(), 'definition' => $category->definition(),
             ], ComparisonCategory::cases()),
             'kpis' => $kpis,
@@ -186,10 +188,21 @@ final class ReportPdfComposer
             'cost_center' => $source->costCenterLabel ?? 'Non classificato',
             'supplier' => $source->supplierLabel ?? 'Senza fornitore',
             'state' => $source->state,
+            'state_label' => match ($source->sourceType) {
+                'contract' => $source->state === null ? '—' : ContractState::from($source->state)->label(),
+                'project' => $source->state === null ? '—' : ProjectState::from($source->state)->label(),
+                default => match ($source->state) {
+                    'active' => 'Attivo', 'reversed' => 'Stornata', null => '—',
+                    default => $source->state,
+                },
+            },
             'allocation' => $source->allocation,
             'actual' => $source->actual,
             'operational_variance' => Decimal::subtract($source->actual, $source->allocation),
             'carryover' => $source->carryover,
+            'residual' => $source->residual,
+            'saving' => $source->saving,
+            'unused' => $source->unused,
             'detail' => $this->normalizeValue($source->detail),
             'corrections' => $this->normalizeValue($source->corrections),
             'annotations' => $this->normalizeValue($source->annotations),
@@ -198,7 +211,7 @@ final class ReportPdfComposer
 
     /**
      * @param  array<int, array<string, mixed>>  $sections
-     * @return array<int, array{id: string, label: string, value: string|int|float, formatted: string}>
+     * @return array<int, array{id: string, label: string, value: string|int|float, formatted: string, description: ?string, group: string}>
      */
     private function kpiDefinitions(ReportResult $result, array $sections): array
     {
@@ -311,6 +324,11 @@ final class ReportPdfComposer
                 ? Number::currency((float) $item[2], in: 'EUR', locale: 'it')
                 : (string) $item[2],
             'description' => $item[4] ?? null,
+            'group' => ! $item[3] ? 'context' : (in_array($item[0], [
+                'current_budget', 'current_allocation', 'selected_actual', 'comparison_initial', 'comparison_final',
+                'comparison_delta', 'allocation', 'actual', 'operational_variance',
+                'specialist_carryover', 'specialist_allocation', 'specialist_actual', 'specialist_variance',
+            ], true) ? 'economic' : 'secondary'),
         ], $items);
     }
 
@@ -390,8 +408,13 @@ final class ReportPdfComposer
             }
             $charts[] = $this->currencyBarChart(
                 'annual-summary', 'Sintesi Economica',
-                'Riferimenti Economici Esplicitamente Disponibili per l’Esercizio.', $labels, $values,
+                'Riferimenti economici disponibili per l’Esercizio.', $labels, $values,
             );
+
+            $categoryChart = $this->categoryChart($result);
+            if ($categoryChart !== null) {
+                $charts[] = $categoryChart;
+            }
 
             $costCenters = [];
             foreach ($result->sources as $source) {
@@ -403,17 +426,13 @@ final class ReportPdfComposer
             if ($costCenters !== []) {
                 $charts[] = $this->groupedBarChart(
                     'annual-cost-centers', 'Allocato ed Effettivo per Centro di Costo',
-                    'Tutte le Sorgenti del Risultato; Non Classificato Resta un Bucket Esplicito.',
+                    'Non classificato include le sorgenti senza Centro di Costo.',
                     array_column($costCenters, 'label'),
                     [
                         ['label' => 'Allocato', 'data' => array_map('floatval', array_column($costCenters, 'allocation')), 'color' => '#39D5C4'],
                         ['label' => (string) $result->header['actual_reference'], 'data' => array_map('floatval', array_column($costCenters, 'actual')), 'color' => '#60A5FA'],
                     ],
                 );
-            }
-            $categoryChart = $this->categoryChart($result);
-            if ($categoryChart !== null) {
-                $charts[] = $categoryChart;
             }
         } elseif (in_array($kind, [
             ReportKind::BudgetActual, ReportKind::BudgetCurrentAllocation,
@@ -423,7 +442,7 @@ final class ReportPdfComposer
             $final = Decimal::sum(array_column($result->comparisons, 'final_value'));
             $charts[] = $this->currencyBarChart(
                 'comparison-totals', 'Confronto Complessivo',
-                'Somma Esatta dei Valori Iniziali e Finali delle Sorgenti Confrontate.',
+                'Valori iniziali e finali delle sorgenti confrontate.',
                 [
                     (string) ($result->header['initial_reference_label'] ?? $result->header['initial_reference']),
                     (string) ($result->header['final_reference_label'] ?? $result->header['final_reference']),
@@ -498,7 +517,7 @@ final class ReportPdfComposer
             if ($sources !== []) {
                 $charts[] = $this->groupedBarChart(
                     'project-values', 'Progetti · Allocato ed Effettivo',
-                    'Valori delle Sorgenti Pertinenti Presenti nel Risultato.',
+                    'Allocato ed Effettivo dei Progetti.',
                     array_map(fn (ReportSource $source): string => $source->label, $sources),
                     [
                         ['label' => 'Allocato', 'data' => array_map(fn (ReportSource $source): float => (float) $source->allocation, $sources), 'color' => '#39D5C4'],
@@ -510,7 +529,7 @@ final class ReportPdfComposer
             $rows = $result->sections[0]['rows'];
             $charts[] = $this->groupedBarChart(
                 'supplier-values', 'Allocato ed Effettivo per Fornitore',
-                'Aggregazione Canonica Già Prodotta dal Report Fornitori.', array_column($rows, 'label'),
+                'Allocato ed Effettivo aggregati per Fornitore.', array_column($rows, 'label'),
                 [
                     ['label' => 'Allocato', 'data' => array_map('floatval', array_column($rows, 'allocation')), 'color' => '#39D5C4'],
                     ['label' => 'Effettivo', 'data' => array_map('floatval', array_column($rows, 'actual')), 'color' => '#60A5FA'],
@@ -521,16 +540,46 @@ final class ReportPdfComposer
             if ($sources !== []) {
                 $charts[] = $this->groupedBarChart(
                     'carryover-values', 'Riporti per Progetto',
-                    'Riporto Insieme ad Allocato ed Effettivo Già Disponibili nel Risultato.',
+                    'Riporto per Progetto.',
                     array_map(fn (ReportSource $source): string => $source->label, $sources),
                     [
-                        ['label' => 'Riporto', 'data' => array_map(fn (ReportSource $source): float => (float) $source->carryover, $sources), 'color' => '#F59E0B'],
-                        ['label' => 'Allocato', 'data' => array_map(fn (ReportSource $source): float => (float) $source->allocation, $sources), 'color' => '#39D5C4'],
-                        ['label' => 'Effettivo', 'data' => array_map(fn (ReportSource $source): float => (float) $source->actual, $sources), 'color' => '#60A5FA'],
+                        ['label' => 'Riporto', 'data' => array_map(fn (ReportSource $source): float => (float) $source->carryover, $sources), 'color' => '#39D5C4'],
                     ],
                 );
             }
         }
+
+        foreach ($charts as &$chart) {
+            $subject = match ($chart['id']) {
+                'annual-cost-centers' => 'centri di costo',
+                'operational-variance' => 'sorgenti',
+                'project-values', 'carryover-values' => 'progetti',
+                'supplier-values' => 'fornitori',
+                default => null,
+            };
+            if ($subject === null) {
+                continue;
+            }
+            $values = $chart['data']['datasets'][0]['data'];
+            $indices = array_keys($values);
+            $variance = $chart['id'] === 'operational-variance';
+            usort($indices, fn (int $a, int $b): int => $variance
+                ? abs($values[$b]) <=> abs($values[$a])
+                : $values[$b] <=> $values[$a]);
+            $total = count($indices);
+            $indices = array_slice($indices, 0, $orientation === 'portrait' ? 5 : 8);
+            $order = $variance ? 'valore assoluto dello Scostamento Operativo' : ($chart['id'] === 'carryover-values' ? 'Riporto' : 'Allocato');
+            $chart['description'] .= ' Visualizzati '.count($indices).' di '.$total.' '.$subject.' · ordinati per '.$order.' decrescente.';
+            $chart['data']['labels'] = array_map(fn (int $index): string => $chart['data']['labels'][$index], $indices);
+            foreach ($chart['data']['datasets'] as &$dataset) {
+                $dataset['data'] = array_map(fn (int $index): float => $dataset['data'][$index], $indices);
+                if (is_array($dataset['backgroundColor'])) {
+                    $dataset['backgroundColor'] = array_map(fn (int $index): string => $dataset['backgroundColor'][$index], $indices);
+                }
+            }
+            unset($dataset);
+        }
+        unset($chart);
 
         return $charts;
     }
@@ -633,12 +682,18 @@ final class ReportPdfComposer
                 );
             }
 
-            return $this->chart(
+            if ($chart['variant'] === 'category-doughnut') {
+                return $this->categoryDistribution($chart['id'], $chart['heading'], $chart['description'], $chart['data']['labels'], $datasets[0], $orientation);
+            }
+
+            return $this->monetaryBarChart(
                 (string) $chart['id'],
                 (string) $chart['heading'],
                 (string) $chart['description'],
                 array_map('strval', $chart['data']['labels']),
                 $datasets,
+                $orientation,
+                $chart['variant'] === 'variance-horizontal',
             );
         }, $definitions);
     }
@@ -693,30 +748,87 @@ final class ReportPdfComposer
      * @param  array<int, array{label: string, values: array<int, float>, colors: array<int, string>}>  $series
      * @return array{id: string, heading: string, description: string, image: string}
      */
-    private function chart(string $id, string $heading, string $description, array $labels, array $series): array
+    private function monetaryBarChart(string $id, string $heading, string $description, array $labels, array $series, string $orientation, bool $divergent): array
     {
-        $rowHeight = 25;
-        $height = max(105, 48 + count($labels) * $rowHeight);
-        $plotX = 178;
-        $plotWidth = 552;
-        $max = max(1.0, ...array_map('abs', array_merge(...array_column($series, 'values'))));
-        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 '.$height.'">';
-        $svg .= '<rect width="760" height="'.$height.'" fill="#ffffff"/>';
-        foreach ($series as $index => $dataset) {
-            $svg .= '<rect x="'.($plotX + $index * 120).'" y="8" width="11" height="11" rx="1" fill="'.$dataset['colors'][0].'"/>';
-            $svg .= '<text x="'.($plotX + 17 + $index * 120).'" y="17" font-family="sans-serif" font-size="10" fill="#33484b">'.$this->escape($dataset['label']).'</text>';
+        $portrait = $orientation === 'portrait';
+        $canvasWidth = $portrait ? 1000 : 1400;
+        $rowHeight = count($series) > 1 ? ($portrait ? 56 : 46) : ($portrait ? 50 : 44);
+        $height = 42 + count($labels) * $rowHeight;
+        $plotX = $portrait ? 350 : 470;
+        $plotEnd = $canvasWidth - 175;
+        $values = array_merge(...array_column($series, 'values'));
+        $minimum = min(0.0, ...$values);
+        $maximum = max(1.0, ...$values);
+        if ($divergent) {
+            $maximum = max(1.0, ...array_map('abs', $values));
+            $minimum = -$maximum;
         }
+        $scale = ($plotEnd - $plotX) / ($maximum - $minimum);
+        $zero = $plotX - $minimum * $scale;
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '.$canvasWidth.' '.$height.'">';
+        $legend = $divergent ? [['label' => 'Negativo (−)'], ['label' => 'Positivo (+)']] : $series;
+        foreach ($legend as $index => $dataset) {
+            $color = $divergent ? ['#60a5fa', '#15323b'][$index] : (count($series) > 1 ? ['#15323b', '#39d5c4'][$index] : '#39d5c4');
+            $legendX = $plotX + $index * 190;
+            $svg .= '<rect x="'.$legendX.'" y="0" width="12" height="12" fill="'.$color.'"/>';
+            $svg .= '<text x="'.($legendX + 20).'" y="12" font-family="Geist" font-size="16" fill="#15323b">'.$this->escape($dataset['label']).'</text>';
+        }
+        $svg .= '<line class="zero-axis" x1="'.$zero.'" x2="'.$zero.'" y1="32" y2="'.$height.'" stroke="#91a3a8" stroke-width="1.5"/>';
+        $svg .= '<text x="'.$zero.'" y="28" text-anchor="middle" font-family="Geist" font-size="14" fill="#526762">0</text>';
         foreach ($labels as $row => $label) {
-            $y = 34 + $row * $rowHeight;
-            $svg .= '<text x="4" y="'.($y + 10).'" font-family="sans-serif" font-size="9" fill="#33484b">'.$this->escape(mb_strimwidth($label, 0, 28, '…')).'</text>';
-            foreach ($series as $index => $dataset) {
-                $value = $dataset['values'][$row] ?? 0.0;
-                $width = abs($value) / $max * ($plotWidth - 112);
-                $barY = $y + $index * 10;
-                $color = $dataset['colors'][$row] ?? $dataset['colors'][0];
-                $svg .= '<rect x="'.$plotX.'" y="'.$barY.'" width="'.round($width, 2).'" height="8" rx="1" fill="'.$color.'"/>';
-                $svg .= '<text x="'.($plotX + $width + 5).'" y="'.($barY + 7).'" font-family="sans-serif" font-size="8" fill="#33484b">'.$this->escape(Number::currency($value, in: 'EUR', locale: 'it')).'</text>';
+            $y = 42 + $row * $rowHeight;
+            $lineLength = $portrait ? 32 : 44;
+            $firstLine = mb_substr($label, 0, $lineLength);
+            $space = mb_strrpos($firstLine, ' ');
+            $split = mb_strlen($label) > $lineLength && $space !== false ? $space : $lineLength;
+            foreach ([mb_substr($label, 0, $split), ltrim(mb_substr($label, $split))] as $lineIndex => $line) {
+                $svg .= '<text x="0" y="'.($y + 15 + $lineIndex * 19).'" font-family="Geist" font-size="18" fill="#15323b">'.$this->escape(mb_strimwidth($line, 0, $lineLength, '…')).'</text>';
             }
+            foreach ($series as $index => $dataset) {
+                $value = $dataset['values'][$row];
+                $width = abs($value) * $scale;
+                $x = $value < 0 ? $zero - $width : $zero;
+                $barY = $y + $index * 23;
+                $color = $divergent
+                    ? ($value > 0 ? '#15323b' : '#60a5fa')
+                    : (count($series) > 1 ? ['#15323b', '#39d5c4'][$index] : '#39d5c4');
+                if ($value === 0.0) {
+                    $svg .= '<circle class="zero-value" cx="'.$zero.'" cy="'.($barY + 7).'" r="3" fill="#667b7d"/>';
+                } else {
+                    $svg .= '<rect class="'.($value < 0 ? 'negative' : 'positive').'" x="'.$x.'" y="'.$barY.'" width="'.$width.'" height="14" fill="'.$color.'"/>';
+                }
+                $formatted = ($divergent && $value > 0 ? '+' : '').Number::currency($value, in: 'EUR', locale: 'it');
+                $svg .= '<text x="'.($canvasWidth - 2).'" y="'.($barY + 14).'" text-anchor="end" font-family="Geist" font-size="16" fill="#15323b">'.$this->escape($formatted).'</text>';
+            }
+        }
+        $svg .= '</svg>';
+
+        return compact('id', 'heading', 'description') + ['image' => 'data:image/svg+xml;base64,'.base64_encode($svg)];
+    }
+
+    /**
+     * @param  array<int, string>  $labels
+     * @param  array{label: string, values: array<int, float>, colors: array<int, string>}  $series
+     * @return array{id: string, heading: string, description: string, image: string}
+     */
+    private function categoryDistribution(string $id, string $heading, string $description, array $labels, array $series, string $orientation): array
+    {
+        $width = $orientation === 'portrait' ? 1000 : 1400;
+        $total = array_sum($series['values']);
+        $offset = 0.0;
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '.$width.' 76">';
+        foreach ($labels as $index => $label) {
+            $count = (int) $series['values'][$index];
+            $color = ['#39d5c4', '#60a5fa', '#91a3a8', '#15323b'][$index];
+            if ($count > 0) {
+                $segment = $count / $total * $width;
+                $svg .= '<rect x="'.$offset.'" y="0" width="'.$segment.'" height="16" fill="'.$color.'"/>';
+                $offset += $segment;
+            }
+            $x = $index * $width / count($labels);
+            $svg .= '<rect x="'.$x.'" y="32" width="10" height="10" fill="'.$color.'"/>';
+            $svg .= '<text x="'.($x + 18).'" y="43" font-family="Geist" font-size="18" fill="#526762">'.$this->escape($label).'</text>';
+            $svg .= '<text x="'.($x + 18).'" y="69" font-family="Geist" font-size="24" fill="#15323b">'.$count.'</text>';
         }
         $svg .= '</svg>';
 
