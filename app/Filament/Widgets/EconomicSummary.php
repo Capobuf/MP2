@@ -20,6 +20,17 @@ class EconomicSummary extends Widget
 
     protected static bool $isLazy = false;
 
+    public static function canView(): bool
+    {
+        $tenant = Filament::getTenant();
+        $user = auth()->user();
+
+        return $tenant instanceof TenantCompany
+            && $user instanceof User
+            && $user->canAccessTenant($tenant)
+            && $user->can('View:Reports');
+    }
+
     /** @return array<string, mixed> */
     protected function getViewData(): array
     {

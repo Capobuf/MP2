@@ -4178,6 +4178,12 @@ Devono essere registrati almeno:
 - motivo opzionale;
 - valore precedente e nuovo.
 
+Nel modello autorizzativo corrente, quando cambiano i permessi di un ruolo globale,
+il sistema registra l'effetto effettivo per ciascun beneficiario associato a una Azienda,
+attribuendolo all'Azienda del beneficiario e alla stessa operazione. Un beneficiario per
+il quale le autorizzazioni effettive non cambiano non genera un evento. Gli account
+globali senza Azienda non generano eventi nella Timeline di un Tenant.
+
 ## 26.9 Audit delle Impostazioni
 
 Ogni modifica registra:
@@ -6617,9 +6623,12 @@ L'eliminazione **MUST NOT**:
 * lasciare parti del dominio accessibili;
 * lasciare oggetti orfani appartenenti al Tenant.
 
-Il ciclo di vita degli eventuali account utente globali della piattaforma non è definito da questa sezione.
+Nel modello corrente, gli account associati a una Azienda e privi del ruolo `super_admin`
+sono account interni al Tenant e vengono eliminati definitivamente insieme al Tenant.
 
-L'eliminazione delle associazioni fra tali account e il Tenant eliminato è invece obbligatoria.
+Gli account con ruolo `super_admin` sono account globali della piattaforma e **MUST NOT**
+essere eliminati dalla cancellazione di un Tenant. Qualora uno di essi risulti associato
+all'Azienda eliminata, la sola associazione viene rimossa.
 
 ---
 

@@ -7,6 +7,7 @@ use App\Domain\Contracts\ContractState;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Projects\ProjectAnnualReferenceDate;
 use App\Domain\Projects\ProjectDeferralMode;
+use App\Domain\Projects\ProjectDeferralValues;
 use App\Domain\Projects\ProjectState;
 use App\Domain\Reporting\ActualReference;
 use App\Domain\Reporting\ComparisonEngine;
@@ -175,7 +176,7 @@ final class BuildReport
             allocation: (string) $row->approved_allocation,
             actual: '0.00',
             hasActuals: false,
-            carryover: (string) $row->approved_carryover,
+            receivedCarryover: (string) $row->approved_carryover,
             detail: $row->detail,
         ))->all();
     }
@@ -235,6 +236,7 @@ final class BuildReport
                 actual: $actual,
                 hasActuals: (bool) $row->has_actuals,
                 carryover: (string) ($detail['consolidated_carryover'] ?? '0.00'),
+                receivedCarryover: (string) $row->received_carryover,
                 residual: (string) ($detail['residual'] ?? '0.00'),
                 saving: (string) ($detail['saving'] ?? '0.00'),
                 unused: (string) ($detail['unused_allocation'] ?? '0.00'),
@@ -308,6 +310,7 @@ final class BuildReport
                 continue;
             }
             $balance = Decimal::subtract((string) $totals['allocation'], (string) $totals['actual']);
+            $residual = ProjectDeferralValues::residual((string) $totals['allocation'], (string) $totals['actual']);
             $sources[] = new ReportSource(
                 sourceType: 'project', originId: $project->id, originKey: $project->originKey(), copiedFromOriginKey: null,
                 label: $project->title, summary: $project->description, supplierId: null, supplierLabel: null,
@@ -315,14 +318,15 @@ final class BuildReport
                 state: $state?->value,
                 allocation: (string) $totals['allocation'], actual: (string) $totals['actual'], hasActuals: (bool) $totals['has_actuals'],
                 carryover: $carryover,
-                residual: in_array($state?->value, ['planned', 'open'], true) ? $balance : '0.00',
+                receivedCarryover: $incomingCarryover,
+                residual: in_array($state?->value, ['planned', 'open'], true) ? $residual : '0.00',
                 saving: $state?->value === 'closed' ? $balance : '0.00',
                 unused: $state?->value === 'cancelled' ? $balance : '0.00',
                 detail: [
                     'expenses' => $project->expenses->map(fn (Expense $expense): array => $this->expenseDetail($expense))->all(),
                     'transitions' => $project->transitions->map(fn ($transition): array => $transition->toArray())->all(),
                     'deferrals' => $project->deferrals->map(fn ($deferral): array => $deferral->toArray())->all(),
-                    'residual' => in_array($state?->value, ['planned', 'open'], true) ? $balance : '0.00',
+                    'residual' => in_array($state?->value, ['planned', 'open'], true) ? $residual : '0.00',
                     'saving' => $state?->value === 'closed' ? $balance : '0.00',
                     'unused_allocation' => $state?->value === 'cancelled' ? $balance : '0.00',
                     'archived_or_reversed' => $project->isArchived(),

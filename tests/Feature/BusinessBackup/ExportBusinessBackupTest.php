@@ -29,7 +29,11 @@ it('exports the exact V1 workbook only for a viewer of an active Tenant', functi
 
     $artifact = app(ExportBusinessBackup::class)->execute($company, $viewer);
     try {
-        expect($artifact['filename'])->toMatch('/^MP2-azienda-backup-\d{4}-\d{2}-\d{2}\.xlsx$/')
+        expect($artifact['filename'])->toBe(sprintf(
+            'MP2-azienda-backup-%s-%s.xlsx',
+            now($company->timezone)->format('Y-m-d'),
+            $artifact['package_id'],
+        ))
             ->and(is_file($artifact['path']))->toBeTrue();
 
         $workbook = IOFactory::load($artifact['path']);

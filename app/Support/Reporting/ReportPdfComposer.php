@@ -486,8 +486,8 @@ final class ReportPdfComposer
                         : 'Contratti ordinati per Allocato decrescente.',
                     array_map(fn (ReportSource $source): string => $source->label, $sources),
                     [
-                        ['label' => 'Allocato', 'data' => array_map(fn (ReportSource $source): float => (float) $source->allocation, $sources), 'color' => '#15323B'],
-                        ['label' => 'Effettivo', 'data' => array_map(fn (ReportSource $source): float => (float) $source->actual, $sources), 'color' => '#39D5C4'],
+                        ['label' => 'Allocato', 'data' => array_map(fn (ReportSource $source): float => (float) $source->allocation, $sources), 'color' => '#39D5C4'],
+                        ['label' => 'Effettivo', 'data' => array_map(fn (ReportSource $source): float => (float) $source->actual, $sources), 'color' => '#60A5FA'],
                     ],
                 );
 

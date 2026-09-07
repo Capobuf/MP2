@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Operations\CreateExpense;
 use App\Actions\Reporting\BuildReport;
 use App\Domain\Reporting\ReportDefinition;
 use App\Models\BudgetSnapshot;
@@ -9,12 +10,83 @@ use App\Models\Company;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
+use App\Models\Project;
 use App\Models\Proposal;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
+
+afterEach(fn () => CarbonImmutable::setTestNow());
+
+it('uses the domain residual for an overspent current Project', function (): void {
+    CarbonImmutable::setTestNow('2026-09-07 10:00:00 Europe/Rome');
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    $viewer = s11ReportingViewer($company);
+    grantTestPermissions([
+        'company_id' => $company->id,
+        'user' => $viewer,
+        'permissions' => TestPermissions::MANAGE_OPERATIONS,
+    ]);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $project = Project::factory()->for($company)->create([
+        'initial_state' => 'open',
+        'initial_effective_date' => '2026-01-01',
+    ]);
+
+    app(CreateExpense::class)->execute($viewer, $company, [
+        'exercise_id' => $exercise->id,
+        'project_id' => $project->id,
+        'description' => 'Spesa in sovraspesa',
+        'lines' => [
+            ['type' => 'estimate', 'amount' => '100.00'],
+            ['type' => 'actual', 'amount' => '150.00'],
+        ],
+    ], (string) Str::uuid());
+
+    $result = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'kind' => 'projects',
+        'final_reference' => ['type' => 'current', 'exercise_id' => $exercise->id],
+    ], CarbonImmutable::now()));
+
+    $source = collect($result->sources)->sole(fn ($source): bool => $source->originId === $project->id);
+    expect($source->allocation)->toBe('100.00')
+        ->and($source->actual)->toBe('150.00')
+        ->and($source->residual)->toBe('0.00')
+        ->and($source->detail['residual'])->toBe('0.00')
+        ->and($result->totals['current_operational_variance'])->toBe('50.00');
+
+    $underBudgetProject = Project::factory()->for($company)->create([
+        'initial_state' => 'open',
+        'initial_effective_date' => '2026-01-01',
+    ]);
+    app(CreateExpense::class)->execute($viewer, $company, [
+        'exercise_id' => $exercise->id,
+        'project_id' => $underBudgetProject->id,
+        'description' => 'Spesa entro l’allocato',
+        'lines' => [
+            ['type' => 'estimate', 'amount' => '100.00'],
+            ['type' => 'actual', 'amount' => '40.00'],
+        ],
+    ], (string) Str::uuid());
+
+    $updatedResult = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'kind' => 'projects',
+        'final_reference' => ['type' => 'current', 'exercise_id' => $exercise->id],
+    ], CarbonImmutable::now()));
+    $underBudgetSource = collect($updatedResult->sources)
+        ->sole(fn ($reportSource): bool => $reportSource->originId === $underBudgetProject->id);
+
+    expect($underBudgetSource->residual)->toBe('60.00')
+        ->and($underBudgetSource->detail['residual'])->toBe('60.00');
+});
 
 it('builds the annual executive header and distinct current measures', function (): void {
     CarbonImmutable::setTestNow('2026-08-24 10:00:00 Europe/Rome');

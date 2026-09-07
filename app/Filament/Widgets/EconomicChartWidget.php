@@ -26,6 +26,17 @@ abstract class EconomicChartWidget extends ChartWidget
     /** @var array<string, mixed>|null */
     private ?array $economicData = null;
 
+    public static function canView(): bool
+    {
+        $tenant = Filament::getTenant();
+        $user = auth()->user();
+
+        return $tenant instanceof TenantCompany
+            && $user instanceof User
+            && $user->canAccessTenant($tenant)
+            && $user->can('View:Reports');
+    }
+
     public function chartSurfaceClass(): string
     {
         return 'mp2-economic-chart';

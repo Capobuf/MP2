@@ -96,6 +96,7 @@ it('lists both states and exposes only the valid lifecycle action for each row',
 it('requires both Wizard confirmations and destroys only after both are present', function (): void {
     $platformAdmin = User::factory()->platformAdmin()->create();
     $company = Company::factory()->create(['name' => 'Da eliminare']);
+    $tenantUser = User::factory()->create(['company_id' => $company->id]);
     $this->actingAs($platformAdmin);
 
     Livewire::test(ListTenantCompanies::class)
@@ -121,7 +122,8 @@ it('requires both Wizard confirmations and destroys only after both are present'
         ])
         ->assertNotified('Cancellazione Completata');
 
-    expect(Company::query()->whereKey($company->id)->exists())->toBeFalse();
+    expect(Company::query()->whereKey($company->id)->exists())->toBeFalse()
+        ->and(User::query()->whereKey($tenantUser->id)->exists())->toBeFalse();
 });
 
 it('reports pending file cleanup without claiming database and storage atomicity', function (): void {

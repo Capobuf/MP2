@@ -1,10 +1,13 @@
 <?php
 
+use App\Domain\Company\AuditEventType;
 use App\Filament\Platform\Resources\SuperAdmins\Pages\CreateSuperAdmin;
 use App\Filament\Platform\Resources\SuperAdmins\Pages\ListSuperAdmins;
 use App\Filament\Resources\Users\Pages\CreateUser;
+use App\Filament\Resources\Users\Pages\EditUser;
 use App\Filament\Resources\Users\Pages\ListUsers;
 use App\Filament\Resources\Users\UserResource;
+use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -70,8 +73,15 @@ it('creates a tenant user with a global Spatie role and rejects super_admin assi
         ->assertHasNoFormErrors();
 
     $created = User::query()->where('email', 'nuovo@example.test')->sole();
+    $event = AuditEvent::query()->sole();
     expect($created->company_id)->toBe($company->id)
-        ->and($created->roles->modelKeys())->toBe([$ordinaryRole->id]);
+        ->and($created->roles->modelKeys())->toBe([$ordinaryRole->id])
+        ->and($event->event_type)->toBe(AuditEventType::AuthorizationChanged)
+        ->and($event->actor_id)->toBe($manager->id)
+        ->and($event->beneficiary_id)->toBe($created->id)
+        ->and($event->company_id)->toBe($company->id)
+        ->and($event->previous_value)->toBe(['roles' => [], 'permissions' => []])
+        ->and($event->new_value['assigned_roles'])->toBe(['Operatore']);
 
     Livewire::test(CreateUser::class)
         ->fillForm([
@@ -84,6 +94,72 @@ it('creates a tenant user with a global Spatie role and rejects super_admin assi
         ->assertHasFormErrors(['roles.0']);
 
     expect(User::query()->where('email', 'elevazione@example.test')->exists())->toBeFalse();
+});
+
+it('audits real role changes without producing events for unchanged saves', function () {
+    $company = Company::factory()->create();
+    $manager = User::factory()->create();
+    grantTestPermissions([
+        'company_id' => $company->id,
+        'user' => $manager,
+        'permissions' => TestPermissions::MANAGE_PERMISSIONS,
+    ]);
+    $viewer = Role::query()->create(['name' => 'Ruolo lettura', 'guard_name' => 'web']);
+    $editor = Role::query()->create(['name' => 'Ruolo modifica', 'guard_name' => 'web']);
+    $beneficiary = User::factory()->create(['company_id' => $company->id]);
+    $beneficiary->assignRole($viewer);
+
+    $this->actingAs($manager);
+    Filament::setCurrentPanel('admin');
+    Filament::setTenant($company->tenantCompany);
+
+    Livewire::test(EditUser::class, ['record' => $beneficiary->getRouteKey()])
+        ->fillForm(['roles' => [$editor->id]])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $event = AuditEvent::query()->sole();
+    expect($beneficiary->refresh()->roles->modelKeys())->toBe([$editor->id])
+        ->and($event->actor_id)->toBe($manager->id)
+        ->and($event->beneficiary_id)->toBe($beneficiary->id)
+        ->and($event->previous_value['roles'])->toBe(['Ruolo lettura'])
+        ->and($event->new_value['roles'])->toBe(['Ruolo modifica'])
+        ->and($event->new_value['assigned_roles'])->toBe(['Ruolo modifica'])
+        ->and($event->new_value['revoked_roles'])->toBe(['Ruolo lettura']);
+
+    Livewire::test(EditUser::class, ['record' => $beneficiary->getRouteKey()])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(AuditEvent::query()->count())->toBe(1);
+});
+
+it('rolls back a role change when its audit cannot be recorded', function () {
+    $company = Company::factory()->create();
+    $manager = User::factory()->create();
+    grantTestPermissions([
+        'company_id' => $company->id,
+        'user' => $manager,
+        'permissions' => TestPermissions::MANAGE_PERMISSIONS,
+    ]);
+    $viewer = Role::query()->create(['name' => 'Ruolo iniziale', 'guard_name' => 'web']);
+    $editor = Role::query()->create(['name' => 'Ruolo non salvato', 'guard_name' => 'web']);
+    $beneficiary = User::factory()->create(['company_id' => $company->id]);
+    $beneficiary->assignRole($viewer);
+
+    $this->actingAs($manager);
+    Filament::setCurrentPanel('admin');
+    Filament::setTenant($company->tenantCompany);
+    AuditEvent::creating(fn () => throw new RuntimeException('Forced audit failure'));
+
+    expect(fn () => Livewire::test(EditUser::class, ['record' => $beneficiary->getRouteKey()])
+        ->fillForm(['roles' => [$editor->id]])
+        ->call('save'))
+        ->toThrow(RuntimeException::class, 'Forced audit failure');
+
+    AuditEvent::flushEventListeners();
+
+    expect($beneficiary->refresh()->roles->modelKeys())->toBe([$viewer->id]);
 });
 
 it('manages only super administrators through the Platform resource', function () {

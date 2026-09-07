@@ -25,6 +25,7 @@ final readonly class ReportSource
         public string $actual,
         public bool $hasActuals,
         public string $carryover = '0.00',
+        public string $receivedCarryover = '0.00',
         public string $residual = '0.00',
         public string $saving = '0.00',
         public string $unused = '0.00',

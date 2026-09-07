@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Platform\Resources\Roles\RoleResource;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Enums\ThemeMode;
@@ -40,6 +41,9 @@ class PlatformPanelProvider extends PanelProvider
             ->multiFactorAuthentication([
                 AppAuthentication::make()
                     ->recoverable(),
+            ])
+            ->resources([
+                RoleResource::class,
             ])
             ->plugin(
                 FilamentShieldPlugin::make()

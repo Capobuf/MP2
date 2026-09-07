@@ -77,7 +77,7 @@ class TenantCompaniesTable
                     ->label('Elimina Definitivamente')
                     ->color('danger')
                     ->modalHeading(fn (TenantCompany $record): string => "Elimina Definitivamente {$record->company->name}")
-                    ->modalDescription('La cancellazione è irreversibile e rimuove Azienda, contratti, progetti, spese, snapshot, audit, allegati e ogni altro dato appartenente al Tenant. Il Tenant deve essere privo di utenti.')
+                    ->modalDescription('La cancellazione è irreversibile e rimuove Azienda, account utente interni, contratti, progetti, spese, snapshot, audit, allegati e ogni altro dato appartenente al Tenant. I Super Admin non vengono eliminati.')
                     ->modalSubmitActionLabel('Elimina Definitivamente')
                     ->steps([
                         Step::make('Irreversibilità')->schema([

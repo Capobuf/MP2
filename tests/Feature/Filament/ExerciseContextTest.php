@@ -2,7 +2,9 @@
 
 use App\Domain\Expenses\ExerciseStatus;
 use App\Filament\Pages\Dashboard;
+use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Widgets\EconomicSummary;
+use App\Filament\Widgets\SourceEconomicProfileChart;
 use App\Livewire\ExerciseContextSelector;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
@@ -126,6 +128,36 @@ it('does not expose the Platform link to a tenant user', function (): void {
         ->assertOk()
         ->assertDontSee('Piattaforma');
 });
+
+it('keeps the tenant dashboard usable without exposing economic widgets to an expense-only user', function (bool $withExercise): void {
+    $company = Company::factory()->create();
+    if ($withExercise) {
+        Exercise::factory()->for($company)->create(['year' => 2026]);
+    }
+    $user = User::factory()->create();
+    grantTestPermissions([
+        'company_id' => $company->id,
+        'user' => $user,
+        'permissions' => ['ViewAny:Expense', 'View:Expense'],
+    ]);
+
+    $this->actingAs($user);
+    Filament::setCurrentPanel('admin');
+    Filament::setTenant($company->tenantCompany);
+
+    $this->get(ExpenseResource::getUrl(tenant: $company->tenantCompany))
+        ->assertOk();
+    $this->get(Dashboard::getUrl(tenant: $company->tenantCompany))
+        ->assertOk()
+        ->assertDontSee('Quadro Economico')
+        ->assertDontSee('Profilo Economico delle Sorgenti');
+
+    expect(EconomicSummary::canView())->toBeFalse()
+        ->and(SourceEconomicProfileChart::canView())->toBeFalse();
+})->with([
+    'tenant senza Esercizi' => false,
+    'tenant con un Esercizio' => true,
+]);
 
 it('orders Exercises by descending year in the selector', function (): void {
     $user = User::factory()->create();

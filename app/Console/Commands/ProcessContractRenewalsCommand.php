@@ -7,6 +7,7 @@ use App\Domain\Company\TenantCompanyStatus;
 use App\Models\Contract;
 use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ProcessContractRenewalsCommand extends Command
@@ -34,6 +35,11 @@ class ProcessContractRenewalsCommand extends Command
                 if (! $actor instanceof User) {
                     $failed++;
                     $this->warn("Contratto {$contract->id}: nessun operatore autorizzato disponibile.");
+                    Log::error('Elaborazione rinnovo contratto fallita.', [
+                        'company_id' => $contract->company_id,
+                        'contract_id' => $contract->id,
+                        'reason' => 'no_authorized_operator',
+                    ]);
 
                     return;
                 }
@@ -42,11 +48,18 @@ class ProcessContractRenewalsCommand extends Command
                 } catch (\Throwable $exception) {
                     $failed++;
                     $this->warn("Contratto {$contract->id}: {$exception->getMessage()}");
+                    Log::error('Elaborazione rinnovo contratto fallita.', [
+                        'company_id' => $contract->company_id,
+                        'contract_id' => $contract->id,
+                        'reason' => 'processing_exception',
+                        'exception' => $exception::class,
+                        'message' => $exception->getMessage(),
+                    ]);
                 }
             });
 
         $this->info($failed === 0 ? 'Scadenze contrattuali elaborate.' : "Scadenze elaborate con {$failed} contratto/i non aggiornato/i.");
 
-        return self::SUCCESS;
+        return $failed === 0 ? self::SUCCESS : self::FAILURE;
     }
 }

@@ -15,6 +15,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Tests\Support\TestPermissions;
 
@@ -88,12 +89,43 @@ it('runs from the command without opening a page and isolates a broken contract 
         'contractual_start_date' => '2023-01-01',
         'next_expiry_date' => '2025-12-31', 'renewal_anchor_date' => '2025-12-31',
     ]);
+    $laterFixture = renewalFixture();
+    Log::spy();
 
-    $this->artisan('contracts:process-renewals')->assertSuccessful();
-    $this->artisan('contracts:process-renewals')->assertSuccessful();
+    $this->artisan('contracts:process-renewals')->assertFailed();
+    $this->artisan('contracts:process-renewals')->assertFailed();
 
     expect($contract->refresh()->next_expiry_date->toDateString())->toBe('2026-12-31')
-        ->and($broken->refresh()->next_expiry_date->toDateString())->toBe('2025-12-31');
+        ->and($broken->refresh()->next_expiry_date->toDateString())->toBe('2025-12-31')
+        ->and($laterFixture['contract']->refresh()->next_expiry_date->toDateString())->toBe('2026-12-31');
+    Log::shouldHaveReceived('error')
+        ->with('Elaborazione rinnovo contratto fallita.', Mockery::on(fn (array $context): bool => $context['company_id'] === $company->id
+            && $context['contract_id'] === $broken->id
+            && $context['reason'] === 'processing_exception'))
+        ->twice();
+});
+
+it('fails and logs identifiers when no authorized renewal operator exists', function (): void {
+    $company = Company::factory()->create();
+    $contract = Contract::factory()->for($company)->create([
+        'contractual_start_date' => '2025-01-01',
+        'next_expiry_date' => '2025-12-31',
+        'renewal_anchor_date' => '2025-12-31',
+    ]);
+    Log::spy();
+
+    $this->artisan('contracts:process-renewals')
+        ->assertFailed()
+        ->expectsOutputToContain('nessun operatore autorizzato disponibile');
+
+    Log::shouldHaveReceived('error')->once()->with(
+        'Elaborazione rinnovo contratto fallita.',
+        [
+            'company_id' => $company->id,
+            'contract_id' => $contract->id,
+            'reason' => 'no_authorized_operator',
+        ],
+    );
 });
 
 it('skips archived Tenants and catches up from real dates after Restore', function (): void {

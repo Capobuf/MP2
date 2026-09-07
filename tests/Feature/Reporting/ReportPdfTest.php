@@ -224,6 +224,8 @@ it('composes the dedicated contracts document with validated orientation and spe
         ->and($landscapeHtml)->toContain('class="portfolio-summary"', 'class="economic-summary"', 'Registro contratti')
         ->and($portraitHtml)->toContain('class="portfolio-summary"', 'class="economic-summary"', 'class="contract-secondary"')
         ->and($landscapeBarSvg)->toContain('Contratto Connettività', '120,00', '45,00')
+        ->and($landscapeBarSvg)->toContain('fill="#39D5C4"', 'fill="#60A5FA"')
+        ->and($landscapeBarSvg)->not->toMatch('/<rect[^>]+fill="#15323B"/')
         ->and($landscapeStateSvg)->toContain('Pianificato', 'Attivo', 'Cessato', 'Annullato')
         ->and($portraitStateSvg)->toBe($landscapeStateSvg)
         ->and($landscape['selected_blocks'])->not->toContain('details:contracts')
@@ -784,10 +786,10 @@ function pdfFamilyFixture(string $kind, int $count = 12, bool $annualComparison 
             label: 'Progetto '.$index.' · Infrastruttura e servizi applicativi', summary: 'Intervento sul sistema informativo',
             supplierId: null, supplierLabel: null, costCenterId: $index, costCenterLabel: 'Centro '.$index,
             state: 'open', allocation: (string) ($index * 1000), actual: (string) ($index * ($index === 1 ? 1000 : ($index % 2 ? 1250 : 750))),
-            hasActuals: true, carryover: (string) ((20 - $index) * 25), residual: '150.00',
+            hasActuals: true, carryover: (string) ((20 - $index) * 25), receivedCarryover: (string) ((20 - $index) * 25), residual: '150.00',
             detail: ['expenses' => [[
                 'id' => $index, 'source' => 'Spesa '.$index, 'supplier_id' => $index, 'supplier_label' => 'Fornitore '.$index,
-                'allocation' => (string) ($index * 1000), 'actual' => (string) ($index * 750),
+                'allocation' => (string) (($index * 1000) - ((20 - $index) * 25)), 'actual' => (string) ($index * 750),
                 'lines' => [['id' => $index, 'type' => 'actual', 'amount' => '25.00', 'note' => 'Nota verificabile', 'annulled' => false]],
             ]]],
         );

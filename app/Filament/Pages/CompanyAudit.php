@@ -413,6 +413,14 @@ class CompanyAudit extends Page implements HasTable
                 'sha256' => 'SHA-256',
                 'detached_at' => 'Rimosso il',
             ],
+            User::class => [
+                'roles' => 'Ruoli',
+                'permissions' => 'Permessi',
+                'assigned_roles' => 'Ruoli Assegnati',
+                'revoked_roles' => 'Ruoli Revocati',
+                'assigned_permissions' => 'Permessi Assegnati',
+                'revoked_permissions' => 'Permessi Revocati',
+            ],
             default => null,
         };
 

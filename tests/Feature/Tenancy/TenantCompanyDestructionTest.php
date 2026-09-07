@@ -87,6 +87,12 @@ it('deletes the full Tenant graph while preserving shared Users, another Tenant 
     $actor = User::factory()->platformAdmin()->create();
     $company = Company::factory()->create(['name' => 'Target']);
     $otherCompany = Company::factory()->create(['name' => 'Other']);
+    $tenantUser = User::factory()->create(['company_id' => $company->id]);
+    grantTestPermissions([
+        'company_id' => $company->id,
+        'user' => $tenantUser,
+        'permissions' => TestPermissions::VIEW,
+    ]);
 
     $exclusivePath = 'attachments/target-exclusive.pdf';
     $sharedPath = 'attachments/shared.pdf';
@@ -138,6 +144,7 @@ it('deletes the full Tenant graph while preserving shared Users, another Tenant 
     expect($result->isComplete())->toBeTrue()
         ->and($result->filesProcessed)->toBe(3)
         ->and(Company::query()->find($company->id))->toBeNull()
+        ->and(User::query()->whereKey($tenantUser->id)->exists())->toBeFalse()
         ->and(User::query()->whereKey($actor->id)->exists())->toBeTrue()
         ->and(Company::query()->whereKey($otherCompany->id)->exists())->toBeTrue()
         ->and(PendingFileDeletion::query()->count())->toBe(0);
@@ -177,15 +184,18 @@ it('requires platform authorization and both independent confirmations with zero
         ->and(PendingFileDeletion::query()->count())->toBe(0);
 });
 
-it('refuses permanent destruction while tenant users are still linked', function (): void {
+it('deletes Tenant users while preserving and detaching Super Admin accounts', function (): void {
     $company = Company::factory()->create();
     $tenantUser = User::factory()->create(['company_id' => $company->id]);
     $platform = User::factory()->platformAdmin()->create();
+    $platform->forceFill(['company_id' => $company->id])->save();
 
-    expect(fn () => app(DestroyTenantCompany::class)->execute($platform, $company->tenantCompany, true, true))
-        ->toThrow(ValidationException::class, 'contiene utenti')
-        ->and($tenantUser->refresh()->company_id)->toBe($company->id)
-        ->and($company->refresh()->exists)->toBeTrue();
+    app(DestroyTenantCompany::class)->execute($platform, $company->tenantCompany, true, true);
+
+    expect(User::query()->whereKey($tenantUser->id)->exists())->toBeFalse()
+        ->and($platform->refresh()->company_id)->toBeNull()
+        ->and($platform->hasRole('super_admin'))->toBeTrue()
+        ->and(Company::query()->whereKey($company->id)->exists())->toBeFalse();
 });
 
 it('serializes an Archive followed by destruction and rejects a stale deleted target', function (): void {
@@ -218,6 +228,13 @@ it('supports archived targets and rolls back graph and manifest when the databas
         ->and(Company::query()->whereKey($archived->id)->exists())->toBeFalse();
 
     $company = Company::factory()->create();
+    $tenantUser = User::factory()->create(['company_id' => $company->id]);
+    grantTestPermissions([
+        'company_id' => $company->id,
+        'user' => $tenantUser,
+        'permissions' => TestPermissions::VIEW,
+    ]);
+    $tenantRoleIds = $tenantUser->roles->modelKeys();
     $contract = Contract::factory()->create(['company_id' => $company->id]);
     $path = 'attachments/rollback.pdf';
     Storage::disk('tenant-destruction-rollback')->put($path, 'content');
@@ -238,6 +255,8 @@ it('supports archived targets and rolls back graph and manifest when the databas
         ->toThrow(RuntimeException::class, 'Injected delete failure');
 
     expect(Company::query()->whereKey($company->id)->exists())->toBeTrue()
+        ->and($tenantUser->refresh()->company_id)->toBe($company->id)
+        ->and($tenantUser->roles->modelKeys())->toBe($tenantRoleIds)
         ->and(Attachment::query()->where('company_id', $company->id)->exists())->toBeTrue()
         ->and(PendingFileDeletion::query()->count())->toBe(0);
     Storage::disk('tenant-destruction-rollback')->assertExists($path);

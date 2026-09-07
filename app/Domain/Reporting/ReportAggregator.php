@@ -66,7 +66,7 @@ final class ReportAggregator
                 $buckets[$key]['sources'][] = $expense['source'] ?? $source->label;
             }
 
-            if (Decimal::compare($source->carryover, '0.00') !== 0) {
+            if (Decimal::compare($source->receivedCarryover, '0.00') !== 0) {
                 $key = 'carryover_without_supplier';
                 $buckets[$key] ??= [
                     'key' => $key,
@@ -75,7 +75,7 @@ final class ReportAggregator
                     'actual' => '0.00',
                     'sources' => [],
                 ];
-                $buckets[$key]['allocation'] = Decimal::add($buckets[$key]['allocation'], $source->carryover);
+                $buckets[$key]['allocation'] = Decimal::add($buckets[$key]['allocation'], $source->receivedCarryover);
                 $buckets[$key]['sources'][] = $source->label;
             }
         }

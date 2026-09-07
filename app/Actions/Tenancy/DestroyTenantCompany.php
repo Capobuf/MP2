@@ -35,12 +35,6 @@ class DestroyTenantCompany
 
             Gate::forUser($actor)->authorize('destroy', $lockedTenant);
 
-            if ($company->users()->exists()) {
-                throw ValidationException::withMessages([
-                    'tenant' => 'Il Tenant Azienda non può essere eliminato finché contiene utenti.',
-                ]);
-            }
-
             if (! in_array($lockedTenant->status(), [TenantCompanyStatus::Active, TenantCompanyStatus::Archived], true)) {
                 throw ValidationException::withMessages([
                     'tenant' => 'Lo stato del Tenant Azienda non consente la cancellazione definitiva.',
@@ -62,6 +56,14 @@ class DestroyTenantCompany
             $operationId = (string) Str::uuid();
             $files = $this->exclusiveFiles($company->getKey());
             $now = now();
+            $linkedUsers = User::query()
+                ->where('company_id', $company->getKey())
+                ->lockForUpdate()
+                ->get();
+            $tenantUsers = $linkedUsers
+                ->reject(fn (User $user): bool => $user->hasRole('super_admin'));
+            $tenantUserIds = $tenantUsers->modelKeys();
+            $tenantUserEmails = $tenantUsers->pluck('email')->all();
 
             if ($files !== []) {
                 DB::table('pending_file_deletions')->upsert(
@@ -80,9 +82,33 @@ class DestroyTenantCompany
                 );
             }
 
+            if ($linkedUsers->isNotEmpty()) {
+                User::query()
+                    ->whereKey($linkedUsers->modelKeys())
+                    ->update(['company_id' => null]);
+            }
+
             $deleted = DB::table('companies')->where('id', $company->getKey())->delete();
             if ($deleted !== 1) {
                 throw new \RuntimeException('The locked Company could not be deleted.');
+            }
+
+            if ($tenantUserIds !== []) {
+                DB::table('model_has_roles')
+                    ->where('model_type', User::class)
+                    ->whereIn('model_id', $tenantUserIds)
+                    ->delete();
+                DB::table('model_has_permissions')
+                    ->where('model_type', User::class)
+                    ->whereIn('model_id', $tenantUserIds)
+                    ->delete();
+                DB::table('sessions')->whereIn('user_id', $tenantUserIds)->delete();
+                DB::table('password_reset_tokens')->whereIn('email', $tenantUserEmails)->delete();
+
+                $deletedUsers = DB::table('users')->whereIn('id', $tenantUserIds)->delete();
+                if ($deletedUsers !== count($tenantUserIds)) {
+                    throw new \RuntimeException('Not all Tenant users could be deleted.');
+                }
             }
 
             return $operationId;

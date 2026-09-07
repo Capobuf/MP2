@@ -60,7 +60,8 @@ it('aggregates suppliers through expenses without adding project totals', functi
         allocation: '100.00',
         actual: '80.00',
         hasActuals: true,
-        carryover: '10.00',
+        carryover: '25.00',
+        receivedCarryover: '10.00',
         detail: ['expenses' => [
             ['supplier_id' => 1, 'supplier_label' => 'A', 'allocation' => '60.00', 'actual' => '50.00', 'source' => 'One'],
             ['supplier_id' => null, 'supplier_label' => null, 'allocation' => '30.00', 'actual' => '30.00', 'source' => 'Two'],

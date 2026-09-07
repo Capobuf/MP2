@@ -26,6 +26,7 @@ it('writes the exact generated XLSX bytes to the configured Drive disk', functio
     Storage::disk('google')->assertExists($filename);
     expect(hash('sha256', (string) Storage::disk('google')->get($filename)))->toBe($expectedHash)
         ->and($filename)->toEndWith('.xlsx')
+        ->and($filename)->toContain($artifact['package_id'])
         ->and(is_file($artifact['path']))->toBeFalse();
 });
 

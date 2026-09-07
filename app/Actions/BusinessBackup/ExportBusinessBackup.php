@@ -45,7 +45,12 @@ final class ExportBusinessBackup
 
         return [
             'path' => $path,
-            'filename' => sprintf('MP2-%s-%s.xlsx', $safeName === '' ? 'Azienda' : $safeName, now($company->timezone)->format('Y-m-d')),
+            'filename' => sprintf(
+                'MP2-%s-%s-%s.xlsx',
+                $safeName === '' ? 'Azienda' : $safeName,
+                now($company->timezone)->format('Y-m-d'),
+                $package['package_id'],
+            ),
             'package_id' => $package['package_id'],
         ];
     }
