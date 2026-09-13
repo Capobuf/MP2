@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseLineType;
 use Database\Factories\ExpenseFactory;
@@ -144,12 +145,12 @@ class Expense extends Model
         return $this->contract === null ? 'Autonoma' : $this->contract->title;
     }
 
-    public function costCenterLabel(): string
+    public function costCenterLabel(?CostCenterHierarchy $hierarchy = null): string
     {
         if ($this->project_id === null && $this->contract_id === null) {
             return $this->directCostCenter === null
                 ? 'Non classificata'
-                : $this->directCostCenter->name.($this->directCostCenter->isArchived() ? ' · Archiviato' : '');
+                : $this->hierarchicalCostCenterLabel($this->directCostCenter, $hierarchy);
         }
 
         $container = $this->project_id !== null ? $this->project : $this->contract;
@@ -162,7 +163,17 @@ class Expense extends Model
 
         return $costCenter === null
             ? 'Non classificata · ereditata dal '.$owner
-            : $costCenter->name.($costCenter->isArchived() ? ' · Archiviato' : '').' · ereditata dal '.$owner;
+            : $this->hierarchicalCostCenterLabel($costCenter, $hierarchy).' · ereditata dal '.$owner;
+    }
+
+    private function hierarchicalCostCenterLabel(CostCenter $costCenter, ?CostCenterHierarchy $hierarchy): string
+    {
+        $path = $hierarchy?->path((int) $costCenter->id)
+            ?? ($costCenter->parent_id === null
+                ? $costCenter->name
+                : CostCenterHierarchy::forCompany((int) $this->company_id)->path((int) $costCenter->id));
+
+        return $path.($costCenter->isArchived() ? ' · Archiviato' : '');
     }
 
     public function hasActuals(): bool

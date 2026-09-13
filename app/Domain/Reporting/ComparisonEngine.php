@@ -90,6 +90,7 @@ final class ComparisonEngine
             [ModificationDimension::Actual, $before->actual, $after->actual],
             [ModificationDimension::Carryover, $before->carryover, $after->carryover],
             [ModificationDimension::CostCenter, $before->costCenterId, $after->costCenterId],
+            [ModificationDimension::CostCenterPlacement, $before->costCenterLineage, $after->costCenterLineage],
             [ModificationDimension::Supplier, $before->supplierId, $after->supplierId],
             [ModificationDimension::StateOrTransitions, $before->state, $after->state],
             [ModificationDimension::ArchiveOrReversal, $before->detail['archived_or_reversed'] ?? false, $after->detail['archived_or_reversed'] ?? false],

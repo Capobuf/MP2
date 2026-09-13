@@ -4,6 +4,7 @@ namespace App\Actions\Reporting;
 
 use App\Domain\Company\AuditEventType;
 use App\Domain\Contracts\ContractState;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Projects\ProjectAnnualReferenceDate;
 use App\Domain\Projects\ProjectDeferralMode;
@@ -105,6 +106,7 @@ final class BuildReport
             $categoryCounts,
             $labelCounts,
             $sections,
+            $this->aggregator->costCenters($sources),
         );
     }
 
@@ -177,6 +179,12 @@ final class BuildReport
             actual: '0.00',
             hasActuals: false,
             receivedCarryover: (string) $row->approved_carryover,
+            costCenterLineage: $this->materializedCostCenterLineage(
+                $row->cost_center_id,
+                $row->cost_center_label,
+                (int) $row->detail_version,
+                $row->detail,
+            ),
             detail: $row->detail,
         ))->all();
     }
@@ -240,6 +248,12 @@ final class BuildReport
                 residual: (string) ($detail['residual'] ?? '0.00'),
                 saving: (string) ($detail['saving'] ?? '0.00'),
                 unused: (string) ($detail['unused_allocation'] ?? '0.00'),
+                costCenterLineage: $this->materializedCostCenterLineage(
+                    $row->cost_center_id,
+                    $row->cost_center_label,
+                    (int) $row->detail_version,
+                    $detail,
+                ),
                 detail: $detail,
                 corrections: $currentKnowledge ? $correctionRows : [],
                 annotations: $rowAnnotations,
@@ -254,6 +268,7 @@ final class BuildReport
             $exercise->year,
             CarbonImmutable::now($company->timezone),
         );
+        $costCenterHierarchy = CostCenterHierarchy::forCompany((int) $company->id);
         $sources = [];
         $expenses = Expense::query()
             ->where('company_id', $company->id)
@@ -262,7 +277,7 @@ final class BuildReport
             ->with(['lines.attachments', 'supplier', 'directCostCenter'])
             ->orderBy('id')->get();
         foreach ($expenses as $expense) {
-            $sources[] = $this->expenseSource($expense);
+            $sources[] = $this->expenseSource($expense, $costCenterHierarchy);
         }
 
         $budgetProjectKeys = BudgetSourceRow::query()
@@ -314,7 +329,8 @@ final class BuildReport
             $sources[] = new ReportSource(
                 sourceType: 'project', originId: $project->id, originKey: $project->originKey(), copiedFromOriginKey: null,
                 label: $project->title, summary: $project->description, supplierId: null, supplierLabel: null,
-                costCenterId: $classification?->cost_center_id, costCenterLabel: $classification?->costCenter?->name,
+                costCenterId: $classification?->cost_center_id,
+                costCenterLabel: $classification?->cost_center_id === null ? null : $costCenterHierarchy->path((int) $classification->cost_center_id),
                 state: $state?->value,
                 allocation: (string) $totals['allocation'], actual: (string) $totals['actual'], hasActuals: (bool) $totals['has_actuals'],
                 carryover: $carryover,
@@ -322,6 +338,7 @@ final class BuildReport
                 residual: in_array($state?->value, ['planned', 'open'], true) ? $residual : '0.00',
                 saving: $state?->value === 'closed' ? $balance : '0.00',
                 unused: $state?->value === 'cancelled' ? $balance : '0.00',
+                costCenterLineage: $classification?->cost_center_id === null ? [] : $costCenterHierarchy->lineage((int) $classification->cost_center_id),
                 detail: [
                     'expenses' => $project->expenses->map(fn (Expense $expense): array => $this->expenseDetail($expense))->all(),
                     'transitions' => $project->transitions->map(fn ($transition): array => $transition->toArray())->all(),
@@ -345,9 +362,11 @@ final class BuildReport
             $sources[] = new ReportSource(
                 sourceType: 'contract', originId: $contract->id, originKey: $contract->originKey(), copiedFromOriginKey: null,
                 label: $contract->title, summary: $contract->notes, supplierId: $contract->supplier_id, supplierLabel: $contract->supplier?->legal_name,
-                costCenterId: $classification?->cost_center_id, costCenterLabel: $classification?->costCenter?->name,
+                costCenterId: $classification?->cost_center_id,
+                costCenterLabel: $classification?->cost_center_id === null ? null : $costCenterHierarchy->path((int) $classification->cost_center_id),
                 state: $state->value,
                 allocation: (string) $totals['allocation'], actual: (string) $totals['actual'], hasActuals: (bool) $totals['has_actuals'],
+                costCenterLineage: $classification?->cost_center_id === null ? [] : $costCenterHierarchy->lineage((int) $classification->cost_center_id),
                 detail: [
                     'expenses' => $contract->expenses->map(fn (Expense $expense): array => $this->expenseDetail($expense))->all(),
                     'conditions' => $contract->conditions->map(fn ($condition): array => $condition->toArray())->all(),
@@ -380,13 +399,15 @@ final class BuildReport
         ];
     }
 
-    private function expenseSource(Expense $expense): ReportSource
+    private function expenseSource(Expense $expense, CostCenterHierarchy $hierarchy): ReportSource
     {
         return new ReportSource(
             sourceType: 'expense', originId: $expense->id, originKey: $expense->originKey(), copiedFromOriginKey: $expense->copied_from_origin_key,
             label: $expense->description, summary: $expense->notes, supplierId: $expense->supplier_id, supplierLabel: $expense->supplier?->legal_name,
-            costCenterId: $expense->direct_cost_center_id, costCenterLabel: $expense->directCostCenter?->name,
+            costCenterId: $expense->direct_cost_center_id,
+            costCenterLabel: $expense->direct_cost_center_id === null ? null : $hierarchy->path((int) $expense->direct_cost_center_id),
             state: $expense->isReversed() ? 'reversed' : 'active', allocation: $expense->allocation(), actual: $expense->actual(), hasActuals: $expense->hasActuals(),
+            costCenterLineage: $expense->direct_cost_center_id === null ? [] : $hierarchy->lineage((int) $expense->direct_cost_center_id),
             detail: [...$this->expenseDetail($expense), 'archived_or_reversed' => $expense->isReversed()],
         );
     }
@@ -617,7 +638,9 @@ final class BuildReport
             }
 
             return match ($key) {
-                'cost_center_id' => 'Centro di Costo: '.CostCenter::query()->where('company_id', $company->id)->findOrFail($id)->name,
+                'cost_center_id' => $id === 'unclassified'
+                    ? 'Centro di Costo: Non classificato'
+                    : 'Centro di Costo: '.CostCenterHierarchy::forCompany((int) $company->id)->path((int) $id),
                 'project_id' => 'Progetto: '.Project::query()->where('company_id', $company->id)->findOrFail($id)->title,
                 'contract_id' => 'Contratto: '.Contract::query()->where('company_id', $company->id)->findOrFail($id)->title,
                 'expense_id' => 'Spesa autonoma: '.Expense::query()->where('company_id', $company->id)->findOrFail($id)->description,
@@ -638,6 +661,9 @@ final class BuildReport
         ];
         foreach ($definition->filters as $key => $id) {
             if ($id === null) {
+                continue;
+            }
+            if ($key === 'cost_center_id' && $id === 'unclassified') {
                 continue;
             }
             $model = $models[$key];
@@ -663,13 +689,17 @@ final class BuildReport
                 if ($value === null) {
                     continue;
                 }
-                $id = (int) $value;
+                $id = $value === 'unclassified' ? null : (int) $value;
                 $expenseDetails = $source->detail['expenses'] ?? [];
                 /** @var array<int, array<string, mixed>> $expenseDetails */
                 $expenseDetails = is_array($expenseDetails) ? $expenseDetails : [];
                 $expenses = collect($expenseDetails);
                 $matches = match ($key) {
-                    'cost_center_id' => $source->costCenterId === $id,
+                    'cost_center_id' => $id === null
+                        ? $source->costCenterId === null
+                        : collect($source->costCenterLineage)->contains(
+                            fn (array $node): bool => $node['cost_center_id'] === $id,
+                        ),
                     'project_id' => $source->sourceType === 'project' && $source->originId === $id,
                     'contract_id' => $source->sourceType === 'contract' && $source->originId === $id,
                     'expense_id' => ($source->sourceType === 'expense' && $source->originId === $id)
@@ -706,5 +736,42 @@ final class BuildReport
         $sources = $annotation->getAttribute('affected_sources');
 
         return is_array($sources) ? $sources : [];
+    }
+
+    /**
+     * Old snapshot payloads deliberately remain flat: their historical ancestry was never materialized.
+     *
+     * @param  array<string, mixed>  $detail
+     * @return list<array{cost_center_id: int, cost_center_label: string}>
+     */
+    private function materializedCostCenterLineage(?int $costCenterId, ?string $label, int $detailVersion, array $detail): array
+    {
+        if ($costCenterId === null) {
+            return [];
+        }
+
+        $lineage = $detailVersion >= 2 ? ($detail['cost_center_lineage'] ?? null) : null;
+        if (! is_array($lineage) || ! array_is_list($lineage)) {
+            return [['cost_center_id' => $costCenterId, 'cost_center_label' => $label ?? (string) $costCenterId]];
+        }
+
+        $normalized = [];
+        foreach ($lineage as $node) {
+            if (! is_array($node) || ! isset($node['cost_center_id'], $node['cost_center_label'])) {
+                throw ValidationException::withMessages(['snapshot' => 'Lineage del Centro di Costo materializzato non valido.']);
+            }
+            $nodeId = (int) $node['cost_center_id'];
+            $nodeLabel = trim((string) $node['cost_center_label']);
+            if ($nodeId < 1 || $nodeLabel === '') {
+                throw ValidationException::withMessages(['snapshot' => 'Lineage del Centro di Costo materializzato non valido.']);
+            }
+            $normalized[] = ['cost_center_id' => $nodeId, 'cost_center_label' => $nodeLabel];
+        }
+
+        if ($normalized === [] || $normalized[array_key_last($normalized)]['cost_center_id'] !== $costCenterId) {
+            throw ValidationException::withMessages(['snapshot' => 'Lineage del Centro di Costo materializzato non coerente.']);
+        }
+
+        return $normalized;
     }
 }

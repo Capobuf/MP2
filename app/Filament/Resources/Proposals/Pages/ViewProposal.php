@@ -16,6 +16,7 @@ use App\Actions\Proposals\PlanProposalRelation;
 use App\Actions\Proposals\RealignProposalItem;
 use App\Actions\Proposals\ReviewProposalReadiness;
 use App\Domain\Contracts\ContractState;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Projects\ProjectDeferralMode;
 use App\Domain\Projects\ProjectDeferralValues;
@@ -36,7 +37,6 @@ use App\Filament\Resources\Budgets\BudgetResource;
 use App\Filament\Resources\Proposals\ProposalResource;
 use App\Models\Attachment;
 use App\Models\Contract;
-use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -209,7 +209,7 @@ class ViewProposal extends ViewRecord
                     TextInput::make('description')->label('Descrizione')->required()->maxLength(255), Textarea::make('notes')->label('Note'),
                     Select::make('project_reference')->label('Progetto di Destinazione')->options(fn (): array => $this->newExpenseProjectReferenceOptions())->default('autonomous')->required(),
                     Select::make('supplier_id')->label('Fornitore')->options(fn (): array => Supplier::query()->where('company_id', $this->proposal()->company_id)->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all())->placeholder('Nessun Fornitore'),
-                    Select::make('cost_center_id')->label('Centro di Costo Diretto (Solo Autonoma)')->options(fn (): array => CostCenter::query()->where('company_id', $this->proposal()->company_id)->active()->orderBy('name')->pluck('name', 'id')->all())->placeholder('Non classificata'),
+                    Select::make('cost_center_id')->label('Centro di Costo Diretto (Solo Autonoma)')->options(fn (): array => CostCenterHierarchy::forCompany((int) $this->proposal()->company_id)->options())->placeholder('Non classificata'),
                     Repeater::make('estimate_lines')->label('Righe Stima')->schema($this->estimateLineSchema())->defaultItems(1)->required(),
                     Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
                 ])->modalDescription('Per riposizionare piano residuo, ridurre prima le Stime originarie e creare qui una Spesa distinta: nessun matching con gli Effettivi.')->action(function (array $data): void {
@@ -259,7 +259,7 @@ class ViewProposal extends ViewRecord
                     $this->refreshProposal('Fornitore del Piano Aggiornato');
                 }),
                 Action::make('planExpenseCostCenter')->label('Cambia Centro di Costo Piano Spesa')->visible(fn (): bool => $this->canPlan())->form([
-                    Select::make('item_id')->label('Spesa Autonoma senza Effettivi')->options(fn (): array => $this->proposal()->items()->where('source_type', 'expense')->pluck('proposal_item_id', 'id')->all())->required(), Select::make('cost_center_id')->label('Centro di Costo Diretto')->options(fn (): array => CostCenter::query()->where('company_id', $this->proposal()->company_id)->active()->orderBy('name')->pluck('name', 'id')->all())->placeholder('Non classificata'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                    Select::make('item_id')->label('Spesa Autonoma senza Effettivi')->options(fn (): array => $this->proposal()->items()->where('source_type', 'expense')->pluck('proposal_item_id', 'id')->all())->required(), Select::make('cost_center_id')->label('Centro di Costo Diretto')->options(fn (): array => CostCenterHierarchy::forCompany((int) $this->proposal()->company_id)->options())->placeholder('Non classificata'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
                 ])->action(function (array $data): void {
                     app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $this->expenseItem((int) $data['item_id']), ProposalActionType::SetExpenseCostCenter, ['cost_center_id' => filled($data['cost_center_id'] ?? null) ? (int) $data['cost_center_id'] : null], null, $data['operation_id'], (int) $data['proposal_revision']);
                     $this->refreshProposal('Centro di Costo del Piano Aggiornato');
@@ -314,7 +314,7 @@ class ViewProposal extends ViewRecord
                     $this->refreshProposal('Stime Figlie del Progetto Aggiornate');
                 }),
                 Action::make('planProjectCostCenter')->label('Cambia Centro di Costo Progetto')->visible(fn (): bool => $this->canPlan())->form([
-                    Select::make('item_id')->label('Progetto senza Effettivi')->options(fn (): array => $this->proposal()->items()->where('source_type', 'project')->pluck('proposal_item_id', 'id')->all())->required(), Select::make('cost_center_id')->label('Centro di Costo Annuale')->options(fn (): array => CostCenter::query()->where('company_id', $this->proposal()->company_id)->active()->orderBy('name')->pluck('name', 'id')->all())->placeholder('Non classificato'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                    Select::make('item_id')->label('Progetto senza Effettivi')->options(fn (): array => $this->proposal()->items()->where('source_type', 'project')->pluck('proposal_item_id', 'id')->all())->required(), Select::make('cost_center_id')->label('Centro di Costo Annuale')->options(fn (): array => CostCenterHierarchy::forCompany((int) $this->proposal()->company_id)->options())->placeholder('Non classificato'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
                 ])->action(function (array $data): void {
                     $item = ProposalItem::query()->where('proposal_id', $this->proposal()->id)->where('source_type', 'project')->findOrFail($data['item_id']);
                     app(PlanProject::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::SetProjectCostCenter, ['exercise_id' => $this->proposal()->exercise_id, 'cost_center_id' => filled($data['cost_center_id'] ?? null) ? (int) $data['cost_center_id'] : null], null, $data['operation_id'], (int) $data['proposal_revision']);
@@ -355,7 +355,7 @@ class ViewProposal extends ViewRecord
                     $this->refreshProposal('Rinnovo Contrattuale Pianificato');
                 }),
                 Action::make('planContractCostCenter')->label('Cambia Centro di Costo Contratto')->visible(fn (): bool => $this->canPlan())->form([
-                    Select::make('item_id')->label('Contratto senza Effettivi')->options(fn (): array => $this->proposal()->items()->where('source_type', 'contract')->pluck('proposal_item_id', 'id')->all())->required(), Select::make('cost_center_id')->label('Centro di Costo Annuale')->options(fn (): array => CostCenter::query()->where('company_id', $this->proposal()->company_id)->active()->orderBy('name')->pluck('name', 'id')->all())->placeholder('Non classificato'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                    Select::make('item_id')->label('Contratto senza Effettivi')->options(fn (): array => $this->proposal()->items()->where('source_type', 'contract')->pluck('proposal_item_id', 'id')->all())->required(), Select::make('cost_center_id')->label('Centro di Costo Annuale')->options(fn (): array => CostCenterHierarchy::forCompany((int) $this->proposal()->company_id)->options())->placeholder('Non classificato'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
                 ])->action(function (array $data): void {
                     $item = ProposalItem::query()->where('proposal_id', $this->proposal()->id)->findOrFail($data['item_id']);
                     app(PlanContract::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::SetContractCostCenter, ['exercise_id' => $this->proposal()->exercise_id, 'cost_center_id' => filled($data['cost_center_id'] ?? null) ? (int) $data['cost_center_id'] : null], null, $data['operation_id'], (int) $data['proposal_revision']);

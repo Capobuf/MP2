@@ -6,6 +6,7 @@ use App\Domain\Contracts\ContractAnnualAllocation;
 use App\Domain\Contracts\ContractAttributionMode;
 use App\Domain\Contracts\ContractCycleType;
 use App\Domain\Contracts\ContractStateTimeline;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
 use App\Models\Contract;
 use App\Models\ContractCondition;
@@ -34,6 +35,7 @@ class ContractInfolist
     {
         $today = CarbonImmutable::now($contract->company->timezone)->startOfDay();
         $selectedExercise = app(ExerciseContext::class)->current($contract->company);
+        $hierarchy = CostCenterHierarchy::forCompany((int) $contract->company_id);
         $currentCondition = $contract->conditions
             ->filter(fn (ContractCondition $condition): bool => ! $condition->isAnnulled()
                 && $condition->validFrom()->startOfDay()->lessThanOrEqualTo($today)
@@ -42,7 +44,7 @@ class ContractInfolist
             ->first();
 
         $annualRows = $contract->company->exercises->sortBy('year')->map(
-            fn (Exercise $exercise): array => self::annualRow($contract, $exercise, $today, $selectedExercise?->id),
+            fn (Exercise $exercise): array => self::annualRow($contract, $exercise, $today, $selectedExercise?->id, $hierarchy),
         )->values()->all();
 
         $selectedRow = collect($annualRows)->firstWhere('selected', true);
@@ -67,7 +69,7 @@ class ContractInfolist
     }
 
     /** @return array<string, mixed> */
-    private static function annualRow(Contract $contract, Exercise $exercise, CarbonImmutable $today, ?int $selectedExerciseId): array
+    private static function annualRow(Contract $contract, Exercise $exercise, CarbonImmutable $today, ?int $selectedExerciseId, CostCenterHierarchy $hierarchy): array
     {
         $reference = ContractStateTimeline::referenceDateForExercise($exercise->year, $today);
         $allocation = ContractAnnualAllocation::forYear(
@@ -98,7 +100,7 @@ class ContractInfolist
             'state' => $contract->stateAtDate($reference->toDateString())->label(),
             'cost_center' => $classification === null || $classification->cost_center_id === null
                 ? 'Non classificato'
-                : $classification->costCenter->name.($classification->costCenter->isArchived() ? ' · Archiviato' : ''),
+                : $hierarchy->path((int) $classification->cost_center_id).($classification->costCenter->isArchived() ? ' · Archiviato' : ''),
             'allocation' => self::money($allocation->amount),
             'actual' => self::money($actual),
             'variance' => self::money(Decimal::subtract($actual, $allocation->amount)),
@@ -119,7 +121,13 @@ class ContractInfolist
 
         abort_unless($exercise instanceof Exercise, 404);
 
-        return self::annualRow($contract, $exercise, $today, null);
+        return self::annualRow(
+            $contract,
+            $exercise,
+            $today,
+            null,
+            CostCenterHierarchy::forCompany((int) $contract->company_id),
+        );
     }
 
     private static function money(string|int|float $amount): string

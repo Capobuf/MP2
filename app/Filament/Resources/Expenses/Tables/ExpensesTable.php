@@ -2,12 +2,12 @@
 
 namespace App\Filament\Resources\Expenses\Tables;
 
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Filament\Resources\Contracts\ContractResource;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Resources\Expenses\Pages\ListExpenses;
 use App\Filament\Resources\Projects\ProjectResource;
 use App\Models\Company;
-use App\Models\CostCenter;
 use App\Models\Expense;
 use App\Models\Supplier;
 use App\Models\TenantCompany;
@@ -26,6 +26,8 @@ class ExpensesTable
 {
     public static function configure(Table $table): Table
     {
+        $hierarchy = null;
+
         return $table
             ->modifyQueryUsing(function (Builder $query): Builder {
                 $tenant = Filament::getTenant();
@@ -48,7 +50,11 @@ class ExpensesTable
                         default => null,
                     })->visibleFrom('md'),
                 TextColumn::make('supplier.legal_name')->label('Fornitore')->searchable()->placeholder('—')->wrap()->visibleFrom('md'),
-                TextColumn::make('cost_center')->label('Centro di Costo')->state(fn (Expense $record): string => $record->costCenterLabel())
+                TextColumn::make('cost_center')->label('Centro di Costo')->state(function (Expense $record) use (&$hierarchy): string {
+                    $hierarchy ??= CostCenterHierarchy::forCompany((int) $record->company_id);
+
+                    return $record->costCenterLabel($hierarchy);
+                })
                     ->wrap()->visibleFrom('md'),
                 TextColumn::make('allocation')->label('Stima')->state(fn (Expense $record): string => $record->allocation())
                     ->money('EUR', locale: 'it')->alignment(Alignment::End)->color('primary'),
@@ -97,7 +103,7 @@ class ExpensesTable
                         $tenant = Filament::getTenant();
 
                         return $tenant instanceof TenantCompany
-                            ? CostCenter::query()->whereBelongsTo($tenant->company, 'company')->orderBy('name')->pluck('name', 'id')->all()
+                            ? ['unclassified' => 'Non classificato'] + CostCenterHierarchy::forCompany((int) $tenant->company->id)->options(activeOnly: false)
                             : [];
                     })
                     ->query(function (Builder $query, array $data): Builder {
@@ -106,14 +112,28 @@ class ExpensesTable
                             return $query;
                         }
 
-                        return $query->where(function (Builder $query) use ($costCenterId): void {
-                            $query->where('direct_cost_center_id', $costCenterId)
+                        if ($costCenterId === 'unclassified') {
+                            return $query->whereNull('direct_cost_center_id')
+                                ->whereDoesntHave('project.classifications', fn (Builder $classification): Builder => $classification
+                                    ->whereColumn('project_exercise_classifications.exercise_id', 'expenses.exercise_id')
+                                    ->whereNotNull('cost_center_id'))
+                                ->whereDoesntHave('contract.classifications', fn (Builder $classification): Builder => $classification
+                                    ->whereColumn('contract_exercise_classifications.exercise_id', 'expenses.exercise_id')
+                                    ->whereNotNull('cost_center_id'));
+                        }
+                        $tenant = Filament::getTenant();
+                        $ids = $tenant instanceof TenantCompany
+                            ? CostCenterHierarchy::forCompany((int) $tenant->company->id)->descendantIds((int) $costCenterId)
+                            : [];
+
+                        return $query->where(function (Builder $query) use ($ids): void {
+                            $query->whereIn('direct_cost_center_id', $ids)
                                 ->orWhereHas('project.classifications', fn (Builder $classification): Builder => $classification
                                     ->whereColumn('project_exercise_classifications.exercise_id', 'expenses.exercise_id')
-                                    ->where('cost_center_id', $costCenterId))
+                                    ->whereIn('cost_center_id', $ids))
                                 ->orWhereHas('contract.classifications', fn (Builder $classification): Builder => $classification
                                     ->whereColumn('contract_exercise_classifications.exercise_id', 'expenses.exercise_id')
-                                    ->where('cost_center_id', $costCenterId));
+                                    ->whereIn('cost_center_id', $ids));
                         });
                     }),
             ], layout: FiltersLayout::AboveContent)

@@ -6,6 +6,7 @@ use App\Actions\LateCorrections\RecordHistoricalErrorAnnotation;
 use App\Actions\LateCorrections\RecordLateCorrection;
 use App\Actions\Operations\UploadAttachment;
 use App\Actions\Proposals\InitializeProposal;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\LateCorrections\HistoricalCorrectionSource;
 use App\Domain\LateCorrections\HistoricalErrorKind;
 use App\Domain\LateCorrections\HistoricalExpenseCompatibility;
@@ -498,8 +499,9 @@ class ViewExercise extends ViewRecord
             ->merge(ProjectExerciseClassification::query()->where('company_id', $companyId)->where('exercise_id', $exercise->id)->pluck('cost_center_id'))
             ->merge(ContractExerciseClassification::query()->where('company_id', $companyId)->where('exercise_id', $exercise->id)->pluck('cost_center_id'))
             ->unique();
-        CostCenter::query()->whereIn('id', $costCenterIds)->orderBy('name')->get()->each(function (CostCenter $costCenter) use (&$options): void {
-            $label = $costCenter->name.($costCenter->isArchived() ? ' · Archiviato' : '');
+        $hierarchy = CostCenterHierarchy::forCompany((int) $companyId);
+        CostCenter::query()->whereIn('id', $costCenterIds)->orderBy('name')->get()->each(function (CostCenter $costCenter) use (&$options, $hierarchy): void {
+            $label = $hierarchy->path((int) $costCenter->id).($costCenter->isArchived() ? ' · Archiviato' : '');
             $options['cost_center:'.$costCenter->id.':'.($costCenter->updated_at?->getTimestamp() ?? 0)] = 'Centro di Costo · '.$label.' · #'.$costCenter->id;
         });
 

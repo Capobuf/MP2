@@ -126,6 +126,7 @@ final class ReportPdfComposer
             'kpis' => $kpis,
             'charts' => $charts,
             'sources' => $sources,
+            'cost_centers' => $result->costCenters,
             'comparisons' => $comparisons,
             'sections' => $sections,
             'contracts' => $contracts,
@@ -416,21 +417,17 @@ final class ReportPdfComposer
                 $charts[] = $categoryChart;
             }
 
-            $costCenters = [];
-            foreach ($result->sources as $source) {
-                $key = $source->costCenterId === null ? 'unclassified' : 'cost-center:'.$source->costCenterId;
-                $costCenters[$key] ??= ['label' => $source->costCenterLabel ?? 'Non classificato', 'allocation' => '0.00', 'actual' => '0.00'];
-                $costCenters[$key]['allocation'] = Decimal::add($costCenters[$key]['allocation'], $source->allocation);
-                $costCenters[$key]['actual'] = Decimal::add($costCenters[$key]['actual'], $source->actual);
-            }
+            $costCenters = $result->costCenters;
             if ($costCenters !== []) {
                 $charts[] = $this->groupedBarChart(
                     'annual-cost-centers', 'Allocato ed Effettivo per Centro di Costo',
-                    'Non classificato include le sorgenti senza Centro di Costo.',
+                    'Totali diretti e di ramo; Non classificato include solo le sorgenti senza Centro di Costo.',
                     array_column($costCenters, 'label'),
                     [
-                        ['label' => 'Allocato', 'data' => array_map('floatval', array_column($costCenters, 'allocation')), 'color' => '#39D5C4'],
-                        ['label' => (string) $result->header['actual_reference'], 'data' => array_map('floatval', array_column($costCenters, 'actual')), 'color' => '#60A5FA'],
+                        ['label' => 'Allocato diretto', 'data' => array_map('floatval', array_column($costCenters, 'direct_allocation')), 'color' => '#39D5C4'],
+                        ['label' => 'Allocato ramo', 'data' => array_map('floatval', array_column($costCenters, 'branch_allocation')), 'color' => '#1A9489'],
+                        ['label' => (string) $result->header['actual_reference'].' diretto', 'data' => array_map('floatval', array_column($costCenters, 'direct_actual')), 'color' => '#60A5FA'],
+                        ['label' => (string) $result->header['actual_reference'].' ramo', 'data' => array_map('floatval', array_column($costCenters, 'branch_actual')), 'color' => '#2563EB'],
                     ],
                 );
             }
@@ -768,7 +765,7 @@ final class ReportPdfComposer
         $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '.$canvasWidth.' '.$height.'">';
         $legend = $divergent ? [['label' => 'Negativo (−)'], ['label' => 'Positivo (+)']] : $series;
         foreach ($legend as $index => $dataset) {
-            $color = $divergent ? ['#60a5fa', '#15323b'][$index] : (count($series) > 1 ? ['#15323b', '#39d5c4'][$index] : '#39d5c4');
+            $color = $divergent ? ['#60a5fa', '#15323b'][$index] : $dataset['colors'][0];
             $legendX = $plotX + $index * 190;
             $svg .= '<rect x="'.$legendX.'" y="0" width="12" height="12" fill="'.$color.'"/>';
             $svg .= '<text x="'.($legendX + 20).'" y="12" font-family="Geist" font-size="16" fill="#15323b">'.$this->escape($dataset['label']).'</text>';
@@ -791,7 +788,7 @@ final class ReportPdfComposer
                 $barY = $y + $index * 23;
                 $color = $divergent
                     ? ($value > 0 ? '#15323b' : '#60a5fa')
-                    : (count($series) > 1 ? ['#15323b', '#39d5c4'][$index] : '#39d5c4');
+                    : $dataset['colors'][0];
                 if ($value === 0.0) {
                     $svg .= '<circle class="zero-value" cx="'.$zero.'" cy="'.($barY + 7).'" r="3" fill="#667b7d"/>';
                 } else {

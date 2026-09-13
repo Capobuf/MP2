@@ -7,6 +7,7 @@ use App\Actions\MasterData\CreateSupplier;
 use App\Domain\Contracts\ContractAttributionMode;
 use App\Domain\Contracts\ContractCycle;
 use App\Domain\Contracts\ContractCycleType;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Filament\Forms\AttachmentUpload;
 use App\Filament\Forms\DateInput;
 use App\Filament\Forms\DecimalInput;
@@ -432,7 +433,7 @@ class ContractForm
         $company = self::company();
 
         return $company instanceof Company
-            ? CostCenter::query()->whereBelongsTo($company, 'company')->active()->orderBy('name')->pluck('name', 'id')->all()
+            ? CostCenterHierarchy::forCompany((int) $company->id)->options()
             : [];
     }
 }

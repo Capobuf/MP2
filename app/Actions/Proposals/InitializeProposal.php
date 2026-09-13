@@ -3,6 +3,7 @@
 namespace App\Actions\Proposals;
 
 use App\Domain\Company\AuditEventType;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Proposals\ProposalPurpose;
 use App\Domain\Proposals\ProposalSourceCatalog;
 use App\Domain\Proposals\ProposalSourceSnapshot;
@@ -72,12 +73,13 @@ final class InitializeProposal
                 'created_by_id' => $actor->id,
             ]);
 
+            $costCenterHierarchy = CostCenterHierarchy::forCompany((int) $lockedCompany->id);
             foreach ($sources as $source) {
                 $model = $source['model'];
                 $snapshot = match (true) {
-                    $model instanceof Expense => ProposalSourceSnapshot::expense($model),
-                    $model instanceof Project => ProposalSourceSnapshot::project($model, $lockedExercise->id),
-                    $model instanceof Contract => ProposalSourceSnapshot::contract($model, $lockedExercise->id),
+                    $model instanceof Expense => ProposalSourceSnapshot::expense($model, $costCenterHierarchy),
+                    $model instanceof Project => ProposalSourceSnapshot::project($model, $lockedExercise->id, $costCenterHierarchy),
+                    $model instanceof Contract => ProposalSourceSnapshot::contract($model, $lockedExercise->id, $costCenterHierarchy),
                 };
                 $proposal->items()->create([
                     'proposal_item_id' => (string) Str::uuid(), 'company_id' => $lockedCompany->id,

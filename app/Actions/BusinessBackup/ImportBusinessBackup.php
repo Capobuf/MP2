@@ -61,6 +61,15 @@ final class ImportBusinessBackup
                 $this->insertBasic($package, '_MP2_cost_centers', 'cost_center', 'cost_centers', $ids, $companyId, $now, fn (array $x): array => [
                     'company_id' => $companyId, 'name' => $x['name'], 'archived_at' => $this->null($x['archived_at']),
                 ]);
+                foreach ($this->rows($package, '_MP2_cost_centers') as $x) {
+                    if ($x['parent_cost_center_ref'] === '') {
+                        continue;
+                    }
+                    DB::table('cost_centers')->where('id', $this->id($ids, 'cost_center', $x['cost_center_ref']))->update([
+                        'parent_id' => $this->id($ids, 'cost_center', $x['parent_cost_center_ref']),
+                        'updated_at' => $now,
+                    ]);
+                }
                 $this->insertBasic($package, '_MP2_exercises', 'exercise', 'exercises', $ids, $companyId, $now, fn (array $x): array => [
                     'company_id' => $companyId, 'year' => (int) $x['year'], 'status' => $x['status'], 'revision' => 0,
                 ]);
@@ -249,7 +258,7 @@ final class ImportBusinessBackup
 
                 $this->verifyCounts($package, $companyId);
                 DB::table('business_backup_imports')->insert([
-                    'package_id' => $packageId, 'format_version' => 1, 'company_id' => $companyId,
+                    'package_id' => $packageId, 'format_version' => (int) $package['manifest']['format_version'], 'company_id' => $companyId,
                     'imported_by_id' => $actor->id, 'completed_at' => $now, 'created_at' => $now, 'updated_at' => $now,
                 ]);
 

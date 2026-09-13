@@ -5,10 +5,10 @@ namespace App\Domain\Proposals;
 use App\Domain\Contracts\ContractAnnualAllocation;
 use App\Domain\Contracts\ContractDeadline;
 use App\Domain\Contracts\ContractStateTimeline;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Models\Contract;
-use App\Models\CostCenter;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\Project;
@@ -31,6 +31,7 @@ final class BudgetSnapshotPayload
         $proposal->loadMissing(['company', 'exercise', 'items.actions', 'actions']);
         $rows = [];
         $totalParts = [];
+        $costCenterHierarchy = CostCenterHierarchy::forCompany((int) $proposal->company_id);
 
         foreach ($proposal->items->sortBy('id') as $item) {
             $live = self::liveIdentity($item, $identities);
@@ -45,7 +46,7 @@ final class BudgetSnapshotPayload
                 'payload' => self::budgetActionPayload($action->action_type, $action->payload), 'reason' => $action->reason,
             ])->values()->all();
             $common = [
-                'schema_version' => 1,
+                'schema_version' => 2,
                 'identity' => [
                     'source_type' => $item->source_type->value, 'origin_id' => $live->id, 'origin_key' => $live->originKey(),
                     'proposal_item_id' => $item->proposal_item_id, 'copied_from_origin_key' => $item->copied_from_origin_key,
@@ -55,12 +56,13 @@ final class BudgetSnapshotPayload
                 'approval_event_sequences' => array_values($eventSequences),
             ];
             $detail = match (true) {
-                $live instanceof Expense => [...$common, 'expense' => self::expenseDetail($live, $proposal)],
-                $live instanceof Project => [...$common, 'project' => self::projectDetail($live, $proposal, $item)],
-                $live instanceof Contract => [...$common, 'contract' => self::contractDetail($live, $proposal, $item)],
+                $live instanceof Expense => [...$common, 'expense' => self::expenseDetail($live, $proposal, $costCenterHierarchy)],
+                $live instanceof Project => [...$common, 'project' => self::projectDetail($live, $proposal, $item, $costCenterHierarchy)],
+                $live instanceof Contract => [...$common, 'contract' => self::contractDetail($live, $proposal, $item, $costCenterHierarchy)],
             };
             BudgetPayloadGuard::assertPlanOnly($detail);
             $costCenterId = self::costCenterId($live, $proposal->exercise_id);
+            $detail['cost_center_lineage'] = $costCenterId === null ? [] : $costCenterHierarchy->lineage($costCenterId);
             $rows[] = [
                 'company_id' => $proposal->company_id, 'source_type' => $item->source_type->value,
                 'origin_id' => $live->id, 'origin_key' => $live->originKey(), 'proposal_item_id' => $item->proposal_item_id,
@@ -69,13 +71,13 @@ final class BudgetSnapshotPayload
                 'summary' => $live instanceof Project ? $live->description : ($live->notes ?? null),
                 'supplier_id' => $live instanceof Project ? null : $live->supplier_id,
                 'supplier_label' => $live instanceof Project ? null : $live->supplier()->value('legal_name'),
-                'cost_center_id' => $costCenterId, 'cost_center_label' => self::costCenterLabel($costCenterId),
+                'cost_center_id' => $costCenterId, 'cost_center_label' => self::costCenterLabel($costCenterId, $costCenterHierarchy),
                 'approved_estimates' => $estimates, 'approved_carryover' => $carryover,
                 'carryover_state' => Decimal::compare($carryover, '0.00') > 0 ? 'provisional' : null,
                 'approved_allocation' => $allocation,
                 'start_state' => self::state($live, $proposal->exercise->year.'-01-01'),
                 'end_state' => self::state($live, $proposal->exercise->year.'-12-31'),
-                'detail_version' => 1, 'detail' => $detail,
+                'detail_version' => 2, 'detail' => $detail,
             ];
         }
 
@@ -90,7 +92,7 @@ final class BudgetSnapshotPayload
     }
 
     /** @return array<string, mixed> */
-    private static function expenseDetail(Expense $expense, Proposal $proposal): array
+    private static function expenseDetail(Expense $expense, Proposal $proposal, CostCenterHierarchy $hierarchy): array
     {
         $expense->loadMissing(['lines', 'supplier', 'project', 'contract']);
         $owner = match (true) {
@@ -108,14 +110,14 @@ final class BudgetSnapshotPayload
             'exercise_id' => $expense->exercise_id, 'exercise_year' => $proposal->exercise->year,
             'origin' => $expense->origin, 'owner' => $owner,
             'supplier' => ['id' => $expense->supplier_id, 'label' => $expense->supplier?->legal_name],
-            'cost_center' => ['id' => self::costCenterId($expense, $proposal->exercise_id), 'label' => self::costCenterLabel(self::costCenterId($expense, $proposal->exercise_id))],
+            'cost_center' => ['id' => self::costCenterId($expense, $proposal->exercise_id), 'label' => self::costCenterLabel(self::costCenterId($expense, $proposal->exercise_id), $hierarchy)],
             'state' => $expense->isReversed() ? 'reversed' : 'active',
             'approved_estimate_total' => $expense->allocation(), 'active_estimate_lines' => $lines,
         ];
     }
 
     /** @return array<string, mixed> */
-    private static function projectDetail(Project $project, Proposal $proposal, ProposalItem $item): array
+    private static function projectDetail(Project $project, Proposal $proposal, ProposalItem $item, CostCenterHierarchy $hierarchy): array
     {
         $project->loadMissing(['transitions', 'expenses.lines', 'expenses.supplier', 'classifications.costCenter', 'deferrals']);
         $deferral = $project->deferrals->firstWhere('destination_exercise_id', $proposal->exercise_id);
@@ -144,13 +146,13 @@ final class BudgetSnapshotPayload
             'approved_reprogrammed_amount' => $deferral?->mode->value === 'reprogramming' ? (string) $deferral->reprogrammed_amount : '0.00',
             'reprogramming_operation_id' => $deferral?->reprogramming_operation_id,
             'reprogramming_effects' => $deferral?->reprogramming_effects,
-            'cost_center' => ['id' => self::costCenterId($project, $proposal->exercise_id), 'label' => self::costCenterLabel(self::costCenterId($project, $proposal->exercise_id))],
+            'cost_center' => ['id' => self::costCenterId($project, $proposal->exercise_id), 'label' => self::costCenterLabel(self::costCenterId($project, $proposal->exercise_id), $hierarchy)],
             'approved_estimate_total' => Decimal::subtract(self::allocation($project, $proposal->exercise_id), self::carryover($project, $proposal->exercise_id)), 'expenses' => $expenses,
         ];
     }
 
     /** @return array<string, mixed> */
-    private static function contractDetail(Contract $contract, Proposal $proposal, ProposalItem $item): array
+    private static function contractDetail(Contract $contract, Proposal $proposal, ProposalItem $item, CostCenterHierarchy $hierarchy): array
     {
         $contract->loadMissing(['supplier', 'conditions', 'lifecycleFacts', 'renewalConfigurations', 'classifications.costCenter']);
         $stateAt = fn (string $date) => ContractStateTimeline::stateAtDate(
@@ -199,7 +201,7 @@ final class BudgetSnapshotPayload
             'next_expiry_date' => $contract->nextExpiryDate()?->toDateString(), 'automatic_renewal' => (bool) $contract->automatic_renewal,
             'renewal_duration_months' => $contract->renewal_duration_months, 'notice_days' => $contract->notice_days,
             'cancellation_deadline' => $deadline->noticeLimitDate,
-            'cost_center' => ['id' => self::costCenterId($contract, $proposal->exercise_id), 'label' => self::costCenterLabel(self::costCenterId($contract, $proposal->exercise_id))],
+            'cost_center' => ['id' => self::costCenterId($contract, $proposal->exercise_id), 'label' => self::costCenterLabel(self::costCenterId($contract, $proposal->exercise_id), $hierarchy)],
             'approved_estimate_total' => $annual->amount, 'conditions' => $conditions,
             'annual_composition' => $annual->composition, 'approved_lifecycle' => $lifecycle,
         ];
@@ -268,9 +270,9 @@ final class BudgetSnapshotPayload
         return $live->classifications()->where('exercise_id', $exerciseId)->value('cost_center_id');
     }
 
-    private static function costCenterLabel(?int $id): string
+    private static function costCenterLabel(?int $id, CostCenterHierarchy $hierarchy): string
     {
-        return $id === null ? 'Non classificato' : CostCenter::query()->findOrFail($id)->name;
+        return $id === null ? 'Non classificato' : $hierarchy->path($id);
     }
 
     private static function state(Expense|Project|Contract $live, string $date): string

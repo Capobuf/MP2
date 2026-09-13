@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Expenses\Pages;
 use App\Actions\MasterData\CreateSupplier;
 use App\Actions\Operations\UpdateExpense;
 use App\Domain\Contracts\ContractActualKind;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\ExpenseImpactPlan;
 use App\Domain\Projects\ProjectActualKind;
 use App\Domain\Projects\ProjectOverspend;
@@ -254,9 +255,10 @@ class ViewExpense extends ViewRecord
     /** @return array<int, string> */
     private function costCenterOptions(Expense $expense): array
     {
-        $options = CostCenter::query()->where('company_id', $expense->company_id)->active()->orderBy('name')->pluck('name', 'id')->all();
+        $hierarchy = CostCenterHierarchy::forCompany((int) $expense->company_id);
+        $options = $hierarchy->options();
         if ($expense->directCostCenter !== null && $expense->directCostCenter->isArchived()) {
-            $options[$expense->directCostCenter->id] = $expense->directCostCenter->name.' · Archiviato';
+            $options[$expense->directCostCenter->id] = $hierarchy->path((int) $expense->directCostCenter->id).' · Archiviato';
         }
 
         return $options;
@@ -497,7 +499,8 @@ class ViewExpense extends ViewRecord
 
         return $costCenter === null
             ? 'Centro di Costo #'.$costCenterId
-            : $costCenter->name.($costCenter->isArchived() ? ' · Archiviato' : '');
+            : CostCenterHierarchy::forCompany((int) $costCenter->company_id)->path((int) $costCenter->id)
+                .($costCenter->isArchived() ? ' · Archiviato' : '');
     }
 
     private function ownerLabel(?int $projectId, ?int $contractId): string

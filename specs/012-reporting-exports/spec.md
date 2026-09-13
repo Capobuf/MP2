@@ -153,6 +153,10 @@ Un utente apre `Personalizza PDF`, seleziona i soli blocchi e colonne applicabil
 - **FR-S11-037**: La configurazione PDF MUST essere effimera e limitata a blocchi/colonne realmente disponibili ricostruiti lato server; MUST NOT accettare HTML, CSS, URL, path o JavaScript dall'utente.
 - **FR-S11-038**: Anteprima e download MUST usare lo stesso composer e lo stesso renderer WeasyPrint 69.0, senza fallback, file PDF temporanei, code o rendering browser.
 - **FR-S11-039**: I grafici PDF MUST essere SVG statici server-side derivati dagli stessi dati canonici e con la stessa semantica della UI.
+- **FR-S11-040**: L'aggregazione per Centro di Costo MUST distinguere totale diretto e totale di ramo; i roll-up dei padri sono derivati e MUST NOT essere sommati nuovamente nel totale aziendale.
+- **FR-S11-041**: Il filtro per Centro di Costo MUST includere il Centro selezionato e tutti i suoi discendenti secondo la lineage propria del riferimento; `Non classificato` MUST indicare soltanto assenza del Centro diretto.
+- **FR-S11-042**: Budget e Chiusure MUST usare esclusivamente la lineage materializzata nel relativo payload; le Snapshot precedenti prive di lineage MUST restare piatte e MUST NOT essere reinterpretate con la gerarchia viva.
+- **FR-S11-043**: UI, grafici e PDF MUST consumare la stessa aggregazione canonica dei Centri di Costo e mostrare la collocazione gerarchica separatamente dall'identità del Centro direttamente assegnato.
 
 ### Canonical Requirement Reconciliation
 

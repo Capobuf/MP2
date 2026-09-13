@@ -3,7 +3,7 @@
 ## Tenant: Backup dati
 
 - Visibile soltanto su Tenant attivo a utente con `visualizza`.
-- Mostra avviso di consultazione/copia e formato V1.
+- Mostra avviso di consultazione/copia e formato corrente V2.
 - `Scarica backup XLSX`: genera e restituisce l'artefatto completo.
 - `Salva backup su Google Drive`: visibile soltanto quando il disk configurato è risolvibile; salva lo stesso artefatto e mostra nome/percorso risultante.
 - Nessuna scelta di tabelle, formato, retention o frequenza.
@@ -12,7 +12,7 @@
 
 - Accessibile soltanto a `is_platform_admin`.
 - Step 1 upload temporaneo XLSX.
-- Step 2 validazione read-only e preview con: Azienda, export time, versione, Esercizi, conteggi, totali, allegati inventariati, collisione nome e warning.
+- Step 2 validazione read-only V1/V2 e preview con: Azienda, export time, versione, Esercizi, conteggi, totali, allegati inventariati, collisione nome e warning.
 - Step 3 conferma esplicita; nessun selettore Azienda destinazione.
 - Successo: collegamento al Tenant/Azienda creata o risultato esistente del medesimo package.
 - Errore: messaggio specifico, nessuna Azienda parziale.

@@ -5,6 +5,7 @@ namespace App\Domain\Closing;
 use App\Domain\Contracts\ContractAnnualAllocation;
 use App\Domain\Contracts\ContractRenewalSchedule;
 use App\Domain\Contracts\ContractState;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Projects\ProjectDeferralMode;
 use App\Domain\Projects\ProjectDeferralValues;
@@ -42,6 +43,7 @@ final class ClosingSnapshotPayload
         $budgetOriginKeys = $budgets->flatMap->rows->pluck('origin_key')->unique()->flip();
         $decisions = collect($projectDecisions)->keyBy('project_id');
         $rows = [];
+        $costCenterHierarchy = CostCenterHierarchy::forCompany((int) $exercise->company_id);
 
         $standaloneExpenses = Expense::query()
             ->where('company_id', $exercise->company_id)
@@ -55,7 +57,7 @@ final class ClosingSnapshotPayload
             if (! self::includeStandalone($expense, $budgetOriginKeys, $exercise->year)) {
                 continue;
             }
-            $rows[] = self::expenseRow($expense, $eventReferences[$expense->originKey()] ?? []);
+            $rows[] = self::expenseRow($expense, $eventReferences[$expense->originKey()] ?? [], $costCenterHierarchy);
         }
 
         $projects = Project::query()
@@ -85,6 +87,7 @@ final class ClosingSnapshotPayload
                 $yearEnd,
                 $decision,
                 $eventReferences[$project->originKey()] ?? [],
+                $costCenterHierarchy,
             );
         }
 
@@ -114,6 +117,7 @@ final class ClosingSnapshotPayload
                 $yearStart,
                 $yearEnd,
                 $eventReferences[$contract->originKey()] ?? [],
+                $costCenterHierarchy,
             );
         }
 
@@ -203,7 +207,7 @@ final class ClosingSnapshotPayload
     /** @param list<array{operation_id: string, event_sequence: int}> $eventReferences
      * @return array<string, mixed>
      */
-    private static function expenseRow(Expense $expense, array $eventReferences): array
+    private static function expenseRow(Expense $expense, array $eventReferences, CostCenterHierarchy $hierarchy): array
     {
         $costCenter = $expense->directCostCenter;
 
@@ -218,7 +222,7 @@ final class ClosingSnapshotPayload
             'supplier_id' => $expense->supplier_id,
             'supplier_label' => $expense->supplier?->legal_name,
             'cost_center_id' => $expense->direct_cost_center_id,
-            'cost_center_label' => $costCenter === null ? 'Non classificato' : $costCenter->name,
+            'cost_center_label' => $costCenter === null ? 'Non classificato' : $hierarchy->path((int) $costCenter->id),
             'end_state' => $expense->isReversed() ? 'reversed' : 'active',
             'has_actuals' => $expense->hasActuals(),
             'final_estimates' => $expense->allocation(),
@@ -226,8 +230,11 @@ final class ClosingSnapshotPayload
             'final_allocation' => $expense->allocation(),
             'closing_actual' => $expense->actual(),
             'operational_variance' => $expense->operationalVariance(),
-            'detail_version' => 1,
-            'detail' => self::expenseDetail($expense, $eventReferences),
+            'detail_version' => 2,
+            'detail' => [
+                ...self::expenseDetail($expense, $eventReferences, $hierarchy),
+                'cost_center_lineage' => $costCenter === null ? [] : $hierarchy->lineage((int) $costCenter->id),
+            ],
         ];
     }
 
@@ -235,7 +242,7 @@ final class ClosingSnapshotPayload
      * @param  list<array{operation_id: string, event_sequence: int}>  $eventReferences
      * @return array<string, mixed>
      */
-    private static function projectRow(Project $project, Exercise $exercise, CarbonImmutable $yearStart, CarbonImmutable $yearEnd, ?array $decision, array $eventReferences): array
+    private static function projectRow(Project $project, Exercise $exercise, CarbonImmutable $yearStart, CarbonImmutable $yearEnd, ?array $decision, array $eventReferences, CostCenterHierarchy $hierarchy): array
     {
         $totals = $project->annualTotals()[$exercise->id] ?? ['allocation' => '0.00', 'actual' => '0.00', 'has_actuals' => false];
         $incoming = Decimal::sum($project->deferrals
@@ -266,7 +273,7 @@ final class ClosingSnapshotPayload
             'supplier_id' => null,
             'supplier_label' => null,
             'cost_center_id' => $classification?->cost_center_id,
-            'cost_center_label' => $costCenter === null ? 'Non classificato' : $costCenter->name,
+            'cost_center_label' => $costCenter === null ? 'Non classificato' : $hierarchy->path((int) $costCenter->id),
             'end_state' => $state?->value,
             'has_actuals' => (bool) $totals['has_actuals'],
             'final_estimates' => $estimates,
@@ -274,7 +281,7 @@ final class ClosingSnapshotPayload
             'final_allocation' => (string) $totals['allocation'],
             'closing_actual' => (string) $totals['actual'],
             'operational_variance' => Decimal::subtract((string) $totals['actual'], (string) $totals['allocation']),
-            'detail_version' => 1,
+            'detail_version' => 2,
             'detail' => [
                 'project_id' => $project->id,
                 'title' => $project->title,
@@ -282,8 +289,9 @@ final class ClosingSnapshotPayload
                 'state_at_31_december' => $state?->value,
                 'classification' => [
                     'cost_center_id' => $classification?->cost_center_id,
-                    'cost_center_label' => $costCenter?->name,
+                    'cost_center_label' => $costCenter === null ? null : $hierarchy->path((int) $costCenter->id),
                 ],
+                'cost_center_lineage' => $costCenter === null ? [] : $hierarchy->lineage((int) $costCenter->id),
                 'received_carryover' => $incoming,
                 'final_estimates' => $estimates,
                 'final_allocation' => (string) $totals['allocation'],
@@ -309,7 +317,7 @@ final class ClosingSnapshotPayload
                 'expenses' => $project->expenses
                     ->where('exercise_id', $exercise->id)
                     ->sortBy('id')
-                    ->map(fn (Expense $expense): array => self::expenseDetail($expense, []))
+                    ->map(fn (Expense $expense): array => self::expenseDetail($expense, [], $hierarchy))
                     ->values()->all(),
                 'relations' => self::relations($project),
                 'event_references' => $eventReferences,
@@ -320,7 +328,7 @@ final class ClosingSnapshotPayload
     /** @param list<array{operation_id: string, event_sequence: int}> $eventReferences
      * @return array<string, mixed>
      */
-    private static function contractRow(Contract $contract, Exercise $exercise, CarbonImmutable $yearStart, CarbonImmutable $yearEnd, array $eventReferences): array
+    private static function contractRow(Contract $contract, Exercise $exercise, CarbonImmutable $yearStart, CarbonImmutable $yearEnd, array $eventReferences, CostCenterHierarchy $hierarchy): array
     {
         $annual = ContractAnnualAllocation::forYear(
             $contract->conditions,
@@ -392,7 +400,7 @@ final class ClosingSnapshotPayload
             'supplier_id' => $contract->supplier_id,
             'supplier_label' => $contract->supplier?->legal_name,
             'cost_center_id' => $classification?->cost_center_id,
-            'cost_center_label' => $costCenter === null ? 'Non classificato' : $costCenter->name,
+            'cost_center_label' => $costCenter === null ? 'Non classificato' : $hierarchy->path((int) $costCenter->id),
             'end_state' => $state->value,
             'has_actuals' => (bool) $totals['has_actuals'],
             'final_estimates' => (string) $totals['allocation'],
@@ -400,7 +408,7 @@ final class ClosingSnapshotPayload
             'final_allocation' => (string) $totals['allocation'],
             'closing_actual' => (string) $totals['actual'],
             'operational_variance' => Decimal::subtract((string) $totals['actual'], (string) $totals['allocation']),
-            'detail_version' => 1,
+            'detail_version' => 2,
             'detail' => [
                 'contract_id' => $contract->id,
                 'title' => $contract->title,
@@ -408,8 +416,9 @@ final class ClosingSnapshotPayload
                 'supplier' => ['id' => $contract->supplier_id, 'label' => $contract->supplier?->legal_name],
                 'classification' => [
                     'cost_center_id' => $classification?->cost_center_id,
-                    'cost_center_label' => $costCenter?->name,
+                    'cost_center_label' => $costCenter === null ? null : $hierarchy->path((int) $costCenter->id),
                 ],
+                'cost_center_lineage' => $costCenter === null ? [] : $hierarchy->lineage((int) $costCenter->id),
                 'contractual_start_date' => $contract->contractualStartDate()->toDateString(),
                 'next_expiry_date' => $contract->nextExpiryDate()?->toDateString(),
                 'automatic_renewal' => $renewalAtClosing['automatic_renewal'],
@@ -422,7 +431,7 @@ final class ClosingSnapshotPayload
                 'expenses' => $contract->expenses
                     ->where('exercise_id', $exercise->id)
                     ->sortBy('id')
-                    ->map(fn (Expense $expense): array => self::expenseDetail($expense, []))
+                    ->map(fn (Expense $expense): array => self::expenseDetail($expense, [], $hierarchy))
                     ->values()->all(),
                 'relations' => self::relations($contract),
                 'event_references' => $eventReferences,
@@ -433,7 +442,7 @@ final class ClosingSnapshotPayload
     /** @param list<array{operation_id: string, event_sequence: int}> $eventReferences
      * @return array<string, mixed>
      */
-    private static function expenseDetail(Expense $expense, array $eventReferences): array
+    private static function expenseDetail(Expense $expense, array $eventReferences, CostCenterHierarchy $hierarchy): array
     {
         $expense->loadMissing([
             'lines',
@@ -465,7 +474,8 @@ final class ClosingSnapshotPayload
             'supplier' => ['id' => $expense->supplier_id, 'label' => $expense->supplier?->legal_name],
             'cost_center' => [
                 'id' => $costCenter?->id,
-                'label' => $costCenter?->name,
+                'label' => $costCenter === null ? null : $hierarchy->path((int) $costCenter->id),
+                'lineage' => $costCenter === null ? [] : $hierarchy->lineage((int) $costCenter->id),
                 'source' => $costCenterSource,
             ],
             'state' => $expense->isReversed() ? 'reversed' : 'active',

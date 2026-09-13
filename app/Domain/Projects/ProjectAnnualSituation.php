@@ -2,6 +2,7 @@
 
 namespace App\Domain\Projects;
 
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
 use App\Models\Exercise;
 use App\Models\Project;
@@ -42,6 +43,7 @@ final readonly class ProjectAnnualSituation
             : $project->classifications()->with('costCenter')->get();
         $situations = [];
         $deferrals = $project->relationLoaded('deferrals') ? $project->deferrals : $project->deferrals()->get();
+        $hierarchy = CostCenterHierarchy::forCompany((int) $project->company_id);
 
         foreach ($exercises as $exercise) {
             $referenceDate = ProjectAnnualReferenceDate::forYear($exercise->year, $today);
@@ -67,7 +69,7 @@ final readonly class ProjectAnnualSituation
                 costCenterId: $classification?->cost_center_id,
                 costCenterLabel: $costCenter === null
                     ? null
-                    : $costCenter->name.($costCenter->isArchived() ? ' · Archiviato' : ''),
+                    : $hierarchy->path((int) $costCenter->id).($costCenter->isArchived() ? ' · Archiviato' : ''),
                 estimates: Decimal::subtract($allocation, $receivedCarryover),
                 receivedCarryover: $receivedCarryover,
                 allocation: $allocation,

@@ -5,6 +5,7 @@ use App\Domain\LateCorrections\HistoricalErrorKind;
 use App\Domain\Reporting\ReportDefinition;
 use App\Models\ClosingSourceRow;
 use App\Models\Company;
+use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -19,16 +20,30 @@ it('keeps closing values immutable and composes current knowledge from separate 
     $company = Company::factory()->create();
     $viewer = s11ReportingViewer($company);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
-    $expense = Expense::factory()->forExercise($exercise)->create(['description' => 'Storica']);
+    $historicalParent = CostCenter::factory()->for($company)->create(['name' => 'IT']);
+    $liveParent = CostCenter::factory()->for($company)->create(['name' => 'Digital']);
+    $costCenter = CostCenter::factory()->for($company)->create(['name' => 'Software', 'parent_id' => $historicalParent->id]);
+    $expense = Expense::factory()->forExercise($exercise)->create([
+        'description' => 'Storica',
+        'direct_cost_center_id' => $costCenter->id,
+    ]);
     ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '100.00']);
     $snapshot = closeExerciseFixture($exercise, $viewer);
     ClosingSourceRow::query()->create([
         'company_id' => $company->id, 'closing_snapshot_id' => $snapshot->id,
         'source_type' => 'expense', 'origin_id' => $expense->id, 'origin_key' => $expense->originKey(),
-        'label' => 'Etichetta alla Chiusura', 'cost_center_label' => 'Storico', 'end_state' => 'active',
+        'label' => 'Etichetta alla Chiusura', 'cost_center_id' => $costCenter->id,
+        'cost_center_label' => 'IT / Software', 'end_state' => 'active',
         'has_actuals' => true, 'final_estimates' => '100.00', 'received_carryover' => '0.00',
         'final_allocation' => '100.00', 'closing_actual' => '100.00', 'operational_variance' => '0.00',
-        'detail_version' => 1, 'detail' => ['saving' => '15.00', 'consolidated_carryover' => '8.00'],
+        'detail_version' => 2, 'detail' => [
+            'saving' => '15.00',
+            'consolidated_carryover' => '8.00',
+            'cost_center_lineage' => [
+                ['cost_center_id' => $historicalParent->id, 'cost_center_label' => 'IT'],
+                ['cost_center_id' => $costCenter->id, 'cost_center_label' => 'Software'],
+            ],
+        ],
     ]);
     foreach ([['30.00', 'Aumento'], ['-10.00', 'Riduzione']] as [$amount, $reason]) {
         $line = ExpenseLine::factory()->for($expense)->actual()->create(['amount' => $amount, 'note' => $reason]);
@@ -50,6 +65,7 @@ it('keeps closing values immutable and composes current knowledge from separate 
         ]],
     ]);
     $expense->update(['description' => 'Rinominata dopo la Chiusura']);
+    $costCenter->update(['parent_id' => $liveParent->id]);
 
     $result = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray([
         'company_id' => $company->id, 'exercise_id' => $exercise->id, 'kind' => 'annual_executive',
@@ -69,5 +85,7 @@ it('keeps closing values immutable and composes current knowledge from separate 
         ->and($result->comparisons[0]['initial_value'])->toBe('100.00')
         ->and($result->comparisons[0]['final_value'])->toBe('120.00')
         ->and($result->comparisons[0]['delta'])->toBe('20.00')
+        ->and($result->comparisons[0]['initial_source']->costCenterLabel)->toBe('IT / Software')
+        ->and($result->comparisons[0]['final_source']->costCenterLabel)->toBe('IT / Software')
         ->and($snapshot->refresh()->total_closing_actual)->toBe('100.00');
 });

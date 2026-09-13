@@ -41,6 +41,7 @@ class EditCostCenter extends EditRecord
     {
         return [
             ViewAction::make(),
+            CostCenterResource::moveAction(),
             CostCenterResource::archiveAction(),
             CostCenterResource::restoreAction(),
         ];

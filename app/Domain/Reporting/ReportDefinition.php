@@ -90,7 +90,10 @@ final readonly class ReportDefinition
         if (array_diff(array_keys($this->filters), self::FILTERS) !== []) {
             throw new InvalidArgumentException('Il report contiene filtri non supportati.');
         }
-        foreach ($this->filters as $value) {
+        foreach ($this->filters as $key => $value) {
+            if ($key === 'cost_center_id' && $value === 'unclassified') {
+                continue;
+            }
             if ($value !== null && (! is_int($value) || $value < 1)) {
                 throw new InvalidArgumentException('Ogni filtro deve contenere un identificativo valido.');
             }

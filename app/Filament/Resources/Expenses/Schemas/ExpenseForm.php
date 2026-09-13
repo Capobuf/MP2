@@ -6,6 +6,7 @@ use App\Actions\MasterData\CreateCostCenter;
 use App\Actions\MasterData\CreateSupplier;
 use App\Domain\Contracts\ContractActualKind;
 use App\Domain\Contracts\ContractState;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Expenses\ManualExpenseLine;
@@ -130,7 +131,7 @@ class ExpenseForm
                 Select::make('direct_cost_center_id')
                     ->label('Centro di Costo')
                     ->options(fn (): array => self::company() instanceof Company
-                        ? CostCenter::query()->whereBelongsTo(self::company(), 'company')->active()->orderBy('name')->pluck('name', 'id')->all()
+                        ? CostCenterHierarchy::forCompany((int) self::company()->id)->options()
                         : [])
                     ->searchable()
                     ->createOptionForm([

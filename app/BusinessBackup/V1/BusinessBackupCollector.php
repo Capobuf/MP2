@@ -119,7 +119,7 @@ final class BusinessBackupCollector
             PortablePayload::json($this->decode($x->role_tags, [])),
         ], $data['supplier_contacts']));
         $sheets['_MP2_cost_centers'] = $sheet('_MP2_cost_centers', array_map(fn (object $x): array => [
-            $r->get('cost_center', $x->id), $this->str($x->name), $this->timestamp($x->archived_at),
+            $r->get('cost_center', $x->id), $this->str($x->name), $r->get('cost_center', $x->parent_id), $this->timestamp($x->archived_at),
         ], $data['cost_centers']));
         $sheets['_MP2_exercises'] = $sheet('_MP2_exercises', array_map(fn (object $x): array => [
             $r->get('exercise', $x->id), (string) $x->year, $this->str($x->status),
@@ -269,7 +269,7 @@ final class BusinessBackupCollector
             'Progetti' => ['columns' => ['Titolo', 'Descrizione', 'Stato iniziale', 'Archiviato il'], 'rows' => array_map(fn (array $x): array => [$x[1], $x[2], $x[4], $x[6]], $machine['_MP2_projects']['rows'])],
             'Contratti' => ['columns' => ['Titolo', 'Inizio', 'Scadenza', 'Rinnovo automatico'], 'rows' => array_map(fn (array $x): array => [$x[2], $x[4], $x[5], $x[7]], $machine['_MP2_contracts']['rows'])],
             'Fornitori' => ['columns' => ['Ragione sociale', 'Partita IVA', 'Note', 'Archiviato il'], 'rows' => array_map(fn (array $x): array => [$x[1], $x[2], $x[3], $x[4]], $machine['_MP2_suppliers']['rows'])],
-            'Centri di Costo' => ['columns' => ['Nome', 'Archiviato il'], 'rows' => array_map(fn (array $x): array => [$x[1], $x[2]], $machine['_MP2_cost_centers']['rows'])],
+            'Centri di Costo' => ['columns' => ['Nome', 'Centro padre', 'Archiviato il'], 'rows' => array_map(fn (array $x): array => [$x[1], $x[2], $x[3]], $machine['_MP2_cost_centers']['rows'])],
             'Chiusure' => ['columns' => ['Esercizio', 'Chiusa il', 'Allocato finale', 'Effettivo'], 'rows' => array_map(fn (array $x): array => [$x[3], $x[4], $x[7], $x[8]], $machine['_MP2_closings']['rows'])],
             'Correzioni' => ['columns' => ['Registrata il', 'Tipo', 'Motivo'], 'rows' => [
                 ...array_map(fn (array $x): array => [$x[6], 'Correzione tardiva', $x[7]], $machine['_MP2_late_corrections']['rows']),

@@ -12,6 +12,7 @@ final readonly class ReportResult
      * @param  array<string, int>  $categoryCounts
      * @param  array<string, int>  $labelCounts
      * @param  array<int, array<string, mixed>>  $sections
+     * @param  array<int, array<string, mixed>>  $costCenters
      */
     public function __construct(
         public ReportDefinition $definition,
@@ -22,5 +23,6 @@ final readonly class ReportResult
         public array $categoryCounts = [],
         public array $labelCounts = [],
         public array $sections = [],
+        public array $costCenters = [],
     ) {}
 }

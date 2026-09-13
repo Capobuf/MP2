@@ -3,6 +3,7 @@
 namespace App\Actions\MasterData;
 
 use App\Domain\Company\AuditEventType;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Models\AuditEvent;
 use App\Models\Company;
 use App\Models\CostCenter;
@@ -73,11 +74,13 @@ class RenameCostCenter
         });
     }
 
-    /** @return array{name: string, archived: bool} */
+    /** @return array{name: string, parent_id: int|null, path: string, archived: bool} */
     private function snapshot(CostCenter $costCenter): array
     {
         return [
             'name' => $costCenter->name,
+            'parent_id' => $costCenter->parent_id,
+            'path' => CostCenterHierarchy::forCompany((int) $costCenter->company_id)->path((int) $costCenter->id),
             'archived' => $costCenter->isArchived(),
         ];
     }

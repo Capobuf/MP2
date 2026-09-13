@@ -46,7 +46,7 @@ it('lists and resolves cost centers only inside the current tenant', function ()
         ->assertNotFound();
 });
 
-it('creates cost centers for managers without exposing later-slice fields', function () {
+it('creates cost centers for managers with an optional parent and without economic fields', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
     grantCostCenterResourceCapabilities($manager, $company);
@@ -56,7 +56,7 @@ it('creates cost centers for managers without exposing later-slice fields', func
     Livewire::test(CreateCostCenter::class)
         ->assertFormFieldDoesNotExist('exercise_id')
         ->assertFormFieldDoesNotExist('classification')
-        ->assertFormFieldDoesNotExist('parent_id')
+        ->assertFormFieldExists('parent_id')
         ->assertFormFieldDoesNotExist('percentage')
         ->assertFormFieldDoesNotExist('amount')
         ->fillForm(['name' => 'Operations'])

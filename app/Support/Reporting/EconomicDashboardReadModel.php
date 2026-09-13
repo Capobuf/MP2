@@ -7,6 +7,7 @@ use App\Domain\Expenses\Decimal;
 use App\Domain\Reporting\ActualReference;
 use App\Domain\Reporting\ComparisonCategory;
 use App\Domain\Reporting\ReferenceType;
+use App\Domain\Reporting\ReportAggregator;
 use App\Domain\Reporting\ReportDefinition;
 use App\Domain\Reporting\ReportKind;
 use App\Domain\Reporting\ReportReference;
@@ -29,7 +30,10 @@ final class EconomicDashboardReadModel
     /** @var array<string, array<string, mixed>> */
     private array $resolved = [];
 
-    public function __construct(private readonly BuildReport $buildReport) {}
+    public function __construct(
+        private readonly BuildReport $buildReport,
+        private readonly ReportAggregator $aggregator,
+    ) {}
 
     /** @return array<string, mixed> */
     public function load(User $user, Company $company, Exercise $exercise, ?BudgetSnapshot $budget): array
@@ -222,36 +226,45 @@ final class EconomicDashboardReadModel
         array $budgetSources,
         array $currentSources,
     ): array {
+        $budgetBuckets = [];
+        foreach ($this->aggregator->costCenters($budgetSources) as $bucket) {
+            $budgetBuckets[(string) $bucket['key']] = $bucket;
+        }
+        $currentBuckets = [];
+        foreach ($this->aggregator->costCenters($currentSources) as $bucket) {
+            $currentBuckets[(string) $bucket['key']] = $bucket;
+        }
+        $keys = array_unique([...array_keys($budgetBuckets), ...array_keys($currentBuckets)]);
         $buckets = [];
 
-        foreach ($budgetSources as $source) {
-            $key = $source->costCenterId === null ? 'unclassified' : 'cost_center:'.$source->costCenterId;
-            $buckets[$key] ??= $this->emptyCostCenterBucket($source, $key);
-            $buckets[$key]['budget'] = Decimal::add($buckets[$key]['budget'], $source->allocation);
-        }
-
-        foreach ($currentSources as $source) {
-            $key = $source->costCenterId === null ? 'unclassified' : 'cost_center:'.$source->costCenterId;
-            $buckets[$key] ??= $this->emptyCostCenterBucket($source, $key);
-            if ($source->costCenterLabel !== null) {
-                $buckets[$key]['label'] = $source->costCenterLabel;
+        foreach ($keys as $key) {
+            $budgetBucket = $budgetBuckets[$key] ?? null;
+            $currentBucket = $currentBuckets[$key] ?? null;
+            $source = $currentBucket ?? $budgetBucket;
+            if ($source === null) {
+                continue;
             }
-            $buckets[$key]['allocation'] = Decimal::add($buckets[$key]['allocation'], $source->allocation);
-            $buckets[$key]['actual'] = Decimal::add($buckets[$key]['actual'], $source->actual);
+            $buckets[$key] = [
+                ...$source,
+                'budget' => (string) ($budgetBucket['branch_allocation'] ?? '0.00'),
+                'direct_budget' => (string) ($budgetBucket['direct_allocation'] ?? '0.00'),
+                'allocation' => (string) ($currentBucket['branch_allocation'] ?? '0.00'),
+                'actual' => (string) ($currentBucket['branch_actual'] ?? '0.00'),
+                'direct_allocation' => (string) ($currentBucket['direct_allocation'] ?? '0.00'),
+                'direct_actual' => (string) ($currentBucket['direct_actual'] ?? '0.00'),
+            ];
         }
 
         foreach ($buckets as &$bucket) {
             $bucket['operational_variance'] = Decimal::subtract($bucket['actual'], $bucket['allocation']);
-            $bucket['url'] = $bucket['cost_center_id'] === null
-                ? null
-                : Reports::getUrl(array_filter([
-                    'exerciseId' => $exercise->id,
-                    'kind' => ReportKind::AnnualExecutive->value,
-                    'budgetId' => $budget?->id,
-                    'actualReference' => ActualReference::Current->value,
-                    'costCenterId' => $bucket['cost_center_id'],
-                    'auto' => 1,
-                ], fn (mixed $value): bool => $value !== null), tenant: $company);
+            $bucket['url'] = Reports::getUrl(array_filter([
+                'exerciseId' => $exercise->id,
+                'kind' => ReportKind::AnnualExecutive->value,
+                'budgetId' => $budget?->id,
+                'actualReference' => ActualReference::Current->value,
+                'costCenterId' => $bucket['cost_center_id'] ?? 'unclassified',
+                'auto' => 1,
+            ], fn (mixed $value): bool => $value !== null), tenant: $company);
         }
         unset($bucket);
 
@@ -264,21 +277,6 @@ final class EconomicDashboardReadModel
         });
 
         return array_values($buckets);
-    }
-
-    /** @return array<string, mixed> */
-    private function emptyCostCenterBucket(ReportSource $source, string $key): array
-    {
-        return [
-            'key' => $key,
-            'cost_center_id' => $source->costCenterId,
-            'label' => $source->costCenterLabel ?? 'Non classificato',
-            'budget' => '0.00',
-            'allocation' => '0.00',
-            'actual' => '0.00',
-            'operational_variance' => '0.00',
-            'url' => null,
-        ];
     }
 
     private function sourceUrl(Company $company, ReportSource $source): string

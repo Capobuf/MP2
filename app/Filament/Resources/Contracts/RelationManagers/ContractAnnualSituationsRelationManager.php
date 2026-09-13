@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Contracts\RelationManagers;
 
 use App\Domain\Contracts\ContractAnnualAllocation;
 use App\Domain\Contracts\ContractStateTimeline;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
 use App\Models\Contract;
 use App\Models\Exercise;
@@ -26,16 +27,18 @@ class ContractAnnualSituationsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
+        $hierarchy = CostCenterHierarchy::forCompany((int) $this->contract()->company_id);
+
         return $table->columns([
             TextColumn::make('year')->label('Esercizio')->sortable(),
             TextColumn::make('reference_date')->label('Data di Riferimento')->state(fn (Exercise $record): string => $this->reference($record)->format('d/m/Y')),
             TextColumn::make('state')->label('Stato')->state(fn (Exercise $record): string => $this->contract()->stateAtDate($this->reference($record)->toDateString())->label())->badge(),
-            TextColumn::make('cost_center')->label('Centro di Costo')->state(function (Exercise $record): string {
+            TextColumn::make('cost_center')->label('Centro di Costo')->state(function (Exercise $record) use ($hierarchy): string {
                 $classification = $this->contract()->classifications->firstWhere('exercise_id', $record->id);
 
                 return $classification === null || $classification->cost_center_id === null
                     ? 'Non classificato'
-                    : $classification->costCenter->name;
+                    : $hierarchy->path((int) $classification->cost_center_id);
             }),
             TextColumn::make('allocation')->label('Allocato')->state(fn (Exercise $record): string => $this->allocation($record)->amount)->money('EUR', locale: 'it'),
             TextColumn::make('actual')->label('Effettivo')->state(fn (Exercise $record): string => Decimal::sum($this->contract()->expenses

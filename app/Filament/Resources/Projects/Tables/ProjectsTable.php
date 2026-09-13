@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Projects\Tables;
 
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Projects\ProjectAnnualReferenceDate;
@@ -28,14 +29,17 @@ class ProjectsTable
     {
         /** @var array<int, array{state: string, reference_date: string|null, cost_center: string, allocation: string, actual: string, variance: string}> $annualCache */
         $annualCache = [];
-        $annual = function (Project $record) use (&$annualCache): array {
+        $hierarchy = null;
+        $annual = function (Project $record) use (&$annualCache, &$hierarchy): array {
             if (isset($annualCache[$record->id])) {
                 return $annualCache[$record->id];
             }
 
             $exercise = app(ExerciseContext::class)->current($record->company);
 
-            return $annualCache[$record->id] = self::annualValues($record, $exercise);
+            $hierarchy ??= CostCenterHierarchy::forCompany((int) $record->company_id);
+
+            return $annualCache[$record->id] = self::annualValues($record, $exercise, $hierarchy);
         };
 
         return $table
@@ -111,7 +115,7 @@ class ProjectsTable
     }
 
     /** @return array{state: string, reference_date: string|null, cost_center: string, allocation: string, actual: string, variance: string} */
-    private static function annualValues(Project $project, ?Exercise $exercise): array
+    private static function annualValues(Project $project, ?Exercise $exercise, CostCenterHierarchy $hierarchy): array
     {
         if ($exercise === null) {
             return [
@@ -135,7 +139,7 @@ class ProjectsTable
             'reference_date' => $reference->format('d/m/Y'),
             'cost_center' => $classification === null || $classification->cost_center_id === null
                 ? 'Non classificato'
-                : $classification->costCenter->name,
+                : $hierarchy->path((int) $classification->cost_center_id),
             'allocation' => $allocation,
             'actual' => $actual,
             'variance' => Decimal::subtract($actual, $allocation),

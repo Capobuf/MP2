@@ -827,7 +827,7 @@ function pdfFamilyFixture(string $kind, int $count = 12, bool $annualComparison 
         ],
         $sources, $comparisons,
         collect($comparisons)->countBy(fn (array $row): string => $row['category']->value)->all(),
-        [], $sections,
+        [], $sections, $aggregator->costCenters($sources),
     );
 }
 

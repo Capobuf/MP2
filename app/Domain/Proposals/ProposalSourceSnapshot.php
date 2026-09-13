@@ -2,6 +2,7 @@
 
 namespace App\Domain\Proposals;
 
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Models\Contract;
 use App\Models\Expense;
@@ -12,9 +13,10 @@ use App\Models\ProjectDeferral;
 final class ProposalSourceSnapshot
 {
     /** @return array<string, mixed> */
-    public static function expense(Expense $expense): array
+    public static function expense(Expense $expense, ?CostCenterHierarchy $hierarchy = null): array
     {
         $expense->loadMissing(['lines', 'supplier', 'directCostCenter']);
+        $hierarchy ??= CostCenterHierarchy::forCompany((int) $expense->company_id);
         $estimateLines = $expense->lines->filter(fn (ExpenseLine $line): bool => $line->lineType() === ExpenseLineType::Estimate);
         $actualLines = $expense->lines->filter(fn (ExpenseLine $line): bool => $line->lineType() === ExpenseLineType::Actual);
 
@@ -23,7 +25,9 @@ final class ProposalSourceSnapshot
                 'origin_key' => $expense->originKey(), 'exercise_id' => $expense->exercise_id,
                 'project_id' => $expense->project_id, 'contract_id' => $expense->contract_id,
                 'supplier_id' => $expense->supplier_id, 'supplier_label' => $expense->supplier?->legal_name,
-                'cost_center_id' => $expense->direct_cost_center_id, 'cost_center_label' => $expense->directCostCenter?->name,
+                'cost_center_id' => $expense->direct_cost_center_id,
+                'cost_center_label' => $expense->direct_cost_center_id === null ? null : $hierarchy->path((int) $expense->direct_cost_center_id),
+                'cost_center_lineage' => $expense->direct_cost_center_id === null ? [] : $hierarchy->lineage((int) $expense->direct_cost_center_id),
                 'description' => $expense->description, 'notes' => $expense->notes,
                 'reversed_at' => self::date($expense->reversed_at),
                 'estimate_lines' => self::lines($estimateLines->all()),
@@ -33,9 +37,10 @@ final class ProposalSourceSnapshot
     }
 
     /** @return array<string, mixed> */
-    public static function project(Project $project, int $exerciseId): array
+    public static function project(Project $project, int $exerciseId, ?CostCenterHierarchy $hierarchy = null): array
     {
         $project->loadMissing(['transitions', 'classifications.costCenter', 'expenses.lines', 'contractLinks', 'deferrals']);
+        $hierarchy ??= CostCenterHierarchy::forCompany((int) $project->company_id);
         $expenses = $project->expenses->where('exercise_id', $exerciseId)->sortBy('id');
         $incoming = $project->deferrals->firstWhere('destination_exercise_id', $exerciseId);
 
@@ -45,8 +50,13 @@ final class ProposalSourceSnapshot
                 'notes' => $project->notes, 'initial_state' => $project->initialState()->value,
                 'initial_effective_date' => self::date($project->initial_effective_date), 'archived_at' => self::date($project->archived_at),
                 'transitions' => $project->transitions->map->only(['id', 'from_state', 'to_state', 'effective_date', 'reason', 'annulled_at'])->values()->all(),
-                'classification' => $project->classifications->where('exercise_id', $exerciseId)->map(fn ($row): array => ['id' => $row->id, 'cost_center_id' => $row->cost_center_id, 'cost_center_label' => $row->costCenter?->name])->values()->all(),
-                'expense_plan' => $expenses->map(fn (Expense $expense): array => self::expense($expense)['plan_baseline'])->values()->all(),
+                'classification' => $project->classifications->where('exercise_id', $exerciseId)->map(fn ($row): array => [
+                    'id' => $row->id,
+                    'cost_center_id' => $row->cost_center_id,
+                    'cost_center_label' => $row->cost_center_id === null ? null : $hierarchy->path((int) $row->cost_center_id),
+                    'cost_center_lineage' => $row->cost_center_id === null ? [] : $hierarchy->lineage((int) $row->cost_center_id),
+                ])->values()->all(),
+                'expense_plan' => $expenses->map(fn (Expense $expense): array => self::expense($expense, $hierarchy)['plan_baseline'])->values()->all(),
                 'contract_links' => $project->contractLinks->map->only(['id', 'contract_id', 'archived_at'])->values()->all(),
                 'incoming_deferral' => self::incomingDeferral($incoming, $exerciseId),
             ],
@@ -55,9 +65,10 @@ final class ProposalSourceSnapshot
     }
 
     /** @return array<string, mixed> */
-    public static function contract(Contract $contract, int $exerciseId): array
+    public static function contract(Contract $contract, int $exerciseId, ?CostCenterHierarchy $hierarchy = null): array
     {
         $contract->loadMissing(['supplier', 'conditions', 'lifecycleFacts', 'renewalConfigurations', 'classifications.costCenter', 'expenses.lines', 'projectLinks']);
+        $hierarchy ??= CostCenterHierarchy::forCompany((int) $contract->company_id);
         $expenses = $contract->expenses->where('exercise_id', $exerciseId)->sortBy('id');
 
         return self::canonical([
@@ -71,8 +82,13 @@ final class ProposalSourceSnapshot
                 'conditions' => $contract->conditions->map->only(['id', 'cycle', 'attribution_mode', 'amount', 'valid_from', 'valid_to', 'reason', 'annulled_at'])->values()->all(),
                 'lifecycle_facts' => $contract->lifecycleFacts->map->only(['id', 'type', 'declared_contractual_date', 'state_change_date', 'renewed_expiry_date', 'reason', 'annulled_at'])->values()->all(),
                 'renewal_configurations' => $contract->renewalConfigurations->map->only(['id', 'effective_from', 'expiry_anchor_date', 'automatic_renewal', 'renewal_duration_months', 'notice_days'])->values()->all(),
-                'classification' => $contract->classifications->where('exercise_id', $exerciseId)->map(fn ($row): array => ['id' => $row->id, 'cost_center_id' => $row->cost_center_id, 'cost_center_label' => $row->costCenter?->name])->values()->all(),
-                'expense_plan' => $expenses->map(fn (Expense $expense): array => self::expense($expense)['plan_baseline'])->values()->all(),
+                'classification' => $contract->classifications->where('exercise_id', $exerciseId)->map(fn ($row): array => [
+                    'id' => $row->id,
+                    'cost_center_id' => $row->cost_center_id,
+                    'cost_center_label' => $row->cost_center_id === null ? null : $hierarchy->path((int) $row->cost_center_id),
+                    'cost_center_lineage' => $row->cost_center_id === null ? [] : $hierarchy->lineage((int) $row->cost_center_id),
+                ])->values()->all(),
+                'expense_plan' => $expenses->map(fn (Expense $expense): array => self::expense($expense, $hierarchy)['plan_baseline'])->values()->all(),
                 'project_links' => $contract->projectLinks->map->only(['id', 'project_id', 'archived_at'])->values()->all(),
             ],
             'actual_context' => ['has_actuals' => $expenses->contains(fn (Expense $expense): bool => $expense->hasActuals()), 'expenses' => $expenses->map(fn (Expense $expense): array => self::expense($expense)['actual_context'])->values()->all()],

@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
+use App\Domain\CostCenters\CostCenterHierarchy;
 use Database\Factories\CostCenterFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['company_id', 'name', 'archived_at'])]
+#[Fillable(['company_id', 'parent_id', 'name', 'archived_at'])]
 class CostCenter extends Model
 {
     /** @use HasFactory<CostCenterFactory> */
@@ -17,6 +19,17 @@ class CostCenter extends Model
 
     protected static function booted(): void
     {
+        static::saving(function (self $costCenter): void {
+            if (! $costCenter->isDirty('parent_id')) {
+                return;
+            }
+
+            CostCenterHierarchy::forCompany((int) $costCenter->company_id)->assertCanAssignParent(
+                $costCenter->exists ? (int) $costCenter->id : null,
+                (int) $costCenter->company_id,
+                $costCenter->parent_id === null ? null : (int) $costCenter->parent_id,
+            );
+        });
         static::deleting(function (): never {
             throw new \LogicException('Persisted master data cannot be deleted.');
         });
@@ -26,6 +39,18 @@ class CostCenter extends Model
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    /** @return BelongsTo<CostCenter, $this> */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    /** @return HasMany<CostCenter, $this> */
+    public function children(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id');
     }
 
     /** @return BelongsTo<TenantCompany, $this> */

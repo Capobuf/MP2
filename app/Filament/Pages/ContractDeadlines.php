@@ -4,12 +4,12 @@ namespace App\Filament\Pages;
 
 use App\Domain\Contracts\ContractDeadline;
 use App\Domain\Contracts\ContractState;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Filament\Forms\DateInput;
 use App\Filament\Resources\Contracts\ContractResource;
 use App\Filament\Resources\Suppliers\SupplierResource;
 use App\Models\Company;
 use App\Models\Contract;
-use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Supplier;
 use App\Models\TenantCompany;
@@ -123,7 +123,7 @@ class ContractDeadlines extends Page implements HasTable
                     ->query(fn (Builder $query, array $data): Builder => blank($data['value'] ?? null)
                         ? $query
                         : $query->where('supplier_id', $data['value'])),
-                SelectFilter::make('cost_center')->label('Centro di Costo')->options(fn (): array => CostCenter::query()->where('company_id', $this->company()->id)->orderBy('name')->pluck('name', 'id')->all())
+                SelectFilter::make('cost_center')->label('Centro di Costo')->options(fn (): array => ['unclassified' => 'Non classificato'] + CostCenterHierarchy::forCompany((int) $this->company()->id)->options(activeOnly: false))
                     ->query(function (Builder $query, array $data): Builder {
                         $costCenterId = $data['value'] ?? null;
                         $exercise = $this->exercise();
@@ -131,8 +131,14 @@ class ContractDeadlines extends Page implements HasTable
                             return $query;
                         }
 
+                        if ($costCenterId === 'unclassified') {
+                            return $query->whereDoesntHave('classifications', fn (Builder $classification): Builder => $classification
+                                ->where('exercise_id', $exercise->id)->whereNotNull('cost_center_id'));
+                        }
+                        $ids = CostCenterHierarchy::forCompany((int) $this->company()->id)->descendantIds((int) $costCenterId);
+
                         return $query->whereHas('classifications', fn (Builder $classification): Builder => $classification
-                            ->where('exercise_id', $exercise->id)->where('cost_center_id', $costCenterId));
+                            ->where('exercise_id', $exercise->id)->whereIn('cost_center_id', $ids));
                     }),
             ])
             ->defaultSort('next_expiry_date')
@@ -156,7 +162,10 @@ class ContractDeadlines extends Page implements HasTable
         }
         $costCenter = $contract->classifications->firstWhere('exercise_id', $this->exercise()?->id)?->costCenter;
 
-        return $costCenter === null ? 'Centro di Costo #'.$costCenterId : $costCenter->name.($costCenter->isArchived() ? ' · Archiviato' : '');
+        return $costCenter === null
+            ? 'Centro di Costo #'.$costCenterId
+            : CostCenterHierarchy::forCompany((int) $costCenter->company_id)->path((int) $costCenter->id)
+                .($costCenter->isArchived() ? ' · Archiviato' : '');
     }
 
     private function exercise(): ?Exercise

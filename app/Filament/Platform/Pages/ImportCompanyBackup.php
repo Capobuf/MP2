@@ -328,8 +328,9 @@ final class ImportCompanyBackup extends Page
     private function attachmentWarning(): string
     {
         $count = $this->previewInt('attachment_count');
+        $format = $this->previewInt('format_version');
 
-        return "{$count} allegati non saranno ripristinati. Il backup ne conserva l’inventario, ma il formato V1 non contiene i file originali.";
+        return "{$count} allegati non saranno ripristinati. Il backup ne conserva l’inventario, ma il formato V{$format} non contiene i file originali.";
     }
 
     private function confirmationDescription(): string
@@ -339,7 +340,7 @@ final class ImportCompanyBackup extends Page
             $description .= ' Esiste già un’Azienda con questa denominazione. Verrà comunque creata una nuova identità.';
         }
         if ($this->previewInt('attachment_count') > 0) {
-            $description .= ' I file allegati originali non fanno parte del backup V1 e non verranno ripristinati.';
+            $description .= ' I file allegati originali non fanno parte del backup V'.$this->previewInt('format_version').' e non verranno ripristinati.';
         }
 
         return $description;

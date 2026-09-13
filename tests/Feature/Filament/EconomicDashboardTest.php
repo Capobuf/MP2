@@ -203,7 +203,7 @@ it('renders live charts without a Budget and keeps comparative charts unavailabl
         ->and(array_column($sourceProfile['datasets'], 'label'))->toBe(['Allocato Corrente', 'Effettivo'])
         ->and(array_sum($sourceProfile['datasets'][0]['data']))->toBe(600.0)
         ->and(array_sum($sourceProfile['datasets'][1]['data']))->toBe(640.0)
-        ->and(array_column($costCenters['datasets'], 'label'))->toBe(['Allocato Corrente', 'Effettivo'])
+        ->and(array_column($costCenters['datasets'], 'label'))->toBe(['Allocato Ramo', 'Effettivo Ramo'])
         ->and($costCenters['labels'])->not->toBeEmpty()
         ->and($operationalVariance['datasets'][0]['label'])->toBe('Scostamento Operativo')
         ->and(array_sum($operationalVariance['datasets'][0]['data']))->toBe(40.0)
@@ -235,9 +235,9 @@ it('enriches live charts and enables comparative charts with the selected Budget
         'Allocato Corrente',
         'Effettivo',
     ])->and(array_column($costCenters['datasets'], 'label'))->toBe([
-        'Budget Selezionato',
-        'Allocato Corrente',
-        'Effettivo',
+        'Budget Ramo',
+        'Allocato Ramo',
+        'Effettivo Ramo',
     ])->and($operationalVariance['datasets'][0]['data'])->not->toBeEmpty()
         ->and($budgetVariation['datasets'][0]['data'])->not->toBeEmpty()
         ->and($allocationComparison['datasets'][0]['data'])->not->toBeEmpty();

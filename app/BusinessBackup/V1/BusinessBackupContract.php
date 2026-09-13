@@ -4,7 +4,9 @@ namespace App\BusinessBackup\V1;
 
 final class BusinessBackupContract
 {
-    public const FORMAT_VERSION = '1';
+    public const FORMAT_VERSION = '2';
+
+    public const LEGACY_FORMAT_VERSION = '1';
 
     public const MANIFEST = '_MP2_manifest';
 
@@ -15,7 +17,7 @@ final class BusinessBackupContract
         '_MP2_company' => ['company_ref', 'name', 'timezone', 'overspend_note_required', 'unclassified_closing_policy'],
         '_MP2_suppliers' => ['supplier_ref', 'legal_name', 'vat_number', 'notes', 'archived_at'],
         '_MP2_supplier_contacts' => ['contact_ref', 'supplier_ref', 'first_name', 'last_name', 'phone', 'email', 'notes', 'role_tags_json'],
-        '_MP2_cost_centers' => ['cost_center_ref', 'name', 'archived_at'],
+        '_MP2_cost_centers' => ['cost_center_ref', 'name', 'parent_cost_center_ref', 'archived_at'],
         '_MP2_exercises' => ['exercise_ref', 'year', 'status'],
         '_MP2_projects' => ['project_ref', 'title', 'description', 'notes', 'initial_state', 'initial_effective_date', 'archived_at'],
         '_MP2_project_transitions' => ['transition_ref', 'project_ref', 'from_state', 'to_state', 'effective_date', 'reason', 'annulled_at', 'annulment_reason'],
@@ -124,5 +126,21 @@ final class BusinessBackupContract
     public static function machineSheets(): array
     {
         return array_keys(self::SCHEMAS);
+    }
+
+    /** @return array<string, list<string>> */
+    public static function schemasForVersion(string $version): array
+    {
+        if ($version === self::FORMAT_VERSION) {
+            return self::SCHEMAS;
+        }
+        if ($version !== self::LEGACY_FORMAT_VERSION) {
+            throw new \InvalidArgumentException("Unsupported business backup version [$version].");
+        }
+
+        $schemas = self::SCHEMAS;
+        $schemas['_MP2_cost_centers'] = ['cost_center_ref', 'name', 'archived_at'];
+
+        return $schemas;
     }
 }

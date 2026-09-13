@@ -8,6 +8,7 @@ enum ModificationDimension: string
     case Actual = 'actual';
     case Carryover = 'carryover';
     case CostCenter = 'cost_center';
+    case CostCenterPlacement = 'cost_center_placement';
     case Supplier = 'supplier';
     case Container = 'container';
     case StateOrTransitions = 'state_or_transitions';
@@ -23,6 +24,7 @@ enum ModificationDimension: string
             self::Actual => 'Effettivo',
             self::Carryover => 'Riporto',
             self::CostCenter => 'Centro di Costo',
+            self::CostCenterPlacement => 'Collocazione gerarchica del Centro di Costo',
             self::Supplier => 'Fornitore',
             self::Container => 'Contenitore',
             self::StateOrTransitions => 'Stato o Transizioni',

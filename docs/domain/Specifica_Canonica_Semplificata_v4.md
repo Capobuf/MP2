@@ -2946,6 +2946,8 @@ Il Centro di Costo è una classificazione annuale e non genera importi.
 
 ## 20.2 Cardinalità
 
+Ogni Centro di Costo appartiene a una sola Azienda, può avere zero o un solo Centro padre della stessa Azienda e zero o più figli. Un Centro senza padre è una radice. La gerarchia è opzionale, non ha un limite funzionale di profondità e **MUST NOT** contenere auto-riferimenti o cicli diretti o indiretti.
+
 Per Esercizio:
 
 - una Spesa autonoma appartiene a zero o un Centro di Costo;
@@ -2953,6 +2955,8 @@ Per Esercizio:
 - un Contratto appartiene a zero o un Centro di Costo.
 
 `Non classificato` è assenza di associazione.
+
+La classificazione resta sempre diretta verso zero o un solo Centro: gli antenati non vengono salvati come classificazioni aggiuntive. Un Centro padre Attivo è selezionabile come qualsiasi foglia. I nomi duplicati restano ammessi e il percorso gerarchico è una label derivata, non un'identità o un vincolo di unicità.
 
 ## 20.3 Classificazione annuale
 
@@ -2992,6 +2996,14 @@ L'identità resta invariata.
 
 Le Snapshot conservano la denominazione materializzata al momento.
 
+Nei contesti in cui una denominazione non è sufficiente, il sistema mostra il percorso derivato, per esempio `IT / Software / SaaS`.
+
+## 20.7.1 Spostamento nella gerarchia
+
+Cambiare padre preserva ID, classificazioni dirette e importi del Centro e dell'intero sottoalbero. Lo spostamento è un'operazione atomica, autorizzata, idempotente e auditata. Prima della conferma il sistema mostra, per ogni Esercizio Aperto realmente interessato, le sorgenti del sottoalbero e gli importi che cambiano ramo aggregativo. Gli Esercizi Chiusi, i Budget e le Snapshot di Chiusura non vengono ricalcolati.
+
+L'evento conserva almeno vecchio e nuovo padre, vecchio e nuovo percorso, autore, Azienda, operation ID, Esercizi Aperti e sorgenti interessate. Allocato ed Effettivo dell'evento restano a delta zero, perché cambia soltanto il roll-up. Le sorgenti interessate di Proposte in Bozza diventano `Da riallineare`; le altre Proposte restano invariate.
+
 ## 20.8 Archivio
 
 Un Centro di Costo referenziato viene Archiviato, non eliminato.
@@ -3004,15 +3016,24 @@ Resta disponibile:
 
 Non è selezionabile per nuove classificazioni finché resta Archiviato.
 
+L'Archivio di un padre non sposta, non archivia e non riclassifica i figli. Un padre Archiviato resta visibile quando serve a rappresentare un percorso esistente o storico.
+
 ## 20.9 Aggregazioni
 
 ```text
-AllocatoCdC = somma Allocati delle sorgenti classificate
-EffettivoCdC = somma Effettivi delle sorgenti classificate
-ScostamentoCdC = EffettivoCdC - AllocatoCdC
+AllocatoDirettoCdC = somma Allocati delle sorgenti classificate direttamente
+EffettivoDirettoCdC = somma Effettivi delle sorgenti classificate direttamente
+AllocatoRamoCdC = AllocatoDirettoCdC + somma Allocati dei discendenti
+EffettivoRamoCdC = EffettivoDirettoCdC + somma Effettivi dei discendenti
+ScostamentoDirettoCdC = EffettivoDirettoCdC - AllocatoDirettoCdC
+ScostamentoRamoCdC = EffettivoRamoCdC - AllocatoRamoCdC
 ```
 
 Il Riporto mostrato per Centro di Costo è la somma dei Riporti dei Progetti classificati nell'Esercizio destinazione.
+
+I roll-up dei rami sono aggregazioni derivate e **MUST NOT** essere sommati ai totali aziendali come nuove sorgenti. Ogni importo contribuisce una sola volta ai totali generali.
+
+Un filtro per Centro di Costo seleziona il Centro stesso e tutti i discendenti secondo la gerarchia propria del riferimento usato. `Non classificato` seleziona esclusivamente sorgenti prive di Centro diretto.
 
 ## 20.10 Limite
 
@@ -3263,6 +3284,10 @@ Ogni Snapshot è:
 - leggibile dopo Archivio o modifiche successive;
 - idempotente rispetto all'ID dell'operazione che la crea.
 
+Quando una riga possiede un Centro di Costo, una nuova Snapshot materializza anche il percorso e la lineage ordinata di ID e label esistente nel riferimento. Questa informazione è parte del payload versionato della riga e non viene risolta dalla gerarchia viva durante la lettura.
+
+Le Snapshot precedenti prive di lineage restano valide e rappresentano soltanto il Centro e la label allora materializzati: il sistema **MUST NOT** ricostruire per esse antenati storici usando la gerarchia corrente.
+
 ## 23.3 Cardinalità
 
 Per Esercizio:
@@ -3479,6 +3504,8 @@ Il confronto usa:
 3. presenza in un solo riferimento per Aggiunto o Rimosso.
 
 Il sistema **MUST NOT** usare fuzzy matching per titolo, importo o Fornitore.
+
+Ogni lato del confronto usa la lineage materializzata nel proprio Budget o Snapshot; la Situazione Corrente usa la gerarchia viva. Uno spostamento che conserva lo stesso Centro diretto non è un cambio di identità del Centro, ma può essere esposto separatamente come modifica della collocazione gerarchica.
 
 ## 23.14 Nessun as-of arbitrario
 
@@ -3745,6 +3772,7 @@ Per una sorgente `Modificata`, il sistema indica una o più dimensioni:
 - Effettivo;
 - Riporto;
 - Centro di Costo;
+- collocazione gerarchica del Centro di Costo, distinta dal Centro direttamente assegnato;
 - Fornitore;
 - contenitore, quando applicabile;
 - stato o transizioni;
@@ -3823,6 +3851,7 @@ La vista annuale mostra almeno:
 - conteggio per categoria primaria;
 - conteggio per etichette principali;
 - totale Non classificato;
+- totali diretti e di ramo per Centro di Costo, senza sommare i roll-up ai totali aziendali;
 - Annotazioni di errore storico.
 
 ## 25.11 Drill-down
@@ -3839,6 +3868,8 @@ Ogni totale deve essere approfondibile per:
 - Riporti;
 - eventi della Timeline;
 - Annotazioni di errore storico.
+
+Il drill-down e il filtro di un Centro padre comprendono il Centro e l'intero sottoalbero con la stessa semantica usata da UI e PDF.
 
 ## 25.12 Spiegazione della variazione
 
@@ -5388,6 +5419,22 @@ La relazione informativa `Collegato a` non trasferisce valori, stato, classifica
 
 Il Plafond non introduce entità, tipo, flag, stato o report dedicato.
 
+## 28.62 Gerarchia dei Centri di Costo
+
+La gerarchia è opzionale, usa zero o un padre della stessa Azienda, ammette più figli e profondità non prefissata, e non ammette auto-riferimenti o cicli.
+
+## 28.63 Classificazione diretta e roll-up
+
+Ogni sorgente conserva al massimo un Centro diretto per Esercizio. Gli antenati sono soltanto dimensioni di aggregazione: totale diretto e totale del ramo restano distinti e i roll-up non duplicano il totale aziendale.
+
+## 28.64 Lineage storica del Centro di Costo
+
+Le nuove Snapshot materializzano la lineage del Centro; quelle precedenti prive di lineage restano piatte e non vengono reinterpretate con l'albero vivo.
+
+## 28.65 Spostamento del Centro di Costo
+
+Uno spostamento preserva ID e importi, produce anteprima e audit, riallinea le sole sorgenti interessate nelle Proposte in Bozza e non modifica Esercizi Chiusi o Snapshot.
+
 
 ---
 
@@ -5498,6 +5545,11 @@ Questa sezione è un indice di tracciabilità. Le regole normative sono esclusiv
 | FR-099 | Evoluzione del dominio tramite categorie A–E | §3 |
 | FR-100 | Nessun Forecast | §§1.4, 28.59 |
 | FR-101 | Presenza di Effettivi distinta dal totale netto | §§6.4, 28.2 |
+| FR-102 | Gerarchia opzionale dei Centri di Costo senza cicli e confinata all'Azienda | §§20.2, 28.62 |
+| FR-103 | Classificazione diretta singola, totale diretto e totale ramo senza doppio conteggio | §§20.2, 20.9, 28.63 |
+| FR-104 | Filtro del Centro padre sull'intero sottoalbero e Non classificato invariato | §§20.9, 25.11 |
+| FR-105 | Lineage dei Centri materializzata nelle nuove Snapshot e compatibilità delle precedenti | §§23.2, 23.13, 28.64 |
+| FR-106 | Spostamento del Centro con anteprima, audit, idempotenza e riallineamento Proposte | §§20.7.1, 28.65, 30.4 |
 
 ---
 
@@ -5733,6 +5785,8 @@ Salvo nuova decisione di dominio, il sistema **MUST NOT** introdurre:
 - propagazione economica delle relazioni informative;
 - ripartizioni molti-a-molti fra Centri di Costo;
 - gerarchie obbligatorie di Centro di Costo;
+- gerarchie di Centro di Costo per Esercizio o con validità temporale;
+- classificazioni duplicate sugli antenati o selezione limitata alle sole foglie;
 - scenari paralleli;
 - branching completo del dominio;
 - merge per campo della Proposta;
@@ -5787,6 +5841,12 @@ La baseline mostra e filtra scadenze e termini di disdetta, ma non invia notific
 ### Centro di Costo unico
 
 Un costo condiviso non può essere ripartito percentualmente.
+
+La gerarchia non modifica questo limite: la sorgente conserva un solo Centro diretto.
+Con `IT diretto = 10`, `IT / Software = 20` e `IT / Hardware = 30`, il report deve
+mostrare `IT diretto = 10`, `IT totale ramo = 60` e totale Azienda `60`, mai `120`.
+Il filtro `IT` include i tre importi; un Budget materializzato prima di uno spostamento
+di `Software` conserva invece il proprio percorso storico.
 
 ### Multi-valuta e IVA
 

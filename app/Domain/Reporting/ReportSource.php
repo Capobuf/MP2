@@ -8,6 +8,7 @@ final readonly class ReportSource
      * @param  array<string, mixed>  $detail
      * @param  array<int, array<string, mixed>>  $corrections
      * @param  array<int, array<string, mixed>>  $annotations
+     * @param  list<array{cost_center_id: int, cost_center_label: string}>  $costCenterLineage
      */
     public function __construct(
         public string $sourceType,
@@ -29,6 +30,7 @@ final readonly class ReportSource
         public string $residual = '0.00',
         public string $saving = '0.00',
         public string $unused = '0.00',
+        public array $costCenterLineage = [],
         public array $detail = [],
         public array $corrections = [],
         public array $annotations = [],

@@ -29,8 +29,8 @@ class CostCenterEconomicChart extends EconomicChartWidget
         return match (true) {
             $count > self::RADAR_AXIS_LIMIT => "{$count} Centri di Costo · Barre Orizzontali per Preservare Tutti i Dati oltre 12 Assi.",
             $count > 0 && $count < 3 => "{$count} Centri di Costo · Barre Orizzontali perché un Radar Richiede Almeno Tre Assi Leggibili.",
-            $data['has_budget'] ?? false => 'Budget Selezionato, Allocato Corrente ed Effettivo per Classificazione Annuale.',
-            default => 'Allocato Corrente ed Effettivo per Classificazione Annuale.',
+            $data['has_budget'] ?? false => 'Budget Selezionato, Allocato Corrente ed Effettivo: valori di ramo con dettaglio diretto.',
+            default => 'Allocato Corrente ed Effettivo: valori di ramo con dettaglio diretto.',
         };
     }
 
@@ -49,9 +49,9 @@ class CostCenterEconomicChart extends EconomicChartWidget
             'labels' => array_column($centers, 'label'),
             'sourceUrls' => array_column($centers, 'url'),
             'datasets' => [
-                ...($hasBudget ? [['label' => 'Budget Selezionato', 'data' => array_map('floatval', array_column($centers, 'budget')), 'borderColor' => '#91A3A8', 'backgroundColor' => 'rgba(145, 163, 168, 0.12)', 'borderWidth' => 2, 'pointRadius' => 3]] : []),
-                ['label' => 'Allocato Corrente', 'data' => array_map('floatval', array_column($centers, 'allocation')), 'borderColor' => '#39D5C4', 'backgroundColor' => 'rgba(57, 213, 196, 0.14)', 'borderWidth' => 2, 'pointRadius' => 3],
-                ['label' => 'Effettivo', 'data' => array_map('floatval', array_column($centers, 'actual')), 'borderColor' => '#60A5FA', 'backgroundColor' => 'rgba(96, 165, 250, 0.13)', 'borderWidth' => 2, 'pointRadius' => 3],
+                ...($hasBudget ? [['label' => 'Budget Ramo', 'data' => array_map('floatval', array_column($centers, 'budget')), 'borderColor' => '#91A3A8', 'backgroundColor' => 'rgba(145, 163, 168, 0.12)', 'borderWidth' => 2, 'pointRadius' => 3]] : []),
+                ['label' => 'Allocato Ramo', 'data' => array_map('floatval', array_column($centers, 'allocation')), 'borderColor' => '#39D5C4', 'backgroundColor' => 'rgba(57, 213, 196, 0.14)', 'borderWidth' => 2, 'pointRadius' => 3],
+                ['label' => 'Effettivo Ramo', 'data' => array_map('floatval', array_column($centers, 'actual')), 'borderColor' => '#60A5FA', 'backgroundColor' => 'rgba(96, 165, 250, 0.13)', 'borderWidth' => 2, 'pointRadius' => 3],
             ],
         ];
     }

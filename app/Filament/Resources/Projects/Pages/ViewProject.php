@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Projects\Pages;
 use App\Actions\Operations\ChangeProjectDeferral;
 use App\Actions\Operations\SetProjectArchived;
 use App\Actions\Operations\UpdateProjectClassification;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Projects\ProjectDeferralMode;
 use App\Domain\Projects\ProjectState;
 use App\Filament\Pages\CompanyAudit;
@@ -120,7 +121,7 @@ class ViewProject extends ViewRecord
                         ->required(),
                     Select::make('cost_center_id')
                         ->label('Nuovo Centro di Costo')
-                        ->options(fn (): array => CostCenter::query()->where('company_id', $this->projectRecord()->company_id)->active()->orderBy('name')->pluck('name', 'id')->all())
+                        ->options(fn (): array => CostCenterHierarchy::forCompany((int) $this->projectRecord()->company_id)->options())
                         ->live()
                         ->afterStateUpdated(fn (Set $set) => $set('impact_confirmed', false))
                         ->placeholder('Non classificato'),
@@ -295,7 +296,8 @@ class ViewProject extends ViewRecord
 
         return $costCenter === null
             ? 'Centro di Costo non disponibile'
-            : $costCenter->name.($costCenter->isArchived() ? ' · Archiviato' : '');
+            : CostCenterHierarchy::forCompany((int) $costCenter->company_id)->path((int) $costCenter->id)
+                .($costCenter->isArchived() ? ' · Archiviato' : '');
     }
 
     private function reclassificationPreview(Get $get): View

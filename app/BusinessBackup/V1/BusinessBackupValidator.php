@@ -31,7 +31,7 @@ final class BusinessBackupValidator
 
         try {
             $expectedSheets = [...BusinessBackupContract::VISIBLE_SHEETS, BusinessBackupContract::MANIFEST, ...BusinessBackupContract::machineSheets()];
-            $this->assert($workbook->getSheetNames() === $expectedSheets, 'L’elenco o l’ordine dei fogli non coincide con il formato V1.');
+            $this->assert($workbook->getSheetNames() === $expectedSheets, 'L’elenco o l’ordine dei fogli non coincide con un formato MP2 supportato.');
 
             $visible = [];
             foreach (BusinessBackupContract::VISIBLE_SHEETS as $name) {
@@ -44,21 +44,28 @@ final class BusinessBackupValidator
                 $this->assert($row[0] !== '' && ! array_key_exists($row[0], $manifest), 'Il manifest contiene una chiave vuota o duplicata.');
                 $manifest[$row[0]] = $row[1];
             }
-            $this->assertManifest($manifest, $workbook->getProperties());
+            $version = $manifest['format_version'] ?? '';
+            $this->assert(in_array($version, [BusinessBackupContract::LEGACY_FORMAT_VERSION, BusinessBackupContract::FORMAT_VERSION], true), 'Versione backup non supportata.');
+            $schemas = BusinessBackupContract::schemasForVersion($version);
+            $this->assertManifest($manifest, $workbook->getProperties(), $schemas);
 
             $stored = [];
-            foreach (BusinessBackupContract::SCHEMAS as $name => $columns) {
+            foreach ($schemas as $name => $columns) {
                 $stored[$name] = $this->readExact($workbook->getSheetByName($name), $columns, true);
             }
-            $machine = $this->expandPayloads($stored);
+            $machine = $this->expandPayloads($stored, $schemas);
 
-            foreach (BusinessBackupContract::SCHEMAS as $name => $columns) {
+            foreach ($schemas as $name => $columns) {
                 $rowsForChecksum = $name === BusinessBackupContract::LONG_PAYLOADS ? $stored[$name]['rows'] : $machine[$name]['rows'];
                 $this->assert(($manifest['row_count:'.$name] ?? null) === (string) count($stored[$name]['rows']), "Conteggio non valido per [$name].");
                 $this->assert(hash_equals($manifest['sha256:'.$name] ?? '', PortablePayload::checksum($columns, $rowsForChecksum)), "Checksum non valido per [$name].");
             }
             foreach ($visible as $name => $view) {
                 $this->assert(hash_equals($manifest['view_sha256:'.$name] ?? '', PortablePayload::checksum($view['columns'], $view['rows'])), "Il foglio visibile [$name] è stato modificato.");
+            }
+
+            if ($version === BusinessBackupContract::LEGACY_FORMAT_VERSION) {
+                $machine = $this->normalizeLegacyMachine($machine);
             }
 
             $this->assertStructure($machine);
@@ -71,22 +78,24 @@ final class BusinessBackupValidator
         }
     }
 
-    /** @param array<string, string> $manifest */
-    private function assertManifest(array $manifest, Properties $properties): void
+    /**
+     * @param  array<string, string>  $manifest
+     * @param  array<string, list<string>>  $schemas
+     */
+    private function assertManifest(array $manifest, Properties $properties, array $schemas): void
     {
         $required = ['format_version', 'package_id', 'exported_at', 'application_revision', 'company_ref', 'company_name', 'company_timezone', 'currency', 'vat_basis', 'machine_sheet_count'];
         foreach ($required as $key) {
             $this->assert(array_key_exists($key, $manifest), "Chiave manifest mancante [$key].");
         }
-        $this->assert($manifest['format_version'] === BusinessBackupContract::FORMAT_VERSION, 'Versione backup non supportata.');
         $this->assert((bool) preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $manifest['package_id']), 'package_id non è un UUID valido.');
         $this->assert($this->validTimestamp($manifest['exported_at']), 'exported_at non è un timestamp ISO 8601 valido.');
-        $this->assert($manifest['company_ref'] === 'COM-0000000001', 'Riferimento Azienda V1 non valido.');
+        $this->assert($manifest['company_ref'] === 'COM-0000000001', 'Riferimento Azienda non valido.');
         $this->assert($manifest['currency'] === 'EUR' && $manifest['vat_basis'] === 'net', 'Valuta o base IVA non supportata.');
-        $this->assert($manifest['machine_sheet_count'] === (string) count(BusinessBackupContract::SCHEMAS), 'Conteggio fogli macchina non valido.');
+        $this->assert($manifest['machine_sheet_count'] === (string) count($schemas), 'Conteggio fogli macchina non valido.');
 
         $expectedKeys = $required;
-        foreach (BusinessBackupContract::SCHEMAS as $sheet => $_columns) {
+        foreach ($schemas as $sheet => $_columns) {
             $expectedKeys[] = 'row_count:'.$sheet;
             $expectedKeys[] = 'sha256:'.$sheet;
         }
@@ -94,7 +103,7 @@ final class BusinessBackupValidator
             $expectedKeys[] = 'view_sha256:'.$sheet;
         }
         $this->assert(array_keys($manifest) === $expectedKeys, 'Il manifest contiene chiavi mancanti, aggiuntive o fuori ordine.');
-        $this->assert($properties->getCustomPropertyValue('mp2_format_version') === BusinessBackupContract::FORMAT_VERSION, 'Metadata formato MP2 mancante o incoerente.');
+        $this->assert($properties->getCustomPropertyValue('mp2_format_version') === $manifest['format_version'], 'Metadata formato MP2 mancante o incoerente.');
         $this->assert($properties->getCustomPropertyValue('mp2_package_id') === $manifest['package_id'], 'Metadata package MP2 mancante o incoerente.');
     }
 
@@ -115,16 +124,17 @@ final class BusinessBackupValidator
     }
 
     /** @param array<string, array{columns: list<string>, rows: list<list<string>>}> $stored
+     * @param  array<string, list<string>>  $schemas
      * @return array<string, array{columns: list<string>, rows: list<list<string>>}>
      */
-    private function expandPayloads(array $stored): array
+    private function expandPayloads(array $stored, array $schemas): array
     {
         $groups = [];
         foreach ($stored[BusinessBackupContract::LONG_PAYLOADS]['rows'] as $row) {
             [$ref, $sheet, $targetRef, $column, $index, $count, $checksum, $text] = $row;
             $this->assert((bool) preg_match('/^PAY-\d{10}$/', $ref), 'Riferimento payload lungo non valido.');
-            $this->assert(isset(BusinessBackupContract::SCHEMAS[$sheet]) && $sheet !== BusinessBackupContract::LONG_PAYLOADS, 'Foglio target payload non valido.');
-            $this->assert(in_array($column, BusinessBackupContract::SCHEMAS[$sheet], true), 'Colonna target payload non valida.');
+            $this->assert(isset($schemas[$sheet]) && $sheet !== BusinessBackupContract::LONG_PAYLOADS, 'Foglio target payload non valido.');
+            $this->assert(in_array($column, $schemas[$sheet], true), 'Colonna target payload non valida.');
             $this->assert(ctype_digit($index) && ctype_digit($count) && (int) $index >= 1 && (int) $count >= 1, 'Indici payload non validi.');
             $this->assert(strlen($text) <= PortablePayload::CHUNK_BYTES && hash_equals($checksum, hash('sha256', $text)), 'Chunk payload non valido.');
             $groups[$ref][] = compact('sheet', 'targetRef', 'column', 'index', 'count', 'text');
@@ -177,6 +187,23 @@ final class BusinessBackupValidator
         return $expanded;
     }
 
+    /**
+     * @param  array<string, array{columns: list<string>, rows: list<list<string>>}>  $machine
+     * @return array<string, array{columns: list<string>, rows: list<list<string>>}>
+     */
+    private function normalizeLegacyMachine(array $machine): array
+    {
+        $machine['_MP2_cost_centers'] = [
+            'columns' => BusinessBackupContract::SCHEMAS['_MP2_cost_centers'],
+            'rows' => array_map(
+                fn (array $row): array => [$row[0], $row[1], '', $row[2]],
+                $machine['_MP2_cost_centers']['rows'],
+            ),
+        ];
+
+        return $machine;
+    }
+
     /** @param array<string, array{columns: list<string>, rows: list<list<string>>}> $m */
     private function assertStructure(array $m): void
     {
@@ -196,6 +223,7 @@ final class BusinessBackupValidator
         }
 
         $foreign = [
+            '_MP2_cost_centers' => [2 => 'CDC'],
             '_MP2_supplier_contacts' => [1 => 'SUP'], '_MP2_project_transitions' => [1 => 'PRJ'],
             '_MP2_project_classes' => [1 => 'PRJ', 2 => 'EXE', 3 => 'CDC'],
             '_MP2_contracts' => [1 => 'SUP'], '_MP2_contract_renewals' => [1 => 'CTR'],
@@ -222,6 +250,8 @@ final class BusinessBackupValidator
                 }
             }
         }
+
+        $this->assertCostCenterHierarchy($m['_MP2_cost_centers']['rows']);
 
         foreach (BusinessBackupContract::ENUMS as $key => $allowed) {
             [$sheet, $column] = explode('.', $key, 2);
@@ -338,6 +368,26 @@ final class BusinessBackupValidator
         }
     }
 
+    /** @param list<list<string>> $rows */
+    private function assertCostCenterHierarchy(array $rows): void
+    {
+        $parents = [];
+        foreach ($rows as $row) {
+            $this->assert($row[0] !== $row[2], 'Un Centro di Costo non può essere padre di sé stesso.');
+            $parents[$row[0]] = $row[2] === '' ? null : $row[2];
+        }
+
+        foreach (array_keys($parents) as $ref) {
+            $seen = [];
+            $current = $ref;
+            while ($current !== null) {
+                $this->assert(! isset($seen[$current]), 'La gerarchia dei Centri di Costo contiene un ciclo.');
+                $seen[$current] = true;
+                $current = $parents[$current] ?? null;
+            }
+        }
+    }
+
     /** @param array<string, array{columns: list<string>, rows: list<list<string>>}> $m */
     private function assertDates(array $m): void
     {
@@ -361,7 +411,7 @@ final class BusinessBackupValidator
         }
 
         $timestamps = [
-            '_MP2_suppliers' => [4 => true], '_MP2_cost_centers' => [2 => true], '_MP2_projects' => [6 => true],
+            '_MP2_suppliers' => [4 => true], '_MP2_cost_centers' => [3 => true], '_MP2_projects' => [6 => true],
             '_MP2_project_transitions' => [6 => true], '_MP2_contracts' => [10 => true],
             '_MP2_contract_lifecycle' => [8 => true], '_MP2_contract_conditions' => [8 => true],
             '_MP2_project_contract_links' => [4 => true], '_MP2_expenses' => [10 => true],
@@ -604,14 +654,14 @@ final class BusinessBackupValidator
         $nameCollision = Company::query()->where('name', $manifest['company_name'])->exists();
         $warnings = [];
         if ($attachmentCount > 0) {
-            $warnings[] = "{$attachmentCount} allegati non saranno ripristinati. Il backup ne conserva l’inventario, ma il formato V1 non contiene i file originali.";
+            $warnings[] = "{$attachmentCount} allegati non saranno ripristinati. Il backup ne conserva l’inventario, ma il formato V{$manifest['format_version']} non contiene i file originali.";
         }
         if ($nameCollision) {
             $warnings[] = "Esiste già un’Azienda denominata “{$manifest['company_name']}”. Il ripristino creerà una nuova Azienda indipendente. L’Azienda esistente non verrà modificata né unita ai dati importati.";
         }
 
         return new BackupPreview(
-            $manifest['package_id'], 1, $manifest['company_name'], $manifest['company_timezone'], $manifest['exported_at'],
+            $manifest['package_id'], (int) $manifest['format_version'], $manifest['company_name'], $manifest['company_timezone'], $manifest['exported_at'],
             $counts,
             array_map(fn (array $row): array => ['year' => (int) $row[1], 'status' => $row[2]], $m['_MP2_exercises']['rows']),
             $this->sum(array_column($m['_MP2_budgets']['rows'], 6)),

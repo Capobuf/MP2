@@ -14,7 +14,7 @@ use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
-it('exports the exact V1 workbook only for a viewer of an active Tenant', function (): void {
+it('exports the exact current workbook only for a viewer of an active Tenant', function (): void {
     $company = Company::factory()->create(['name' => 'Azienda Backup']);
     $viewer = User::factory()->create();
     $outsider = User::factory()->create();

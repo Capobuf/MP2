@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Projects\Schemas;
 
 use App\Actions\MasterData\CreateCostCenter;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Projects\ProjectState;
 use App\Filament\Forms\DateInput;
 use App\Models\Company;
@@ -42,7 +43,7 @@ class ProjectForm
                     Select::make('cost_center_id')
                         ->label('Centro di Costo')
                         ->options(fn (): array => self::company() instanceof Company
-                            ? CostCenter::query()->whereBelongsTo(self::company(), 'company')->active()->orderBy('name')->pluck('name', 'id')->all()
+                            ? CostCenterHierarchy::forCompany((int) self::company()->id)->options()
                             : [])
                         ->searchable()
                         ->createOptionForm([

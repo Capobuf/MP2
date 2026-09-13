@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\CostCenters\Tables;
 
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Filament\Resources\CostCenters\CostCenterResource;
 use App\Models\CostCenter;
 use Filament\Actions\EditAction;
@@ -15,12 +16,19 @@ class CostCentersTable
 {
     public static function configure(Table $table): Table
     {
+        $hierarchy = null;
+
         return $table
             ->columns([
-                TextColumn::make('name')
-                    ->label('Denominazione')
-                    ->searchable()
-                    ->sortable(),
+                TextColumn::make('hierarchical_path')
+                    ->label('Percorso')
+                    ->state(function (CostCenter $record) use (&$hierarchy): string {
+                        $hierarchy ??= CostCenterHierarchy::forCompany((int) $record->company_id);
+
+                        return $hierarchy->path((int) $record->id);
+                    })
+                    ->searchable(query: fn (Builder $query, string $search): Builder => $query->where('name', 'like', "%{$search}%"))
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('name', $direction)),
                 TextColumn::make('status')
                     ->label('Stato')
                     ->state(fn (CostCenter $record): string => $record->isArchived() ? 'Archiviato' : 'Attivo')
@@ -49,6 +57,7 @@ class CostCentersTable
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make(),
+                CostCenterResource::moveAction(),
                 CostCenterResource::archiveAction(),
                 CostCenterResource::restoreAction(),
             ]);

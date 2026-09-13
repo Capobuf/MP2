@@ -86,4 +86,98 @@ final class ReportAggregator
 
         return array_values($buckets);
     }
+
+    /**
+     * Builds direct and branch totals without adding branch roll-ups to company totals.
+     *
+     * @param  array<int, ReportSource>  $sources
+     * @return array<int, array<string, mixed>>
+     */
+    public function costCenters(array $sources): array
+    {
+        $buckets = [];
+
+        foreach ($sources as $source) {
+            if ($source->costCenterId === null) {
+                $buckets['unclassified'] ??= $this->emptyCostCenterBucket('unclassified', null, 'Non classificato');
+                $this->addDirectAndBranch($buckets['unclassified'], $source);
+
+                continue;
+            }
+
+            $lineage = $source->costCenterLineage !== []
+                ? $source->costCenterLineage
+                : [['cost_center_id' => $source->costCenterId, 'cost_center_label' => $source->costCenterLabel ?? (string) $source->costCenterId]];
+            $path = [];
+            foreach ($lineage as $index => $node) {
+                $id = $node['cost_center_id'];
+                if ($id < 1) {
+                    continue;
+                }
+                $path[] = $node['cost_center_label'];
+                $key = 'cost-center:'.$id;
+                $buckets[$key] ??= $this->emptyCostCenterBucket($key, $id, implode(' / ', $path));
+                $this->addBranch($buckets[$key], $source);
+                if ($index === array_key_last($lineage)) {
+                    $this->addDirect($buckets[$key], $source);
+                }
+            }
+        }
+
+        foreach ($buckets as &$bucket) {
+            $bucket['direct_operational_variance'] = Decimal::subtract($bucket['direct_actual'], $bucket['direct_allocation']);
+            $bucket['branch_operational_variance'] = Decimal::subtract($bucket['branch_actual'], $bucket['branch_allocation']);
+            $bucket['allocation'] = $bucket['branch_allocation'];
+            $bucket['actual'] = $bucket['branch_actual'];
+            $bucket['operational_variance'] = $bucket['branch_operational_variance'];
+        }
+        unset($bucket);
+
+        uasort($buckets, fn (array $left, array $right): int => strnatcasecmp((string) $left['label'], (string) $right['label']));
+
+        return array_values($buckets);
+    }
+
+    /** @return array<string, mixed> */
+    private function emptyCostCenterBucket(string $key, ?int $id, string $label): array
+    {
+        return [
+            'key' => $key,
+            'cost_center_id' => $id,
+            'label' => $label,
+            'direct_allocation' => '0.00',
+            'direct_actual' => '0.00',
+            'direct_carryover' => '0.00',
+            'direct_count' => 0,
+            'branch_allocation' => '0.00',
+            'branch_actual' => '0.00',
+            'branch_carryover' => '0.00',
+            'branch_count' => 0,
+        ];
+    }
+
+    /** @param array<string, mixed> $bucket */
+    private function addDirectAndBranch(array &$bucket, ReportSource $source): void
+    {
+        $this->addDirect($bucket, $source);
+        $this->addBranch($bucket, $source);
+    }
+
+    /** @param array<string, mixed> $bucket */
+    private function addDirect(array &$bucket, ReportSource $source): void
+    {
+        $bucket['direct_allocation'] = Decimal::add($bucket['direct_allocation'], $source->allocation);
+        $bucket['direct_actual'] = Decimal::add($bucket['direct_actual'], $source->actual);
+        $bucket['direct_carryover'] = Decimal::add($bucket['direct_carryover'], $source->carryover);
+        $bucket['direct_count']++;
+    }
+
+    /** @param array<string, mixed> $bucket */
+    private function addBranch(array &$bucket, ReportSource $source): void
+    {
+        $bucket['branch_allocation'] = Decimal::add($bucket['branch_allocation'], $source->allocation);
+        $bucket['branch_actual'] = Decimal::add($bucket['branch_actual'], $source->actual);
+        $bucket['branch_carryover'] = Decimal::add($bucket['branch_carryover'], $source->carryover);
+        $bucket['branch_count']++;
+    }
 }

@@ -30,7 +30,8 @@ it('materializes zero-net Actual presence autonomously and keeps Snapshot rows i
         grantTestPermissions(['company_id' => $company->id, 'user' => $actor, 'permissions' => $capability]);
     }
     $supplier = Supplier::factory()->for($company)->create(['legal_name' => 'Supplier at Closing']);
-    $costCenter = CostCenter::factory()->for($company)->create(['name' => 'Cost Center at Closing']);
+    $parent = CostCenter::factory()->for($company)->create(['name' => 'IT']);
+    $costCenter = CostCenter::factory()->for($company)->create(['name' => 'Software', 'parent_id' => $parent->id]);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
     $expense = Expense::factory()->forExercise($exercise)->create([
         'supplier_id' => $supplier->id,
@@ -55,15 +56,23 @@ it('materializes zero-net Actual presence autonomously and keeps Snapshot rows i
         ->and($row->closing_actual)->toBe('0.00')
         ->and($row->has_actuals)->toBeTrue()
         ->and($row->supplier_label)->toBe('Supplier at Closing')
-        ->and($row->cost_center_label)->toBe('Cost Center at Closing')
+        ->and($row->cost_center_label)->toBe('IT / Software')
+        ->and($row->detail_version)->toBe(2)
+        ->and($row->detail['cost_center_lineage'])->toBe([
+            ['cost_center_id' => $parent->id, 'cost_center_label' => 'IT'],
+            ['cost_center_id' => $costCenter->id, 'cost_center_label' => 'Software'],
+        ])
         ->and(count($row->detail['lines']))->toBe(2);
 
+    $newParent = CostCenter::factory()->for($company)->create(['name' => 'Digital']);
     $supplier->update(['legal_name' => 'Supplier renamed later']);
-    $costCenter->update(['name' => 'Cost Center renamed later']);
+    $parent->update(['name' => 'Technology']);
+    $costCenter->update(['name' => 'SaaS', 'parent_id' => $newParent->id]);
     $row->refresh();
 
     expect($row->supplier_label)->toBe('Supplier at Closing')
-        ->and($row->cost_center_label)->toBe('Cost Center at Closing')
+        ->and($row->cost_center_label)->toBe('IT / Software')
+        ->and($row->detail['cost_center_lineage'][0]['cost_center_label'])->toBe('IT')
         ->and(fn () => $snapshot->update(['company_name' => 'Changed']))->toThrow(LogicException::class)
         ->and(fn () => $snapshot->delete())->toThrow(LogicException::class)
         ->and(fn () => $row->update(['label' => 'Changed']))->toThrow(LogicException::class)

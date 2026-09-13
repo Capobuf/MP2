@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Actions\Reporting\BuildReport;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Reporting\ActualReference;
 use App\Domain\Reporting\ComparisonCategory;
@@ -15,7 +16,6 @@ use App\Filament\Forms\DateInput;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
 use App\Models\Contract;
-use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\Project;
@@ -76,7 +76,7 @@ class Reports extends Page
     public ?string $dateTo = null;
 
     #[Url]
-    public ?int $costCenterId = null;
+    public int|string|null $costCenterId = null;
 
     #[Url]
     public ?int $projectId = null;
@@ -473,10 +473,11 @@ class Reports extends Page
         ];
     }
 
-    /** @return array<int, string> */
+    /** @return array<int|string, string> */
     public function costCenterOptions(): array
     {
-        return CostCenter::query()->where('company_id', $this->company()->id)->orderBy('name')->pluck('name', 'id')->all();
+        return ['unclassified' => 'Non classificato']
+            + CostCenterHierarchy::forCompany((int) $this->company()->id)->options(activeOnly: false);
     }
 
     /** @return array<int, string> */
@@ -570,7 +571,7 @@ class Reports extends Page
                 'contract_id' => $this->contractId,
                 'expense_id' => $this->expenseId,
                 'supplier_id' => $this->supplierId,
-            ], fn (?int $value): bool => $value !== null),
+            ], fn (mixed $value): bool => $value !== null),
         ];
         $input = array_filter($input, fn (mixed $value): bool => $value !== null && $value !== '');
         if ($this->kind === ReportKind::AnnualExecutive->value) {
@@ -637,6 +638,7 @@ class Reports extends Page
             'header' => $result->header,
             'totals' => $result->totals,
             'sources' => $sources,
+            'cost_centers' => $result->costCenters,
             'comparisons' => $comparisons,
             'category_counts' => $result->categoryCounts,
             'label_counts' => $result->labelCounts,
@@ -686,21 +688,17 @@ class Reports extends Page
                 'Riferimenti Economici Esplicitamente Disponibili per l’Esercizio.', $labels, $values,
             );
 
-            $costCenters = [];
-            foreach ($result->sources as $source) {
-                $key = $source->costCenterId === null ? 'unclassified' : 'cost-center:'.$source->costCenterId;
-                $costCenters[$key] ??= ['label' => $source->costCenterLabel ?? 'Non classificato', 'allocation' => '0.00', 'actual' => '0.00'];
-                $costCenters[$key]['allocation'] = Decimal::add($costCenters[$key]['allocation'], $source->allocation);
-                $costCenters[$key]['actual'] = Decimal::add($costCenters[$key]['actual'], $source->actual);
-            }
+            $costCenters = $result->costCenters;
             if ($costCenters !== []) {
                 $charts[] = $this->groupedBarChart(
                     'annual-cost-centers', 'Allocato ed Effettivo per Centro di Costo',
-                    'Tutte le Sorgenti del Risultato; Non Classificato Resta un Bucket Esplicito.',
+                    'Totali diretti e di ramo; ogni sorgente contribuisce una sola volta ai totali aziendali.',
                     array_column($costCenters, 'label'),
                     [
-                        ['label' => 'Allocato', 'data' => array_map('floatval', array_column($costCenters, 'allocation')), 'color' => '#39D5C4'],
-                        ['label' => (string) $result->header['actual_reference'], 'data' => array_map('floatval', array_column($costCenters, 'actual')), 'color' => '#60A5FA'],
+                        ['label' => 'Allocato diretto', 'data' => array_map('floatval', array_column($costCenters, 'direct_allocation')), 'color' => '#39D5C4'],
+                        ['label' => 'Allocato ramo', 'data' => array_map('floatval', array_column($costCenters, 'branch_allocation')), 'color' => '#1A9489'],
+                        ['label' => (string) $result->header['actual_reference'].' diretto', 'data' => array_map('floatval', array_column($costCenters, 'direct_actual')), 'color' => '#60A5FA'],
+                        ['label' => (string) $result->header['actual_reference'].' ramo', 'data' => array_map('floatval', array_column($costCenters, 'branch_actual')), 'color' => '#2563EB'],
                     ],
                 );
             }
@@ -912,7 +910,7 @@ class Reports extends Page
     /**
      * @param  array<int|string, string>  $options
      */
-    private function optionExists(?int $value, array $options): bool
+    private function optionExists(int|string|null $value, array $options): bool
     {
         return $value !== null && array_key_exists($value, $options);
     }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\BusinessBackup\ExportBusinessBackup;
+use App\Actions\BusinessBackup\ImportBusinessBackup;
 use App\BusinessBackup\V1\BusinessBackupContract;
 use App\BusinessBackup\V1\BusinessBackupValidator;
 use App\BusinessBackup\V1\PortablePayload;
@@ -8,6 +9,7 @@ use App\Models\BudgetSnapshot;
 use App\Models\BudgetSourceRow;
 use App\Models\Company;
 use App\Models\Contract;
+use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -40,7 +42,7 @@ function backupValidatorRows(Worksheet $sheet): array
     return $rows;
 }
 
-function refreshBackupValidatorChecksum(Spreadsheet $workbook, string $sheetName): void
+function refreshBackupValidatorChecksum(Spreadsheet $workbook, string $sheetName, string $manifestPrefix = 'sha256:'): void
 {
     $sheet = $workbook->getSheetByName($sheetName);
     $manifest = $workbook->getSheetByName(BusinessBackupContract::MANIFEST);
@@ -52,7 +54,7 @@ function refreshBackupValidatorChecksum(Spreadsheet $workbook, string $sheetName
     }
     $checksum = PortablePayload::checksum($columns, backupValidatorRows($sheet));
     for ($row = 2; $row <= $manifest->getHighestDataRow(); $row++) {
-        if ($manifest->getCell([1, $row])->getValue() === 'sha256:'.$sheetName) {
+        if ($manifest->getCell([1, $row])->getValue() === $manifestPrefix.$sheetName) {
             $manifest->setCellValueExplicit([2, $row], $checksum, DataType::TYPE_STRING);
 
             return;
@@ -70,6 +72,9 @@ it('rejects corrupt future orphan duplicate and non-canonical workbooks before w
     ExpenseLine::factory()->for($first)->create(['amount' => '10.00']);
     $second = Expense::factory()->forExercise($exercise)->create();
     ExpenseLine::factory()->for($second)->create(['amount' => '20.00']);
+    $childCenter = CostCenter::factory()->for($company)->create(['name' => 'Figlio']);
+    $parentCenter = CostCenter::factory()->for($company)->create(['name' => 'Padre']);
+    $childCenter->update(['parent_id' => $parentCenter->id]);
     Contract::factory()->create(['company_id' => $company->id]);
     $proposal = Proposal::factory()->for($company)->for($exercise)->for($actor, 'creator')->create(['status' => 'approved']);
     $budget = BudgetSnapshot::factory()->for($proposal)->create([
@@ -95,12 +100,24 @@ it('rejects corrupt future orphan duplicate and non-canonical workbooks before w
             },
             'future' => function ($workbook): void {
                 $manifest = $workbook->getSheetByName(BusinessBackupContract::MANIFEST);
-                $manifest->setCellValueExplicit('B2', '2', DataType::TYPE_STRING);
-                $workbook->getProperties()->setCustomProperty('mp2_format_version', '2');
+                $manifest->setCellValueExplicit('B2', '3', DataType::TYPE_STRING);
+                $workbook->getProperties()->setCustomProperty('mp2_format_version', '3');
             },
             'orphan' => function ($workbook): void {
                 $workbook->getSheetByName('_MP2_expense_lines')->setCellValueExplicit('B2', 'EXP-9999999999', DataType::TYPE_STRING);
                 refreshBackupValidatorChecksum($workbook, '_MP2_expense_lines');
+            },
+            'orphan-cost-center-parent' => function ($workbook): void {
+                $workbook->getSheetByName('_MP2_cost_centers')->setCellValueExplicit('C2', 'CDC-9999999999', DataType::TYPE_STRING);
+                refreshBackupValidatorChecksum($workbook, '_MP2_cost_centers');
+            },
+            'cost-center-cycle' => function ($workbook): void {
+                $sheet = $workbook->getSheetByName('_MP2_cost_centers');
+                $firstRef = (string) $sheet->getCell('A2')->getValue();
+                $secondRef = (string) $sheet->getCell('A3')->getValue();
+                $sheet->setCellValueExplicit('C2', $secondRef, DataType::TYPE_STRING);
+                $sheet->setCellValueExplicit('C3', $firstRef, DataType::TYPE_STRING);
+                refreshBackupValidatorChecksum($workbook, '_MP2_cost_centers');
             },
             'duplicate' => function ($workbook): void {
                 $sheet = $workbook->getSheetByName('_MP2_expenses');
@@ -171,5 +188,37 @@ it('rejects corrupt future orphan duplicate and non-canonical workbooks before w
         }
     } finally {
         @unlink($artifact['path']);
+    }
+});
+
+it('accepts a previous V1 workbook without hierarchy and restores every cost center as a root', function (): void {
+    $company = Company::factory()->create();
+    $admin = User::factory()->platformAdmin()->create();
+    grantTestPermissions(['company_id' => $company->id, 'user' => $admin, 'permissions' => TestPermissions::VIEW]);
+    CostCenter::factory()->for($company)->count(2)->create();
+    $artifact = app(ExportBusinessBackup::class)->execute($company, $admin);
+    $legacyPath = storage_path('framework/testing/business-backup-v1.xlsx');
+
+    try {
+        $workbook = IOFactory::load($artifact['path']);
+        $workbook->getSheetByName('_MP2_cost_centers')->removeColumn('C');
+        $workbook->getSheetByName('Centri di Costo')->removeColumn('B');
+        $workbook->getSheetByName(BusinessBackupContract::MANIFEST)->setCellValueExplicit('B2', '1', DataType::TYPE_STRING);
+        $workbook->getProperties()->setCustomProperty('mp2_format_version', '1');
+        refreshBackupValidatorChecksum($workbook, '_MP2_cost_centers');
+        refreshBackupValidatorChecksum($workbook, 'Centri di Costo', 'view_sha256:');
+        IOFactory::createWriter($workbook, 'Xlsx')->save($legacyPath);
+        $workbook->disconnectWorksheets();
+
+        $package = app(BusinessBackupValidator::class)->validate($legacyPath);
+        $restored = app(ImportBusinessBackup::class)->execute($admin, $package);
+
+        expect($package['preview']->formatVersion)->toBe(1)
+            ->and($package['machine']['_MP2_cost_centers']['columns'])->toBe(BusinessBackupContract::SCHEMAS['_MP2_cost_centers'])
+            ->and($restored->costCenters()->whereNotNull('parent_id')->count())->toBe(0)
+            ->and($restored->costCenters()->count())->toBe(2);
+    } finally {
+        @unlink($artifact['path']);
+        @unlink($legacyPath);
     }
 });

@@ -62,7 +62,7 @@ final class BusinessBackupWorkbook implements Export, WithEvents, WithMultipleSh
                 $properties = $event->writer->getDelegate()->getProperties();
                 $properties->setCreator('MP2');
                 $properties->setTitle('MP2 Business Data Backup');
-                $properties->setSubject('Portable business backup format v1');
+                $properties->setSubject('Portable business backup format v'.BusinessBackupContract::FORMAT_VERSION);
                 $properties->setCustomProperty('mp2_format_version', BusinessBackupContract::FORMAT_VERSION);
                 $properties->setCustomProperty('mp2_package_id', $this->package['package_id']);
             },

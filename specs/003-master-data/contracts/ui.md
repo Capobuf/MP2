@@ -72,7 +72,7 @@ Behavior:
 
 Table content:
 
-- Denominazione;
+- percorso gerarchico derivato (`Padre / Figlio`) per disambiguare nomi duplicati;
 - active/archived state;
 - last update.
 
@@ -85,13 +85,18 @@ Filters:
 Create/edit fields:
 
 - Denominazione — required and not unique.
+- Centro padre — optional on creation, limited to the current Company.
 
 Behavior:
 
 - read-only viewers can inspect active or archived identities;
-- managers can create, rename, Archive, and restore;
-- no Exercise selector, hierarchy, allocation, percentage, amount, or economic total
-  appears.
+- managers can create, rename, move, Archive, and restore;
+- moving is a dedicated confirmed domain action that previews affected open Exercises
+  and old/new branches; the ordinary edit form does not update `parent_id` directly;
+- a move cannot choose the node itself, one of its descendants, or a node from another
+  Company;
+- archiving a parent does not move or archive its children;
+- no Exercise selector, percentage allocation, or editable economic amount appears.
 
 ## Company Timeline extension
 

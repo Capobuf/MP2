@@ -5,6 +5,12 @@
 **Status:** Verified
 **Roadmap ID:** S2
 
+> **Current-domain addendum (2026-09-10):** this slice records the original S2
+> delivery boundary. Its statements that cost-center hierarchy was not offered in
+> S2 are historical, not a current prohibition. Canonical §§20, 23, 25 and 28 now
+> define an optional live cost-center hierarchy. S2-FR-024–S2-FR-029 below supersede
+> only the cost-center-hierarchy exclusion in S2-FR-023.
+
 ## User Scenarios & Testing
 
 ### User Story 1 — Manage suppliers (Priority: P1)
@@ -223,7 +229,24 @@ to that company.
   reporting, or any S3+ economic behavior.
 - **S2-FR-023**: S2 MUST NOT introduce physical deletion, supplier deduplication,
   contact hierarchies, mandatory contact roles, additional supplier fiscal fields,
-  cost-center hierarchies, or percentage allocations.
+  cost-center hierarchies, or percentage allocations. The cost-center-hierarchy
+  clause described the original S2 scope and is superseded by S2-FR-024–S2-FR-029;
+  the other exclusions remain effective.
+- **S2-FR-024**: A cost center MAY have one parent in the same company and any number
+  of children; roots and arbitrary-depth trees MUST remain optional and MUST reject
+  self-parenting, direct cycles, indirect cycles, and cross-company parents.
+- **S2-FR-025**: Parent and leaf cost centers MUST retain the same stable identity,
+  duplicate denominations MUST remain valid, and any active node MAY be selected as
+  one direct classification without storing classifications on its ancestors.
+- **S2-FR-026**: Moving a cost center MUST preserve its ID, run as an authorized,
+  idempotent, atomic audited operation, show the impact on affected open Exercises,
+  and mark only affected draft Proposal sources for realignment.
+- **S2-FR-027**: Archiving a cost center MUST NOT move or archive its children and
+  MUST NOT alter classifications, amounts, or materialized history.
+- **S2-FR-028**: Contextual cost-center labels MUST derive the readable ancestor path
+  without persisting that path as identity or uniqueness data.
+- **S2-FR-029**: Cost-center hierarchy MUST remain live rather than effective-dated;
+  Budget and Closing Snapshot materialization remains governed by canonical §23.
 
 ### Key Entities
 
@@ -233,8 +256,9 @@ to that company.
 - **Contact**: Optional descriptive contact information belonging to exactly one
   supplier, with zero or more truthful optional role tags and no S2 deletion or
   archive lifecycle.
-- **Cost Center**: A company-owned stable classification identity with a denomination
-  and active/archived visibility; annual classification begins in a later slice.
+- **Cost Center**: A company-owned stable classification identity with a denomination,
+  active/archived visibility, and an optional same-company parent; annual
+  classification remains direct to one identity per Exercise.
 - **Audit Event**: The existing immutable company Timeline record, extended with
   typed master-data operations without creating a parallel history mechanism.
 

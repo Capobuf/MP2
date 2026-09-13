@@ -3,6 +3,7 @@
 namespace App\Actions\Proposals;
 
 use App\Domain\Company\AuditEventType;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Proposals\ProposalReadiness;
 use App\Domain\Proposals\ProposalReadinessReason;
 use App\Domain\Proposals\ProposalReadinessState;
@@ -48,13 +49,14 @@ final class ReviewProposalReadiness
             $locked->setRelation('items', $items);
             $previousReadiness = $items->map(fn ($item): array => ['proposal_item_id' => $item->proposal_item_id, 'state' => $item->readiness_state->value, 'reasons' => $item->readiness_reasons])->values()->all();
             $existingKeys = $items->map(fn ($item): ?string => $item->expense_id ? 'expense:'.$item->expense_id : ($item->project_id ? 'project:'.$item->project_id : ($item->contract_id ? 'contract:'.$item->contract_id : null)))->filter();
+            $costCenterHierarchy = CostCenterHierarchy::forCompany((int) $locked->company_id);
             foreach ($this->catalog->forExercise($exercise) as $source) {
                 if ($existingKeys->contains($source['origin_key'])) {
                     continue;
                 }
                 $model = $source['model'];
                 $snapshot = match (true) {
-                    $model instanceof Expense => ProposalSourceSnapshot::expense($model), $model instanceof Project => ProposalSourceSnapshot::project($model, $exercise->id), $model instanceof Contract => ProposalSourceSnapshot::contract($model, $exercise->id)
+                    $model instanceof Expense => ProposalSourceSnapshot::expense($model, $costCenterHierarchy), $model instanceof Project => ProposalSourceSnapshot::project($model, $exercise->id, $costCenterHierarchy), $model instanceof Contract => ProposalSourceSnapshot::contract($model, $exercise->id, $costCenterHierarchy)
                 };
                 $locked->items()->create(['proposal_item_id' => (string) Str::uuid(), 'company_id' => $locked->company_id, 'source_type' => $source['source_type'], 'expense_id' => $model instanceof Expense ? $model->id : null, 'project_id' => $model instanceof Project ? $model->id : null, 'contract_id' => $model instanceof Contract ? $model->id : null, 'baseline_revision' => (int) $model->revision, 'baseline_fingerprint' => ProposalSourceSnapshot::fingerprint($snapshot), 'baseline' => $snapshot, 'result' => $snapshot['plan_baseline'], 'readiness_state' => ProposalReadinessState::ToReview, 'readiness_reasons' => [['code' => ProposalReadinessReason::NewSource->value, 'message' => ProposalReadinessReason::NewSource->message()]], 'read_only_source' => $source['read_only'], 'last_aligned_at' => null, 'last_aligned_by_id' => null]);
             }

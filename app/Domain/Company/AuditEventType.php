@@ -15,6 +15,7 @@ enum AuditEventType: string
     case SupplierContactUpdated = 'supplier_contact_updated';
     case CostCenterCreated = 'cost_center_created';
     case CostCenterRenamed = 'cost_center_renamed';
+    case CostCenterMoved = 'cost_center_moved';
     case CostCenterArchived = 'cost_center_archived';
     case CostCenterRestored = 'cost_center_restored';
     case ExerciseCreated = 'exercise_created';
@@ -107,6 +108,7 @@ enum AuditEventType: string
             self::SupplierContactUpdated => 'Referente Modificato',
             self::CostCenterCreated => 'Centro di Costo Creato',
             self::CostCenterRenamed => 'Centro di Costo Rinominato',
+            self::CostCenterMoved => 'Centro di Costo Spostato',
             self::CostCenterArchived => 'Centro di Costo Archiviato',
             self::CostCenterRestored => 'Centro di Costo Ripristinato',
             self::ExerciseCreated => 'Esercizio Creato',

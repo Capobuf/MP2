@@ -31,6 +31,7 @@ it('creates the complete forward S2 master data schema', function () {
         ]))->toBeTrue()
         ->and(Schema::hasColumns('cost_centers', [
             'company_id',
+            'parent_id',
             'name',
             'archived_at',
         ]))->toBeTrue()

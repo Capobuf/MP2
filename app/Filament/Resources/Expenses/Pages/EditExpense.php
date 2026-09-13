@@ -8,6 +8,7 @@ use App\Actions\Operations\UpdateExpenseLine;
 use App\Actions\Operations\UploadAttachment;
 use App\Domain\Contracts\ContractActualKind;
 use App\Domain\Contracts\ContractState;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Expenses\ManualExpenseLine;
@@ -106,7 +107,9 @@ class EditExpense extends EditRecord
                     ->dehydrated(false),
                 Select::make('direct_cost_center_id')
                     ->label('Centro di Costo')
-                    ->options($expense->directCostCenter === null ? [] : [$expense->directCostCenter->id => $expense->directCostCenter->name])
+                    ->options($expense->directCostCenter === null ? [] : [
+                        $expense->directCostCenter->id => CostCenterHierarchy::forCompany((int) $expense->company_id)->path((int) $expense->directCostCenter->id),
+                    ])
                     ->placeholder('Non classificata')
                     ->visible(fn (Get $get): bool => $get('container') === 'autonomous')
                     ->disabled()

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Proposals\Schemas;
 use App\Domain\Contracts\ContractAttributionMode;
 use App\Domain\Contracts\ContractCycleType;
 use App\Domain\Contracts\ContractState;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Projects\ProjectDeferralMode;
 use App\Domain\Projects\ProjectState;
@@ -13,7 +14,6 @@ use App\Domain\Proposals\ProposalPlanData;
 use App\Domain\Proposals\ProposalReadiness;
 use App\Domain\Proposals\ProposalSourceType;
 use App\Models\Contract;
-use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -429,8 +429,7 @@ class ProposalInfolist
         return [
             'exercises' => $proposal->company->exercises
                 ->mapWithKeys(fn (Exercise $exercise): array => [(int) $exercise->id => self::exerciseLabel($exercise)]),
-            'cost_centers' => CostCenter::query()->where('company_id', $proposal->company_id)->get(['id', 'name'])
-                ->mapWithKeys(fn (CostCenter $costCenter): array => [(int) $costCenter->id => (string) $costCenter->name]),
+            'cost_centers' => collect(CostCenterHierarchy::forCompany((int) $proposal->company_id)->options(activeOnly: false)),
             'projects' => Project::query()->where('company_id', $proposal->company_id)->get(['id', 'title'])
                 ->mapWithKeys(fn (Project $project): array => [(int) $project->id => (string) $project->title]),
             'contracts' => Contract::query()->where('company_id', $proposal->company_id)->get(['id', 'title'])

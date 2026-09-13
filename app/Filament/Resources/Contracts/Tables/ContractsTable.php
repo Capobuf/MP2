@@ -4,11 +4,11 @@ namespace App\Filament\Resources\Contracts\Tables;
 
 use App\Domain\Contracts\ContractAnnualAllocation;
 use App\Domain\Contracts\ContractStateTimeline;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
 use App\Filament\Resources\Contracts\ContractResource;
 use App\Models\Company;
 use App\Models\Contract;
-use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Supplier;
 use App\Models\TenantCompany;
@@ -31,14 +31,17 @@ class ContractsTable
     {
         /** @var array<int, array{state: string, reference_date: string|null, cost_center: string, allocation: string, actual: string, variance: string}> $annualCache */
         $annualCache = [];
-        $annual = function (Contract $record) use (&$annualCache): array {
+        $hierarchy = null;
+        $annual = function (Contract $record) use (&$annualCache, &$hierarchy): array {
             if (isset($annualCache[$record->id])) {
                 return $annualCache[$record->id];
             }
 
             $exercise = app(ExerciseContext::class)->current($record->company);
 
-            return $annualCache[$record->id] = self::annualValues($record, $exercise);
+            $hierarchy ??= CostCenterHierarchy::forCompany((int) $record->company_id);
+
+            return $annualCache[$record->id] = self::annualValues($record, $exercise, $hierarchy);
         };
 
         return $table->columns([
@@ -84,7 +87,7 @@ class ContractsTable
                     $tenant = Filament::getTenant();
 
                     return $tenant instanceof TenantCompany
-                        ? CostCenter::query()->whereBelongsTo($tenant->company, 'company')->orderBy('name')->pluck('name', 'id')->all()
+                        ? ['unclassified' => 'Non classificato'] + CostCenterHierarchy::forCompany((int) $tenant->company->id)->options(activeOnly: false)
                         : [];
                 })
                 ->query(function (Builder $query, array $data): Builder {
@@ -93,11 +96,18 @@ class ContractsTable
                     $costCenterId = $data['value'] ?? null;
                     $exercise = $company instanceof Company ? app(ExerciseContext::class)->current($company) : null;
 
-                    return blank($costCenterId) || $exercise === null
-                        ? $query
-                        : $query->whereHas('classifications', fn (Builder $classification): Builder => $classification
-                            ->where('exercise_id', $exercise->id)
-                            ->where('cost_center_id', $costCenterId));
+                    if (blank($costCenterId) || $exercise === null) {
+                        return $query;
+                    }
+                    if ($costCenterId === 'unclassified') {
+                        return $query->whereDoesntHave('classifications', fn (Builder $classification): Builder => $classification
+                            ->where('exercise_id', $exercise->id)->whereNotNull('cost_center_id'));
+                    }
+                    $ids = CostCenterHierarchy::forCompany((int) $company->id)->descendantIds((int) $costCenterId);
+
+                    return $query->whereHas('classifications', fn (Builder $classification): Builder => $classification
+                        ->where('exercise_id', $exercise->id)
+                        ->whereIn('cost_center_id', $ids));
                 }),
             TernaryFilter::make('automatic_renewal')->label('Rinnovo Automatico')->native(false)
                 ->placeholder('Tutti')->trueLabel('Attivo')->falseLabel('Disattivo'),
@@ -126,7 +136,7 @@ class ContractsTable
     }
 
     /** @return array{state: string, reference_date: string|null, cost_center: string, allocation: string, actual: string, variance: string} */
-    private static function annualValues(Contract $contract, ?Exercise $exercise): array
+    private static function annualValues(Contract $contract, ?Exercise $exercise, CostCenterHierarchy $hierarchy): array
     {
         if ($exercise === null) {
             return [
@@ -157,7 +167,7 @@ class ContractsTable
             'reference_date' => $reference->format('d/m/Y'),
             'cost_center' => $classification === null || $classification->cost_center_id === null
                 ? 'Non classificato'
-                : $classification->costCenter->name,
+                : $hierarchy->path((int) $classification->cost_center_id),
             'allocation' => $allocation,
             'actual' => $actual,
             'variance' => Decimal::subtract($actual, $allocation),

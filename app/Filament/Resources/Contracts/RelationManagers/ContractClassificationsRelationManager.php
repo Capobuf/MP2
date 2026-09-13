@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Contracts\RelationManagers;
 
 use App\Actions\MasterData\CreateCostCenter;
 use App\Actions\Operations\UpdateContractClassification;
+use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Models\Contract;
 use App\Models\ContractExerciseClassification;
 use App\Models\CostCenter;
@@ -36,18 +37,21 @@ class ContractClassificationsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
+        $hierarchy = CostCenterHierarchy::forCompany((int) $this->contract()->company_id);
+
         return $table->columns([
             TextColumn::make('exercise.year')->label('Esercizio')->sortable(),
             TextColumn::make('cost_center')->label('Centro di Costo')->state(fn (ContractExerciseClassification $record): string => $record->costCenter === null
                 ? 'Non classificato'
-                : $record->costCenter->name.($record->costCenter->isArchived() ? ' · Archiviato' : '')),
+                : $hierarchy->path((int) $record->cost_center_id)
+                    .($record->costCenter->isArchived() ? ' · Archiviato' : '')),
         ])->recordActions([
             Action::make('reclassify')
                 ->label('Riclassifica')
                 ->visible(fn (ContractExerciseClassification $record): bool => $record->exercise->isOpen() && $this->canManage())
                 ->form([
                     Select::make('cost_center_id')->label('Nuovo Centro di Costo')->placeholder('Non classificato')
-                        ->options(fn (): array => CostCenter::query()->where('company_id', $this->contract()->company_id)->active()->orderBy('name')->pluck('name', 'id')->all())
+                        ->options(fn (): array => CostCenterHierarchy::forCompany((int) $this->contract()->company_id)->options())
                         ->searchable()
                         ->createOptionForm([
                             TextInput::make('name')->label('Nome')->required()->maxLength(255),

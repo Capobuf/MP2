@@ -25,6 +25,7 @@ function reportSource(string $key, string $allocation = '0.00', string $actual =
         actual: $actual,
         hasActuals: $hasActuals,
         carryover: $overrides['carryover'] ?? '0.00',
+        costCenterLineage: $overrides['costCenterLineage'] ?? [],
         detail: $overrides['detail'] ?? [],
         corrections: $overrides['corrections'] ?? [],
         annotations: $overrides['annotations'] ?? [],
@@ -43,6 +44,29 @@ it('assigns exactly one primary category to every unique source', function (): v
         ComparisonCategory::Removed,
         ComparisonCategory::Added,
     ])->and($rows)->toHaveCount(4);
+});
+
+it('reports a hierarchy placement change without claiming the direct cost center changed', function (): void {
+    $rows = (new ComparisonEngine)->compare(
+        [reportSource('expense:1', '10.00', overrides: [
+            'costCenterId' => 2,
+            'costCenterLineage' => [
+                ['cost_center_id' => 1, 'cost_center_label' => 'IT'],
+                ['cost_center_id' => 2, 'cost_center_label' => 'Software'],
+            ],
+        ])],
+        [reportSource('expense:1', '10.00', overrides: [
+            'costCenterId' => 2,
+            'costCenterLineage' => [
+                ['cost_center_id' => 3, 'cost_center_label' => 'Digital'],
+                ['cost_center_id' => 2, 'cost_center_label' => 'Software'],
+            ],
+        ])],
+    );
+
+    expect($rows[0]['category'])->toBe(ComparisonCategory::Modified)
+        ->and($rows[0]['dimensions'])->toContain(ModificationDimension::CostCenterPlacement)
+        ->not->toContain(ModificationDimension::CostCenter);
 });
 
 it('reports all changed dimensions without changing the primary count', function (): void {

@@ -14,6 +14,7 @@ class ViewCostCenter extends ViewRecord
     {
         return [
             EditAction::make(),
+            CostCenterResource::moveAction(),
             CostCenterResource::archiveAction(),
             CostCenterResource::restoreAction(),
         ];
