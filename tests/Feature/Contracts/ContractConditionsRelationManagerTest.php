@@ -11,7 +11,10 @@ use App\Models\Supplier;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\Placeholder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\Support\TestPermissions;
 
@@ -83,12 +86,105 @@ it('exposes separate confirmed previews for agreement changes and material corre
     Livewire::test(ContractConditionsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
         ->assertTableActionExists('changeAgreement', record: $condition)
         ->mountTableAction('changeAgreement', record: $condition)
-        ->assertSchemaComponentExists('impact_preview')
-        ->assertSchemaComponentExists('effective_date_confirmed');
+        ->assertSchemaComponentExists('impact_preview', checkComponentUsing: function (Placeholder $component): bool {
+            $html = $component->getContent()->render();
+
+            expect($html)
+                ->toContain('Decorrenza')
+                ->toContain('Data richiesta')
+                ->toContain('Data minima richiedibile')
+                ->toContain('Data effettiva applicabile')
+                ->toContain('Prorata applicato: no')
+                ->toContain('Impatto sugli Esercizi Aperti');
+
+            return true;
+        })
+        ->assertSchemaComponentExists('effective_date_confirmed', checkComponentUsing: function (Checkbox $component): bool {
+            expect($component->isRequired())->toBeFalse()
+                ->and($component->isMarkedAsRequired())->toBeTrue();
+
+            return true;
+        });
 
     Livewire::test(ContractConditionsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
         ->assertTableActionExists('correctMaterialError', record: $condition)
         ->mountTableAction('correctMaterialError', record: $condition)
-        ->assertSchemaComponentExists('declared_input_error')
+        ->assertSchemaComponentExists('declared_input_error', checkComponentUsing: function (Checkbox $component): bool {
+            expect($component->isRequired())->toBeFalse()
+                ->and($component->isMarkedAsRequired())->toBeTrue();
+
+            return true;
+        })
         ->assertSchemaComponentExists('impact_preview');
+});
+
+it('shows validation errors for every unconfirmed economic action without mutating the condition', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $manager, 'permissions' => $capability]);
+    }
+    Exercise::factory()->for($company)->create(['year' => 2026]);
+    $supplier = Supplier::factory()->for($company)->create();
+    $contract = Contract::factory()->for($company)->for($supplier)->create(['next_expiry_date' => null, 'renewal_anchor_date' => null]);
+    ContractLifecycleFact::factory()->forContract($contract)->create();
+    $condition = ContractCondition::factory()->forContract($contract)->create(['valid_from' => '2026-01-01']);
+    $this->actingAs($manager);
+    Filament::setTenant(($company)->tenantCompany);
+
+    Livewire::test(ContractConditionsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
+        ->callTableAction('changeAgreement', record: $condition, data: [
+            'requested_date' => '2026-08-20',
+            'amount' => '150.00',
+            'cycle' => 'monthly',
+            'attribution_mode' => 'cycle_start',
+            'reason' => 'Nuovo accordo',
+            'effective_date_confirmed' => false,
+        ])
+        ->assertHasTableActionErrors(['effective_date_confirmed' => 'accepted']);
+
+    Livewire::test(ContractConditionsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
+        ->callTableAction('correctMaterialError', record: $condition, data: [
+            'amount' => '90.00',
+            'cycle' => 'monthly',
+            'attribution_mode' => 'cycle_start',
+            'reason' => 'Errore di inserimento',
+            'declared_input_error' => false,
+            'declared_no_new_agreement' => false,
+            'impact_confirmed' => false,
+        ])
+        ->assertHasTableActionErrors([
+            'declared_input_error' => 'accepted',
+            'declared_no_new_agreement' => 'accepted',
+            'impact_confirmed' => 'accepted',
+        ]);
+
+    expect($condition->refresh()->amount)->toBe('100.00')
+        ->and($condition->valid_to)->toBeNull()
+        ->and($contract->refresh()->revision)->toBe(0)
+        ->and(ContractCondition::query()->where('contract_id', $contract->id)->count())->toBe(1);
+});
+
+it('generates the hidden operation identifier when opening either economic action', function () {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    foreach ([TestPermissions::VIEW, TestPermissions::MANAGE_OPERATIONS] as $capability) {
+        grantTestPermissions(['company_id' => $company->id, 'user' => $manager, 'permissions' => $capability]);
+    }
+    Exercise::factory()->for($company)->create(['year' => 2026]);
+    $supplier = Supplier::factory()->for($company)->create();
+    $contract = Contract::factory()->for($company)->for($supplier)->create(['next_expiry_date' => null, 'renewal_anchor_date' => null]);
+    ContractLifecycleFact::factory()->forContract($contract)->create();
+    $condition = ContractCondition::factory()->forContract($contract)->create(['valid_from' => '2026-01-01']);
+    $this->actingAs($manager);
+    Filament::setTenant(($company)->tenantCompany);
+
+    foreach (['changeAgreement', 'correctMaterialError'] as $action) {
+        $component = Livewire::test(ContractConditionsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
+            ->mountTableAction($action, record: $condition);
+
+        expect($component->get('mountedActions.0.data.operation_id'))
+            ->toBeString()
+            ->and(Str::isUuid($component->get('mountedActions.0.data.operation_id')))->toBeTrue();
+    }
 });
