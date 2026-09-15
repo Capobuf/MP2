@@ -101,7 +101,7 @@ it('toggles the sibling expense detail from the row without exposing a detail bu
         ->assertDispatched('show-expense-detail', expenseId: $expense->id);
 
     expect($list->instance()->getTable()->getRecordAction($expense))->toBe('selectExpense')
-        ->and($list->instance()->getTable()->isSelectionEnabled())->toBeTrue();
+        ->and($list->instance()->getTable()->isSelectionEnabled())->toBeFalse();
 
     $list->set('tableSearch', 'nessun-risultato-corrispondente')
         ->assertSet('selectedExpenseId', null)
