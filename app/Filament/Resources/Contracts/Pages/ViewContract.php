@@ -7,6 +7,7 @@ use App\Domain\Contracts\ContractState;
 use App\Filament\Pages\CompanyAudit;
 use App\Filament\Resources\Contracts\ContractResource;
 use App\Filament\Resources\Contracts\Schemas\ContractInfolist;
+use App\Filament\Resources\Expenses\Actions\RegisterContractPayment;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Models\Contract;
 use App\Models\User;
@@ -67,10 +68,13 @@ class ViewContract extends ViewRecord
             ])),
             EditAction::make()->label('Modifica')->icon('heroicon-m-pencil-square')->color('gray')->outlined()
                 ->visible(fn (): bool => ! $this->contract()->isArchived()),
-            Action::make('createContractActual')->label('Nuova Spesa')->icon('heroicon-m-plus')
-                ->extraAttributes(['class' => 'mp2-contract-primary-action'])
-                ->url(fn (): string => ExpenseResource::getUrl('create', ['contract' => $this->contract()->getKey()]))
-                ->visible(fn (): bool => $this->canCreateActual()),
+            ActionGroup::make([
+                Action::make('createContractActual')->label('Nuova Spesa')->icon('heroicon-m-plus')
+                    ->url(fn (): string => ExpenseResource::getUrl('create', ['contract' => $this->contract()->getKey()]))
+                    ->visible(fn (): bool => $this->canCreateActual()),
+                RegisterContractPayment::make($this->contract()),
+            ])->label('Nuova Spesa')->button()
+                ->extraAttributes(['class' => 'mp2-contract-primary-action']),
             ActionGroup::make([
                 Action::make('archive')->label('Archivia')->color('warning')->requiresConfirmation()
                     ->visible(fn (): bool => $this->canArchive())

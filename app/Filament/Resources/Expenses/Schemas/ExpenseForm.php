@@ -236,7 +236,7 @@ class ExpenseForm
     }
 
     /** @return array<int, mixed> */
-    private static function creationActivityFields(): array
+    public static function creationActivityFields(): array
     {
         return [
             Placeholder::make('ordinary_project_activity')

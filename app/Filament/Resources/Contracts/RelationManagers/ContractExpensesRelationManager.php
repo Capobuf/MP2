@@ -2,11 +2,13 @@
 
 namespace App\Filament\Resources\Contracts\RelationManagers;
 
+use App\Filament\Resources\Expenses\Actions\RegisterContractPayment;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Models\Contract;
 use App\Models\Expense;
 use App\Models\User;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\ViewAction;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
@@ -31,6 +33,9 @@ class ContractExpensesRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
+        /** @var Contract $contract */
+        $contract = $this->getOwnerRecord();
+
         return $table->columns([
             TextColumn::make('description')->label('Descrizione')->searchable(),
             TextColumn::make('origin')->label('Origine')->formatStateUsing(fn (string $state): string => $state === 'system' ? 'Stima di sistema' : 'Manuale')->badge(),
@@ -40,9 +45,12 @@ class ContractExpensesRelationManager extends RelationManager
             TextColumn::make('allocation')->label('Allocato')->state(fn (Expense $record): string => $record->allocation())->money('EUR', locale: 'it'),
             TextColumn::make('actual')->label('Effettivo')->state(fn (Expense $record): string => $record->actual())->money('EUR', locale: 'it'),
         ])->headerActions([
-            Action::make('createContractActual')->label('Nuova Spesa')
-                ->url(fn (): string => ExpenseResource::getUrl('create', ['contract' => $this->getOwnerRecord()->getKey()]))
-                ->visible(fn (): bool => $this->canMutateOwner()),
+            ActionGroup::make([
+                Action::make('createContractActual')->label('Nuova Spesa')
+                    ->url(fn (): string => ExpenseResource::getUrl('create', ['contract' => $this->getOwnerRecord()->getKey()]))
+                    ->visible(fn (): bool => $this->canMutateOwner()),
+                RegisterContractPayment::make($contract),
+            ])->label('Nuova Spesa')->button(),
         ])->recordActions([
             ViewAction::make()->url(fn (Expense $record): string => ExpenseResource::getUrl('view', ['record' => $record])),
             ExpenseResource::reverseAction(),

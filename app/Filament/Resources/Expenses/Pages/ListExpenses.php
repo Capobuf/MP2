@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Expenses\Pages;
 
+use App\Filament\Resources\Expenses\Actions\RegisterContractPayment;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Resources\Expenses\Widgets\ExpenseOverview;
 use App\Livewire\ExpenseDetail;
@@ -9,6 +10,7 @@ use App\Models\Company;
 use App\Models\Exercise;
 use App\Models\TenantCompany;
 use App\Support\ExerciseContext;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\ListRecords;
@@ -34,10 +36,13 @@ class ListExpenses extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make()
-                ->label('Nuova Spesa')
-                ->disabled(fn (): bool => $this->createDisabledReason() !== null)
-                ->tooltip(fn (): ?string => $this->createDisabledReason()),
+            ActionGroup::make([
+                CreateAction::make()
+                    ->label('Nuova Spesa')
+                    ->disabled(fn (): bool => $this->createDisabledReason() !== null)
+                    ->tooltip(fn (): ?string => $this->createDisabledReason()),
+                RegisterContractPayment::make(),
+            ])->label('Nuova Spesa')->button(),
         ];
     }
 
