@@ -145,7 +145,10 @@ final class ProposalReadiness
         return [
             'state' => ProposalReadinessState::Inconsistent,
             'reasons' => collect(ProposalReadinessReason::fromValidation($exception))
-                ->map(fn (ProposalReadinessReason $reason): array => $this->reason($reason))
+                ->map(fn (ProposalReadinessReason $reason): array => [
+                    'code' => $reason->value,
+                    'message' => implode(' ', collect($exception->errors())->flatten()->all()),
+                ])
                 ->all(),
         ];
     }

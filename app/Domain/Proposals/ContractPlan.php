@@ -71,8 +71,18 @@ final class ContractPlan
     public static function create(array $payload): array
     {
         self::dateOrder((string) $payload['contractual_start_date'], $payload['next_expiry_date'] ?? null, 'next_expiry_date');
+        if (($payload['automatic_renewal'] ?? false) && filled($payload['next_expiry_date'] ?? null)
+            && (! is_numeric($payload['renewal_duration_months'] ?? null) || (int) $payload['renewal_duration_months'] < 1)) {
+            throw ValidationException::withMessages(['renewal_duration_months' => 'La durata del rinnovo è obbligatoria e positiva con rinnovo automatico e scadenza definita.']);
+        }
 
-        return [...$payload, 'planned_conditions' => [], 'planned_lifecycle' => [], 'renewal_configurations' => [], 'prorata_applied' => false, 'start_state' => ContractState::Planned->value];
+        return [...$payload, 'planned_conditions' => [], 'planned_lifecycle' => [], 'renewal_configurations' => [[
+            'effective_from' => $payload['contractual_start_date'],
+            'expiry_anchor_date' => $payload['next_expiry_date'] ?? null,
+            'automatic_renewal' => $payload['automatic_renewal'] ?? false,
+            'renewal_duration_months' => $payload['renewal_duration_months'] ?? null,
+            'notice_days' => $payload['notice_days'] ?? null,
+        ]], 'prorata_applied' => false, 'start_state' => ContractState::Planned->value];
     }
 
     /**

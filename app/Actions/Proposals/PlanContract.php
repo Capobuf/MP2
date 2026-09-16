@@ -22,6 +22,25 @@ use Illuminate\Validation\ValidationException;
 
 final class PlanContract
 {
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $condition
+     */
+    public function createWithCondition(User $actor, Proposal $proposal, array $payload, array $condition, string $operationId, int $expectedRevision): ProposalAction
+    {
+        return DB::transaction(function () use ($actor, $proposal, $payload, $condition, $operationId, $expectedRevision): ProposalAction {
+            $created = $this->create($actor, $proposal, $payload, $operationId, $expectedRevision);
+            if ($created->wasRecentlyCreated) {
+                $this->execute($actor, $proposal->fresh(), $created->item, ProposalActionType::AddContractCondition, [
+                    ...$condition,
+                    'valid_from' => $payload['contractual_start_date'],
+                ], null, (string) Str::uuid(), $expectedRevision + 1);
+            }
+
+            return $created->load('item');
+        });
+    }
+
     /** @param array<string, mixed> $payload */
     public function create(User $actor, Proposal $proposal, array $payload, string $operationId, int $expectedRevision): ProposalAction
     {

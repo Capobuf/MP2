@@ -5,9 +5,11 @@ namespace App\Filament\Resources\Users;
 use App\Filament\Resources\Users\Pages\CreateUser;
 use App\Filament\Resources\Users\Pages\EditUser;
 use App\Filament\Resources\Users\Pages\ListUsers;
+use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
 use Filament\Actions\EditAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
@@ -21,6 +23,9 @@ use Illuminate\Validation\Rule;
 class UserResource extends Resource
 {
     protected static ?string $model = User::class;
+
+    // Actor relationships must resolve global platform accounts as well as tenant users.
+    protected static bool $isScopedToTenant = false;
 
     protected static string|BackedEnum|null $navigationIcon = null;
 
@@ -90,7 +95,11 @@ class UserResource extends Resource
     /** @return Builder<User> */
     public static function getEloquentQuery(): Builder
     {
+        $tenant = Filament::getTenant();
+        abort_unless($tenant instanceof TenantCompany, 404);
+
         return parent::getEloquentQuery()
+            ->where('company_id', $tenant->company_id)
             ->whereDoesntHave('roles', fn (Builder $query): Builder => $query->where('name', 'super_admin'));
     }
 
