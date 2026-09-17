@@ -8,15 +8,16 @@ use App\Domain\Contracts\ContractStateTimeline;
 use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseLineType;
+use App\Domain\Projects\ProjectDeferralMode;
 use App\Models\Contract;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\Project;
 use App\Models\ProjectContractLink;
-use App\Models\ProjectDeferral;
 use App\Models\Proposal;
 use App\Models\ProposalItem;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
 
 final class BudgetSnapshotPayload
@@ -32,6 +33,7 @@ final class BudgetSnapshotPayload
         $rows = [];
         $totalParts = [];
         $costCenterHierarchy = CostCenterHierarchy::forCompany((int) $proposal->company_id);
+        $identities = self::preloadSources($proposal, $identities);
 
         foreach ($proposal->items->sortBy('id') as $item) {
             if ($item->isExcludedFromPlan()) {
@@ -73,7 +75,7 @@ final class BudgetSnapshotPayload
                 'label' => $live instanceof Expense ? $live->description : $live->title,
                 'summary' => $live instanceof Project ? $live->description : ($live->notes ?? null),
                 'supplier_id' => $live instanceof Project ? null : $live->supplier_id,
-                'supplier_label' => $live instanceof Project ? null : $live->supplier()->value('legal_name'),
+                'supplier_label' => $live instanceof Project ? null : $live->supplier?->legal_name,
                 'cost_center_id' => $costCenterId, 'cost_center_label' => self::costCenterLabel($costCenterId, $costCenterHierarchy),
                 'approved_estimates' => $estimates, 'approved_carryover' => $carryover,
                 'carryover_state' => Decimal::compare($carryover, '0.00') > 0 ? 'provisional' : null,
@@ -94,10 +96,42 @@ final class BudgetSnapshotPayload
         return ['rows' => $rows, 'total' => $derivedTotal];
     }
 
+    /**
+     * @param  array<string, Expense|Project|Contract>  $identities
+     * @return array<string, Expense|Project|Contract>
+     */
+    private static function preloadSources(Proposal $proposal, array $identities): array
+    {
+        $items = $proposal->items->reject(fn (ProposalItem $item): bool => $item->isExcludedFromPlan());
+        $items->filter(fn (ProposalItem $item): bool => ! isset($identities[$item->proposal_item_id]))
+            ->loadMissing(['expense', 'project', 'contract']);
+        $sources = $items->mapWithKeys(fn (ProposalItem $item): array => [
+            $item->proposal_item_id => self::liveIdentity($item, $identities),
+        ]);
+        $classifications = fn ($query) => $query->where('exercise_id', $proposal->exercise_id);
+        $expenses = fn ($query) => $query->where('exercise_id', $proposal->exercise_id)->with(['lines', 'supplier']);
+        $links = fn ($query) => $query->active()->with(['project', 'contract'])->orderBy('id');
+
+        // Approval may have changed these relations after the identity was resolved.
+        (new Collection($sources->filter(fn ($live): bool => $live instanceof Expense)->values()->all()))->load([
+            'lines', 'supplier', 'project.classifications' => $classifications, 'contract.classifications' => $classifications,
+        ]);
+        (new Collection($sources->filter(fn ($live): bool => $live instanceof Project)->values()->all()))->load([
+            'transitions', 'expenses' => $expenses, 'classifications' => $classifications,
+            'deferrals' => fn ($query) => $query->where('destination_exercise_id', $proposal->exercise_id),
+            'contractLinks' => $links,
+        ]);
+        (new Collection($sources->filter(fn ($live): bool => $live instanceof Contract)->values()->all()))->load([
+            'supplier', 'conditions', 'lifecycleFacts', 'renewalConfigurations',
+            'expenses' => $expenses, 'classifications' => $classifications, 'projectLinks' => $links,
+        ]);
+
+        return $sources->all();
+    }
+
     /** @return array<string, mixed> */
     private static function expenseDetail(Expense $expense, Proposal $proposal, CostCenterHierarchy $hierarchy): array
     {
-        $expense->loadMissing(['lines', 'supplier', 'project', 'contract']);
         $owner = match (true) {
             $expense->project !== null => ['type' => 'project', 'origin_id' => $expense->project->id, 'origin_key' => $expense->project->originKey(), 'label' => $expense->project->title],
             $expense->contract !== null => ['type' => 'contract', 'origin_id' => $expense->contract->id, 'origin_key' => $expense->contract->originKey(), 'label' => $expense->contract->title],
@@ -122,7 +156,6 @@ final class BudgetSnapshotPayload
     /** @return array<string, mixed> */
     private static function projectDetail(Project $project, Proposal $proposal, ProposalItem $item, CostCenterHierarchy $hierarchy): array
     {
-        $project->loadMissing(['transitions', 'expenses.lines', 'expenses.supplier', 'classifications.costCenter', 'deferrals']);
         $deferral = $project->deferrals->firstWhere('destination_exercise_id', $proposal->exercise_id);
         $expenses = $project->expenses->where('exercise_id', $proposal->exercise_id)->sortBy('id')->map(fn (Expense $expense): array => [
             'expense_id' => $expense->id, 'description' => $expense->description,
@@ -157,7 +190,6 @@ final class BudgetSnapshotPayload
     /** @return array<string, mixed> */
     private static function contractDetail(Contract $contract, Proposal $proposal, ProposalItem $item, CostCenterHierarchy $hierarchy): array
     {
-        $contract->loadMissing(['supplier', 'conditions', 'lifecycleFacts', 'renewalConfigurations', 'classifications.costCenter']);
         $stateAt = fn (string $date) => ContractStateTimeline::stateAtDate(
             $contract->contractualStartDate()->toDateString(), $contract->lifecycleFacts, $date, $contract->renewalConfigurations,
         );
@@ -216,9 +248,7 @@ final class BudgetSnapshotPayload
         if ($live instanceof Expense) {
             return [];
         }
-        $links = ProjectContractLink::query()->active()->with(['project', 'contract'])->when(
-            $live instanceof Project, fn ($query) => $query->where('project_id', $live->id), fn ($query) => $query->where('contract_id', $live->id),
-        )->orderBy('id')->get();
+        $links = $live instanceof Project ? $live->contractLinks : $live->projectLinks;
 
         return $links->map(fn (ProjectContractLink $link): array => [
             'type' => 'linked_to', 'project' => ['origin_key' => $link->project->originKey(), 'label' => $link->project->title],
@@ -228,18 +258,22 @@ final class BudgetSnapshotPayload
 
     private static function allocation(Expense|Project|Contract $live, int $exerciseId): string
     {
-        return match (true) {
-            $live instanceof Expense => $live->allocation(),
-            $live instanceof Project => $live->annualTotals()[$exerciseId]['allocation'] ?? '0.00',
-            $live instanceof Contract => $live->annualTotals()[$exerciseId]['allocation'] ?? '0.00',
-        };
+        if ($live instanceof Expense) {
+            return $live->allocation();
+        }
+        $estimates = Decimal::sum($live->expenses->map(fn (Expense $expense): string => $expense->allocation()));
+
+        $carryover = $live instanceof Project
+            ? Decimal::sum($live->deferrals->where('destination_exercise_id', $exerciseId)
+                ->where('mode', ProjectDeferralMode::Carryover)->pluck('carryover_amount'))
+            : '0.00';
+
+        return Decimal::add($estimates, $carryover);
     }
 
     private static function carryover(Project $project, int $exerciseId): string
     {
-        $deferral = $project->relationLoaded('deferrals')
-            ? $project->deferrals->firstWhere('destination_exercise_id', $exerciseId)
-            : ProjectDeferral::query()->where('project_id', $project->id)->where('destination_exercise_id', $exerciseId)->first();
+        $deferral = $project->deferrals->firstWhere('destination_exercise_id', $exerciseId);
 
         return $deferral?->mode->value === 'carryover' ? (string) $deferral->carryover_amount : '0.00';
     }
@@ -261,16 +295,16 @@ final class BudgetSnapshotPayload
     {
         if ($live instanceof Expense) {
             if ($live->project_id !== null) {
-                return $live->project?->classifications()->where('exercise_id', $exerciseId)->value('cost_center_id');
+                return $live->project?->classifications->firstWhere('exercise_id', $exerciseId)?->cost_center_id;
             }
             if ($live->contract_id !== null) {
-                return $live->contract?->classifications()->where('exercise_id', $exerciseId)->value('cost_center_id');
+                return $live->contract?->classifications->firstWhere('exercise_id', $exerciseId)?->cost_center_id;
             }
 
             return $live->direct_cost_center_id;
         }
 
-        return $live->classifications()->where('exercise_id', $exerciseId)->value('cost_center_id');
+        return $live->classifications->firstWhere('exercise_id', $exerciseId)?->cost_center_id;
     }
 
     private static function costCenterLabel(?int $id, CostCenterHierarchy $hierarchy): string
