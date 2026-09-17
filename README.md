@@ -51,3 +51,22 @@ La suite usa esclusivamente il database MySQL `testing` e si arresta prima dei
 reset se ambiente o database non sono quelli previsti. La policy corrente è in
 [`docs/testing-policy.md`](docs/testing-policy.md); il gate eseguibile dalla CI è
 definito in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+## Log di produzione
+
+Il template `.env.production.example` usa `LOG_CHANNEL=stack`, `LOG_STACK=daily`,
+`LOG_DAILY_DAYS=14` e `LOG_LEVEL=error`. Il canale conserva al massimo 14 file
+giornalieri in `storage/logs/laravel-YYYY-MM-DD.log`; la rotazione avviene quando
+vengono scritti nuovi messaggi. I log sono consultabili dagli operatori con accesso
+al filesystem del deployment e non devono essere esposti dal web server.
+
+Per le installazioni esistenti, applicare gli stessi valori al file `.env` del
+deployment e rigenerare l'eventuale configurazione in cache con
+`php artisan config:cache`. Il vecchio `storage/logs/laravel.log` non viene ruotato
+dal nuovo canale: l'operatore deve gestirne separatamente archiviazione e rimozione.
+
+Il cleanup orario `tenant-files:cleanup` registra gli esiti falliti nel log con
+conteggi di file elaborati, completati e falliti e l'ID operazione, se il comando
+è limitato a una singola operazione. Non registra percorsi, contenuti dei file o
+messaggi delle eccezioni dello storage. Un'esecuzione riuscita non genera errori
+nel log. Il cron può quindi mantenere la redirezione dell'output a `/dev/null`.

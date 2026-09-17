@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Actions\Tenancy\DeletePendingTenantFiles;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class DeletePendingTenantFilesCommand extends Command
@@ -22,6 +23,9 @@ class DeletePendingTenantFilesCommand extends Command
         }
 
         $result = $deletePendingTenantFiles->execute($operationId);
+        if ($result['failed'] > 0) {
+            Log::error('Tenant file cleanup failed.', ['operation_id' => $operationId, ...$result]);
+        }
         $this->components->info(
             "Elaborati: {$result['processed']}; completati: {$result['completed']}; falliti: {$result['failed']}.",
         );

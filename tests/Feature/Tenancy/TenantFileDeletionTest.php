@@ -8,6 +8,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -98,6 +99,7 @@ it('keeps sanitized retry metadata after false or exceptional storage deletion a
 ]);
 
 it('reports cleanup command failure and validates an optional operation UUID', function (): void {
+    Log::spy();
     $filesystem = Mockery::mock(Filesystem::class);
     $filesystem->shouldReceive('exists')->once()->andReturn(true);
     $filesystem->shouldReceive('delete')->once()->andReturn(false);
@@ -113,4 +115,50 @@ it('reports cleanup command failure and validates an optional operation UUID', f
     expect(Artisan::call('tenant-files:cleanup', ['--operation' => $operationId]))->toBe(Command::FAILURE)
         ->and(Artisan::output())->toContain('Elaborati: 1; completati: 0; falliti: 1.')
         ->and(Artisan::call('tenant-files:cleanup', ['--operation' => 'invalid']))->toBe(Command::FAILURE);
+
+    Log::shouldHaveReceived('error')->once()->with('Tenant file cleanup failed.', [
+        'operation_id' => $operationId, 'processed' => 1, 'completed' => 0, 'failed' => 1,
+    ]);
+});
+
+it('persists sanitized scheduled cleanup failures in the daily application log', function (bool $throws) {
+    Storage::fake('cleanup-log');
+    config([
+        'logging.default' => 'daily',
+        'logging.channels.daily.path' => Storage::disk('cleanup-log')->path('laravel.log'),
+        'logging.channels.daily.level' => 'error',
+    ]);
+    Log::forgetChannel('daily');
+    $filesystem = Mockery::mock(Filesystem::class);
+    $filesystem->shouldReceive('exists')->once()->andReturn(true);
+    $deletion = $filesystem->shouldReceive('delete')->once();
+    $throws ? $deletion->andThrow(new RuntimeException('credential-secret /private/sensitive.pdf')) : $deletion->andReturn(false);
+    Storage::set('cleanup-failed', $filesystem);
+    PendingFileDeletion::query()->create([
+        'operation_id' => (string) Str::uuid(), 'storage_disk' => 'cleanup-failed',
+        'storage_path' => '/private/sensitive.pdf',
+    ]);
+
+    expect(Artisan::call('tenant-files:cleanup'))->toBe(Command::FAILURE);
+
+    $files = Storage::disk('cleanup-log')->allFiles();
+    expect($files)->toHaveCount(1);
+    $contents = Storage::disk('cleanup-log')->get($files[0]);
+    expect($contents)->toContain('Tenant file cleanup failed.', '"processed":1', '"completed":0', '"failed":1')
+        ->not->toContain('/private/', 'sensitive.pdf', 'credential-secret', 'RuntimeException');
+    Log::forgetChannel('daily');
+})->with(['storage returns false' => false, 'storage throws' => true]);
+
+it('keeps successful and empty cleanup commands silent in the application log', function () {
+    Log::spy();
+    Storage::fake('cleanup-success');
+    Storage::disk('cleanup-success')->put('removed.txt', 'content');
+    PendingFileDeletion::query()->create([
+        'operation_id' => (string) Str::uuid(), 'storage_disk' => 'cleanup-success', 'storage_path' => 'removed.txt',
+    ]);
+
+    expect(Artisan::call('tenant-files:cleanup'))->toBe(Command::SUCCESS)
+        ->and(Artisan::call('tenant-files:cleanup'))->toBe(Command::SUCCESS);
+    Storage::disk('cleanup-success')->assertMissing('removed.txt');
+    Log::shouldNotHaveReceived('error');
 });
