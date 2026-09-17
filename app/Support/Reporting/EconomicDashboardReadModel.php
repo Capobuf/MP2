@@ -113,6 +113,7 @@ final class EconomicDashboardReadModel
                 'operational_variance' => (string) $report->totals['current_operational_variance'],
             ],
             'sources' => $sources,
+            'suppliers' => $this->aggregator->suppliers($currentSources),
             'cost_centers' => $costCenters,
             'comparison_categories' => $categoryCounts,
             'comparison_source_count' => array_sum($categoryCounts),

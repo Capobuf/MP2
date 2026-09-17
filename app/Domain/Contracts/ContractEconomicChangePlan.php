@@ -171,7 +171,7 @@ final readonly class ContractEconomicChangePlan
         string $delayReason,
         bool $futureReplacement,
     ): self {
-        $contract->loadMissing(['conditions', 'lifecycleFacts']);
+        $contract->loadMissing(['conditions', 'lifecycleFacts', 'renewalConfigurations']);
         $oldTerms = self::terms($condition);
         $newTerms += ['valid_from' => $effectiveDate, 'valid_to' => $condition->validTo()?->toDateString()];
         $beforeConditions = $contract->conditions->map(fn (ContractCondition $item): array => self::terms($item))->all();
@@ -217,6 +217,7 @@ final readonly class ContractEconomicChangePlan
                 $contract->contractualStartDate()->toDateString(),
                 $contract->lifecycleFacts,
                 $date,
+                $contract->renewalConfigurations,
             );
             $before = ContractAnnualAllocation::forYear($beforeConditions, $exercise->year, $stateAt);
             $after = ContractAnnualAllocation::forYear($afterConditions, $exercise->year, $stateAt);

@@ -5,6 +5,7 @@ namespace App\Actions\Operations;
 use App\Domain\Company\AuditEventType;
 use App\Domain\Contracts\ContractEconomicUse;
 use App\Models\AuditEvent;
+use App\Models\BudgetSourceRow;
 use App\Models\Company;
 use App\Models\Contract;
 use App\Models\Supplier;
@@ -22,10 +23,12 @@ class UpdateContract
         $validated = Validator::make([
             'title' => is_string($input['title'] ?? null) ? trim($input['title']) : ($input['title'] ?? null),
             'notes' => $this->nullableTrim($input['notes'] ?? null),
+            'reason' => $this->nullableTrim($input['reason'] ?? null),
             'supplier_id' => $input['supplier_id'] ?? $contract->supplier_id,
             'operation_id' => $operationId,
         ], [
             'title' => ['required', 'string', 'max:255'],
+            'reason' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
             'supplier_id' => ['required', 'integer'],
             'operation_id' => ['required', 'uuid'],
@@ -71,6 +74,9 @@ class UpdateContract
             if (! $locked->isDirty()) {
                 return $locked;
             }
+            if ($locked->isDirty(['title', 'notes']) && self::reasonRequired($locked) && $validated['reason'] === null) {
+                throw ValidationException::withMessages(['reason' => 'La motivazione è obbligatoria per modificare titolo o note dopo un Budget approvato.']);
+            }
             $locked->update([
                 'title' => $validated['title'],
                 'notes' => $validated['notes'],
@@ -94,10 +100,17 @@ class UpdateContract
                 'new_value' => ['title' => $locked->title, 'notes' => $locked->notes, 'supplier_id' => $locked->supplier_id],
                 'allocated_impact_by_exercise' => [],
                 'actual_impact_by_exercise' => [],
+                'reason' => $validated['reason'],
             ]);
 
             return $locked;
         });
+    }
+
+    public static function reasonRequired(?Contract $contract): bool
+    {
+        return $contract !== null && BudgetSourceRow::query()->where('company_id', $contract->company_id)
+            ->where('source_type', 'contract')->where('origin_id', $contract->id)->exists();
     }
 
     private function nullableTrim(mixed $value): mixed

@@ -17,8 +17,10 @@ use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\Project;
+use App\Models\ProjectDeferral;
 use App\Models\ProjectExerciseClassification;
 use App\Models\Proposal;
+use App\Models\Supplier;
 use App\Support\BudgetContext;
 use App\Support\ExerciseContext;
 use App\Support\Reporting\EconomicDashboardReadModel;
@@ -107,9 +109,13 @@ function economicDashboardFixture(): array
 }
 
 /** @return array<string, mixed> */
-function chartData(string $widget): array
+function chartData(string $widget, ?string $filter = null): array
 {
-    $instance = Livewire::test($widget)->assertSuccessful()->instance();
+    $component = Livewire::test($widget)->assertSuccessful();
+    if ($filter !== null) {
+        $component->set('filter', $filter)->assertHasNoErrors();
+    }
+    $instance = $component->instance();
     $method = new ReflectionMethod($instance, 'getData');
 
     return $method->invoke($instance);
@@ -212,8 +218,9 @@ it('renders current charts without a Budget using only primary sources', functio
         ->and($byType['labels'])->toBe(['Spese Autonome', 'Progetti', 'Contratti'])
         ->and($byType['datasets'][0]['data'])->toBe([100.0, 200.0, 300.0])
         ->and($byType['datasets'][1]['data'])->toBe([110.0, 180.0, 350.0])
-        ->and($distribution['labels'])->toBe(['Inferiore', 'Uguale', 'Superiore'])
-        ->and($distribution['datasets'][0]['data'])->toBe([1, 0, 2])
+        ->and($distribution['labels'])->toBe(['Contratti', 'Progetti', 'Spese Autonome'])
+        ->and($distribution['datasets'][0]['data'])->toBe([300.0, 200.0, 100.0])
+        ->and($distribution['total'])->toBe('600.00')
         ->and($budgetContext->current($fixture['company'], $fixture['exercise']))->toBeNull();
 
     Livewire::test(BudgetVariationChart::class)
@@ -221,7 +228,8 @@ it('renders current charts without a Budget using only primary sources', functio
         ->assertSeeHtml('data-chart-type="bar"')
         ->assertDontSee('Confronto Budget Non Disponibile');
     Livewire::test(AllocationComparisonScatterChart::class)
-        ->assertSee('Sorgenti per Scostamento')
+        ->assertSee('Distribuzione dell’Allocato')
+        ->assertSeeHtml('aria-label="Raggruppa Allocato per"')
         ->assertSeeHtml('data-chart-type="doughnut"')
         ->assertDontSee('Confronto Allocato Non Disponibile');
 
@@ -250,7 +258,8 @@ it('switches current charts to the selected Budget and back when the Budget is c
         ->assertDontSee('Allocato ed Effettivo per Tipologia');
     Livewire::test(AllocationComparisonScatterChart::class)
         ->assertSee('Budget → Allocato Corrente')
-        ->assertSeeHtml('data-chart-type="scatter"');
+        ->assertSeeHtml('data-chart-type="scatter"')
+        ->assertDontSeeHtml('aria-label="Raggruppa Allocato per"');
     $budgetPoint = collect(chartData(AllocationComparisonScatterChart::class)['datasets'][0]['data'])->firstWhere('label', 'Licenze autonome');
     expect($budgetPoint)->toMatchArray(['x' => 90.0, 'y' => 100.0, 'variation' => '10.00']);
 
@@ -263,9 +272,9 @@ it('switches current charts to the selected Budget and back when the Budget is c
         ->assertSee('Allocato ed Effettivo per Tipologia')
         ->assertSeeHtml('data-chart-type="bar"');
     Livewire::test(AllocationComparisonScatterChart::class)
-        ->assertSee('Sorgenti per Scostamento')
+        ->assertSee('Distribuzione dell’Allocato')
         ->assertSeeHtml('data-chart-type="doughnut"');
-    expect(chartData(AllocationComparisonScatterChart::class)['datasets'][0]['data'])->toBe([1, 0, 2]);
+    expect(chartData(AllocationComparisonScatterChart::class)['datasets'][0]['data'])->toBe([300.0, 200.0, 100.0]);
 });
 
 it('preserves negative actuals and zero values in current charts', function (): void {
@@ -284,7 +293,107 @@ it('preserves negative actuals and zero values in current charts', function (): 
     $byType = chartData(BudgetVariationChart::class);
     expect($byType['datasets'][0]['data'])->toBe([100.0, 0.0, 0.0])
         ->and($byType['datasets'][1]['data'])->toBe([-25.0, 0.0, 0.0]);
-    expect(chartData(AllocationComparisonScatterChart::class)['datasets'][0]['data'])->toBe([1, 1, 0]);
+    $distribution = chartData(AllocationComparisonScatterChart::class);
+    expect($distribution['labels'])->toBe(['Spese Autonome'])
+        ->and($distribution['datasets'][0]['data'])->toBe([100.0])
+        ->and($distribution['total'])->toBe('100.00');
+});
+
+it('switches distribution groupings without duplicating expenses or received carryover', function (): void {
+    $fixture = economicDashboardFixture();
+    $company = $fixture['company'];
+    $supplier = Supplier::factory()->for($company)->create(['legal_name' => 'Fornitore condiviso']);
+    $fixture['standalone']->update(['supplier_id' => $supplier->id]);
+    $fixture['project']->expenses()->firstOrFail()->update(['supplier_id' => $supplier->id]);
+    $fixture['contract']->supplier->update(['legal_name' => 'Fornitore contratto']);
+    $fixture['contract']->expenses()->firstOrFail()->update(['supplier_id' => $supplier->id]);
+    $unassigned = Expense::factory()->forExercise($fixture['exercise'])->for($fixture['project'])->create();
+    ExpenseLine::factory()->for($unassigned)->create(['amount' => '25.00']);
+    $previousExercise = Exercise::factory()->for($company)->create(['year' => 2025]);
+    $fixture['project']->update(['initial_effective_date' => '2025-01-01']);
+    $previousExpense = Expense::factory()->forExercise($previousExercise)->for($fixture['project'])->create();
+    ExpenseLine::factory()->for($previousExpense)->create(['amount' => '20.00']);
+    ProjectDeferral::factory()->carryover('20.00')->create([
+        'company_id' => $company->id,
+        'project_id' => $fixture['project']->id,
+        'source_exercise_id' => $previousExercise->id,
+        'destination_exercise_id' => $fixture['exercise']->id,
+    ]);
+    $this->actingAs($fixture['viewer']);
+    Filament::setTenant($company->tenantCompany);
+    app(ExerciseContext::class)->select($company, $fixture['exercise']->id);
+
+    $component = Livewire::test(AllocationComparisonScatterChart::class);
+    foreach (['type', 'supplier', 'cost_center', 'type'] as $grouping) {
+        $component->set('filter', $grouping)->assertHasNoErrors();
+        $data = (new ReflectionMethod($component->instance(), 'getCachedData'))->invoke($component->instance());
+        expect($data['total'])->toBe('645.00')
+            ->and(array_sum($data['datasets'][0]['data']))->toBe(645.0);
+        if ($grouping === 'supplier') {
+            expect(array_combine($data['labels'], $data['datasets'][0]['data']))->toMatchArray([
+                'Fornitore condiviso' => 300.0,
+                'Fornitore contratto' => 300.0,
+                'Senza Fornitore' => 25.0,
+                'Riporto senza Fornitore' => 20.0,
+            ]);
+        }
+    }
+    $component->set('filter', 'unknown')->assertStatus(422);
+});
+
+it('uses direct cost center allocations without counting ancestor branches twice', function (): void {
+    $fixture = economicDashboardFixture();
+    $child = CostCenter::factory()->for($fixture['company'])->create([
+        'name' => 'Licenze',
+        'parent_id' => $fixture['costCenter']->id,
+    ]);
+    $fixture['standalone']->update(['direct_cost_center_id' => $child->id]);
+    $this->actingAs($fixture['viewer']);
+    Filament::setTenant($fixture['company']->tenantCompany);
+    app(ExerciseContext::class)->select($fixture['company'], $fixture['exercise']->id);
+
+    $data = chartData(AllocationComparisonScatterChart::class, 'cost_center');
+    expect(array_combine($data['labels'], $data['datasets'][0]['data']))->toBe([
+        'Operations' => 300.0,
+        'Non classificato' => 200.0,
+        'Operations / Licenze' => 100.0,
+    ])->and($data['total'])->toBe('600.00');
+});
+
+it('groups small allocation shares into Others while preserving the total and omitting zeros', function (): void {
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    foreach (range(0, 8) as $number) {
+        $supplier = Supplier::factory()->for($company)->create(['legal_name' => 'Fornitore '.$number]);
+        $expense = Expense::factory()->forExercise($exercise)->for($supplier)->create();
+        ExpenseLine::factory()->for($expense)->create(['amount' => (string) ($number * 10)]);
+    }
+    $this->actingAs($viewer);
+    Filament::setTenant($company->tenantCompany);
+    app(ExerciseContext::class)->select($company, $exercise->id);
+
+    $data = chartData(AllocationComparisonScatterChart::class, 'supplier');
+    expect($data['labels'])->toBe(['Fornitore 8', 'Fornitore 7', 'Fornitore 6', 'Fornitore 5', 'Fornitore 4', 'Fornitore 3', 'Altri (2)'])
+        ->and($data['datasets'][0]['data'])->toBe([80.0, 70.0, 60.0, 50.0, 40.0, 30.0, 30.0])
+        ->and($data['total'])->toBe('360.00');
+});
+
+it('shows an empty distribution when sources exist but have no allocation', function (): void {
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $expense = Expense::factory()->forExercise($exercise)->create();
+    ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '10.00']);
+    $this->actingAs($viewer);
+    Filament::setTenant($company->tenantCompany);
+    app(ExerciseContext::class)->select($company, $exercise->id);
+
+    $component = Livewire::test(AllocationComparisonScatterChart::class);
+    foreach (['type', 'supplier', 'cost_center'] as $grouping) {
+        $component->set('filter', $grouping)->assertHasNoErrors()->assertSee('Nessun Allocato Disponibile');
+        expect((new ReflectionMethod($component->instance(), 'getCachedData'))->invoke($component->instance()))->toBe([]);
+    }
 });
 
 it('enriches live charts and enables comparative charts with the selected Budget', function (): void {
@@ -452,7 +561,7 @@ it('renders every chart and handles no Exercise no Budget and no sources', funct
     expect(chartData(BudgetVariationChart::class))->toBe([])
         ->and(chartData(AllocationComparisonScatterChart::class))->toBe([]);
     Livewire::test(BudgetVariationChart::class)->assertSee('Nessuna Sorgente Disponibile');
-    Livewire::test(AllocationComparisonScatterChart::class)->assertSee('Nessuna Sorgente Disponibile');
+    Livewire::test(AllocationComparisonScatterChart::class)->assertSee('Nessun Allocato Disponibile');
     Livewire::test(EconomicSummary::class)
         ->assertSuccessful()
         ->assertDontSee('EUR · intero Esercizio');

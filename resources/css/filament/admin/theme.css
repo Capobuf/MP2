@@ -1842,6 +1842,57 @@ html.fi {
     cursor: default;
 }
 
+.mp2-economic-chart-filter {
+    position: relative;
+}
+
+.mp2-economic-chart-filter-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 9.25rem;
+    min-height: 36px;
+    padding: 6px 10px 6px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    cursor: pointer;
+}
+
+.mp2-economic-chart-filter-trigger > .fi-icon {
+    width: 16px;
+    height: 16px;
+    color: var(--text-muted);
+}
+
+.mp2-economic-chart-filter-trigger:hover,
+.mp2-economic-chart-filter-trigger[aria-expanded='true'] {
+    border-color: var(--primary);
+}
+
+.mp2-economic-chart-filter-trigger:focus-visible {
+    outline: 2px solid var(--mp2-focus);
+    outline-offset: -1px;
+}
+
+.mp2-economic-chart-filter-trigger:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+.mp2-economic-chart-filter .fi-dropdown-panel {
+    min-width: 100%;
+    width: max-content;
+}
+
+.mp2-economic-chart-filter [aria-checked='true'] {
+    background: var(--primary-soft);
+}
+
 .mp2-operational-variance-chart .fi-wi-chart-canvas-ctn {
     height: 23rem;
 }

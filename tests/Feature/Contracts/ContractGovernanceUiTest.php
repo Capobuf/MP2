@@ -130,11 +130,7 @@ it('registers classification link and private attachment governance surfaces wit
         ->and(ProjectResource::getRelations())->toContain(App\Filament\Resources\Projects\RelationManagers\ProjectContractLinksRelationManager::class);
 
     Livewire::test(ContractClassificationsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
-        ->assertTableActionExists('reclassify')
-        ->mountTableAction('reclassify', record: $contract->classifications()->sole())
-        ->assertSchemaComponentExists('cost_center_id')
-        ->assertFormComponentActionHidden('cost_center_id', 'createOption', formName: 'mountedActionSchema0')
-        ->assertSchemaComponentExists('impact_preview')
+        ->assertTableActionDoesNotExist('reclassify')
         ->assertTableActionDoesNotExist('delete');
 
     Livewire::test(ProjectContractLinksRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
@@ -148,40 +144,6 @@ it('registers classification link and private attachment governance surfaces wit
         ->mountTableAction('preview', record: $attachment)
         ->assertSchemaComponentExists('attachment_'.$attachment->id)
         ->assertTableActionDoesNotExist('delete');
-});
-
-it('creates and selects a Cost Center inline while reclassifying a Contract', function () {
-    ['user' => $user, 'company' => $company, 'defined' => $contract] = governanceUiContext();
-    grantTestPermissions([
-        'company_id' => $company->id,
-        'user' => $user,
-        'permissions' => TestPermissions::MANAGE_MASTER_DATA,
-    ]);
-    $this->actingAs($user);
-    Filament::setTenant(($company)->tenantCompany);
-
-    $component = Livewire::test(ContractClassificationsRelationManager::class, [
-        'ownerRecord' => $contract,
-        'pageClass' => ViewContract::class,
-    ])->mountTableAction('reclassify', record: $contract->classifications()->sole())
-        ->assertSchemaComponentHidden('reason')
-        ->assertFormComponentActionVisible('cost_center_id', 'createOption', formName: 'mountedActionSchema0')
-        ->callFormComponentAction(
-            'cost_center_id',
-            'createOption',
-            ['name' => 'Centro creato in riclassifica'],
-            formName: 'mountedActionSchema0',
-        )
-        ->assertHasNoFormComponentActionErrors();
-
-    $costCenter = CostCenter::query()->where('company_id', $company->id)->where('name', 'Centro creato in riclassifica')->sole();
-
-    $component->assertSchemaStateSet(['cost_center_id' => $costCenter->id]);
-
-    $expense = Expense::factory()->forExercise($contract->classifications()->sole()->exercise)->for($contract)->create();
-    ExpenseLine::factory()->actual()->for($expense)->create(['amount' => '10.00']);
-    $component->assertSchemaComponentVisible('reason');
-    expect(AuditEvent::query()->where('subject_type', CostCenter::class)->where('subject_id', $costCenter->id)->count())->toBe(1);
 });
 
 it('shows terminal Archive and ordered Contract Timeline detail while keeping viewer mode read only', function () {

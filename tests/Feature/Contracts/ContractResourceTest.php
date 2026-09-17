@@ -622,9 +622,9 @@ it('allows descriptive and eligible Supplier edit while keeping contractual date
         ->assertFormFieldExists('title')
         ->assertFormFieldExists('notes')
         ->assertFormFieldExists('supplier_id')
-        ->assertFormFieldDoesNotExist('contractual_start_date')
-        ->assertFormFieldDoesNotExist('next_expiry_date')
-        ->assertFormFieldDoesNotExist('automatic_renewal')
+        ->assertFormFieldExists('contractual_start_date', fn ($field): bool => $field->isReadOnly())
+        ->assertFormFieldExists('conditions')
+        ->assertFormFieldExists('duration_type')
         ->fillForm(['title' => 'Dopo', 'notes' => 'Aggiornato', 'supplier_id' => $replacement->id])
         ->call('save')
         ->assertHasNoFormErrors();

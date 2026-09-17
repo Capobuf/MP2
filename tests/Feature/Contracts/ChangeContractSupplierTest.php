@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Operations\SetExpenseLineActive;
 use App\Actions\Operations\UpdateContract;
 use App\Models\Company;
 use App\Models\Contract;
@@ -89,4 +90,19 @@ it('keeps an archived historical Supplier readable but rejects selecting an arch
         'title' => 'Contratto storico', 'notes' => null, 'supplier_id' => $replacement->id,
     ], (string) Str::uuid()))->toThrow(ValidationException::class)
         ->and($contract->refresh()->supplier_id)->toBe($old->id);
+});
+
+it('does not undo first economic use when an Actual Line is annulled', function () {
+    ['actor' => $actor, 'contract' => $contract, 'replacement' => $replacement, 'exercise' => $exercise] = supplierChangeFixture();
+    $expense = Expense::factory()->forExercise($exercise)->create([
+        'contract_id' => $contract->id, 'origin' => 'manual', 'supplier_id' => $contract->supplier_id,
+    ]);
+    $line = ExpenseLine::factory()->actual()->for($expense)->create(['amount' => '0.00']);
+    app(SetExpenseLineActive::class)->execute($actor, $line, false, (string) Str::uuid());
+
+    expect($contract->hasEconomicUse())->toBeTrue()
+        ->and(fn () => app(UpdateContract::class)->execute($actor, $contract, [
+            'title' => $contract->title, 'supplier_id' => $replacement->id,
+        ], (string) Str::uuid()))->toThrow(ValidationException::class)
+        ->and($contract->fresh()->supplier_id)->toBe($contract->supplier_id);
 });

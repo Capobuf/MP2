@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Contracts\Schemas;
 
 use App\Actions\MasterData\CreateCostCenter;
 use App\Actions\MasterData\CreateSupplier;
+use App\Actions\Operations\UpdateContract;
 use App\Domain\Contracts\ContractAttributionMode;
 use App\Domain\Contracts\ContractCycle;
 use App\Domain\Contracts\ContractCycleType;
@@ -12,6 +13,7 @@ use App\Filament\Forms\AttachmentUpload;
 use App\Filament\Forms\DateInput;
 use App\Filament\Forms\DecimalInput;
 use App\Models\Company;
+use App\Models\Contract;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Supplier;
@@ -43,15 +45,19 @@ class ContractForm
 
     public const NO_COST_CENTER = '__unclassified__';
 
-    public static function configure(Schema $schema): Schema
+    public static function configure(Schema $schema, ?Contract $contract = null): Schema
     {
+        $editing = $contract !== null;
+
         return $schema->components([
             Section::make('Dati Principali')
                 ->description('Inserisci le informazioni che identificano il Contratto. Le date di fattura e pagamento appartengono alle Spese.')
                 ->schema([
                     TextInput::make('title')->label('Titolo')->required()->maxLength(255),
                     Select::make('supplier_id')->label('Fornitore')
-                        ->options(fn (): array => self::supplierOptions())
+                        ->options(fn (): array => self::supplierOptions($contract))
+                        ->disabled($contract?->hasEconomicUse() ?? false)->dehydrated()
+                        ->helperText($editing ? 'Il Fornitore può cambiare solo prima del primo utilizzo economico; successivamente occorre un nuovo Contratto.' : null)
                         ->searchable()
                         ->createOptionForm([
                             TextInput::make('legal_name')->label('Ragione Sociale')->required()->maxLength(255),
@@ -71,28 +77,26 @@ class ContractForm
                             ->visible(fn (): bool => self::canCreateSupplier()))
                         ->required(),
                     self::costCenterSelect('default_cost_center_id')
-                        ->label('Centro di Costo')
+                        ->label('Centro di Costo')->visible(! $editing)
                         ->placeholder('Non classificato')
                         ->helperText('Predefinito per tutti gli Esercizi Aperti. Le eventuali eccezioni si impostano in Avanzate.'),
                     Textarea::make('notes')->label('Note')->rows(3)->columnSpanFull(),
-                    AttachmentUpload::make('attachments')
-                        ->label('Allegati')
-                        ->multiple()
-                        ->storeFiles(false)
-                        ->helperText('Opzionali. Potrai aggiungerne altri dalla scheda del Contratto.')
-                        ->columnSpanFull(),
-                ])->columns(['default' => 1, 'md' => 2, 'xl' => 3])->columnSpanFull(),
+                ])->columns(['default' => 1, 'md' => 2, 'xl' => $editing ? 2 : 3])->columnSpanFull(),
             Section::make('Condizioni Economiche')
                 ->description('Ogni riga definisce un importo ricorrente; non sono calcolati prorata. “Valida fino al” termina solo quella condizione economica: non determina la scadenza del Contratto.')
                 ->schema([
                     Repeater::make('conditions')
                         ->hiddenLabel()
                         ->schema([
+                            Hidden::make('id')->visible($editing),
                             DecimalInput::make('amount')->label('Importo per Ciclo')->minValue(0)->prefix('€')->required(),
                             Select::make('cycle')->label('Frequenza')->options(ContractCycleType::options())->native(false)->required(),
                             Select::make('attribution_mode')->label('Attribuzione')->options(ContractAttributionMode::options())->native(false)->required(),
-                            DateInput::make('valid_from')->label('Valida dal')->required()
-                                ->afterStateUpdated(function (Get $get, Set $set, mixed $state): void {
+                            DateInput::make('valid_from')->label('Valida dal')->required()->readOnly($editing)
+                                ->afterStateUpdated(function (Get $get, Set $set, mixed $state) use ($editing): void {
+                                    if ($editing) {
+                                        return;
+                                    }
                                     self::syncSuggestedContractualStart(
                                         $get,
                                         $set,
@@ -102,30 +106,35 @@ class ContractForm
                                     );
                                     self::syncSuggestedContractualTerms($get, $set, $get('../../conditions'), '../../');
                                 }),
-                            DateInput::make('valid_to')->label('Valida fino al')
+                            DateInput::make('valid_to')->label('Valida fino al')->readOnly($editing)
                                 ->placeholder('Fino a variazione')
-                                ->afterStateUpdated(fn (Get $get, Set $set) => self::syncSuggestedContractualTerms($get, $set, $get('../../conditions'), '../../')),
+                                ->afterStateUpdated(fn (Get $get, Set $set) => $editing ? null : self::syncSuggestedContractualTerms($get, $set, $get('../../conditions'), '../../')),
                         ])
                         ->table([
                             TableColumn::make('Importo per ciclo')->alignment(Alignment::Center)->markAsRequired(),
-                            TableColumn::make('Frequenza')->alignment(Alignment::Center)->markAsRequired(),
-                            TableColumn::make('Attribuzione')->alignment(Alignment::Center)->markAsRequired(),
+                            TableColumn::make('Frequenza')->width('20%')->alignment(Alignment::Center)->markAsRequired(),
+                            TableColumn::make('Attribuzione')->width('20%')->alignment(Alignment::Center)->markAsRequired(),
                             TableColumn::make('Valida dal')->alignment(Alignment::Center)->markAsRequired(),
                             TableColumn::make('Valida fino al')->alignment(Alignment::Center),
                         ])
-                        ->afterStateUpdated(function (Get $get, Set $set, mixed $state): void {
+                        ->afterStateUpdated(function (Get $get, Set $set, mixed $state) use ($editing): void {
+                            if ($editing) {
+                                return;
+                            }
                             self::syncSuggestedContractualStart($get, $set, $state);
                             self::syncSuggestedContractualTerms($get, $set, $state);
                         })
                         ->defaultItems(1)
-                        ->minItems(1)
+                        ->minItems($editing ? 0 : 1)
+                        ->addable(! $editing)->deletable(! $editing)
+                        ->helperText($editing ? 'Le date delle condizioni esistenti non sono correggibili. Per un nuovo accordo, modifica importo, frequenza o attribuzione: al salvataggio potrai indicare la decorrenza richiesta. Nuove condizioni e annullamenti restano nella scheda del Contratto.' : null)
                         ->addActionLabel('Aggiungi condizione')
                         ->reorderable(false)
                         ->extraAttributes(['class' => 'mp2-economic-conditions'])
                         ->columnSpanFull(),
                 ])->columnSpanFull(),
             Section::make('Termini Contrattuali')
-                ->description('Il sistema propone scadenza e rinnovo dall’ultima condizione economica con termine. Verifica i valori: restano dati contrattuali distinti.')
+                ->description($editing ? 'Le modifiche saranno registrate nello storico del rinnovo, dopo la conferma dell’impatto.' : 'Il sistema propone scadenza e rinnovo dall’ultima condizione economica con termine. Verifica i valori: restano dati contrattuali distinti.')
                 ->schema([
                     Hidden::make('suggested_contractual_start_date')->dehydrated(false),
                     Hidden::make('suggested_next_expiry_date')->dehydrated(false),
@@ -135,14 +144,14 @@ class ContractForm
                     Grid::make(['default' => 1, 'md' => 2])
                         ->schema([
                             Group::make([
-                                DateInput::make('contractual_start_date')->label('Data di inizio')->required()
-                                    ->helperText('Compilata con il “Valida dal” più antico. Anticipala solo se il Contratto è iniziato prima della prima condizione economica.')
-                                    ->afterStateUpdated(fn (Set $set, mixed $state): mixed => filled($state) ? $set('renewal_effective_from', DateInput::toIso($state)) : null),
-                                DateInput::make('next_expiry_date')->label('Prossima scadenza contrattuale')
+                                DateInput::make('contractual_start_date')->label('Data di inizio')->required()->readOnly($editing)
+                                    ->helperText($editing ? 'La data di inizio originaria non è correggibile. Gli eventi futuri si gestiscono nel Ciclo di Vita, senza riscrivere l’attivazione già efficace.' : 'Compilata con il “Valida dal” più antico. Anticipala solo se il Contratto è iniziato prima della prima condizione economica.')
+                                    ->afterStateUpdated(fn (Set $set, mixed $state): mixed => ! $editing && filled($state) ? $set('renewal_effective_from', DateInput::toIso($state)) : null),
+                                DateInput::make('next_expiry_date')->dehydratedWhenHidden()->label('Prossima scadenza contrattuale')
                                     ->required(fn (Get $get): bool => $get('duration_type') === 'fixed')
                                     ->visible(fn (Get $get): bool => $get('duration_type') === 'fixed')
                                     ->helperText('Data in cui il periodo contrattuale corrente termina o si rinnova; non è la fine di validità di un importo.'),
-                                TextInput::make('renewal_duration_months')->label('Rinnovo Ogni')->numeric()->minValue(1)
+                                TextInput::make('renewal_duration_months')->dehydratedWhenHidden()->label('Rinnovo Ogni')->numeric()->minValue(1)
                                     ->suffix('mesi')
                                     ->required(fn (Get $get): bool => $get('duration_type') === 'fixed' && (bool) $get('automatic_renewal'))
                                     ->visible(fn (Get $get): bool => $get('duration_type') === 'fixed' && (bool) $get('automatic_renewal')),
@@ -164,14 +173,16 @@ class ContractForm
                                     ->required()
                                     ->live()
                                     ->dehydrated(false)
-                                    ->afterStateUpdated(function (Get $get, Set $set, mixed $state): void {
+                                    ->afterStateUpdated(function (Get $get, Set $set, mixed $state) use ($editing): void {
                                         $set('duration_type_manually_selected', true);
 
                                         if ($state === 'fixed') {
-                                            if ($get('notice_days') === null || $get('notice_days') === '') {
+                                            if (! $editing && ($get('notice_days') === null || $get('notice_days') === '')) {
                                                 $set('notice_days', 30);
                                             }
-                                            self::syncSuggestedContractualTerms($get, $set, $get('conditions'));
+                                            if (! $editing) {
+                                                self::syncSuggestedContractualTerms($get, $set, $get('conditions'));
+                                            }
 
                                             return;
                                         }
@@ -185,9 +196,11 @@ class ContractForm
                                     ->helperText(fn (Get $get): string => (bool) $get('automatic_renewal')
                                         ? 'Il Contratto resta Attivo e la prossima scadenza viene avanzata.'
                                         : 'Il Contratto termina alla scadenza indicata e risulta Cessato dal giorno successivo.')
-                                    ->afterStateUpdated(function (Get $get, Set $set, mixed $state): void {
+                                    ->afterStateUpdated(function (Get $get, Set $set, mixed $state) use ($editing): void {
                                         if ($state) {
-                                            self::syncSuggestedContractualTerms($get, $set, $get('conditions'));
+                                            if (! $editing) {
+                                                self::syncSuggestedContractualTerms($get, $set, $get('conditions'));
+                                            }
 
                                             return;
                                         }
@@ -196,7 +209,7 @@ class ContractForm
                                     })
                                     ->dehydratedWhenHidden()
                                     ->visible(fn (Get $get): bool => $get('duration_type') === 'fixed'),
-                                TextInput::make('notice_days')->label('Preavviso di Disdetta')->numeric()->minValue(0)
+                                TextInput::make('notice_days')->dehydratedWhenHidden()->label('Preavviso di Disdetta')->numeric()->minValue(0)
                                     ->suffix('giorni')
                                     ->helperText('Opzionale, in giorni di calendario. Non è una scadenza di pagamento.')
                                     ->visible(fn (Get $get): bool => $get('duration_type') === 'fixed'),
@@ -205,16 +218,16 @@ class ContractForm
                         ->columnSpanFull(),
                 ])->columnSpanFull(),
             Section::make('Avanzate')
-                ->description('Personalizza il Centro di Costo solo negli Esercizi che fanno eccezione al valore predefinito.')
+                ->description($editing ? 'La classificazione vale per tutto l’Esercizio, compresi gli Effettivi. Gli Esercizi Chiusi non sono modificabili.' : 'Personalizza il Centro di Costo solo negli Esercizi che fanno eccezione al valore predefinito.')
                 ->schema([
                     Repeater::make('classifications')
                         ->label('Centri di Costo per Esercizio')
-                        ->helperText('Ogni Esercizio usa il Centro di Costo predefinito, salvo una scelta diversa qui.')
+                        ->helperText($editing ? 'Sono mostrati i valori esistenti per ogni Esercizio Aperto.' : 'Ogni Esercizio usa il Centro di Costo predefinito, salvo una scelta diversa qui.')
                         ->schema([
                             Select::make('exercise_id')->label('Esercizio')->options(fn (): array => self::company() instanceof Company
                                 ? Exercise::query()->whereBelongsTo(self::company(), 'company')->open()->orderBy('year')->pluck('year', 'id')->all()
                                 : [])->required()->disabled()->dehydrated()->selectablePlaceholder(false),
-                            self::costCenterSelect('cost_center_selection', includeAnnualChoices: true)
+                            self::costCenterSelect('cost_center_selection', includeAnnualChoices: true, contract: $contract)
                                 ->label('Centro di Costo')
                                 ->required()
                                 ->selectablePlaceholder(false),
@@ -239,17 +252,35 @@ class ContractForm
                         ->deletable(false)
                         ->reorderable(false)
                         ->columnSpanFull(),
-                ])->collapsible()->collapsed()->columnSpanFull(),
+                ])->collapsible()->collapsed(! $editing)->columnSpanFull(),
+            Section::make('Allegati')->schema([
+                ...($contract?->attachments()->attached()->orderBy('id')->get()
+                    ->map(fn ($attachment): AttachmentUpload => AttachmentUpload::forStoredAttachment($attachment))->all() ?? []),
+                AttachmentUpload::make('attachments')->label($editing ? 'Aggiungi Allegati' : 'Allegati')
+                    ->multiple()->storeFiles(false)->visible(! ($contract?->isArchived() ?? false))->columnSpanFull(),
+            ])->columnSpanFull(),
+            Textarea::make('reason')->label('Motivo della modifica')
+                ->helperText('Per titolo e note è obbligatorio dopo un Budget approvato.')
+                ->visible($editing && UpdateContract::reasonRequired($contract))
+                ->columnSpanFull(),
         ]);
     }
 
-    private static function costCenterSelect(string $name, bool $includeAnnualChoices = false): Select
+    private static function costCenterSelect(string $name, bool $includeAnnualChoices = false, ?Contract $contract = null): Select
     {
         return Select::make($name)
-            ->options(fn (): array => ($includeAnnualChoices ? [
-                self::USE_DEFAULT_COST_CENTER => 'Usa il predefinito',
-                self::NO_COST_CENTER => 'Non classificato',
-            ] : []) + self::costCenterOptions())
+            ->options(function (Get $get) use ($includeAnnualChoices, $contract): array {
+                $options = ($includeAnnualChoices ? [
+                    ...($contract === null ? [self::USE_DEFAULT_COST_CENTER => 'Usa il predefinito'] : []),
+                    self::NO_COST_CENTER => 'Non classificato',
+                ] : []) + self::costCenterOptions();
+                $currentId = $contract?->classifications()->where('exercise_id', $get('exercise_id'))->value('cost_center_id');
+                if ($currentId !== null && ! array_key_exists($currentId, $options)) {
+                    $options += array_intersect_key(CostCenterHierarchy::forCompany($contract->company_id)->options(activeOnly: false), [$currentId => true]);
+                }
+
+                return $options;
+            })
             ->searchable()
             ->createOptionForm([
                 TextInput::make('name')->label('Nome')->required()->maxLength(255),
@@ -418,12 +449,12 @@ class ContractForm
     }
 
     /** @return array<int, string> */
-    private static function supplierOptions(): array
+    private static function supplierOptions(?Contract $contract = null): array
     {
         $company = self::company();
 
         return $company instanceof Company
-            ? Supplier::query()->whereBelongsTo($company, 'company')->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all()
+            ? Supplier::query()->whereBelongsTo($company, 'company')->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all() + ($contract === null ? [] : [$contract->supplier_id => $contract->supplier->legal_name])
             : [];
     }
 
