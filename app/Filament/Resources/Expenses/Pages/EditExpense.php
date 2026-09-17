@@ -18,6 +18,7 @@ use App\Domain\Projects\ProjectOverspend;
 use App\Domain\Projects\ProjectOverspendResult;
 use App\Domain\Projects\ProjectState;
 use App\Filament\Forms\AttachmentUpload;
+use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Resources\Expenses\Schemas\ExpenseForm;
 use App\Filament\Support\ProjectOverspendNotifier;
@@ -242,7 +243,7 @@ class EditExpense extends EditRecord
                 'line_id' => null,
                 'type' => $expense->contract_id === null ? null : ExpenseLineType::Actual->value,
                 'amount' => null,
-                'quantity' => null,
+                'quantity' => '1',
                 'unit_amount' => null,
                 'unit_of_measure' => null,
                 'note' => null,
@@ -431,9 +432,9 @@ class EditExpense extends EditRecord
     private function lineChanged(ExpenseLine $line, array $data): bool
     {
         return ($data['type'] ?? null) !== $line->lineType()->value
-            || $this->decimalChanged($data['amount'] ?? null, (string) $line->amount, 2)
+            || $this->decimalChanged(MoneyInput::normalizeInput($data['amount'] ?? null), (string) $line->amount, 2)
             || $this->decimalChanged($data['quantity'] ?? null, $line->getRawOriginal('quantity'), 6)
-            || $this->decimalChanged($data['unit_amount'] ?? null, $line->getRawOriginal('unit_amount'), 6)
+            || $this->decimalChanged(MoneyInput::preserveStoredPrecision($data['unit_amount'] ?? null, $line->getRawOriginal('unit_amount')), $line->getRawOriginal('unit_amount'), 6)
             || $this->nullableTrim($data['unit_of_measure'] ?? null) !== $line->unit_of_measure
             || $this->nullableTrim($data['note'] ?? null) !== $line->note;
     }
@@ -472,7 +473,7 @@ class EditExpense extends EditRecord
     private function lineVarianceContribution(array $data): string
     {
         $type = ExpenseLineType::tryFrom((string) ($data['type'] ?? ''));
-        $amount = Decimal::normalizeInput($data['amount'] ?? null);
+        $amount = MoneyInput::normalizeInput($data['amount'] ?? null);
         if (! $type instanceof ExpenseLineType
             || ! is_string($amount)
             || preg_match('/^-?\d+(?:\.\d+)?$/', $amount) !== 1) {

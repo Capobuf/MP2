@@ -65,7 +65,7 @@ class ExpenseLinesRelationManager extends RelationManager
                 TextColumn::make('type')->label('Tipo')->formatStateUsing(fn ($state): string => $state instanceof ExpenseLineType ? $state->label() : ExpenseLineType::from($state)->label())
                     ->badge()->color(fn ($state): string => ($state instanceof ExpenseLineType ? $state : ExpenseLineType::from($state)) === ExpenseLineType::Estimate ? 'primary' : 'success'),
                 TextColumn::make('note')->label('Nota')->placeholder('—')->wrap(),
-                TextColumn::make('unit_amount')->label('Importo Unitario')->placeholder('—'),
+                TextColumn::make('unit_amount')->label('Importo Unitario')->money('EUR', locale: 'it')->placeholder('—'),
                 TextColumn::make('quantity')->label('Quantità')->placeholder('—'),
                 TextColumn::make('amount')->label('Totale')->money('EUR', locale: 'it')->alignment(Alignment::End),
                 TextColumn::make('state')->label('Stato')->state(fn (ExpenseLine $record): string => $record->isAnnulled() ? 'Annullata' : 'Attiva')

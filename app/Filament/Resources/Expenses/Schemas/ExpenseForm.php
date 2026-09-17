@@ -17,10 +17,13 @@ use App\Domain\Projects\ProjectOverspendResult;
 use App\Domain\Projects\ProjectState;
 use App\Filament\Forms\AttachmentUpload;
 use App\Filament\Forms\DecimalInput;
+use App\Filament\Forms\MoneyInput;
 use App\Models\Company;
 use App\Models\Contract;
 use App\Models\CostCenter;
 use App\Models\Exercise;
+use App\Models\Expense;
+use App\Models\ExpenseLine;
 use App\Models\Project;
 use App\Models\Supplier;
 use App\Models\TenantCompany;
@@ -39,6 +42,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 class ExpenseForm
@@ -205,22 +209,24 @@ class ExpenseForm
             TextInput::make('note')->label('Nota')
                 ->columnSpan(['default' => 12, 'md' => 9, 'xl' => 4]),
             Hidden::make('suggested_amount')->dehydrated(false),
-            DecimalInput::make('unit_amount', 14, 6)->label('Importo Unitario')->suffix('EUR')->live(onBlur: true)
-                ->afterStateUpdated(function (Get $get, Set $set): void {
-                    self::syncSuggestedAmount($get, $set);
+            MoneyInput::make('unit_amount', 14)
+                ->dehydrateStateUsing(fn (Get $get, ?Model $record): mixed => self::unitAmount($get, $record))
+                ->label('Importo Unitario')->suffix('EUR')->live(onBlur: true)
+                ->afterStateUpdated(function (Get $get, Set $set, ?Model $record): void {
+                    self::syncSuggestedAmount($get, $set, $record);
                 })
                 ->columnSpan(['default' => 6, 'md' => 4, 'xl' => 2]),
-            DecimalInput::make('quantity', 14, 6)->label('Quantità')->live(onBlur: true)
-                ->afterStateUpdated(function (Get $get, Set $set): void {
-                    self::syncSuggestedAmount($get, $set);
+            DecimalInput::make('quantity', 14, 6)->label('Quantità')->default('1')->live(onBlur: true)
+                ->afterStateUpdated(function (Get $get, Set $set, ?Model $record): void {
+                    self::syncSuggestedAmount($get, $set, $record);
                 })
                 ->columnSpan(['default' => 6, 'md' => 3, 'xl' => 1]),
-            DecimalInput::make('amount')->label('Totale')->helperText('Importo autoritativo in EUR, netto IVA.')
+            MoneyInput::make('amount')->label('Totale')->helperText('Importo autoritativo in EUR, netto IVA.')
                 ->suffix('EUR')->required()->live(onBlur: true)
                 ->columnSpan(['default' => 12, 'md' => 5, 'xl' => 3]),
             Checkbox::make('amount_warning_acknowledged')
-                ->label(fn (Get $get): string => self::amountMismatchMessage($get).' Confermo il Totale indicato.')
-                ->visible(fn (Get $get): bool => self::hasAmountMismatch($get))
+                ->label(fn (Get $get, ?Model $record): string => self::amountMismatchMessage($get, $record).' Confermo il Totale indicato.')
+                ->visible(fn (Get $get, ?Model $record): bool => self::hasAmountMismatch($get, $record))
                 ->columnSpanFull(),
         ];
 
@@ -357,15 +363,17 @@ class ExpenseForm
                 ->default($contractActualOnly ? ExpenseLineType::Actual->value : null)
                 ->required()->native(false)->live(),
             Hidden::make('suggested_amount')->dehydrated(false),
-            DecimalInput::make('unit_amount', 14, 6)->label('Importo Unitario')->suffix('EUR')->live(onBlur: true)
-                ->afterStateUpdated(function (Get $get, Set $set): void {
-                    self::syncSuggestedAmount($get, $set);
+            MoneyInput::make('unit_amount', 14)
+                ->dehydrateStateUsing(fn (Get $get, ?Model $record): mixed => self::unitAmount($get, $record))
+                ->label('Importo Unitario')->suffix('EUR')->live(onBlur: true)
+                ->afterStateUpdated(function (Get $get, Set $set, ?Model $record): void {
+                    self::syncSuggestedAmount($get, $set, $record);
                 }),
-            DecimalInput::make('quantity', 14, 6)->label('Quantità')->live(onBlur: true)
-                ->afterStateUpdated(function (Get $get, Set $set): void {
-                    self::syncSuggestedAmount($get, $set);
+            DecimalInput::make('quantity', 14, 6)->label('Quantità')->default('1')->live(onBlur: true)
+                ->afterStateUpdated(function (Get $get, Set $set, ?Model $record): void {
+                    self::syncSuggestedAmount($get, $set, $record);
                 }),
-            DecimalInput::make('amount')->label('Totale')->helperText('Importo autoritativo in EUR, netto IVA.')
+            MoneyInput::make('amount')->label('Totale')->helperText('Importo autoritativo in EUR, netto IVA.')
                 ->suffix('EUR')->required()->live(onBlur: true),
         ];
     }
@@ -384,15 +392,24 @@ class ExpenseForm
                 ->dehydrated($requiresBudgetReason),
             Checkbox::make('amount_warning_acknowledged')
                 ->label('Salva Comunque il Totale Indicato')
-                ->helperText(fn (Get $get): string => self::amountMismatchMessage($get))
-                ->visible(fn (Get $get): bool => self::hasAmountMismatch($get)),
+                ->helperText(fn (Get $get, ?Model $record): string => self::amountMismatchMessage($get, $record))
+                ->visible(fn (Get $get, ?Model $record): bool => self::hasAmountMismatch($get, $record)),
         ];
     }
 
-    private static function syncSuggestedAmount(Get $get, Set $set): void
+    private static function unitAmount(Get $get, ?Model $record): mixed
     {
-        $quantity = self::decimalString($get('quantity'));
-        $unitAmount = self::decimalString($get('unit_amount'));
+        $line = $record instanceof ExpenseLine
+            ? $record
+            : ($record instanceof Expense ? $record->lines->firstWhere('id', $get('line_id')) : null);
+
+        return MoneyInput::preserveStoredPrecision($get('unit_amount'), $line?->getRawOriginal('unit_amount'));
+    }
+
+    private static function syncSuggestedAmount(Get $get, Set $set, ?Model $record): void
+    {
+        $quantity = self::decimalString($get('quantity'), money: false);
+        $unitAmount = self::decimalString(self::unitAmount($get, $record), money: false);
         $previousSuggestion = self::decimalString($get('suggested_amount'));
         $currentAmount = $get('amount');
         $suggested = $quantity === null || $unitAmount === null
@@ -425,23 +442,25 @@ class ExpenseForm
             && Decimal::compare($amount, $suggestion, 2) === 0;
     }
 
-    private static function decimalString(mixed $value): ?string
+    private static function decimalString(mixed $value, bool $money = true): ?string
     {
         if (! is_string($value) && ! is_int($value) && ! is_float($value)) {
             return null;
         }
 
-        $normalized = Decimal::normalizeInput((string) $value);
+        $normalized = $money
+            ? MoneyInput::normalizeInput((string) $value)
+            : Decimal::normalizeInput((string) $value);
 
         return is_string($normalized) && preg_match('/^-?\d+(?:\.\d+)?$/', $normalized) === 1
             ? $normalized
             : null;
     }
 
-    private static function hasAmountMismatch(Get $get): bool
+    private static function hasAmountMismatch(Get $get, ?Model $record): bool
     {
-        $quantity = self::decimalString($get('quantity'));
-        $unitAmount = self::decimalString($get('unit_amount'));
+        $quantity = self::decimalString($get('quantity'), money: false);
+        $unitAmount = self::decimalString(self::unitAmount($get, $record), money: false);
         $amount = self::decimalString($get('amount'));
 
         return $quantity !== null
@@ -450,10 +469,10 @@ class ExpenseForm
             && ManualExpenseLine::hasAmountMismatch($quantity, $unitAmount, $amount);
     }
 
-    private static function amountMismatchMessage(Get $get): string
+    private static function amountMismatchMessage(Get $get, ?Model $record): string
     {
-        $quantity = self::decimalString($get('quantity'));
-        $unitAmount = self::decimalString($get('unit_amount'));
+        $quantity = self::decimalString($get('quantity'), money: false);
+        $unitAmount = self::decimalString(self::unitAmount($get, $record), money: false);
         $amount = self::decimalString($get('amount'));
         if ($quantity === null || $unitAmount === null || $amount === null) {
             return '';

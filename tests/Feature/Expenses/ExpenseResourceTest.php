@@ -124,7 +124,7 @@ it('duplicates a line while creating an Expense', function () {
         ->and($lines[1])->toMatchArray([
             'type' => 'estimate',
             'note' => 'Canone mensile',
-            'unit_amount' => '100',
+            'unit_amount' => '100.00',
             'quantity' => '2',
             'amount' => '200.00',
         ]);
@@ -304,6 +304,53 @@ it('shows the creation reason only after a Budget and only for a non-zero Expens
         ->assertHasNoFormErrors();
 });
 
+it('accepts common monetary formats when creating an expense', function (string $amount): void {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
+    $this->actingAs($manager);
+    Filament::setTenant(($company)->tenantCompany);
+    app(ExerciseContext::class)->select($company, $exercise->id);
+
+    $component = Livewire::test(CreateExpense::class);
+    $lineKey = array_key_first((array) $component->get('data.lines'));
+
+    $component
+        ->assertSet("data.lines.{$lineKey}.quantity", '1')
+        ->set('data.description', 'Spesa')
+        ->set("data.lines.{$lineKey}.type", 'estimate')
+        ->set("data.lines.{$lineKey}.amount", $amount)
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $line = ExpenseLine::query()->sole();
+    expect($line->amount)->toBe('2074.00')
+        ->and($line->quantity)->toBe('1.000000');
+})->with(['2.074', '2074', '2074,00', '2074.00', '2.074,00']);
+
+it('rejects malformed monetary input and more than two decimal places in the form', function (string $amount, string $field): void {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
+    $this->actingAs($manager);
+    Filament::setTenant(($company)->tenantCompany);
+    app(ExerciseContext::class)->select($company, $exercise->id);
+
+    $component = Livewire::test(CreateExpense::class);
+    $lineKey = array_key_first((array) $component->get('data.lines'));
+
+    $component
+        ->set('data.description', 'Spesa')
+        ->set("data.lines.{$lineKey}.type", 'estimate')
+        ->set("data.lines.{$lineKey}.{$field}", $amount)
+        ->call('create')
+        ->assertHasFormErrors(["lines.{$lineKey}.{$field}"]);
+
+    expect(Expense::query()->exists())->toBeFalse();
+})->with(['2.07,40', '2.074.00', '2074,001', '2074.001'])->with(['amount', 'unit_amount']);
+
 it('accepts an amount entered with the Italian decimal separator', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
@@ -332,6 +379,67 @@ it('accepts an amount entered with the Italian decimal separator', function () {
         ->and($line->unit_amount)->toBe('40.200000');
 });
 
+it('formats unit amounts to two decimals and suggests the total with the default quantity', function (string $amount): void {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
+    $this->actingAs($manager);
+    Filament::setTenant(($company)->tenantCompany);
+    app(ExerciseContext::class)->select($company, $exercise->id);
+
+    $component = Livewire::test(CreateExpense::class);
+    $lineKey = array_key_first((array) $component->get('data.lines'));
+
+    $component
+        ->set('data.description', 'Spesa')
+        ->set("data.lines.{$lineKey}.type", 'estimate')
+        ->set("data.lines.{$lineKey}.unit_amount", $amount)
+        ->assertSet("data.lines.{$lineKey}.unit_amount", '2074.00')
+        ->assertSet("data.lines.{$lineKey}.amount", '2074.00')
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $line = ExpenseLine::query()->sole();
+    expect($line->amount)->toBe('2074.00')
+        ->and($line->unit_amount)->toBe('2074.000000');
+})->with(['2.074', '2074,00', '2074.00', '2.074,00']);
+
+it('preserves stored unit precision when saving its rounded display and calculating a new quantity', function (): void {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => now($company->timezone)->year]);
+    $expense = Expense::factory()->forExercise($exercise)->create();
+    $line = ExpenseLine::factory()->for($expense)->create([
+        'amount' => '207.41',
+        'quantity' => '100.000000',
+        'unit_amount' => '2.074123',
+    ]);
+    $this->actingAs($manager);
+    Filament::setTenant(($company)->tenantCompany);
+
+    $component = Livewire::test(EditExpense::class, ['record' => $expense->getRouteKey()]);
+    $lineKey = array_key_first((array) $component->get('data.lines'));
+
+    $component
+        ->assertSet("data.lines.{$lineKey}.unit_amount", '2.07')
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($line->refresh()->unit_amount)->toBe('2.074123');
+
+    $component
+        ->set("data.lines.{$lineKey}.quantity", '200')
+        ->assertSet("data.lines.{$lineKey}.amount", '414.82')
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($line->refresh()->unit_amount)->toBe('2.074123')
+        ->and($line->quantity)->toBe('200.000000')
+        ->and($line->amount)->toBe('414.82');
+});
+
 it('suggests the authoritative Total from unit amount and quantity without exposing a unit of measure', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
@@ -346,13 +454,15 @@ it('suggests the authoritative Total from unit amount and quantity without expos
 
     $component
         ->assertFormFieldDoesNotExist("lines.{$lineKey}.unit_of_measure")
+        ->assertSet("data.lines.{$lineKey}.quantity", '1')
         ->set("data.lines.{$lineKey}.unit_amount", '1200')
+        ->assertSet("data.lines.{$lineKey}.amount", '1200.00')
         ->set("data.lines.{$lineKey}.quantity", '2')
         ->assertSet("data.lines.{$lineKey}.amount", '2400.00')
         ->assertSet("data.lines.{$lineKey}.suggested_amount", '2400.00')
-        ->set("data.lines.{$lineKey}.amount", '2500')
+        ->set("data.lines.{$lineKey}.amount", '2500.00')
         ->set("data.lines.{$lineKey}.quantity", '3')
-        ->assertSet("data.lines.{$lineKey}.amount", '2500')
+        ->assertSet("data.lines.{$lineKey}.amount", '2500.00')
         ->assertSet("data.lines.{$lineKey}.suggested_amount", '3600.00');
 });
 
@@ -371,13 +481,13 @@ it('tolerates incomplete decimal input while editing a suggested Total', functio
     $component
         ->set("data.lines.{$lineKey}.unit_amount", '1200')
         ->set("data.lines.{$lineKey}.quantity", '2')
-        ->set("data.lines.{$lineKey}.amount", '2500')
+        ->set("data.lines.{$lineKey}.amount", '2500.00')
         ->set("data.lines.{$lineKey}.unit_amount", '1200,')
-        ->assertSet("data.lines.{$lineKey}.amount", '2500')
+        ->assertSet("data.lines.{$lineKey}.amount", '2500.00')
         ->assertSet("data.lines.{$lineKey}.suggested_amount", null);
 });
 
-it('shows persisted descriptive decimals without insignificant trailing zeroes', function () {
+it('shows unit amounts with two decimals and quantities without trailing zeroes', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
     grantExpenseResource($manager, $company);
@@ -396,7 +506,7 @@ it('shows persisted descriptive decimals without insignificant trailing zeroes',
 
     $component
         ->assertSet("data.lines.{$lineKey}.quantity", '1')
-        ->assertSet("data.lines.{$lineKey}.unit_amount", '3000');
+        ->assertSet("data.lines.{$lineKey}.unit_amount", '3000.00');
 });
 
 it('allows only Actual lines when creating an Expense for a Contract', function () {

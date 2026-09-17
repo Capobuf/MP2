@@ -74,7 +74,7 @@ class ExpenseInfolist
                             fn (mixed $state): string => ($state instanceof ExpenseLineType ? $state : ExpenseLineType::from((string) $state))->label(),
                         )->badge()->color(fn (mixed $state): string => ($state instanceof ExpenseLineType ? $state : ExpenseLineType::from((string) $state)) === ExpenseLineType::Estimate ? 'primary' : 'success'),
                         TextEntry::make('unit_amount')->label('Importo Unitario')
-                            ->state(fn (ExpenseLine $record): ?string => self::formatUnitAmount($record))
+                            ->money('EUR', locale: 'it')
                             ->placeholder('—'),
                         TextEntry::make('quantity')->label('Quantità')->placeholder('—'),
                         TextEntry::make('amount')->label('Totale')->money('EUR', locale: 'it')->weight('semibold'),
@@ -134,12 +134,5 @@ class ExpenseInfolist
             ->latest('id')
             ->limit(5)
             ->get();
-    }
-
-    private static function formatUnitAmount(ExpenseLine $line): ?string
-    {
-        $amount = $line->getRawOriginal('unit_amount');
-
-        return is_string($amount) ? '€ '.str_replace('.', ',', $amount) : null;
     }
 }

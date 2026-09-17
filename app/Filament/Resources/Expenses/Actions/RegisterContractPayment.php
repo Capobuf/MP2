@@ -4,7 +4,7 @@ namespace App\Filament\Resources\Expenses\Actions;
 
 use App\Actions\Operations\CreateExpense;
 use App\Domain\Expenses\Decimal;
-use App\Filament\Forms\DecimalInput;
+use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Resources\Expenses\Schemas\ExpenseForm;
 use App\Models\Company;
@@ -22,21 +22,20 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 final class RegisterContractPayment
 {
-    public static function make(?Contract $contract = null): Action
+    public static function make(Contract $contract): Action
     {
         return Action::make('registerContractPayment')
             ->label('Registra Pagamento')
             ->icon('heroicon-o-banknotes')
             ->visible(fn (): bool => self::company() !== null
                 && auth()->user()?->can('create', [Expense::class, self::company()]) === true
-                && ($contract === null || ! $contract->isArchived()))
+                && ! $contract->isArchived())
             ->disabled(fn (): bool => self::disabledReason() !== null)
             ->tooltip(fn (): ?string => self::disabledReason())
             ->modalHeading('Registra Pagamento')
@@ -46,19 +45,14 @@ final class RegisterContractPayment
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
                 Hidden::make('container')->default('contract')->dehydrated(false),
                 Select::make('contract_id')->label('Contratto')
-                    ->options(fn (): array => self::company() === null ? [] : Contract::query()
-                        ->whereBelongsTo(self::company(), 'company')->active()->orderBy('title')->pluck('title', 'id')->all())
-                    ->default($contract?->id)
-                    ->disabled($contract !== null)->dehydrated()
-                    ->searchable()->required()->live()
-                    ->afterStateUpdated(function (Set $set, mixed $state): void {
-                        $set('amount', self::annualEstimate($state));
-                        $set('actual_kind', null);
-                        $set('activity_note', null);
-                    }),
-                TextInput::make('description')->label('Descrizione')->required()->maxLength(255),
-                DecimalInput::make('amount')->label('Importo')->suffix('EUR')->required()->live(onBlur: true)
-                    ->default(fn (): ?string => self::annualEstimate($contract?->id))
+                    ->options([$contract->id => $contract->title])
+                    ->default($contract->id)
+                    ->disabled()->dehydrated()->required(),
+                TextInput::make('description')->label('Descrizione')
+                    ->default($contract->title.' - Effettivo')
+                    ->required()->maxLength(255),
+                MoneyInput::make('amount')->label('Importo')->suffix('EUR')->required()->live(onBlur: true)
+                    ->default(fn (): ?string => self::annualEstimate($contract->id))
                     ->helperText('Importo iniziale pari alla Stima annuale del Contratto. Puoi modificarlo. EUR, netto IVA.'),
                 Textarea::make('note')->label('Nota')
                     ->helperText('Obbligatoria per un rimborso, un accredito o una correzione con importo negativo, oppure per un importo zero.'),
@@ -66,8 +60,8 @@ final class RegisterContractPayment
                     ->helperText('Richiesto perché l’Esercizio ha già un Budget approvato.')
                     ->visible(fn (): bool => self::exercise()?->hasApprovedBudget() === true)
                     ->required(fn (Get $get): bool => self::exercise()?->hasApprovedBudget() === true
-                        && preg_match('/^-?\d+(?:\.\d+)?$/', (string) Decimal::normalizeInput($get('amount'))) === 1
-                        && Decimal::compare((string) Decimal::normalizeInput($get('amount')), '0') !== 0),
+                        && preg_match('/^-?\d+(?:\.\d+)?$/', (string) MoneyInput::normalizeInput($get('amount'))) === 1
+                        && Decimal::compare((string) MoneyInput::normalizeInput($get('amount')), '0') !== 0),
                 ...ExpenseForm::creationActivityFields(),
             ])
             ->action(function (array $data, Action $action, Schema $schema) use ($contract): void {
@@ -79,7 +73,7 @@ final class RegisterContractPayment
                 try {
                     $expense = app(CreateExpense::class)->execute($actor, $company, [
                         'exercise_id' => $exercise->id,
-                        'contract_id' => $contract->id ?? $data['contract_id'],
+                        'contract_id' => $contract->id,
                         'description' => $data['description'],
                         'change_reason' => $data['change_reason'] ?? null,
                         'actual_kind' => $data['actual_kind'] ?? null,

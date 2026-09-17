@@ -49,12 +49,12 @@ beforeEach(function () {
 
 afterEach(fn () => CarbonImmutable::setTestNow());
 
-it('registers the editable annual Estimate as a separate Contract Actual from the expense menu', function () {
-    $component = Livewire::test(ListExpenses::class)
-        ->assertActionVisible('create')
+it('registers the editable annual Estimate as a separate Actual from the Contract', function () {
+    $component = Livewire::test(ViewContract::class, ['record' => $this->contract->getRouteKey()])
+        ->assertActionVisible('createContractActual')
         ->mountAction('registerContractPayment')
         ->fillForm(['contract_id' => $this->contract->id])
-        ->assertActionDataSet(['amount' => '1200.00'])
+        ->assertActionDataSet(['amount' => '1200.00', 'description' => $this->contract->title.' - Effettivo'])
         ->fillForm(['description' => 'Pagamento servizi', 'amount' => '1150,50'])
         ->callMountedAction()
         ->assertHasNoActionErrors()
@@ -62,6 +62,7 @@ it('registers the editable annual Estimate as a separate Contract Actual from th
 
     $expense = Expense::query()->where('origin', 'manual')->sole();
     expect($expense->contract_id)->toBe($this->contract->id)
+        ->and($expense->description)->toBe('Pagamento servizi')
         ->and($expense->exercise_id)->toBe($this->exercise->id)
         ->and($expense->supplier_id)->toBe($this->contract->supplier_id)
         ->and($expense->lines()->sole()->type->value)->toBe('actual')
@@ -80,12 +81,16 @@ it('preselects the owner Contract and saves the full annual Estimate from its ex
     ])
         ->assertTableActionVisible('createContractActual')
         ->mountTableAction('registerContractPayment')
-        ->assertActionDataSet(['contract_id' => $this->contract->id, 'amount' => '1200.00'])
-        ->fillForm(['description' => 'Pagamento annuale'])
+        ->assertActionDataSet([
+            'contract_id' => $this->contract->id,
+            'amount' => '1200.00',
+            'description' => $this->contract->title.' - Effettivo',
+        ])
         ->callMountedAction()
         ->assertHasNoActionErrors();
 
-    expect(Expense::query()->where('origin', 'manual')->sole()->actual())->toBe('1200.00');
+    expect(Expense::query()->where('origin', 'manual')->sole()->actual())->toBe('1200.00')
+        ->and(Expense::query()->where('origin', 'manual')->sole()->description)->toBe($this->contract->title.' - Effettivo');
 });
 
 it('uses the selected Exercise and never subtracts existing Actuals from the suggested Estimate', function () {
@@ -98,7 +103,7 @@ it('uses the selected Exercise and never subtracts existing Actuals from the sug
     ExpenseLine::factory()->for($actual)->actual()->create(['amount' => '400.00']);
     app(ExerciseContext::class)->select($this->company, $previous->id);
 
-    Livewire::test(ListExpenses::class)
+    Livewire::test(ViewContract::class, ['record' => $this->contract->getRouteKey()])
         ->mountAction('registerContractPayment')
         ->fillForm(['contract_id' => $this->contract->id])
         ->assertActionDataSet(['amount' => '900.00'])
@@ -126,31 +131,37 @@ it('registers from the Contract header without duplicating an operation on retry
         ->and($this->contract->fresh()->annualTotals()[$this->exercise->id]['actual'])->toBe('1200.00');
 });
 
-it('updates the suggestion when the Contract changes and rejects Contracts outside the company or archived', function () {
-    $other = Contract::factory()->for($this->company)->create();
+it('does not expose payment registration in Expenses', function () {
+    Livewire::test(ListExpenses::class)
+        ->assertActionVisible('create')
+        ->assertActionDoesNotExist('registerContractPayment')
+        ->assertDontSee('Registra Pagamento');
+});
+
+it('rejects a different Contract submitted to the payment form', function () {
     $foreign = Contract::factory()->create();
-    $archived = Contract::factory()->for($this->company)->archived()->create();
-    $component = Livewire::test(ListExpenses::class)->mountAction('registerContractPayment');
 
-    $component->fillForm(['contract_id' => $this->contract->id])->assertActionDataSet(['amount' => '1200.00'])
-        ->fillForm(['contract_id' => $other->id])->assertActionDataSet(['amount' => '0.00']);
+    Livewire::test(ViewContract::class, ['record' => $this->contract->getRouteKey()])
+        ->mountAction('registerContractPayment')
+        ->fillForm(['contract_id' => $foreign->id])
+        ->callMountedAction()
+        ->assertHasActionErrors(['contract_id']);
 
-    foreach ([$foreign, $archived] as $unavailable) {
-        $component->fillForm(['contract_id' => $unavailable->id])
-            ->assertActionDataSet(['amount' => null])
-            ->fillForm(['description' => 'Non consentito', 'amount' => '10.00'])
-            ->callMountedAction()
-            ->assertHasActionErrors(['contract_id']);
-    }
+    expect(Expense::query()->where('origin', 'manual')->exists())->toBeFalse();
+});
 
-    expect(Expense::query()->where('origin', 'manual')->count())->toBe(0);
+it('hides payment registration for an archived Contract', function () {
+    $this->contract->update(['archived_at' => now()]);
+
+    Livewire::test(ViewContract::class, ['record' => $this->contract->getRouteKey()])
+        ->assertActionHidden('registerContractPayment');
 });
 
 it('requires the Budget reason before creating the payment', function () {
     $proposal = Proposal::factory()->for($this->company)->for($this->exercise)->create();
     BudgetSnapshot::factory()->for($proposal)->create();
 
-    Livewire::test(ListExpenses::class)->mountAction('registerContractPayment')
+    Livewire::test(ViewContract::class, ['record' => $this->contract->getRouteKey()])->mountAction('registerContractPayment')
         ->fillForm(['contract_id' => $this->contract->id, 'description' => 'Pagamento'])
         ->callMountedAction()->assertHasActionErrors(['change_reason'])
         ->fillForm(['change_reason' => 'Pagamento registrato dopo approvazione'])
@@ -160,7 +171,7 @@ it('requires the Budget reason before creating the payment', function () {
 });
 
 it('requires a note for zero and negative amounts without creating a partial expense', function (string $amount) {
-    $component = Livewire::test(ListExpenses::class)->mountAction('registerContractPayment')
+    $component = Livewire::test(ViewContract::class, ['record' => $this->contract->getRouteKey()])->mountAction('registerContractPayment')
         ->fillForm(['contract_id' => $this->contract->id])
         ->fillForm(['description' => 'Rettifica', 'amount' => $amount])
         ->callMountedAction()->assertHasActionErrors(['note']);
@@ -175,7 +186,7 @@ it('requires a terminal declaration and note for a ceased Contract', function ()
     ContractLifecycleFact::factory()->forContract($this->contract)->create([
         'type' => 'cessation', 'declared_contractual_date' => '2026-08-31', 'state_change_date' => '2026-08-31', 'reason' => 'Fine servizio',
     ]);
-    Livewire::test(ListExpenses::class)->mountAction('registerContractPayment')
+    Livewire::test(ViewContract::class, ['record' => $this->contract->getRouteKey()])->mountAction('registerContractPayment')
         ->fillForm(['contract_id' => $this->contract->id, 'description' => 'Addebito tardivo'])
         ->callMountedAction()->assertHasActionErrors(['actual_kind', 'activity_note'])
         ->fillForm(['actual_kind' => 'late', 'activity_note' => 'Addebito ricevuto dopo la cessazione'])
@@ -186,7 +197,7 @@ it('requires a terminal declaration and note for a ceased Contract', function ()
 
 it('rejects ordinary Actuals for a planned Contract', function () {
     $this->contract->update(['contractual_start_date' => '2027-01-01', 'next_expiry_date' => null, 'renewal_anchor_date' => null]);
-    Livewire::test(ListExpenses::class)->mountAction('registerContractPayment')
+    Livewire::test(ViewContract::class, ['record' => $this->contract->getRouteKey()])->mountAction('registerContractPayment')
         ->fillForm(['contract_id' => $this->contract->id, 'description' => 'Non consentito'])
         ->callMountedAction()->assertHasActionErrors(['actual_kind']);
 
@@ -197,7 +208,7 @@ it('disables payment registration for closed or future Exercises', function (int
     $exercise = Exercise::factory()->for($this->company)->create(['year' => $year, 'status' => $status]);
     app(ExerciseContext::class)->select($this->company, $exercise->id);
 
-    Livewire::test(ListExpenses::class)->assertActionDisabled('registerContractPayment')
+    Livewire::test(ViewContract::class, ['record' => $this->contract->getRouteKey()])->assertActionDisabled('registerContractPayment')
         ->callAction('registerContractPayment', ['contract_id' => $this->contract->id, 'description' => 'Non consentito', 'amount' => '10.00']);
 
     expect(Expense::query()->where('origin', 'manual')->count())->toBe(0);
@@ -208,7 +219,7 @@ it('hides payment registration from viewers', function () {
     grantTestPermissions(['company_id' => $this->company->id, 'user' => $viewer, 'permissions' => TestPermissions::VIEW]);
     $this->actingAs($viewer);
 
-    Livewire::test(ListExpenses::class)->assertActionHidden('registerContractPayment');
+    Livewire::test(ViewContract::class, ['record' => $this->contract->getRouteKey()])->assertActionHidden('registerContractPayment');
     Livewire::test(ContractExpensesRelationManager::class, [
         'ownerRecord' => $this->contract, 'pageClass' => ViewContract::class,
     ])->assertTableActionHidden('registerContractPayment');
