@@ -5496,3 +5496,130 @@ html.fi {
         grid-template-columns: minmax(0, 1fr);
     }
 }
+
+.mp2-proposal-source-summary {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) auto minmax(190px, auto) auto minmax(140px, auto);
+    gap: 12px 20px;
+    align-items: center;
+    width: 100%;
+}
+
+.mp2-proposal-source-summary .mp2-budget-source-identity > strong {
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    font-weight: 650;
+    overflow-wrap: anywhere;
+}
+
+.mp2-proposal-sources-table .mp2-proposal-item-readiness {
+    display: grid;
+}
+
+.mp2-proposal-sources-table .mp2-proposal-item-readiness strong,
+.mp2-proposal-sources-table .mp2-proposal-item-allocation strong,
+.mp2-proposal-source-summary .mp2-budget-source-context {
+    white-space: normal;
+}
+
+.mp2-proposal-sources-table .fi-ta-panel {
+    padding: 0;
+    background: var(--surface);
+}
+
+.mp2-proposal-sources-table .fi-ta-filters-header {
+    display: none;
+}
+
+.mp2-proposal-sources-table .fi-fo-toggle-buttons {
+    flex-wrap: wrap;
+}
+
+.mp2-proposal-sources-table .fi-ta-record .fi-ta-actions {
+    flex-wrap: wrap;
+}
+
+.mp2-proposal-discard {
+    margin-inline-start: 12px;
+}
+
+@media (max-width: 1199px) {
+    .mp2-proposal-source-summary {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .mp2-proposal-source-summary .mp2-proposal-item-allocation {
+        text-align: left;
+    }
+
+    .mp2-proposal-source-summary .mp2-proposal-item-readiness {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 639px) {
+    .mp2-proposal-source-summary {
+        gap: 12px;
+    }
+
+    .mp2-proposal-source-summary .mp2-budget-source-identity {
+        grid-column: 1 / -1;
+    }
+
+    .mp2-proposal-source-summary .mp2-proposal-item-readiness {
+        grid-column: 2;
+        grid-row: 2;
+    }
+
+    .mp2-proposal-sources-table .mp2-budget-source-body {
+        padding: 14px 12px;
+    }
+}
+
+.mp2-proposal-sources-table .fi-ta-record {
+    border-color: var(--border);
+    background: var(--surface);
+    color: var(--text-secondary);
+}
+
+.mp2-proposal-sources-table .fi-ta-record:hover {
+    background: var(--primary-soft);
+}
+
+.mp2-proposal-sources-table .fi-fo-toggle-buttons input:not(:checked) + .fi-btn {
+    border-color: var(--mp2-border) !important;
+    background: var(--mp2-surface-secondary) !important;
+    color: var(--mp2-text-secondary) !important;
+}
+
+.mp2-proposal-sources-table .fi-fo-toggle-buttons input:checked + .fi-btn {
+    border-color: var(--mp2-brand) !important;
+    background: var(--mp2-brand) !important;
+    color: var(--mp2-canvas-abyss) !important;
+}
+
+.mp2-proposal-sources-table .fi-fo-toggle-buttons input:focus-visible + .fi-btn {
+    outline: 2px solid var(--mp2-brand);
+    outline-offset: 3px;
+}
+
+.mp2-proposal-source-summary .mp2-budget-source-type {
+    justify-self: start;
+}
+
+@media (max-width: 767px) {
+    .mp2-proposal-source-summary .mp2-proposal-item-allocation {
+        grid-column: auto;
+    }
+}
+
+.mp2-proposal-sources-table .fi-ta-record:not(.fi-ta-record-collapsed) .fi-ta-actions,
+.mp2-proposal-sources-table .fi-ta-record:not(.fi-ta-record-collapsed) .fi-ta-record-collapse-btn {
+    align-self: flex-start;
+}
+
+.mp2-proposal-object-page .fi-dropdown-list-item:focus-visible,
+.mp2-proposal-sources-table .fi-icon-btn:focus-visible {
+    outline: 2px solid var(--mp2-focus);
+    outline-offset: 2px;
+}

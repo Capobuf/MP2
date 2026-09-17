@@ -114,7 +114,7 @@ final class ProposalReadiness
         BudgetPayloadGuard::assertPlanOnly($item->result);
         foreach ($item->actions as $action) {
             ProposalActionPayload::validate($action->action_type, $action->payload);
-            if ($action->action_type === ProposalActionType::CopyExpense) {
+            if ($action->action_type === ProposalActionType::CopyExpense && ! $item->isExcludedFromPlan()) {
                 $source = Expense::query()->where('company_id', $item->company_id)->find($action->payload['source_expense_id']);
                 if ($source === null
                     || $source->project_id !== null

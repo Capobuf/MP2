@@ -13,6 +13,7 @@ use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalPlanData;
 use App\Domain\Proposals\ProposalReadiness;
 use App\Domain\Proposals\ProposalSourceType;
+use App\Filament\Resources\Proposals\Pages\ViewProposal;
 use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Project;
@@ -40,13 +41,13 @@ class ProposalInfolist
     {
         return $schema->components([
             View::make('filament.resources.proposals.components.overview')
-                ->viewData(fn (Proposal $record): array => ['overview' => self::overview($record)])
+                ->viewData(fn (ViewProposal $livewire): array => ['overview' => $livewire->sourceOverview])
                 ->columnSpanFull(),
         ]);
     }
 
     /** @return array<string, mixed> */
-    private static function overview(Proposal $proposal): array
+    public static function overview(Proposal $proposal): array
     {
         $proposal->loadMissing([
             'company.exercises',
@@ -81,7 +82,7 @@ class ProposalInfolist
                 $impactByItem->get($item->proposal_item_id, []),
                 $maps,
             ))
-            ->values()
+            ->keyBy('id')
             ->all();
 
         return [
@@ -136,6 +137,8 @@ class ProposalInfolist
         $label = self::sourceLabel($item->source_type, $result, $baseline);
 
         return [
+            'id' => $item->id,
+            'excluded' => $item->isExcludedFromPlan(),
             'type_value' => $item->source_type->value,
             'type_label' => $item->source_type->label(),
             'icon' => self::sourceIcon($item->source_type),
@@ -160,7 +163,7 @@ class ProposalInfolist
             'allocation_delta' => self::signedMoney($impact['delta'] ?? '0.00'),
             'allocation_delta_tone' => self::deltaTone($impact['delta'] ?? '0.00'),
             'state_before' => self::stateLabel($item->source_type, $impact['state_before'] ?? null),
-            'state_after' => self::stateLabel($item->source_type, $impact['state_after'] ?? null),
+            'state_after' => $item->isExcludedFromPlan() ? 'Esclusa dalla Proposta' : self::stateLabel($item->source_type, $impact['state_after'] ?? null),
             'details' => match ($item->source_type) {
                 ProposalSourceType::Expense => self::expenseDetails($result, $maps),
                 ProposalSourceType::Project => self::projectDetails($result, $maps),
@@ -182,7 +185,7 @@ class ProposalInfolist
             'notes' => $result['notes'] ?? null,
             'exercise' => $maps['exercises']->get((int) ($result['exercise_id'] ?? 0), '—'),
             'owner' => self::expenseOwner($result, $maps),
-            'state' => ($result['reversed'] ?? filled($result['reversed_at'] ?? null)) ? 'Stornata' : 'Attiva',
+            'state' => ($result['excluded'] ?? false) ? 'Esclusa dalla Proposta' : (($result['reversed'] ?? filled($result['reversed_at'] ?? null)) ? 'Stornata' : 'Attiva'),
             'lines' => self::estimateLines($result['estimate_lines'] ?? []),
         ];
     }
@@ -530,6 +533,7 @@ class ProposalInfolist
             ProposalSourceType::Expense => match ($state) {
                 'active' => 'Attiva',
                 'reversed' => 'Stornata',
+                'excluded' => 'Esclusa dalla Proposta',
                 default => (string) $state,
             },
             ProposalSourceType::Project => self::projectState($state),
@@ -545,6 +549,7 @@ class ProposalInfolist
     private static function actionLabel(ProposalActionType $type): string
     {
         return match ($type) {
+            ProposalActionType::ExcludeExpense => 'Esclusione dalla Proposta',
             ProposalActionType::CreateExpense => 'Creazione Spesa',
             ProposalActionType::CopyExpense => 'Copia Spesa',
             ProposalActionType::SetExpenseEstimates => 'Aggiornamento Stime della Spesa',

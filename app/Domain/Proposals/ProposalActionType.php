@@ -12,6 +12,7 @@ enum ProposalActionType: string
     case SetExpenseCostCenter = 'set_expense_cost_center';
     case ReverseExpense = 'reverse_expense';
     case RestoreExpense = 'restore_expense';
+    case ExcludeExpense = 'exclude_expense';
     case CreateProject = 'create_project';
     case PlanProjectChildExpenses = 'plan_project_child_expenses';
     case SetProjectCostCenter = 'set_project_cost_center';
@@ -37,6 +38,7 @@ enum ProposalActionType: string
             self::SetExpenseCostCenter => 'Set Expense Cost Center',
             self::ReverseExpense => 'Reverse Expense',
             self::RestoreExpense => 'Restore Expense',
+            self::ExcludeExpense => 'Escludi dalla Proposta',
             self::CreateProject => 'Create Project',
             self::PlanProjectChildExpenses => 'Plan Project Child Expenses',
             self::SetProjectCostCenter => 'Set Project Cost Center',

@@ -35,7 +35,7 @@ final class ProposalImpactPlan
                 ];
             }
 
-            $rows = $proposal->items->map(fn (ProposalItem $item): array => self::row($item, $exercise))->filter(
+            $rows = $proposal->items->reject(fn (ProposalItem $item): bool => $item->isExcludedFromPlan())->map(fn (ProposalItem $item): array => self::row($item, $exercise))->filter(
                 fn (array $row): bool => $exerciseId === $proposal->exercise_id
                     || Decimal::compare($row['before'], $row['after']) !== 0
                     || $row['state_before'] !== $row['state_after']
@@ -84,6 +84,9 @@ final class ProposalImpactPlan
         $ids = [$proposal->exercise_id];
 
         foreach ($proposal->items as $item) {
+            if ($item->isExcludedFromPlan()) {
+                continue;
+            }
             self::appendExerciseId($ids, data_get($item->baseline, 'plan_baseline.exercise_id'));
             self::appendExerciseId($ids, $item->result['exercise_id'] ?? null);
             foreach (ProposalPlanData::rows($item->result['expense_plan'] ?? null, 'expense_plan') as $expense) {
@@ -124,6 +127,9 @@ final class ProposalImpactPlan
     /** @param array<string, mixed> $result */
     public static function allocation(array $result): string
     {
+        if (($result['excluded'] ?? false) === true) {
+            return '0.00';
+        }
         if (($result['reversed'] ?? false) === true || filled($result['reversed_at'] ?? null)) {
             return '0.00';
         }

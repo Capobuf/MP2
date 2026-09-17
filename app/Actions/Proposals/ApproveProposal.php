@@ -153,6 +153,9 @@ final class ApproveProposal
                     self::checkpoint($checkpoint, 'after_contract');
                 }
                 foreach ($items->where('source_type', ProposalSourceType::Expense) as $item) {
+                    if ($item->isExcludedFromPlan()) {
+                        continue;
+                    }
                     $identities[$item->proposal_item_id] = $this->expenses->execute($item, $identities, $actor);
                     self::checkpoint($checkpoint, 'after_expense');
                 }

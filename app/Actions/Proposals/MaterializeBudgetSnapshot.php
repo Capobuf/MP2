@@ -34,7 +34,8 @@ final class MaterializeBudgetSnapshot
         $impacts = $confirmedImpacts ?? ProposalImpactPlan::build($proposal);
         $staleProposals = collect($impacts)->flatMap(fn (array $impact): array => ProposalPlanData::rows($impact['stale_proposals'] ?? null, 'stale_proposals'))->unique('proposal_id')->values();
         $eventSequences = [];
-        foreach ($proposal->actions->sortBy('sequence') as $action) {
+        $appliedActions = $proposal->actions->reject(fn ($action): bool => $action->item?->isExcludedFromPlan() === true)->sortBy('sequence');
+        foreach ($appliedActions as $action) {
             $eventSequences[$action->id] = count($eventSequences);
         }
         foreach ($staleProposals as $stale) {
@@ -53,7 +54,7 @@ final class MaterializeBudgetSnapshot
         $budget = BudgetSnapshot::query()->create(['company_id' => $proposal->company_id, 'exercise_id' => $proposal->exercise_id, 'proposal_id' => $proposal->id, 'version' => $version, 'purpose' => $proposal->purpose, 'approved_at' => now(), 'approved_by_id' => $actor->id, 'previous_budget_id' => $previousBudget?->id, 'total_approved_allocation' => $payload['total'], 'affected_exercises' => $impacts, 'operation_id' => $operationId]);
         self::checkpoint($checkpoint, 'after_budget_header');
 
-        foreach ($proposal->actions->sortBy('sequence') as $action) {
+        foreach ($appliedActions as $action) {
             $item = $action->proposal_item_id === null ? null : $action->item;
             $live = $item === null ? null : ($identities[$item->proposal_item_id] ?? null);
             $plannedEvent = AuditEvent::query()->where('operation_id', $action->operation_id)->where('event_sequence', 0)->first();
@@ -88,7 +89,7 @@ final class MaterializeBudgetSnapshot
                 'reason' => $action->reason, 'reference_type' => BudgetSnapshot::class, 'reference_id' => $budget->id,
             ]);
         }
-        $sequence = count($proposal->actions);
+        $sequence = count($appliedActions);
         foreach ($staleProposals as $stale) {
             AuditEvent::query()->create([
                 'operation_id' => $operationId, 'event_sequence' => $sequence++, 'company_id' => $proposal->company_id, 'actor_id' => $actor->id,
@@ -161,6 +162,7 @@ final class MaterializeBudgetSnapshot
     private function appliedEventType(ProposalActionType $type, array $payload): AuditEventType
     {
         return match ($type) {
+            ProposalActionType::ExcludeExpense => throw new \LogicException('Excluded proposal expenses have no live effects.'),
             ProposalActionType::CreateExpense, ProposalActionType::CopyExpense, ProposalActionType::CreateProjectAllocation => AuditEventType::ExpenseCreated,
             ProposalActionType::SetExpenseEstimates => AuditEventType::ExpenseLineUpdated,
             ProposalActionType::SetExpenseOwner, ProposalActionType::SetExpenseCostCenter => AuditEventType::ExpenseMovedOrReclassified,

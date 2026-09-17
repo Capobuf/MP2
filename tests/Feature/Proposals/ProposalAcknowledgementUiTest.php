@@ -8,6 +8,7 @@ use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -31,7 +32,7 @@ it('shows explicit acknowledgement and exact new-source guidance', function (): 
     Filament::setTenant(($company)->tenantCompany);
 
     Livewire::test(ViewProposal::class, ['record' => $proposal->getRouteKey()])
-        ->assertActionExists('acknowledgeSource')
+        ->assertActionVisible(TestAction::make('acknowledgeSource')->table($proposal->items()->sole()))
         ->assertSee('Da Prendere in Visione')
         ->assertSee('Nuova fonte da prendere in visione');
 });

@@ -14,6 +14,7 @@ use App\Models\Proposal;
 use App\Models\Supplier;
 use App\Models\User;
 use Carbon\CarbonImmutable as Carbon;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Placeholder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -41,7 +42,7 @@ afterEach(fn () => Carbon::setTestNow());
 
 it('creates a complete contract through the form and approves its calculated estimates', function (string $cycle, string $attribution, string $total): void {
     Livewire::test(ViewProposal::class, ['record' => $this->proposal->id])
-        ->callAction('createPlannedContract', data: [
+        ->callAction(TestAction::make('createPlannedContract')->table(), data: [
             'title' => 'Assistenza', 'supplier_id' => $this->supplier->id,
             'contractual_start_date' => '01/01/2027', 'amount' => '120,50',
             'cycle' => $cycle, 'attribution_mode' => $attribution,
@@ -70,7 +71,7 @@ it('creates a complete contract through the form and approves its calculated est
 
 it('requires a first amount and rejects negative amounts without creating a partial contract', function (mixed $amount): void {
     Livewire::test(ViewProposal::class, ['record' => $this->proposal->id])
-        ->callAction('createPlannedContract', data: [
+        ->callAction(TestAction::make('createPlannedContract')->table(), data: [
             'title' => 'Assistenza', 'supplier_id' => $this->supplier->id,
             'contractual_start_date' => '01/01/2027', 'amount' => $amount,
             'cycle' => 'annual', 'attribution_mode' => 'cycle_start',
@@ -97,7 +98,7 @@ it('shows the precise missing condition message on an incomplete existing draft'
     expect($review['blocks'][0]['message'])->toBe('Un nuovo Contratto richiede almeno una condizione economica applicabile.');
     $item = $this->proposal->items()->sole();
     Livewire::test(ViewProposal::class, ['record' => $this->proposal->id])
-        ->callAction('addContractCondition', data: ['item_id' => $item->id, 'amount' => '0,00', 'cycle' => 'annual', 'attribution_mode' => 'cycle_start', 'valid_from' => '01/01/2027'])
+        ->callAction(TestAction::make('addContractCondition')->table($item), data: ['amount' => '0,00', 'cycle' => 'annual', 'attribution_mode' => 'cycle_start', 'valid_from' => '01/01/2027'])
         ->assertHasNoActionErrors();
     expect(app(ProposalReadiness::class)->assessProposal($this->proposal->fresh())['ready'])->toBeTrue();
 });
@@ -109,8 +110,8 @@ it('selects a live condition and displays the economic preview before confirming
     $proposal = app(InitializeProposal::class)->execute($this->user, $this->proposal->company, $exercise, (string) Str::uuid());
     $item = $proposal->items()->where('contract_id', $contract->id)->sole();
     $page = Livewire::test(ViewProposal::class, ['record' => $proposal->id])
-        ->mountAction('changeContractEconomics')
-        ->fillForm(['item_id' => $item->id, 'condition_id' => $condition->id, 'amount' => '150,25', 'cycle' => 'monthly', 'attribution_mode' => 'cycle_end', 'requested_date' => '22/08/2026'])
+        ->mountAction(TestAction::make('changeContractEconomics')->table($item))
+        ->fillForm(['condition_id' => $condition->id, 'amount' => '150,25', 'cycle' => 'monthly', 'attribution_mode' => 'cycle_end', 'requested_date' => '22/08/2026'])
         ->assertSchemaComponentExists('economic_preview', checkComponentUsing: function (Placeholder $component): bool {
             expect($component->getContent()->render())->toContain('15/09/2026', 'Data minima richiedibile', 'Termini Economici', 'Impatto sugli Esercizi Aperti');
 
@@ -124,14 +125,14 @@ it('selects a live condition and displays the economic preview before confirming
 
 it('creates a planned project and expense then edits the estimates without live effects', function (): void {
     $page = Livewire::test(ViewProposal::class, ['record' => $this->proposal->id]);
-    $page->callAction('createPlannedProject', data: ['title' => 'Migrazione', 'initial_effective_date' => '01/01/2027'])->assertHasNoActionErrors();
+    $page->callAction(TestAction::make('createPlannedProject')->table(), data: ['title' => 'Migrazione', 'initial_effective_date' => '01/01/2027'])->assertHasNoActionErrors();
     $project = $this->proposal->items()->where('source_type', 'project')->sole();
     $line = ['proposal_line_id' => (string) Str::uuid(), 'line_id' => null, 'amount' => '900719925474099,91', 'annulled' => false];
-    $page->callAction('createPlannedExpense', data: ['description' => 'Licenze', 'project_reference' => 'item:'.$project->proposal_item_id, 'estimate_lines' => [$line]])->assertHasNoActionErrors();
+    $page->callAction(TestAction::make('createPlannedExpense')->table(), data: ['description' => 'Licenze', 'project_reference' => 'item:'.$project->proposal_item_id, 'estimate_lines' => [$line]])->assertHasNoActionErrors();
     $expense = $this->proposal->items()->where('source_type', 'expense')->sole();
     expect($expense->result['estimate_lines'][0]['amount'])->toBe('900719925474099.91');
     $line['amount'] = '100,25';
-    $page->callAction('planExpenseEstimates', data: ['item_id' => $expense->id, 'estimate_lines' => [$line]])->assertHasNoActionErrors();
+    $page->callAction(TestAction::make('planExpenseEstimates')->table($expense), data: ['estimate_lines' => [$line]])->assertHasNoActionErrors();
     expect($expense->fresh()->result['estimate_lines'][0]['amount'])->toBe('100.25')
         ->and(Project::query()->count())->toBe(0)->and(Expense::query()->count())->toBe(0)
         ->and(app(ProposalReadiness::class)->assessProposal($this->proposal->fresh())['ready'])->toBeTrue();
@@ -139,7 +140,7 @@ it('creates a planned project and expense then edits the estimates without live 
 
 it('applies the initial expiry and renewal to both the proposal and the approved contract', function (bool $automatic, string $total): void {
     Livewire::test(ViewProposal::class, ['record' => $this->proposal->id])
-        ->callAction('createPlannedContract', data: [
+        ->callAction(TestAction::make('createPlannedContract')->table(), data: [
             'title' => 'Assistenza', 'supplier_id' => $this->supplier->id,
             'contractual_start_date' => '01/01/2027', 'next_expiry_date' => '30/06/2027',
             'automatic_renewal' => $automatic, 'renewal_duration_months' => $automatic ? 6 : null,
@@ -156,7 +157,7 @@ it('applies the initial expiry and renewal to both the proposal and the approved
 
 it('requires the renewal duration when an initial expiry renews automatically', function (): void {
     Livewire::test(ViewProposal::class, ['record' => $this->proposal->id])
-        ->callAction('createPlannedContract', data: [
+        ->callAction(TestAction::make('createPlannedContract')->table(), data: [
             'title' => 'Assistenza', 'supplier_id' => $this->supplier->id,
             'contractual_start_date' => '01/01/2027', 'next_expiry_date' => '30/06/2027',
             'automatic_renewal' => true, 'amount' => '100,00', 'cycle' => 'monthly', 'attribution_mode' => 'cycle_start',

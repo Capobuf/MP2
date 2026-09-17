@@ -34,6 +34,9 @@ final class BudgetSnapshotPayload
         $costCenterHierarchy = CostCenterHierarchy::forCompany((int) $proposal->company_id);
 
         foreach ($proposal->items->sortBy('id') as $item) {
+            if ($item->isExcludedFromPlan()) {
+                continue;
+            }
             $live = self::liveIdentity($item, $identities);
             $allocation = self::allocation($live, $proposal->exercise_id);
             $carryover = $live instanceof Project ? self::carryover($live, $proposal->exercise_id) : '0.00';

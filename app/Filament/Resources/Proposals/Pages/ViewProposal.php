@@ -26,6 +26,7 @@ use App\Domain\Projects\ProjectDeferralValues;
 use App\Domain\Projects\ProjectState;
 use App\Domain\Projects\ProjectStateTimeline;
 use App\Domain\Proposals\ExpensePlan;
+use App\Domain\Proposals\ProposalActionReplay;
 use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalPlanData;
 use App\Domain\Proposals\ProposalPurpose;
@@ -38,6 +39,7 @@ use App\Filament\Forms\DecimalInput;
 use App\Filament\Pages\CompanyAudit;
 use App\Filament\Resources\Budgets\BudgetResource;
 use App\Filament\Resources\Proposals\ProposalResource;
+use App\Filament\Resources\Proposals\Schemas\ProposalInfolist;
 use App\Models\Attachment;
 use App\Models\Contract;
 use App\Models\ContractCondition;
@@ -59,20 +61,33 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Enums\Width;
+use Filament\Tables\Columns\Layout\Panel;
+use Filament\Tables\Columns\Layout\View as TableView;
+use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
 
-class ViewProposal extends ViewRecord
+/** @property-read array<string, mixed> $sourceOverview */
+class ViewProposal extends ViewRecord implements HasTable
 {
+    use InteractsWithTable;
+
     protected static string $resource = ProposalResource::class;
 
     public string $approvalOperationId = '';
@@ -121,12 +136,68 @@ class ViewProposal extends ViewRecord
         return ['class' => 'mp2-object-page mp2-proposal-object-page'];
     }
 
+    public function table(Table $table): Table
+    {
+        return $table
+            ->query(fn (): Builder => ProposalItem::query()->where('proposal_id', $this->proposal()->id))
+            ->columns([
+                TableView::make('filament.resources.proposals.components.source-summary')
+                    ->viewData(fn (ProposalItem $record): array => ['item' => $this->sourceOverview['items'][$record->id]]),
+                Panel::make([
+                    TableView::make('filament.resources.proposals.components.source-detail')
+                        ->viewData(fn (ProposalItem $record): array => ['item' => $this->sourceOverview['items'][$record->id]]),
+                ])->collapsible(),
+            ])
+            ->headerActions([$this->addSourcesAction()])
+            ->recordActions($this->sourceActions())
+            ->filters([
+                Filter::make('source_type')->schema([
+                    ToggleButtons::make('value')->label('Tipo di sorgente')->hiddenLabel()->inline()
+                        ->options(fn (): array => [
+                            'all' => 'Tutte · '.$this->proposal()->items->count(),
+                            'contract' => 'Contratti · '.$this->proposal()->items->where('source_type', ProposalSourceType::Contract)->count(),
+                            'project' => 'Progetti · '.$this->proposal()->items->where('source_type', ProposalSourceType::Project)->count(),
+                            'expense' => 'Spese · '.$this->proposal()->items->where('source_type', ProposalSourceType::Expense)->count(),
+                        ])->default('all'),
+                ])->query(fn (Builder $query, array $data): Builder => in_array($data['value'] ?? null, ['contract', 'project', 'expense'], true)
+                    ? $query->where('source_type', $data['value']) : $query),
+            ], layout: FiltersLayout::AboveContent)
+            ->deferFilters(false)
+            ->filtersFormColumns(1)
+            ->defaultSort('id')
+            ->paginationPageOptions([10, 25, 50])
+            ->defaultPaginationPageOption(25)
+            ->emptyStateHeading('Nessuna sorgente inclusa nella Proposta.')
+            ->emptyStateDescription(fn (): string => $this->proposal()->items->isEmpty() ? 'Storico Decisioni · Nessuna decisione specifica registrata.' : 'Scegli Tutte per visualizzare le altre sorgenti.')
+            ->extraAttributes(['class' => 'mp2-proposal-sources-table']);
+    }
+
+    /** @return array<string, mixed> */
+    #[Computed]
+    public function sourceOverview(): array
+    {
+        return ProposalInfolist::overview($this->proposal());
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $lines
+     * @return array<int, array<string, mixed>>
+     */
+    private function estimateFormLines(array $lines): array
+    {
+        return collect($lines)->map(fn (array $line): array => [
+            'proposal_line_id' => $line['proposal_line_id'] ?? (string) Str::uuid(),
+            'line_id' => $line['line_id'] ?? $line['id'] ?? null,
+            'amount' => $line['amount'],
+            'note' => $line['note'] ?? null,
+            'annulled' => $line['annulled'] ?? filled($line['annulled_at'] ?? null),
+        ])->all();
+    }
+
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('timeline')->label('Timeline della Proposta')->icon('heroicon-m-chart-bar')->color('gray')->outlined()->url(fn (): string => CompanyAudit::getUrl(['tenant' => $this->proposal()->company, 'proposal' => $this->proposal()->id])),
-            Action::make('viewBudget')->label(fn (): string => 'Apri Budget v'.$this->proposal()->budget()->value('version'))->icon('heroicon-m-banknotes')->url(fn (): string => BudgetResource::getUrl('view', ['record' => $this->proposal()->budget()->sole()], tenant: $this->proposal()->company))->visible(fn (): bool => $this->proposal()->budget()->exists()),
-            Action::make('approveBudget')->label(fn (): string => 'Approva e crea Budget v'.$this->nextBudgetVersion())->color('success')->requiresConfirmation()->modalHeading(fn (): string => 'Approva '.($this->proposal()->purpose === ProposalPurpose::Revision ? 'Revisione' : 'Proposta').' e crea Budget v'.$this->nextBudgetVersion())->modalDescription(fn (): string => 'La conferma rivalida e applica atomicamente il piano. '.$this->approvalSummary())->modalSubmitActionLabel(fn (): string => 'Approva e crea Budget v'.$this->nextBudgetVersion())->visible(fn (): bool => $this->canApprove())->disabled(fn (): bool => ! $this->approvalReady())->tooltip(fn (): ?string => $this->approvalReady() ? null : 'Risolvere tutti i blocchi di verifica prima dell’approvazione.')->form([
+            Action::make('approveBudget')->label(fn (): string => 'Approva e crea Budget v'.$this->nextBudgetVersion())->color('success')->extraAttributes(['class' => 'mp2-object-primary-action'])->requiresConfirmation()->modalHeading(fn (): string => 'Approva '.($this->proposal()->purpose === ProposalPurpose::Revision ? 'Revisione' : 'Proposta').' e crea Budget v'.$this->nextBudgetVersion())->modalDescription(fn (): string => 'La conferma rivalida e applica atomicamente il piano. '.$this->approvalSummary())->modalSubmitActionLabel(fn (): string => 'Approva e crea Budget v'.$this->nextBudgetVersion())->visible(fn (): bool => $this->canApprove())->disabled(fn (): bool => ! $this->approvalReady())->tooltip(fn (): ?string => $this->approvalReady() ? null : 'Risolvere tutti i blocchi di verifica prima dell’approvazione.')->form([
                 Placeholder::make('final_impact')->label('Impatto Finale da Approvare')->content(fn (): string => $this->approvalSummary()), TextInput::make('external_subject')->label('Soggetto Approvante Esterno')->maxLength(255), TextInput::make('external_venue')->label('Sede o Verbale')->maxLength(255), Textarea::make('reason')->label('Motivazione della Revisione')->required(fn (): bool => $this->proposal()->purpose === ProposalPurpose::Revision), AttachmentUpload::make('new_evidence')->label('Nuova Evidenza Privata')->storeFiles(false), Select::make('attachment_ids')->label('Evidenze Già Presenti')->multiple()->options(fn (): array => Attachment::query()->where('company_id', $this->proposal()->company_id)->whereNull('detached_at')->orderBy('original_name')->pluck('original_name', 'id')->all()), Hidden::make('evidence_operation_id')->default(fn (): string => $this->evidenceOperationId), Hidden::make('operation_id')->default(fn (): string => $this->approvalOperationId),
             ])->action(function (array $data): void {
                 $ids = array_map('intval', $data['attachment_ids'] ?? []);
@@ -138,81 +209,191 @@ class ViewProposal extends ViewRecord
                 $budget = app(ApproveProposal::class)->execute($this->actor(), $this->proposal(), $data['operation_id'], ['external_subject' => filled($data['external_subject'] ?? null) ? trim($data['external_subject']) : null, 'external_venue' => filled($data['external_venue'] ?? null) ? trim($data['external_venue']) : null, 'reason' => filled($data['reason'] ?? null) ? trim($data['reason']) : null], array_values(array_unique($ids)));
                 $this->redirect(BudgetResource::getUrl('view', ['record' => $budget], tenant: $this->proposal()->company));
             }),
-            Action::make('reviewReadiness')->label('Ricalcola Verifiche')->visible(fn (): bool => $this->canPlan())->form([Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid())])->action(function (array $data): void {
+            Action::make('viewBudget')->label(fn (): string => 'Apri Budget v'.$this->proposal()->budget()->value('version'))->icon('heroicon-m-banknotes')->url(fn (): string => BudgetResource::getUrl('view', ['record' => $this->proposal()->budget()->sole()], tenant: $this->proposal()->company))->visible(fn (): bool => $this->proposal()->budget()->exists()),
+            Action::make('reviewReadiness')->label('Ricalcola verifiche')->color('gray')->outlined()->visible(fn (): bool => $this->canPlan())->modal(false)->form([Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid())])->action(function (array $data): void {
                 $this->record = app(ReviewProposalReadiness::class)->execute($this->actor(), $this->proposal(), $data['operation_id']);
                 $this->refreshProposal('Verifiche Ricalcolate');
             }),
-            Action::make('discardProposal')->label('Scarta Proposta')->color('danger')->visible(fn (): bool => $this->canPlan())->requiresConfirmation()->modalDescription('Lo scarto conserva la Proposta e il suo storico. La realtà viva e tutti i Budget restano invariati.')->form([
+            Action::make('timeline')->label('Timeline della Proposta')->icon('heroicon-m-chart-bar')->color('gray')->outlined()->url(fn (): string => CompanyAudit::getUrl(['tenant' => $this->proposal()->company, 'proposal' => $this->proposal()->id])),
+            Action::make('discardProposal')->label('Scarta Proposta')->color('danger')->outlined()->extraAttributes(['class' => 'mp2-proposal-discard'])->visible(fn (): bool => $this->canPlan())->requiresConfirmation()->modalDescription('Lo scarto conserva la Proposta e il suo storico. La realtà viva e tutti i Budget restano invariati.')->form([
                 Textarea::make('reason')->label('Motivazione')->required(),
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
             ])->action(function (array $data): void {
                 $this->record = app(DiscardProposal::class)->execute($this->actor(), $this->proposal(), $data['reason'], $data['operation_id']);
                 $this->refreshProposal('Proposta Scartata senza Modificare la Realtà');
             }),
-            Action::make('reloadReality')->label('Ricarica Realtà')->visible(fn (): bool => $this->canRealign())->requiresConfirmation()->modalDescription('Tutte le decisioni che toccano la sorgente saranno ritirate. La realtà corrente sostituirà integralmente piano base e risultato.')->form([
-                Select::make('item_id')->label('Sorgente da Riallineare')->options(fn (): array => $this->realignmentItemOptions())->required(),
-                Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
-                Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-            ])->action(function (array $data): void {
-                app(RealignProposalItem::class)->execute($this->actor(), $this->proposal(), $this->realignmentItem((int) $data['item_id']), ProposalRealignmentChoice::Reload, null, [], $data['operation_id'], (int) $data['proposal_revision']);
-                $this->refreshProposal('Realtà Ricaricata per l’Intera Sorgente');
+        ];
+    }
+
+    private function addSourcesAction(): ActionGroup
+    {
+        return ActionGroup::make([
+            ActionGroup::make([
+                Action::make('createPlannedExpense')->label('Nuova Spesa Pianificata')->visible(fn (): bool => $this->canPlan())->form([
+                    TextInput::make('description')->label('Descrizione')->required()->maxLength(255), Textarea::make('notes')->label('Note'),
+                    Select::make('project_reference')->label('Progetto di Destinazione')->options(fn (): array => $this->newExpenseProjectReferenceOptions())->default('autonomous')->required(),
+                    Select::make('supplier_id')->label('Fornitore')->options(fn (): array => Supplier::query()->where('company_id', $this->proposal()->company_id)->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all())->placeholder('Nessun Fornitore'),
+                    Select::make('cost_center_id')->label('Centro di Costo Diretto (Solo Autonoma)')->options(fn (): array => CostCenterHierarchy::forCompany((int) $this->proposal()->company_id)->options())->placeholder('Non classificata'),
+                    Repeater::make('estimate_lines')->label('Righe Stima')->schema($this->estimateLineSchema())->defaultItems(1)->required(),
+                    Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                ])->modalDescription('Per riposizionare piano residuo, ridurre prima le Stime originarie e creare qui una Spesa distinta: nessun matching con gli Effettivi.')->action(function (array $data): void {
+                    $actor = $this->actor();
+                    app(PlanExpense::class)->create($actor, $this->proposal(), ['description' => $data['description'], 'notes' => $data['notes'] ?? null, 'exercise_id' => $this->proposal()->exercise_id, 'supplier_id' => filled($data['supplier_id'] ?? null) ? (int) $data['supplier_id'] : null, 'cost_center_id' => filled($data['cost_center_id'] ?? null) ? (int) $data['cost_center_id'] : null, ...$this->parseExpenseProjectReference($data['project_reference']), 'estimate_lines' => $this->normalizeEstimateLines($data['estimate_lines'])], null, $data['operation_id'], (int) $data['proposal_revision']);
+                    $this->refreshProposal('Spesa Pianificata Aggiunta');
+                }),
+                Action::make('createPlannedProject')->label('Nuovo Progetto Pianificato')->visible(fn (): bool => $this->canPlan())->form([
+                    TextInput::make('title')->label('Titolo')->required()->maxLength(255), Textarea::make('description')->label('Descrizione'), Textarea::make('notes')->label('Note'),
+                    Hidden::make('initial_state')->default('planned'), DateInput::make('initial_effective_date')->label('Efficace dal')->required(),
+                    Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                ])->action(function (array $data): void {
+                    app(PlanProject::class)->create($this->actor(), $this->proposal(), ['title' => $data['title'], 'description' => $data['description'] ?? null, 'notes' => $data['notes'] ?? null, 'initial_state' => $data['initial_state'], 'initial_effective_date' => $data['initial_effective_date'], 'exercise_id' => $this->proposal()->exercise_id, 'cost_center_id' => null], $data['operation_id'], (int) $data['proposal_revision']);
+                    $this->refreshProposal('Progetto Pianificato Aggiunto');
+                }),
+                Action::make('createPlannedContract')->label('Nuovo Contratto Pianificato')->visible(fn (): bool => $this->canPlan())->form([
+                    TextInput::make('title')->label('Titolo')->required()->maxLength(255), Select::make('supplier_id')->label('Fornitore')->options(fn (): array => Supplier::query()->where('company_id', $this->proposal()->company_id)->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all())->required(), DateInput::make('contractual_start_date')->label('Inizio Contrattuale')->required(), DateInput::make('next_expiry_date')->label('Prossima Scadenza'), Toggle::make('automatic_renewal')->label('Rinnovo Automatico')->default(false), TextInput::make('renewal_duration_months')->label('Durata Rinnovo (Mesi)')->integer()->minValue(1), TextInput::make('notice_days')->label('Preavviso (Giorni)')->integer()->minValue(0)->default(0), Textarea::make('notes')->label('Note'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                    DecimalInput::make('amount')->label('Importo Netto IVA per Ciclo')->minValue(0)->required(), Select::make('cycle')->label('Ciclo')->options(['monthly' => 'Mensile', 'quarterly' => 'Trimestrale', 'semiannual' => 'Semestrale', 'annual' => 'Annuale'])->required(), Select::make('attribution_mode')->label('Attribuzione Stima')->options(['cycle_start' => 'Inizio Ciclo', 'cycle_end' => 'Fine Ciclo'])->required(), DateInput::make('valid_to')->label('Prima Condizione Valida fino al'),
+                ])->modalDescription('La prima condizione economica decorre dall’Inizio Contrattuale. L’importo è riferito al ciclo selezionato.')->action(function (array $data): void {
+                    app(PlanContract::class)->createWithCondition($this->actor(), $this->proposal(), ['title' => $data['title'], 'notes' => $data['notes'] ?? null, 'supplier_id' => (int) $data['supplier_id'], 'contractual_start_date' => $data['contractual_start_date'], 'next_expiry_date' => $data['next_expiry_date'] ?? null, 'automatic_renewal' => (bool) ($data['automatic_renewal'] ?? false), 'renewal_duration_months' => filled($data['renewal_duration_months'] ?? null) ? (int) $data['renewal_duration_months'] : null, 'notice_days' => (int) ($data['notice_days'] ?? 0), 'exercise_id' => $this->proposal()->exercise_id, 'cost_center_id' => null], ['amount' => Decimal::money($data['amount']), 'cycle' => $data['cycle'], 'attribution_mode' => $data['attribution_mode'], 'valid_to' => $data['valid_to'], 'reason' => null], $data['operation_id'], (int) $data['proposal_revision']);
+                    $this->refreshProposal('Contratto Pianificato Aggiunto');
+                }),
+            ])->dropdown(false),
+            ActionGroup::make([
+                Action::make('copyExpense')->label('Copia Spesa da altro Esercizio')->visible(fn (): bool => $this->canPlan())->form([
+                    Select::make('source_expense_id')->label('Spesa Autonoma di Altro Esercizio')->options(fn (): array => Expense::query()->where('company_id', $this->proposal()->company_id)->where('exercise_id', '<>', $this->proposal()->exercise_id)->whereNull('project_id')->whereNull('contract_id')->whereNull('reversed_at')->orderBy('description')->pluck('description', 'id')->all())->required(),
+                    Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                ])->action(function (array $data): void {
+                    app(CopyExpenseIntoProposal::class)->execute($this->actor(), $this->proposal(), Expense::query()->findOrFail($data['source_expense_id']), $data['operation_id'], (int) $data['proposal_revision']);
+                    $this->refreshProposal('Spesa Copiata con Nuova Identità e Lineage');
+                }),
+                Action::make('includeClosedProject')->label('Riapri Progetto esistente')->visible(fn (): bool => $this->canPlan())->form([Select::make('source_id')->label('Progetto Chiuso o Cancellato')->options(fn (): array => $this->eligibleProjectOptions())->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision)])->action(function (array $data): void {
+                    app(IncludeProposalSource::class)->execute($this->actor(), $this->proposal(), ProposalSourceType::Project, (int) $data['source_id'], $data['operation_id'], (int) $data['proposal_revision']);
+                    $this->refreshProposal('Progetto Selezionato: Pianificare Ora la Riapertura');
+                }),
+                Action::make('includeTerminatedContract')->label('Riattiva Contratto esistente')->visible(fn (): bool => $this->canPlan())->form([Select::make('source_id')->label('Contratto Cessato o Annullato')->options(fn (): array => $this->eligibleContractOptions())->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision)])->action(function (array $data): void {
+                    app(IncludeProposalSource::class)->execute($this->actor(), $this->proposal(), ProposalSourceType::Contract, (int) $data['source_id'], $data['operation_id'], (int) $data['proposal_revision']);
+                    $this->refreshProposal('Contratto Selezionato: Pianificare Ora Condizione e Riattivazione');
+                }),
+            ])->dropdown(false),
+        ])->label('Aggiungi')->icon('heroicon-m-plus')->button()->visible(fn (): bool => $this->canPlan())->dropdownWidth(Width::ExtraSmall)->dropdownTeleport();
+    }
+
+    /** @return array<Action|ActionGroup> */
+    private function sourceActions(): array
+    {
+        return [
+            Action::make('planExpenseEstimates')->label('Gestisci')->icon('heroicon-m-pencil-square')->modalHeading('Modifica Stime')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Expense && ! $record->isExcludedFromPlan())->authorize(fn (): bool => $this->canPlan())->fillForm(fn (ProposalItem $record): array => ['estimate_lines' => $this->estimateFormLines($record->result['estimate_lines'] ?? []), 'operation_id' => (string) Str::uuid(), 'proposal_revision' => $this->proposal()->revision])->form([
+                Repeater::make('estimate_lines')->label('Sostituzione Completa Righe Stima')->schema($this->estimateLineSchema())->defaultItems(1)->required(),
+                Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+            ])->action(function (array $data, ProposalItem $record): void {
+                $item = $record;
+                app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::SetExpenseEstimates, ['estimate_lines' => $this->normalizeEstimateLines($data['estimate_lines'])], null, $data['operation_id'], (int) $data['proposal_revision']);
+                $this->refreshProposal('Stime Pianificate Aggiornate');
             }),
-            Action::make('keepProposal')->label('Mantieni Proposta')->visible(fn (): bool => $this->canRealign())->requiresConfirmation()->modalDescription('La realtà corrente diventa il nuovo piano base e tutte le decisioni attive della sorgente vengono rivalidate e riapplicate.')->form([
-                Select::make('item_id')->label('Sorgente da Riallineare')->options(fn (): array => $this->realignmentItemOptions())->required(),
-                Textarea::make('reason')->label('Motivazione')->required(),
-                Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
-                Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-            ])->action(function (array $data): void {
-                app(RealignProposalItem::class)->execute($this->actor(), $this->proposal(), $this->realignmentItem((int) $data['item_id']), ProposalRealignmentChoice::Keep, $data['reason'], [], $data['operation_id'], (int) $data['proposal_revision']);
-                $this->refreshProposal('Decisioni Riapplicate alla Realtà Corrente');
+            Action::make('planProjectTransition')->label('Gestisci')->icon('heroicon-m-pencil-square')->modalHeading('Pianifica Stato Progetto')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Project)->authorize(fn (): bool => $this->canPlan())->form([
+                Select::make('from_state')->label('Da')->options(['planned' => 'Pianificato', 'open' => 'Aperto', 'closed' => 'Chiuso', 'cancelled' => 'Cancellato'])->required(), Select::make('to_state')->label('A')->options(['planned' => 'Pianificato', 'open' => 'Aperto', 'closed' => 'Chiuso', 'cancelled' => 'Cancellato'])->required(), DateInput::make('effective_date')->label('Data Efficacia')->required(), Textarea::make('reason')->label('Motivazione'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+            ])->action(function (array $data, ProposalItem $record): void {
+                $item = $record;
+                app(PlanProject::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::PlanProjectTransition, ['from_state' => $data['from_state'], 'to_state' => $data['to_state'], 'effective_date' => $data['effective_date'], 'reason' => $data['reason'] ?? null], $data['reason'] ?? null, $data['operation_id'], (int) $data['proposal_revision']);
+                $this->refreshProposal('Stato Progetto Pianificato');
             }),
-            Action::make('manualRealignment')->label('Rivedi Manualmente')->visible(fn (): bool => $this->canRealign())->requiresConfirmation()->modalDescription('Selezionare le decisioni da mantenere. Le altre saranno ritirate senza riscriverne lo storico.')->form([
-                Select::make('item_id')->label('Sorgente da Riallineare')->options(fn (): array => $this->realignmentItemOptions())->required()->live(),
-                CheckboxList::make('retained_action_ids')->label('Decisioni da Mantenere')->options(fn (): array => $this->proposal()->actions()->get()->mapWithKeys(fn ($action): array => [$action->id => '#'.$action->sequence.' · '.$action->action_type->label()])->all()),
-                Textarea::make('reason')->label('Nota di Revisione'),
+            ActionGroup::make([
+                Action::make('changeContractEconomics')->label('Modifica Economia')->icon('heroicon-m-pencil-square')->modalHeading('Modifica Economica Contratto')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Contract && $record->contract_id !== null)->modalWidth(Width::FourExtraLarge)->authorize(fn (): bool => $this->canPlan())->form([
+                    Select::make('condition_id')->label('Condizione Economica')->options(fn (ProposalItem $record): array => $this->contractConditionOptions($record))->required()->live()->afterStateUpdated(fn (Set $set) => $set('confirmed_effective_date', null)), DecimalInput::make('amount')->label('Nuovo Importo Netto IVA')->minValue(0)->required()->live(onBlur: true), Select::make('cycle')->label('Nuovo Ciclo')->options(['monthly' => 'Mensile', 'quarterly' => 'Trimestrale', 'semiannual' => 'Semestrale', 'annual' => 'Annuale'])->required()->live(), Select::make('attribution_mode')->label('Nuova Attribuzione')->options(['cycle_start' => 'Inizio ciclo', 'cycle_end' => 'Fine ciclo'])->required()->live(), DateInput::make('requested_date')->label('Data Richiesta')->required(), Placeholder::make('economic_preview')->label('Anteprima Economica')->hiddenLabel()->content(fn (Get $get, ProposalItem $record): View => $this->contractEconomicPreview($get, $record)), DateInput::make('confirmed_effective_date')->label('Data Efficace Applicabile Confermata')->required(), Textarea::make('reason')->label('Motivazione'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                ])->modalDescription('Verifica l’anteprima e conferma la Data Efficace Applicabile. All’approvazione la decorrenza sarà ricalcolata; se cambia sarà necessaria una nuova conferma. Prorata applicato: no.')->action(function (array $data, ProposalItem $record): void {
+                    $item = $record;
+                    app(PlanContract::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::ChangeContractEconomics, ['condition_id' => (int) $data['condition_id'], 'amount' => Decimal::money($data['amount']), 'cycle' => $data['cycle'], 'attribution_mode' => $data['attribution_mode'], 'requested_date' => $data['requested_date'], 'confirmed_effective_date' => $data['confirmed_effective_date'], 'reason' => $data['reason'] ?? null], $data['reason'] ?? null, $data['operation_id'], (int) $data['proposal_revision']);
+                    $this->refreshProposal('Modifica Economica Pianificata');
+                }),
+                Action::make('addContractCondition')->label('Aggiungi Condizione Contratto')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Contract)->authorize(fn (): bool => $this->canPlan())->form([
+                    Select::make('cycle')->label('Ciclo')->options(['monthly' => 'Mensile', 'quarterly' => 'Trimestrale', 'semiannual' => 'Semestrale', 'annual' => 'Annuale'])->required(), Select::make('attribution_mode')->label('Attribuzione')->options(['cycle_start' => 'Inizio Ciclo', 'cycle_end' => 'Fine Ciclo'])->required(), DecimalInput::make('amount')->label('Importo Netto IVA')->minValue(0)->required(), DateInput::make('valid_from')->label('Valida dal')->required(), DateInput::make('valid_to')->label('Valida fino al'), Textarea::make('reason')->label('Motivazione'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                ])->action(function (array $data, ProposalItem $record): void {
+                    $item = $record;
+                    app(PlanContract::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::AddContractCondition, ['cycle' => $data['cycle'], 'attribution_mode' => $data['attribution_mode'], 'amount' => Decimal::money($data['amount']), 'valid_from' => $data['valid_from'], 'valid_to' => $data['valid_to'] ?? null, 'reason' => $data['reason'] ?? null], $data['reason'] ?? null, $data['operation_id'], (int) $data['proposal_revision']);
+                    $this->refreshProposal('Condizione Contrattuale Pianificata');
+                }),
+            ])->label('Gestisci')->icon('heroicon-m-pencil-square')->link()->dropdownWidth(Width::ExtraSmall),
+            Action::make('acknowledgeSource')->label('Prendi visione')->visible(fn (ProposalItem $record): bool => $this->canAcknowledge($record))->requiresConfirmation()->modalDescription('Conferma la realtà corrente della sorgente. La presa visione non crea una modifica economica e non tocca gli Effettivi; eventuali variazioni di Stima vanno preparate prima con un’azione tipizzata.')->authorize(fn (): bool => $this->canPlan())->form([
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
                 Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-            ])->action(function (array $data): void {
-                app(RealignProposalItem::class)->execute($this->actor(), $this->proposal(), $this->realignmentItem((int) $data['item_id']), ProposalRealignmentChoice::Manual, $data['reason'] ?? null, array_map('intval', $data['retained_action_ids'] ?? []), $data['operation_id'], (int) $data['proposal_revision']);
-                $this->refreshProposal('Revisione Manuale Confermata');
-            }),
-            Action::make('acknowledgeSource')->label('Prendi Visione')->visible(fn (): bool => $this->canAcknowledge())->requiresConfirmation()->modalDescription('Conferma la realtà corrente della sorgente. La presa visione non crea una modifica economica e non tocca gli Effettivi; eventuali variazioni di Stima vanno preparate prima con un’azione tipizzata.')->form([
-                Select::make('item_id')->label('Nuova Sorgente')->options(fn (): array => $this->acknowledgementItemOptions())->required(),
-                Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
-                Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-            ])->action(function (array $data): void {
-                $item = $this->proposal()->items()->where('readiness_state', 'to_review')->findOrFail((int) $data['item_id']);
+            ])->action(function (array $data, ProposalItem $record): void {
+                $item = $record;
                 app(AcknowledgeProposalSource::class)->execute($this->actor(), $this->proposal(), $item, $data['operation_id'], (int) $data['proposal_revision']);
                 $this->refreshProposal('Sorgente Presa in Visione');
             }),
             ActionGroup::make([
-                Action::make('includeClosedProject')->label('Seleziona Progetto da Riaprire')->visible(fn (): bool => $this->canPlan())->form([Select::make('source_id')->label('Progetto Chiuso o Cancellato')->options(fn (): array => $this->eligibleProjectOptions())->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision)])->action(function (array $data): void {
-                    app(IncludeProposalSource::class)->execute($this->actor(), $this->proposal(), ProposalSourceType::Project, (int) $data['source_id'], $data['operation_id'], (int) $data['proposal_revision']);
-                    $this->refreshProposal('Progetto Selezionato: Pianificare Ora la Riapertura');
+                Action::make('reloadReality')->label('Ricarica Realtà')->visible(fn (ProposalItem $record): bool => $this->canRealign($record))->requiresConfirmation()->modalDescription('Tutte le decisioni che toccano la sorgente saranno ritirate. La realtà corrente sostituirà integralmente piano base e risultato.')->authorize(fn (): bool => $this->canPlan())->form([
+                    Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
+                    Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                ])->action(function (array $data, ProposalItem $record): void {
+                    app(RealignProposalItem::class)->execute($this->actor(), $this->proposal(), $record, ProposalRealignmentChoice::Reload, null, [], $data['operation_id'], (int) $data['proposal_revision']);
+                    $this->refreshProposal('Realtà Ricaricata per l’Intera Sorgente');
                 }),
-                Action::make('includeTerminatedContract')->label('Seleziona Contratto da Riattivare')->visible(fn (): bool => $this->canPlan())->form([Select::make('source_id')->label('Contratto Cessato o Annullato')->options(fn (): array => $this->eligibleContractOptions())->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision)])->action(function (array $data): void {
-                    app(IncludeProposalSource::class)->execute($this->actor(), $this->proposal(), ProposalSourceType::Contract, (int) $data['source_id'], $data['operation_id'], (int) $data['proposal_revision']);
-                    $this->refreshProposal('Contratto Selezionato: Pianificare Ora Condizione e Riattivazione');
+                Action::make('keepProposal')->label('Mantieni Proposta')->visible(fn (ProposalItem $record): bool => $this->canRealign($record))->requiresConfirmation()->modalDescription('La realtà corrente diventa il nuovo piano base e tutte le decisioni attive della sorgente vengono rivalidate e riapplicate.')->authorize(fn (): bool => $this->canPlan())->form([
+                    Textarea::make('reason')->label('Motivazione')->required(),
+                    Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
+                    Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                ])->action(function (array $data, ProposalItem $record): void {
+                    app(RealignProposalItem::class)->execute($this->actor(), $this->proposal(), $record, ProposalRealignmentChoice::Keep, $data['reason'], [], $data['operation_id'], (int) $data['proposal_revision']);
+                    $this->refreshProposal('Decisioni Riapplicate alla Realtà Corrente');
                 }),
-                Action::make('planProjectDeferral')->label('Rinvio')->visible(fn (): bool => $this->canPlan())->modalDescription('Scegliere una sola modalità. Riporto e Riprogrammazione usano la disponibilità canonica dell’Esercizio immediatamente precedente; gli Effettivi restano in sola lettura e i Budget esistenti invariati.')->form([
-                    Select::make('item_id')->label('Progetto')->options(fn (): array => $this->deferralProjectOptions())->live()->required(),
+                Action::make('manualRealignment')->label('Rivedi Manualmente')->visible(fn (ProposalItem $record): bool => $this->canRealign($record))->requiresConfirmation()->modalDescription('Selezionare le decisioni da mantenere. Le altre saranno ritirate senza riscriverne lo storico.')->authorize(fn (): bool => $this->canPlan())->form([
+                    CheckboxList::make('retained_action_ids')->label('Decisioni da Mantenere')->options(fn (ProposalItem $record): array => app(ProposalActionReplay::class)->touchingActions($record, $this->proposal()->actions()->get())->mapWithKeys(fn ($action): array => [$action->id => '#'.$action->sequence.' · '.$action->action_type->label()])->all()),
+                    Textarea::make('reason')->label('Nota di Revisione'),
+                    Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
+                    Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                ])->action(function (array $data, ProposalItem $record): void {
+                    app(RealignProposalItem::class)->execute($this->actor(), $this->proposal(), $record, ProposalRealignmentChoice::Manual, $data['reason'] ?? null, array_map('intval', $data['retained_action_ids'] ?? []), $data['operation_id'], (int) $data['proposal_revision']);
+                    $this->refreshProposal('Revisione Manuale Confermata');
+                }),
+            ])->label('Riallinea')->icon('heroicon-m-arrow-path')->color('warning')->button()->visible(fn (ProposalItem $record): bool => $this->canRealign($record)),
+            ActionGroup::make([
+                Action::make('planExpenseOwner')->label('Sposta piano')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Expense && ! $record->isExcludedFromPlan() && ! data_get($record->baseline, 'actual_context.has_actuals', false) && data_get($record->baseline, 'plan_baseline.contract_id') === null)->authorize(fn (): bool => $this->canPlan())->form([
+                    Select::make('exercise_id')->label('Esercizio Aperto')->options(fn (): array => Exercise::query()->where('company_id', $this->proposal()->company_id)->open()->orderBy('year')->pluck('year', 'id')->all())->default(fn (): int => $this->proposal()->exercise_id)->required(),
+                    Select::make('project_reference')->label('Contenitore Piano')->options(fn (): array => $this->expenseProjectReferenceOptions())->default('autonomous')->required(),
+                    Textarea::make('reason')->label('Motivazione'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                ])->modalDescription('Muove soltanto una Spesa priva di Effettivi tra autonomia e Progetti. Per cambiare anno a una Spesa di Progetto usa Rinvio in modalità Riprogrammazione.')->action(function (array $data, ProposalItem $record): void {
+                    $item = $record;
+                    app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::SetExpenseOwner, ['exercise_id' => (int) $data['exercise_id'], ...$this->parseExpenseProjectReference($data['project_reference'])], $data['reason'] ?? null, $data['operation_id'], (int) $data['proposal_revision']);
+                    $this->refreshProposal('Contenitore del Piano Aggiornato');
+                }),
+                Action::make('planExpenseSupplier')->label('Cambia Fornitore')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Expense && ! $record->isExcludedFromPlan() && ! data_get($record->baseline, 'actual_context.has_actuals', false) && data_get($record->baseline, 'plan_baseline.contract_id') === null)->authorize(fn (): bool => $this->canPlan())->form([
+                    Select::make('supplier_id')->label('Fornitore')->options(fn (): array => Supplier::query()->where('company_id', $this->proposal()->company_id)->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all())->placeholder('Nessun Fornitore'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                ])->action(function (array $data, ProposalItem $record): void {
+                    app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $record, ProposalActionType::SetExpenseSupplier, ['supplier_id' => filled($data['supplier_id'] ?? null) ? (int) $data['supplier_id'] : null], null, $data['operation_id'], (int) $data['proposal_revision']);
+                    $this->refreshProposal('Fornitore del Piano Aggiornato');
+                }),
+                Action::make('planExpenseCostCenter')->label('Cambia Centro di Costo')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Expense && ! $record->isExcludedFromPlan() && ! data_get($record->baseline, 'actual_context.has_actuals', false) && data_get($record->baseline, 'plan_baseline.contract_id') === null && data_get($record->baseline, 'plan_baseline.project_id') === null && ! filled($record->result['project_id'] ?? $record->result['project_item_id'] ?? null))->authorize(fn (): bool => $this->canPlan())->form([
+                    Select::make('cost_center_id')->label('Centro di Costo Diretto')->options(fn (): array => CostCenterHierarchy::forCompany((int) $this->proposal()->company_id)->options())->placeholder('Non classificata'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                ])->action(function (array $data, ProposalItem $record): void {
+                    app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $record, ProposalActionType::SetExpenseCostCenter, ['cost_center_id' => filled($data['cost_center_id'] ?? null) ? (int) $data['cost_center_id'] : null], null, $data['operation_id'], (int) $data['proposal_revision']);
+                    $this->refreshProposal('Centro di Costo del Piano Aggiornato');
+                }),
+                Action::make('reversePlannedExpense')->label('Storna Spesa nel Piano')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Expense && ! $record->isExcludedFromPlan() && ! data_get($record->baseline, 'actual_context.has_actuals', false) && ! ($record->result['reversed'] ?? filled($record->result['reversed_at'] ?? null)))->requiresConfirmation()->authorize(fn (): bool => $this->canPlan())->form([Textarea::make('reason')->label('Motivazione')->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision)])->action(function (array $data, ProposalItem $record): void {
+                    app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $record, ProposalActionType::ReverseExpense, ['reason' => $data['reason']], $data['reason'], $data['operation_id'], (int) $data['proposal_revision']);
+                    $this->refreshProposal('Storno Pianificato');
+                }),
+                Action::make('restorePlannedExpense')->label('Ripristina Spesa nel Piano')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Expense && ! $record->isExcludedFromPlan() && ! data_get($record->baseline, 'actual_context.has_actuals', false) && ($record->result['reversed'] ?? filled($record->result['reversed_at'] ?? null)))->requiresConfirmation()->authorize(fn (): bool => $this->canPlan())->form([Textarea::make('reason')->label('Motivazione')->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision)])->action(function (array $data, ProposalItem $record): void {
+                    app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $record, ProposalActionType::RestoreExpense, ['reason' => $data['reason']], $data['reason'], $data['operation_id'], (int) $data['proposal_revision']);
+                    $this->refreshProposal('Ripristino Pianificato');
+                }),
+                Action::make('planProjectDeferral')->label('Rinvio')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Project && $record->project_id !== null && $this->previousExercise() !== null)->modalDescription('Scegliere una sola modalità. Riporto e Riprogrammazione usano la disponibilità canonica dell’Esercizio immediatamente precedente; gli Effettivi restano in sola lettura e i Budget esistenti invariati.')->authorize(fn (): bool => $this->canPlan())->form([
                     Select::make('mode')->label('Modalità')->options([
                         ProjectDeferralMode::None->value => ProjectDeferralMode::None->label(),
                         ProjectDeferralMode::Carryover->value => ProjectDeferralMode::Carryover->label(),
                         ProjectDeferralMode::Reprogramming->value => ProjectDeferralMode::Reprogramming->label(),
-                    ])->disableOptionWhen(fn (string $value, Get $get): bool => $this->deferralModeDisabled($value, (int) $get('item_id')))->live()->required(),
+                    ])->disableOptionWhen(fn (string $value, ProposalItem $record): bool => $this->deferralModeDisabled($value, (int) $record->id))->live()->required(),
                     TextInput::make('carryover_amount')->label('Riporto Provvisorio')->numeric()->minValue(0.01)->prefix('€')->visible(fn (Get $get): bool => $get('mode') === 'carryover')->required(fn (Get $get): bool => $get('mode') === 'carryover'),
                     Repeater::make('source_estimate_reductions')->label('Riduzioni Stime Origine')->schema([
-                        Select::make('source_line_id')->label('Riga Stima Origine')->options(fn (Get $get): array => $this->proposalDeferralLineOptions((int) $get('../../item_id')))->required(),
+                        Select::make('source_line_id')->label('Riga Stima Origine')->options(fn (ProposalItem $record): array => $this->proposalDeferralLineOptions((int) $record->id))->required(),
                         TextInput::make('reduction_amount')->label('Riduzione')->numeric()->minValue(0.01)->prefix('€')->required(),
                         Select::make('destination_supplier_id')->label('Fornitore Destinazione')->options(fn (): array => ['none' => 'Nessun Fornitore'] + Supplier::query()->where('company_id', $this->proposal()->company_id)->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all())->required(),
                     ])->columns(3)->minItems(1)->visible(fn (Get $get): bool => $get('mode') === 'reprogramming')->required(fn (Get $get): bool => $get('mode') === 'reprogramming'),
-                    Placeholder::make('deferral_formula')->label('Valori e Impatto')->content(fn (Get $get): string => $this->proposalDeferralSummary($get)),
+                    Placeholder::make('deferral_formula')->label('Valori e Impatto')->content(fn (Get $get, ProposalItem $record): string => $this->proposalDeferralSummary($get, $record)),
                     Textarea::make('reason')->label('Motivazione del Rinvio')->required(),
                     Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
                     Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->action(function (array $data): void {
-                    $item = ProposalItem::query()->where('proposal_id', $this->proposal()->id)->where('source_type', 'project')->whereNotNull('project_id')->findOrFail((int) $data['item_id']);
+                ])->action(function (array $data, ProposalItem $record): void {
+                    $item = $record;
                     $source = $this->previousExercise();
                     if ($source === null) {
                         throw ValidationException::withMessages(['exercise' => 'Non esiste un Esercizio immediatamente precedente.']);
@@ -226,181 +407,93 @@ class ViewProposal extends ViewRecord
                     ], $data['reason'], $data['operation_id'], (int) $data['proposal_revision']);
                     $this->refreshProposal('Rinvio del Progetto Pianificato');
                 }),
-                Action::make('createPlannedExpense')->label('Nuova Spesa Pianificata')->visible(fn (): bool => $this->canPlan())->form([
-                    TextInput::make('description')->label('Descrizione')->required()->maxLength(255), Textarea::make('notes')->label('Note'),
-                    Select::make('project_reference')->label('Progetto di Destinazione')->options(fn (): array => $this->newExpenseProjectReferenceOptions())->default('autonomous')->required(),
-                    Select::make('supplier_id')->label('Fornitore')->options(fn (): array => Supplier::query()->where('company_id', $this->proposal()->company_id)->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all())->placeholder('Nessun Fornitore'),
-                    Select::make('cost_center_id')->label('Centro di Costo Diretto (Solo Autonoma)')->options(fn (): array => CostCenterHierarchy::forCompany((int) $this->proposal()->company_id)->options())->placeholder('Non classificata'),
-                    Repeater::make('estimate_lines')->label('Righe Stima')->schema($this->estimateLineSchema())->defaultItems(1)->required(),
-                    Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->modalDescription('Per riposizionare piano residuo, ridurre prima le Stime originarie e creare qui una Spesa distinta: nessun matching con gli Effettivi.')->action(function (array $data): void {
-                    $actor = $this->actor();
-                    app(PlanExpense::class)->create($actor, $this->proposal(), ['description' => $data['description'], 'notes' => $data['notes'] ?? null, 'exercise_id' => $this->proposal()->exercise_id, 'supplier_id' => filled($data['supplier_id'] ?? null) ? (int) $data['supplier_id'] : null, 'cost_center_id' => filled($data['cost_center_id'] ?? null) ? (int) $data['cost_center_id'] : null, ...$this->parseExpenseProjectReference($data['project_reference']), 'estimate_lines' => $this->normalizeEstimateLines($data['estimate_lines'])], null, $data['operation_id'], (int) $data['proposal_revision']);
-                    $this->refreshProposal('Spesa Pianificata Aggiunta');
-                }),
-                Action::make('createProjectAllocation')->label('Nuova Allocazione')->visible(fn (): bool => $this->canPlan())->modalDescription('Aumenta le Stime di destinazione in modo indipendente: non è Riporto né Riprogrammazione e non sarà rimossa da una futura inversione della Riprogrammazione.')->form([
-                    Select::make('project_id')->label('Progetto Vivo di Destinazione')->options(fn (): array => Project::query()->where('company_id', $this->proposal()->company_id)->active()->orderBy('title')->pluck('title', 'id')->all())->required(),
+                Action::make('createProjectAllocation')->label('Nuova Allocazione')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Project && $record->project_id !== null)->modalDescription('Aumenta le Stime di destinazione in modo indipendente: non è Riporto né Riprogrammazione e non sarà rimossa da una futura inversione della Riprogrammazione.')->authorize(fn (): bool => $this->canPlan())->form([
                     TextInput::make('description')->label('Descrizione')->required()->maxLength(255),
                     Select::make('supplier_id')->label('Fornitore')->options(fn (): array => Supplier::query()->where('company_id', $this->proposal()->company_id)->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all())->placeholder('Nessun Fornitore'),
                     Repeater::make('estimate_lines')->label('Righe Stima')->schema($this->estimateLineSchema())->defaultItems(1)->required(),
                     Textarea::make('reason')->label('Nota')->required(),
                     Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->action(function (array $data): void {
+                ])->action(function (array $data, ProposalItem $record): void {
                     app(PlanExpense::class)->create($this->actor(), $this->proposal(), [
                         'description' => $data['description'], 'notes' => null, 'exercise_id' => $this->proposal()->exercise_id,
                         'supplier_id' => filled($data['supplier_id'] ?? null) ? (int) $data['supplier_id'] : null,
-                        'cost_center_id' => null, 'project_id' => (int) $data['project_id'], 'project_item_id' => null,
+                        'cost_center_id' => null, 'project_id' => (int) $record->project_id, 'project_item_id' => null,
                         'estimate_lines' => $this->normalizeEstimateLines($data['estimate_lines']),
                     ], $data['reason'], $data['operation_id'], (int) $data['proposal_revision'], ProposalActionType::CreateProjectAllocation);
                     $this->refreshProposal('Nuova Allocazione del Progetto Aggiunta');
                 }),
-                Action::make('planExpenseEstimates')->label('Modifica Stime Spesa')->visible(fn (): bool => $this->canPlan())->form([
-                    Select::make('item_id')->label('Spesa')->options(fn (): array => $this->itemOptions(ProposalSourceType::Expense))->required(),
-                    Repeater::make('estimate_lines')->label('Sostituzione Completa Righe Stima')->schema($this->estimateLineSchema())->defaultItems(1)->required(),
+                Action::make('planProjectChildExpenses')->label('Associa Spese Pianificate al Progetto')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Project)->authorize(fn (): bool => $this->canPlan())->form([
+                    Select::make('child_item_ids')->label('Nuove Spese della Stessa Proposta')->multiple()->options(fn (ProposalItem $record): array => $this->proposal()->items()->where('source_type', 'expense')->whereNull('expense_id')->get()->filter(fn (ProposalItem $child): bool => ! $child->isExcludedFromPlan() && ($child->result['project_item_id'] ?? null) === $record->proposal_item_id)->mapWithKeys(fn (ProposalItem $child): array => [$child->proposal_item_id => $child->result['description']])->all())->required(),
                     Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->action(function (array $data): void {
-                    $item = ProposalItem::query()->where('proposal_id', $this->proposal()->id)->findOrFail($data['item_id']);
-                    app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::SetExpenseEstimates, ['estimate_lines' => $this->normalizeEstimateLines($data['estimate_lines'])], null, $data['operation_id'], (int) $data['proposal_revision']);
-                    $this->refreshProposal('Stime Pianificate Aggiornate');
-                }),
-                Action::make('planExpenseOwner')->label('Sposta Piano Spesa')->visible(fn (): bool => $this->canPlan())->form([
-                    Select::make('item_id')->label('Spesa Priva di Effettivi')->options(fn (): array => $this->itemOptions(ProposalSourceType::Expense))->required(),
-                    Select::make('exercise_id')->label('Esercizio Aperto')->options(fn (): array => Exercise::query()->where('company_id', $this->proposal()->company_id)->open()->orderBy('year')->pluck('year', 'id')->all())->default(fn (): int => $this->proposal()->exercise_id)->required(),
-                    Select::make('project_reference')->label('Contenitore Piano')->options(fn (): array => $this->expenseProjectReferenceOptions())->default('autonomous')->required(),
-                    Textarea::make('reason')->label('Motivazione'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->modalDescription('Muove soltanto una Spesa priva di Effettivi tra autonomia e Progetti. Per cambiare anno a una Spesa di Progetto usa Rinvio in modalità Riprogrammazione.')->action(function (array $data): void {
-                    $item = $this->expenseItem((int) $data['item_id']);
-                    app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::SetExpenseOwner, ['exercise_id' => (int) $data['exercise_id'], ...$this->parseExpenseProjectReference($data['project_reference'])], $data['reason'] ?? null, $data['operation_id'], (int) $data['proposal_revision']);
-                    $this->refreshProposal('Contenitore del Piano Aggiornato');
-                }),
-                Action::make('planExpenseSupplier')->label('Cambia Fornitore Piano Spesa')->visible(fn (): bool => $this->canPlan())->form([
-                    Select::make('item_id')->label('Spesa Autonoma o di Progetto senza Effettivi')->options(fn (): array => $this->itemOptions(ProposalSourceType::Expense))->required(), Select::make('supplier_id')->label('Fornitore')->options(fn (): array => Supplier::query()->where('company_id', $this->proposal()->company_id)->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all())->placeholder('Nessun Fornitore'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->action(function (array $data): void {
-                    app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $this->expenseItem((int) $data['item_id']), ProposalActionType::SetExpenseSupplier, ['supplier_id' => filled($data['supplier_id'] ?? null) ? (int) $data['supplier_id'] : null], null, $data['operation_id'], (int) $data['proposal_revision']);
-                    $this->refreshProposal('Fornitore del Piano Aggiornato');
-                }),
-                Action::make('planExpenseCostCenter')->label('Cambia Centro di Costo Piano Spesa')->visible(fn (): bool => $this->canPlan())->form([
-                    Select::make('item_id')->label('Spesa Autonoma senza Effettivi')->options(fn (): array => $this->itemOptions(ProposalSourceType::Expense))->required(), Select::make('cost_center_id')->label('Centro di Costo Diretto')->options(fn (): array => CostCenterHierarchy::forCompany((int) $this->proposal()->company_id)->options())->placeholder('Non classificata'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->action(function (array $data): void {
-                    app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $this->expenseItem((int) $data['item_id']), ProposalActionType::SetExpenseCostCenter, ['cost_center_id' => filled($data['cost_center_id'] ?? null) ? (int) $data['cost_center_id'] : null], null, $data['operation_id'], (int) $data['proposal_revision']);
-                    $this->refreshProposal('Centro di Costo del Piano Aggiornato');
-                }),
-                Action::make('reversePlannedExpense')->label('Storna Spesa nel Piano')->visible(fn (): bool => $this->canPlan())->requiresConfirmation()->form([Select::make('item_id')->label('Spesa Priva di Effettivi')->options(fn (): array => $this->itemOptions(ProposalSourceType::Expense))->required(), Textarea::make('reason')->label('Motivazione')->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision)])->action(function (array $data): void {
-                    app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $this->expenseItem((int) $data['item_id']), ProposalActionType::ReverseExpense, ['reason' => $data['reason']], $data['reason'], $data['operation_id'], (int) $data['proposal_revision']);
-                    $this->refreshProposal('Storno Pianificato');
-                }),
-                Action::make('restorePlannedExpense')->label('Ripristina Spesa nel Piano')->visible(fn (): bool => $this->canPlan())->requiresConfirmation()->form([Select::make('item_id')->label('Spesa Stornata Priva di Effettivi')->options(fn (): array => $this->itemOptions(ProposalSourceType::Expense))->required(), Textarea::make('reason')->label('Motivazione')->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision)])->action(function (array $data): void {
-                    app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $this->expenseItem((int) $data['item_id']), ProposalActionType::RestoreExpense, ['reason' => $data['reason']], $data['reason'], $data['operation_id'], (int) $data['proposal_revision']);
-                    $this->refreshProposal('Ripristino Pianificato');
-                }),
-                Action::make('copyExpense')->label('Copia Spesa Autonoma')->visible(fn (): bool => $this->canPlan())->form([
-                    Select::make('source_expense_id')->label('Spesa Autonoma di Altro Esercizio')->options(fn (): array => Expense::query()->where('company_id', $this->proposal()->company_id)->where('exercise_id', '<>', $this->proposal()->exercise_id)->whereNull('project_id')->whereNull('contract_id')->whereNull('reversed_at')->orderBy('description')->pluck('description', 'id')->all())->required(),
-                    Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->action(function (array $data): void {
-                    app(CopyExpenseIntoProposal::class)->execute($this->actor(), $this->proposal(), Expense::query()->findOrFail($data['source_expense_id']), $data['operation_id'], (int) $data['proposal_revision']);
-                    $this->refreshProposal('Spesa Copiata con Nuova Identità e Lineage');
-                }),
-                Action::make('createPlannedProject')->label('Nuovo Progetto Pianificato')->visible(fn (): bool => $this->canPlan())->form([
-                    TextInput::make('title')->label('Titolo')->required()->maxLength(255), Textarea::make('description')->label('Descrizione'), Textarea::make('notes')->label('Note'),
-                    Hidden::make('initial_state')->default('planned'), DateInput::make('initial_effective_date')->label('Efficace dal')->required(),
-                    Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->action(function (array $data): void {
-                    app(PlanProject::class)->create($this->actor(), $this->proposal(), ['title' => $data['title'], 'description' => $data['description'] ?? null, 'notes' => $data['notes'] ?? null, 'initial_state' => $data['initial_state'], 'initial_effective_date' => $data['initial_effective_date'], 'exercise_id' => $this->proposal()->exercise_id, 'cost_center_id' => null], $data['operation_id'], (int) $data['proposal_revision']);
-                    $this->refreshProposal('Progetto Pianificato Aggiunto');
-                }),
-                Action::make('planProjectTransition')->label('Pianifica Stato Progetto')->visible(fn (): bool => $this->canPlan())->form([
-                    Select::make('item_id')->label('Progetto')->options(fn (): array => $this->itemOptions(ProposalSourceType::Project))->required(), Select::make('from_state')->label('Da')->options(['planned' => 'Pianificato', 'open' => 'Aperto', 'closed' => 'Chiuso', 'cancelled' => 'Cancellato'])->required(), Select::make('to_state')->label('A')->options(['planned' => 'Pianificato', 'open' => 'Aperto', 'closed' => 'Chiuso', 'cancelled' => 'Cancellato'])->required(), DateInput::make('effective_date')->label('Data Efficacia')->required(), Textarea::make('reason')->label('Motivazione'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->action(function (array $data): void {
-                    $item = ProposalItem::query()->where('proposal_id', $this->proposal()->id)->findOrFail($data['item_id']);
-                    app(PlanProject::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::PlanProjectTransition, ['from_state' => $data['from_state'], 'to_state' => $data['to_state'], 'effective_date' => $data['effective_date'], 'reason' => $data['reason'] ?? null], $data['reason'] ?? null, $data['operation_id'], (int) $data['proposal_revision']);
-                    $this->refreshProposal('Stato Progetto Pianificato');
-                }),
-                Action::make('planProjectChildExpenses')->label('Associa Spese Pianificate al Progetto')->visible(fn (): bool => $this->canPlan())->form([
-                    Select::make('item_id')->label('Progetto')->options(fn (): array => $this->itemOptions(ProposalSourceType::Project))->required(),
-                    Select::make('child_item_ids')->label('Nuove Spese della Stessa Proposta')->multiple()->options(fn (): array => $this->proposal()->items()->where('source_type', 'expense')->whereNull('expense_id')->pluck('proposal_item_id', 'proposal_item_id')->all())->required(),
-                    Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->action(function (array $data): void {
-                    $item = ProposalItem::query()->where('proposal_id', $this->proposal()->id)->where('source_type', 'project')->findOrFail($data['item_id']);
+                ])->action(function (array $data, ProposalItem $record): void {
+                    $item = $record;
                     app(PlanProject::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::PlanProjectChildExpenses, ['child_item_ids' => array_values($data['child_item_ids']), 'existing_expenses' => []], null, $data['operation_id'], (int) $data['proposal_revision']);
                     $this->refreshProposal('Spese Pianificate Associate al Progetto');
                 }),
-                Action::make('planProjectExpenseEstimates')->label('Modifica Stime Figlie Progetto')->visible(fn (): bool => $this->canPlan())->form([
-                    Select::make('item_id')->label('Progetto')->options(fn (): array => $this->itemOptions(ProposalSourceType::Project))->required(),
-                    Select::make('expense_id')->label('Spesa Figlia Esistente')->options(fn (): array => Expense::query()->where('company_id', $this->proposal()->company_id)->where('exercise_id', $this->proposal()->exercise_id)->whereNotNull('project_id')->whereNull('reversed_at')->orderBy('description')->pluck('description', 'id')->all())->required(),
+                Action::make('planProjectExpenseEstimates')->label('Modifica Stime Figlie Progetto')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Project && $record->project_id !== null)->authorize(fn (): bool => $this->canPlan())->form([
+                    Select::make('expense_id')->label('Spesa Figlia Esistente')->options(fn (ProposalItem $record): array => Expense::query()->where('company_id', $this->proposal()->company_id)->where('exercise_id', $this->proposal()->exercise_id)->where('project_id', $record->project_id)->whereNull('reversed_at')->orderBy('description')->pluck('description', 'id')->all())->required(),
                     Repeater::make('estimate_lines')->label('Sostituzione Completa Righe Stima')->schema($this->estimateLineSchema())->defaultItems(1)->required(),
                     Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->action(function (array $data): void {
-                    $item = ProposalItem::query()->where('proposal_id', $this->proposal()->id)->where('source_type', 'project')->findOrFail($data['item_id']);
+                ])->action(function (array $data, ProposalItem $record): void {
+                    $item = $record;
                     app(PlanProject::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::PlanProjectChildExpenses, ['child_item_ids' => [], 'existing_expenses' => [['expense_id' => (int) $data['expense_id'], 'estimate_lines' => $this->normalizeEstimateLines($data['estimate_lines'])]]], null, $data['operation_id'], (int) $data['proposal_revision']);
                     $this->refreshProposal('Stime Figlie del Progetto Aggiornate');
                 }),
-                Action::make('planProjectCostCenter')->label('Cambia Centro di Costo Progetto')->visible(fn (): bool => $this->canPlan())->form([
-                    Select::make('item_id')->label('Progetto senza Effettivi')->options(fn (): array => $this->itemOptions(ProposalSourceType::Project))->required(), Select::make('cost_center_id')->label('Centro di Costo Annuale')->options(fn (): array => CostCenterHierarchy::forCompany((int) $this->proposal()->company_id)->options())->placeholder('Non classificato'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->action(function (array $data): void {
-                    $item = ProposalItem::query()->where('proposal_id', $this->proposal()->id)->where('source_type', 'project')->findOrFail($data['item_id']);
+                Action::make('planProjectCostCenter')->label('Cambia Centro di Costo')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Project && ! data_get($record->baseline, 'actual_context.has_actuals', false))->authorize(fn (): bool => $this->canPlan())->form([
+                    Select::make('cost_center_id')->label('Centro di Costo Annuale')->options(fn (): array => CostCenterHierarchy::forCompany((int) $this->proposal()->company_id)->options())->placeholder('Non classificato'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                ])->action(function (array $data, ProposalItem $record): void {
+                    $item = $record;
                     app(PlanProject::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::SetProjectCostCenter, ['exercise_id' => $this->proposal()->exercise_id, 'cost_center_id' => filled($data['cost_center_id'] ?? null) ? (int) $data['cost_center_id'] : null], null, $data['operation_id'], (int) $data['proposal_revision']);
                     $this->refreshProposal('Centro di Costo del Progetto Aggiornato');
                 }),
-                Action::make('createPlannedContract')->label('Nuovo Contratto Pianificato')->visible(fn (): bool => $this->canPlan())->form([
-                    TextInput::make('title')->label('Titolo')->required()->maxLength(255), Select::make('supplier_id')->label('Fornitore')->options(fn (): array => Supplier::query()->where('company_id', $this->proposal()->company_id)->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all())->required(), DateInput::make('contractual_start_date')->label('Inizio Contrattuale')->required(), DateInput::make('next_expiry_date')->label('Prossima Scadenza'), Toggle::make('automatic_renewal')->label('Rinnovo Automatico')->default(false), TextInput::make('renewal_duration_months')->label('Durata Rinnovo (Mesi)')->integer()->minValue(1), TextInput::make('notice_days')->label('Preavviso (Giorni)')->integer()->minValue(0)->default(0), Textarea::make('notes')->label('Note'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                    DecimalInput::make('amount')->label('Importo Netto IVA per Ciclo')->minValue(0)->required(), Select::make('cycle')->label('Ciclo')->options(['monthly' => 'Mensile', 'quarterly' => 'Trimestrale', 'semiannual' => 'Semestrale', 'annual' => 'Annuale'])->required(), Select::make('attribution_mode')->label('Attribuzione Stima')->options(['cycle_start' => 'Inizio Ciclo', 'cycle_end' => 'Fine Ciclo'])->required(), DateInput::make('valid_to')->label('Prima Condizione Valida fino al'),
-                ])->modalDescription('La prima condizione economica decorre dall’Inizio Contrattuale. L’importo è riferito al ciclo selezionato.')->action(function (array $data): void {
-                    app(PlanContract::class)->createWithCondition($this->actor(), $this->proposal(), ['title' => $data['title'], 'notes' => $data['notes'] ?? null, 'supplier_id' => (int) $data['supplier_id'], 'contractual_start_date' => $data['contractual_start_date'], 'next_expiry_date' => $data['next_expiry_date'] ?? null, 'automatic_renewal' => (bool) ($data['automatic_renewal'] ?? false), 'renewal_duration_months' => filled($data['renewal_duration_months'] ?? null) ? (int) $data['renewal_duration_months'] : null, 'notice_days' => (int) ($data['notice_days'] ?? 0), 'exercise_id' => $this->proposal()->exercise_id, 'cost_center_id' => null], ['amount' => Decimal::money($data['amount']), 'cycle' => $data['cycle'], 'attribution_mode' => $data['attribution_mode'], 'valid_to' => $data['valid_to'], 'reason' => null], $data['operation_id'], (int) $data['proposal_revision']);
-                    $this->refreshProposal('Contratto Pianificato Aggiunto');
-                }),
-                Action::make('addContractCondition')->label('Aggiungi Condizione Contratto')->visible(fn (): bool => $this->canPlan())->form([
-                    Select::make('item_id')->label('Contratto')->options(fn (): array => $this->itemOptions(ProposalSourceType::Contract))->required(), Select::make('cycle')->label('Ciclo')->options(['monthly' => 'Mensile', 'quarterly' => 'Trimestrale', 'semiannual' => 'Semestrale', 'annual' => 'Annuale'])->required(), Select::make('attribution_mode')->label('Attribuzione')->options(['cycle_start' => 'Inizio Ciclo', 'cycle_end' => 'Fine Ciclo'])->required(), DecimalInput::make('amount')->label('Importo Netto IVA')->minValue(0)->required(), DateInput::make('valid_from')->label('Valida dal')->required(), DateInput::make('valid_to')->label('Valida fino al'), Textarea::make('reason')->label('Motivazione'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->action(function (array $data): void {
-                    $item = ProposalItem::query()->where('proposal_id', $this->proposal()->id)->findOrFail($data['item_id']);
-                    app(PlanContract::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::AddContractCondition, ['cycle' => $data['cycle'], 'attribution_mode' => $data['attribution_mode'], 'amount' => Decimal::money($data['amount']), 'valid_from' => $data['valid_from'], 'valid_to' => $data['valid_to'] ?? null, 'reason' => $data['reason'] ?? null], $data['reason'] ?? null, $data['operation_id'], (int) $data['proposal_revision']);
-                    $this->refreshProposal('Condizione Contrattuale Pianificata');
-                }),
-                Action::make('changeContractEconomics')->label('Modifica Economica Contratto')->visible(fn (): bool => $this->canPlan())->modalWidth(Width::FourExtraLarge)->form([
-                    Select::make('item_id')->label('Contratto')->options(fn (): array => $this->itemOptions(ProposalSourceType::Contract))->required()->live()->afterStateUpdated(function (Set $set): void {
-                        $set('condition_id', null);
-                        $set('confirmed_effective_date', null);
-                    }), Select::make('condition_id')->label('Condizione Economica')->options(fn (Get $get): array => $this->contractConditionOptions($get('item_id')))->required()->live()->afterStateUpdated(fn (Set $set) => $set('confirmed_effective_date', null)), DecimalInput::make('amount')->label('Nuovo Importo Netto IVA')->minValue(0)->required()->live(onBlur: true), Select::make('cycle')->label('Nuovo Ciclo')->options(['monthly' => 'Mensile', 'quarterly' => 'Trimestrale', 'semiannual' => 'Semestrale', 'annual' => 'Annuale'])->required()->live(), Select::make('attribution_mode')->label('Nuova Attribuzione')->options(['cycle_start' => 'Inizio ciclo', 'cycle_end' => 'Fine ciclo'])->required()->live(), DateInput::make('requested_date')->label('Data Richiesta')->required(), Placeholder::make('economic_preview')->label('Anteprima Economica')->hiddenLabel()->content(fn (Get $get): View => $this->contractEconomicPreview($get)), DateInput::make('confirmed_effective_date')->label('Data Efficace Applicabile Confermata')->required(), Textarea::make('reason')->label('Motivazione'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->modalDescription('Verifica l’anteprima e conferma la Data Efficace Applicabile. All’approvazione la decorrenza sarà ricalcolata; se cambia sarà necessaria una nuova conferma. Prorata applicato: no.')->action(function (array $data): void {
-                    $item = ProposalItem::query()->where('proposal_id', $this->proposal()->id)->findOrFail($data['item_id']);
-                    app(PlanContract::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::ChangeContractEconomics, ['condition_id' => (int) $data['condition_id'], 'amount' => Decimal::money($data['amount']), 'cycle' => $data['cycle'], 'attribution_mode' => $data['attribution_mode'], 'requested_date' => $data['requested_date'], 'confirmed_effective_date' => $data['confirmed_effective_date'], 'reason' => $data['reason'] ?? null], $data['reason'] ?? null, $data['operation_id'], (int) $data['proposal_revision']);
-                    $this->refreshProposal('Modifica Economica Pianificata');
-                }),
-                Action::make('planContractLifecycle')->label('Pianifica Cessazione o Riattivazione')->visible(fn (): bool => $this->canPlan())->form([
-                    Select::make('item_id')->label('Contratto')->options(fn (): array => $this->itemOptions(ProposalSourceType::Contract))->required(), Select::make('type')->label('Evento')->options(['cessation' => 'Cessazione', 'reactivation' => 'Riattivazione'])->required(), DateInput::make('declared_contractual_date')->label('Ultimo Giorno Attivo / Nuova Data di Inizio')->required(), DateInput::make('effective_date')->label('Data Efficace')->required(), DateInput::make('next_expiry_date')->label('Nuova Prossima Scadenza (Riattivazione)'), Textarea::make('reason')->label('Motivazione')->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->action(function (array $data): void {
-                    $item = ProposalItem::query()->where('proposal_id', $this->proposal()->id)->findOrFail($data['item_id']);
+                Action::make('planContractLifecycle')->label('Pianifica Cessazione o Riattivazione')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Contract)->authorize(fn (): bool => $this->canPlan())->form([
+                    Select::make('type')->label('Evento')->options(['cessation' => 'Cessazione', 'reactivation' => 'Riattivazione'])->required(), DateInput::make('declared_contractual_date')->label('Ultimo Giorno Attivo / Nuova Data di Inizio')->required(), DateInput::make('effective_date')->label('Data Efficace')->required(), DateInput::make('next_expiry_date')->label('Nuova Prossima Scadenza (Riattivazione)'), Textarea::make('reason')->label('Motivazione')->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                ])->action(function (array $data, ProposalItem $record): void {
+                    $item = $record;
                     app(PlanContract::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::PlanContractLifecycle, ['type' => $data['type'], 'declared_contractual_date' => $data['declared_contractual_date'], 'effective_date' => $data['effective_date'], 'next_expiry_date' => $data['next_expiry_date'] ?? null, 'reason' => $data['reason']], $data['reason'], $data['operation_id'], (int) $data['proposal_revision']);
                     $this->refreshProposal('Evento Contrattuale Pianificato');
                 }),
-                Action::make('planContractRenewal')->label('Modifica Rinnovo e Scadenza')->visible(fn (): bool => $this->canPlan())->form([
-                    Select::make('item_id')->label('Contratto')->options(fn (): array => $this->itemOptions(ProposalSourceType::Contract))->required(), DateInput::make('effective_from')->label('Configurazione Efficace dal')->required(), DateInput::make('expiry_anchor_date')->label('Prossima Scadenza'), Toggle::make('automatic_renewal')->label('Rinnovo Automatico')->default(false), TextInput::make('renewal_duration_months')->label('Durata Rinnovo (Mesi)')->integer()->minValue(1), TextInput::make('notice_days')->label('Preavviso (Giorni)')->integer()->minValue(0), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->action(function (array $data): void {
-                    $item = ProposalItem::query()->where('proposal_id', $this->proposal()->id)->findOrFail($data['item_id']);
+                Action::make('planContractRenewal')->label('Modifica Rinnovo e Scadenza')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Contract)->authorize(fn (): bool => $this->canPlan())->form([
+                    DateInput::make('effective_from')->label('Configurazione Efficace dal')->required(), DateInput::make('expiry_anchor_date')->label('Prossima Scadenza'), Toggle::make('automatic_renewal')->label('Rinnovo Automatico')->default(false), TextInput::make('renewal_duration_months')->label('Durata Rinnovo (Mesi)')->integer()->minValue(1), TextInput::make('notice_days')->label('Preavviso (Giorni)')->integer()->minValue(0), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                ])->action(function (array $data, ProposalItem $record): void {
+                    $item = $record;
                     app(PlanContract::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::SetContractRenewal, ['effective_from' => $data['effective_from'], 'expiry_anchor_date' => $data['expiry_anchor_date'] ?? null, 'automatic_renewal' => (bool) ($data['automatic_renewal'] ?? false), 'renewal_duration_months' => filled($data['renewal_duration_months'] ?? null) ? (int) $data['renewal_duration_months'] : null, 'notice_days' => filled($data['notice_days'] ?? null) ? (int) $data['notice_days'] : null], null, $data['operation_id'], (int) $data['proposal_revision']);
                     $this->refreshProposal('Rinnovo Contrattuale Pianificato');
                 }),
-                Action::make('planContractCostCenter')->label('Cambia Centro di Costo Contratto')->visible(fn (): bool => $this->canPlan())->form([
-                    Select::make('item_id')->label('Contratto senza Effettivi')->options(fn (): array => $this->itemOptions(ProposalSourceType::Contract))->required(), Select::make('cost_center_id')->label('Centro di Costo Annuale')->options(fn (): array => CostCenterHierarchy::forCompany((int) $this->proposal()->company_id)->options())->placeholder('Non classificato'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->action(function (array $data): void {
-                    $item = ProposalItem::query()->where('proposal_id', $this->proposal()->id)->findOrFail($data['item_id']);
+                Action::make('planContractCostCenter')->label('Cambia Centro di Costo')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Contract && ! data_get($record->baseline, 'actual_context.has_actuals', false))->authorize(fn (): bool => $this->canPlan())->form([
+                    Select::make('cost_center_id')->label('Centro di Costo Annuale')->options(fn (): array => CostCenterHierarchy::forCompany((int) $this->proposal()->company_id)->options())->placeholder('Non classificato'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                ])->action(function (array $data, ProposalItem $record): void {
+                    $item = $record;
                     app(PlanContract::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::SetContractCostCenter, ['exercise_id' => $this->proposal()->exercise_id, 'cost_center_id' => filled($data['cost_center_id'] ?? null) ? (int) $data['cost_center_id'] : null], null, $data['operation_id'], (int) $data['proposal_revision']);
                     $this->refreshProposal('Centro di Costo del Contratto Aggiornato');
                 }),
-                Action::make('linkProjectContract')->label('Collega Progetto e Contratto')->visible(fn (): bool => $this->canPlan())->modalDescription('Collegamento informativo “Collegato a”, senza effetto economico.')->form([
-                    Select::make('project_reference')->label('Progetto')->options(fn (): array => $this->projectReferenceOptions())->required(), Select::make('contract_reference')->label('Contratto')->options(fn (): array => $this->contractReferenceOptions())->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
-                ])->action(function (array $data): void {
-                    app(PlanProposalRelation::class)->execute($this->actor(), $this->proposal(), [...$this->parseReference($data['project_reference'], 'project'), ...$this->parseReference($data['contract_reference'], 'contract')], $data['operation_id'], (int) $data['proposal_revision']);
+                Action::make('linkProjectContract')->label('Collega Progetto e Contratto')->visible(fn (ProposalItem $record): bool => $this->canPlan() && in_array($record->source_type, [ProposalSourceType::Project, ProposalSourceType::Contract], true))->modalDescription('Collegamento informativo “Collegato a”, senza effetto economico.')->authorize(fn (): bool => $this->canPlan())->form([
+                    Select::make('project_reference')->label('Progetto')->visible(fn (ProposalItem $record): bool => $record->source_type === ProposalSourceType::Contract)->options(fn (): array => $this->projectReferenceOptions())->required(), Select::make('contract_reference')->label('Contratto')->visible(fn (ProposalItem $record): bool => $record->source_type === ProposalSourceType::Project)->options(fn (): array => $this->contractReferenceOptions())->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                ])->action(function (array $data, ProposalItem $record): void {
+                    app(PlanProposalRelation::class)->execute($this->actor(), $this->proposal(), [...$this->parseReference(($record->source_type === ProposalSourceType::Project ? 'item:'.$record->proposal_item_id : $data['project_reference']), 'project'), ...$this->parseReference(($record->source_type === ProposalSourceType::Contract ? 'item:'.$record->proposal_item_id : $data['contract_reference']), 'contract')], $data['operation_id'], (int) $data['proposal_revision']);
                     $this->refreshProposal('Progetto e Contratto Collegati');
                 }),
-            ])->label('Azioni di Piano')->button()->dropdownTeleport()->dropdownMaxHeight('min(28rem, 50vh)'),
+                Action::make('excludePlannedExpense')->label('Escludi dalla Proposta')->color('danger')
+                    ->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Expense && $record->expense_id === null && ! $record->isExcludedFromPlan())
+                    ->authorize(fn (): bool => $this->canPlan())
+                    ->requiresConfirmation()
+                    ->modalDescription('La Spesa non contribuirà al piano e non verrà creata all’approvazione. La sorgente e tutte le decisioni resteranno consultabili nello storico.')
+                    ->schema([
+                        Textarea::make('reason')->label('Motivazione'),
+                        Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
+                        Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                    ])->action(function (array $data, ProposalItem $record): void {
+                        app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $record, ProposalActionType::ExcludeExpense, ['reason' => $data['reason'] ?? null], $data['reason'] ?? null, $data['operation_id'], (int) $data['proposal_revision']);
+                        $this->refreshProposal('Spesa Esclusa dalla Proposta');
+                    }),
+            ])->label('Altre azioni')->icon('heroicon-m-ellipsis-horizontal')->color('gray')->dropdownWidth(Width::ExtraSmall),
         ];
     }
 
     /** @return array<int, string> */
-    private function contractConditionOptions(?string $itemId): array
+    private function contractConditionOptions(ProposalItem $item): array
     {
-        $item = $this->proposal()->items()->where('source_type', ProposalSourceType::Contract)->find($itemId);
-        if ($item?->contract_id === null) {
+        if ($item->contract_id === null) {
             return [];
         }
 
@@ -409,7 +502,7 @@ class ViewProposal extends ViewRecord
             ])->all();
     }
 
-    private function contractEconomicPreview(Get $get): View
+    private function contractEconomicPreview(Get $get, ProposalItem $item): View
     {
         $data = [
             'amount' => Decimal::normalizeInput($get('amount')),
@@ -423,8 +516,7 @@ class ViewProposal extends ViewRecord
             'attribution_mode' => ['required', 'in:cycle_start,cycle_end'],
             'requested_date' => ['required', 'date_format:Y-m-d'],
         ]);
-        $item = $this->proposal()->items()->where('source_type', ProposalSourceType::Contract)->find($get('item_id'));
-        $condition = $item?->contract?->conditions()->active()->find($get('condition_id'));
+        $condition = $item->contract?->conditions()->active()->find($get('condition_id'));
         if ($condition === null || $validator->fails()) {
             return view('filament.resources.contracts.components.economic-impact-preview', ['error' => 'Seleziona una condizione esistente e completa i nuovi termini per calcolare l’anteprima.', 'summary' => null]);
         }
@@ -464,15 +556,6 @@ class ViewProposal extends ViewRecord
         ]]);
     }
 
-    /** @return array<int, string> */
-    private function itemOptions(ProposalSourceType $type): array
-    {
-        $label = $type === ProposalSourceType::Expense ? 'description' : 'title';
-
-        return $this->proposal()->items()->where('source_type', $type)->get()
-            ->mapWithKeys(fn (ProposalItem $item): array => [$item->id => $item->result[$label]])->all();
-    }
-
     /** @return array<int, mixed> */
     private function estimateLineSchema(): array
     {
@@ -505,45 +588,19 @@ class ViewProposal extends ViewRecord
         return $actor;
     }
 
-    private function expenseItem(int $id): ProposalItem
-    {
-        return ProposalItem::query()->where('proposal_id', $this->proposal()->id)->where('source_type', 'expense')->findOrFail($id);
-    }
-
     private function canPlan(): bool
     {
         return $this->proposal()->status->value === 'draft' && auth()->user()?->can('update', $this->proposal()) === true;
     }
 
-    private function canRealign(): bool
+    private function canRealign(ProposalItem $item): bool
     {
-        return $this->canPlan() && $this->proposal()->items()->where('readiness_state', 'to_realign')->exists();
+        return $this->canPlan() && $item->readiness_state->value === 'to_realign';
     }
 
-    private function canAcknowledge(): bool
+    private function canAcknowledge(ProposalItem $item): bool
     {
-        return $this->canPlan() && $this->proposal()->items()->where('readiness_state', 'to_review')->exists();
-    }
-
-    /** @return array<int, string> */
-    private function acknowledgementItemOptions(): array
-    {
-        return $this->proposal()->items()->where('readiness_state', 'to_review')->orderBy('id')->get()
-            ->mapWithKeys(fn (ProposalItem $item): array => [$item->id => $item->source_type->label().' · '.$item->proposal_item_id])
-            ->all();
-    }
-
-    /** @return array<int, string> */
-    private function realignmentItemOptions(): array
-    {
-        return $this->proposal()->items()->where('readiness_state', 'to_realign')->orderBy('id')->get()
-            ->mapWithKeys(fn (ProposalItem $item): array => [$item->id => $item->source_type->label().' · '.$item->proposal_item_id])
-            ->all();
-    }
-
-    private function realignmentItem(int $id): ProposalItem
-    {
-        return $this->proposal()->items()->where('readiness_state', 'to_realign')->findOrFail($id);
+        return $this->canPlan() && $item->readiness_state->value === 'to_review';
     }
 
     private function canApprove(): bool
@@ -594,6 +651,8 @@ class ViewProposal extends ViewRecord
     private function refreshProposal(string $title): void
     {
         $this->record = $this->proposal()->refresh()->load(['exercise', 'creator', 'referenceBudget', 'items', 'actions', 'actionHistory']);
+        unset($this->sourceOverview);
+        $this->flushCachedTableRecords();
         Notification::make()->title($title)->success()->send();
     }
 
@@ -618,22 +677,6 @@ class ViewProposal extends ViewRecord
                 ->mapWithKeys(fn (ProposalItem $item): array => ['item:'.$item->proposal_item_id => 'Nuovo Progetto della Proposta · '.$item->result['title']])
                 ->all(),
         ];
-    }
-
-    /** @return array<int, string> */
-    private function deferralProjectOptions(): array
-    {
-        if ($this->previousExercise() === null) {
-            return [];
-        }
-
-        return $this->proposal()->items()
-            ->where('source_type', 'project')
-            ->whereNotNull('project_id')
-            ->orderBy('id')
-            ->get()
-            ->mapWithKeys(fn (ProposalItem $item): array => [$item->id => $item->project->title])
-            ->all();
     }
 
     private function previousExercise(): ?Exercise
@@ -668,15 +711,11 @@ class ViewProposal extends ViewRecord
             ->all();
     }
 
-    private function proposalDeferralSummary(Get $get): string
+    private function proposalDeferralSummary(Get $get, ProposalItem $item): string
     {
-        $item = $this->proposal()->items()->where('source_type', 'project')->whereNotNull('project_id')->find($get('item_id'));
         $source = $this->previousExercise();
         if ($source === null) {
             return 'Nessun Esercizio immediatamente precedente: il rinvio non è configurabile.';
-        }
-        if ($item === null || ! $item->project instanceof Project) {
-            return 'Selezionare un Progetto per calcolare disponibilità e impatto.';
         }
         $project = $item->project;
         $current = $project->deferrals()->where('source_exercise_id', $source->id)->where('destination_exercise_id', $this->proposal()->exercise_id)->first();

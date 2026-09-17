@@ -82,4 +82,9 @@ class ProposalItem extends Model
     {
         return ['source_type' => ProposalSourceType::class, 'baseline' => 'array', 'result' => 'array', 'readiness_state' => ProposalReadinessState::class, 'readiness_reasons' => 'array', 'read_only_source' => 'boolean', 'last_aligned_at' => 'datetime', 'baseline_revision' => 'integer'];
     }
+
+    public function isExcludedFromPlan(): bool
+    {
+        return ($this->result['excluded'] ?? false) === true;
+    }
 }

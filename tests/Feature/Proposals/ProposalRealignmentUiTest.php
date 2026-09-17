@@ -8,6 +8,7 @@ use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -31,9 +32,9 @@ it('shows exactly the three realignment controls and action history for a stale 
     Filament::setTenant(($proposal->company)->tenantCompany);
 
     Livewire::test(ViewProposal::class, ['record' => $proposal->getRouteKey()])
-        ->assertActionExists('reloadReality')
-        ->assertActionExists('keepProposal')
-        ->assertActionExists('manualRealignment')
+        ->assertActionVisible(TestAction::make('reloadReality')->table($proposal->items()->sole()))
+        ->assertActionVisible(TestAction::make('keepProposal')->table($proposal->items()->sole()))
+        ->assertActionVisible(TestAction::make('manualRealignment')->table($proposal->items()->sole()))
         ->assertSee('Da Riallineare')
         ->assertSee('Storico Decisioni');
 });

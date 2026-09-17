@@ -9,6 +9,7 @@ final class ProposalActionPayload
 {
     /** @var array<string, list<string>> */
     private const ALLOWED = [
+        'exclude_expense' => ['reason'],
         'create_expense' => ['description', 'notes', 'exercise_id', 'supplier_id', 'cost_center_id', 'project_id', 'project_item_id', 'estimate_lines'],
         'copy_expense' => ['source_expense_id', 'source_revision', 'source_fingerprint', 'target_exercise_id', 'description', 'notes', 'supplier_id', 'cost_center_id', 'estimate_lines'],
         'set_expense_estimates' => ['estimate_lines'], 'set_expense_owner' => ['exercise_id', 'project_id', 'project_item_id'],

@@ -16,6 +16,11 @@ final class ExpensePlan
 {
     public static function validateForApproval(ProposalItem $item): void
     {
+        if ($item->isExcludedFromPlan()) {
+            self::validateExclusion($item);
+
+            return;
+        }
         self::validateResult($item->proposal, $item, $item->result, null);
         $baseline = (array) data_get($item->baseline, 'plan_baseline', []);
         if ((bool) data_get($item->baseline, 'actual_context.has_actuals', false)) {
@@ -43,6 +48,14 @@ final class ExpensePlan
     {
         if ($item->source_type !== ProposalSourceType::Expense) {
             throw ValidationException::withMessages(['item' => 'L’Elemento non è una Spesa.']);
+        }
+        if ($item->isExcludedFromPlan()) {
+            throw ValidationException::withMessages(['item' => 'La Spesa è esclusa dalla Proposta.']);
+        }
+        if ($type === ProposalActionType::ExcludeExpense) {
+            self::validateExclusion($item);
+
+            return [...$item->result, 'excluded' => true];
         }
         $hasActuals = (bool) data_get($item->baseline, 'actual_context.has_actuals', false);
         if ($hasActuals && in_array($type, [ProposalActionType::SetExpenseOwner, ProposalActionType::SetExpenseSupplier, ProposalActionType::SetExpenseCostCenter, ProposalActionType::ReverseExpense, ProposalActionType::RestoreExpense], true)) {
@@ -77,6 +90,15 @@ final class ExpensePlan
         if ($type === ProposalActionType::CreateProjectAllocation
             && ($projectId === null || $projectItemId !== null || (int) ($result['exercise_id'] ?? $proposal->exercise_id) !== $proposal->exercise_id)) {
             throw ValidationException::withMessages(['project_id' => 'Nuova allocazione richiede un Progetto già vivo nell’Esercizio principale della Proposta.']);
+        }
+    }
+
+    private static function validateExclusion(ProposalItem $item): void
+    {
+        if ($item->source_type !== ProposalSourceType::Expense || $item->expense_id !== null
+            || (array) data_get($item->baseline, 'plan_baseline', []) !== []
+            || (bool) data_get($item->baseline, 'actual_context.has_actuals', false)) {
+            throw ValidationException::withMessages(['item' => 'È possibile escludere soltanto una Spesa nata nella Proposta.']);
         }
     }
 

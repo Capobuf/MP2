@@ -112,6 +112,9 @@ class Proposal extends Model
         $items = $this->relationLoaded('items') ? $this->items : $this->items()->get();
 
         return Decimal::sum($items->map(function (ProposalItem $item): string {
+            if ($item->isExcludedFromPlan()) {
+                return '0.00';
+            }
             $result = $item->result;
             if (isset($result['approved_allocation'])) {
                 return (string) $result['approved_allocation'];
