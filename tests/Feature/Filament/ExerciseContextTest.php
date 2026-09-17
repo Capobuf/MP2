@@ -78,7 +78,9 @@ it('renders the Blade and Livewire global context for the current tenant', funct
 
     Livewire::test(EconomicSummary::class)
         ->assertSee('Quadro Economico')
-        ->assertSee('Budget Selezionato')
+        ->assertDontSee('Budget Selezionato')
+        ->assertDontSeeHtml('mp2-economic-stat-budget')
+        ->assertSeeHtml('mp2-economic-summary-grid-current')
         ->assertSee('Allocato Corrente')
         ->assertSee('Effettivo')
         ->assertSee('Scostamento Operativo');

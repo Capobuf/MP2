@@ -178,7 +178,7 @@ it('changes the exact comparison version without a silent Budget fallback', func
         ->and(collect($v2['sources'])->firstWhere('origin_key', $fixture['standalone']->originKey())['budget'])->toBe('100.00');
 });
 
-it('renders live charts without a Budget and keeps comparative charts unavailable', function (): void {
+it('renders current charts without a Budget using only primary sources', function (): void {
     $fixture = economicDashboardFixture();
     $this->actingAs($fixture['viewer']);
     Filament::setTenant(($fixture['company'])->tenantCompany);
@@ -196,6 +196,8 @@ it('renders live charts without a Budget and keeps comparative charts unavailabl
     $sourceProfile = chartData(SourceEconomicProfileChart::class);
     $costCenters = chartData(CostCenterEconomicChart::class);
     $operationalVariance = chartData(OperationalVarianceBySourceChart::class);
+    $byType = chartData(BudgetVariationChart::class);
+    $distribution = chartData(AllocationComparisonScatterChart::class);
 
     expect($dashboard['has_budget'])->toBeFalse()
         ->and($dashboard['budget_id'])->toBeNull()
@@ -207,14 +209,82 @@ it('renders live charts without a Budget and keeps comparative charts unavailabl
         ->and($costCenters['labels'])->not->toBeEmpty()
         ->and($operationalVariance['datasets'][0]['label'])->toBe('Scostamento Operativo')
         ->and(array_sum($operationalVariance['datasets'][0]['data']))->toBe(40.0)
-        ->and(chartData(BudgetVariationChart::class))->toBe([])
-        ->and(chartData(AllocationComparisonScatterChart::class))->toBe([])
+        ->and($byType['labels'])->toBe(['Spese Autonome', 'Progetti', 'Contratti'])
+        ->and($byType['datasets'][0]['data'])->toBe([100.0, 200.0, 300.0])
+        ->and($byType['datasets'][1]['data'])->toBe([110.0, 180.0, 350.0])
+        ->and($distribution['labels'])->toBe(['Inferiore', 'Uguale', 'Superiore'])
+        ->and($distribution['datasets'][0]['data'])->toBe([1, 0, 2])
         ->and($budgetContext->current($fixture['company'], $fixture['exercise']))->toBeNull();
+
+    Livewire::test(BudgetVariationChart::class)
+        ->assertSee('Allocato ed Effettivo per Tipologia')
+        ->assertSeeHtml('data-chart-type="bar"')
+        ->assertDontSee('Confronto Budget Non Disponibile');
+    Livewire::test(AllocationComparisonScatterChart::class)
+        ->assertSee('Sorgenti per Scostamento')
+        ->assertSeeHtml('data-chart-type="doughnut"')
+        ->assertDontSee('Confronto Allocato Non Disponibile');
 
     Livewire::test(SourceEconomicProfileChart::class)
         ->assertSuccessful()
         ->assertSee('Allocato Corrente ed Effettivo per Sorgente Primaria.')
         ->assertDontSee('Seleziona una versione di Budget');
+});
+
+it('switches current charts to the selected Budget and back when the Budget is cleared', function (): void {
+    $fixture = economicDashboardFixture();
+    $this->actingAs($fixture['viewer']);
+    Filament::setTenant($fixture['company']->tenantCompany);
+    app(ExerciseContext::class)->select($fixture['company'], $fixture['exercise']->id);
+
+    Livewire::test(ExerciseContextSelector::class)
+        ->call('selectBudget', $fixture['budget1']->id)
+        ->assertHasNoErrors();
+    Livewire::test(EconomicSummary::class)
+        ->assertSee('Budget Selezionato')
+        ->assertSeeHtml('mp2-economic-stat-budget')
+        ->assertDontSeeHtml('mp2-economic-summary-grid-current');
+    Livewire::test(BudgetVariationChart::class)
+        ->assertSee('Variazioni vs Budget')
+        ->assertSeeHtml('data-chart-type="doughnut"')
+        ->assertDontSee('Allocato ed Effettivo per Tipologia');
+    Livewire::test(AllocationComparisonScatterChart::class)
+        ->assertSee('Budget → Allocato Corrente')
+        ->assertSeeHtml('data-chart-type="scatter"');
+    $budgetPoint = collect(chartData(AllocationComparisonScatterChart::class)['datasets'][0]['data'])->firstWhere('label', 'Licenze autonome');
+    expect($budgetPoint)->toMatchArray(['x' => 90.0, 'y' => 100.0, 'variation' => '10.00']);
+
+    Livewire::test(ExerciseContextSelector::class)->call('clearBudget')->assertHasNoErrors();
+    Livewire::test(EconomicSummary::class)
+        ->assertDontSee('Budget Selezionato')
+        ->assertDontSeeHtml('mp2-economic-stat-budget')
+        ->assertSeeHtml('mp2-economic-summary-grid-current');
+    Livewire::test(BudgetVariationChart::class)
+        ->assertSee('Allocato ed Effettivo per Tipologia')
+        ->assertSeeHtml('data-chart-type="bar"');
+    Livewire::test(AllocationComparisonScatterChart::class)
+        ->assertSee('Sorgenti per Scostamento')
+        ->assertSeeHtml('data-chart-type="doughnut"');
+    expect(chartData(AllocationComparisonScatterChart::class)['datasets'][0]['data'])->toBe([1, 0, 2]);
+});
+
+it('preserves negative actuals and zero values in current charts', function (): void {
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    foreach ([['Credito', '100.00', '-25.00'], ['Zero', '0.00', '0.00']] as [$label, $allocation, $actual]) {
+        $expense = Expense::factory()->forExercise($exercise)->create(['description' => $label]);
+        ExpenseLine::factory()->for($expense)->create(['amount' => $allocation]);
+        ExpenseLine::factory()->for($expense)->actual()->create(['amount' => $actual, 'note' => 'Rimborso documentato']);
+    }
+    $this->actingAs($viewer);
+    Filament::setTenant($company->tenantCompany);
+    app(ExerciseContext::class)->select($company, $exercise->id);
+
+    $byType = chartData(BudgetVariationChart::class);
+    expect($byType['datasets'][0]['data'])->toBe([100.0, 0.0, 0.0])
+        ->and($byType['datasets'][1]['data'])->toBe([-25.0, 0.0, 0.0]);
+    expect(chartData(AllocationComparisonScatterChart::class)['datasets'][0]['data'])->toBe([1, 1, 0]);
 });
 
 it('enriches live charts and enables comparative charts with the selected Budget', function (): void {
@@ -288,7 +358,7 @@ it('uses ComparisonEngine primary categories and counts the union once', functio
         ->and($dashboard['sources'])->toHaveCount(4);
 });
 
-it('provides correct scatter coordinates and positive negative and zero operational variances', function (): void {
+it('provides correct scatter coordinates and excludes zero operational variances from the chart', function (): void {
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
     $viewer = s11ReportingViewer($company);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
@@ -321,13 +391,33 @@ it('provides correct scatter coordinates and positive negative and zero operatio
     $values = collect($variance['labels'])->mapWithKeys(fn (string $label, int $index): array => [
         $label => $variance['datasets'][0]['data'][$index],
     ]);
-    expect($values->all())->toMatchArray(['Positivo' => 20.0, 'Negativo' => -20.0, 'Zero' => 0.0])
+    expect($values->all())->toHaveCount(2)->toMatchArray(['Positivo' => 20.0, 'Negativo' => -20.0])
+        ->and($variance['sourceUrls'])->toHaveCount(2)
         ->and($variance['datasets'][0]['label'])->toBe('Scostamento Operativo');
 
     $varianceWidget = Livewire::test(OperationalVarianceBySourceChart::class)->assertSuccessful()->instance();
     $options = new ReflectionMethod($varianceWidget, 'getOptions');
-    expect($options->invoke($varianceWidget)->toHtml())->toContain('autoSkip: false')
+    expect($options->invoke($varianceWidget)->toHtml())->toContain('autoSkip: true', "axis: 'y', intersect: false")
+        ->and($variance['datasets'][0])->not->toHaveKey('barThickness')
+        ->and($variance['datasets'][0]['maxBarThickness'])->toBe(10)
         ->and($varianceWidget->chartSurfaceClass())->toContain('mp2-operational-variance-chart');
+});
+
+it('shows an empty operational variance chart when all sources have zero variance', function (): void {
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $expense = Expense::factory()->forExercise($exercise)->create();
+    ExpenseLine::factory()->for($expense)->create(['amount' => '100.00']);
+    ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '100.00']);
+    $this->actingAs($viewer);
+    Filament::setTenant($company->tenantCompany);
+    app(ExerciseContext::class)->select($company, $exercise->id);
+
+    expect(chartData(OperationalVarianceBySourceChart::class))->toBe([]);
+    Livewire::test(OperationalVarianceBySourceChart::class)
+        ->assertSuccessful()
+        ->assertSee('Nessuno Scostamento Disponibile');
 });
 
 it('rejects foreign Budget context and foreign Dashboard data', function (): void {
@@ -354,8 +444,15 @@ it('renders every chart and handles no Exercise no Budget and no sources', funct
         ->assertSuccessful()
         ->assertSee('Nessun Esercizio Selezionato');
 
+    expect(chartData(BudgetVariationChart::class))->toBe([])
+        ->and(chartData(AllocationComparisonScatterChart::class))->toBe([]);
+
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     app(ExerciseContext::class)->select($company, $exercise->id);
+    expect(chartData(BudgetVariationChart::class))->toBe([])
+        ->and(chartData(AllocationComparisonScatterChart::class))->toBe([]);
+    Livewire::test(BudgetVariationChart::class)->assertSee('Nessuna Sorgente Disponibile');
+    Livewire::test(AllocationComparisonScatterChart::class)->assertSee('Nessuna Sorgente Disponibile');
     Livewire::test(EconomicSummary::class)
         ->assertSuccessful()
         ->assertDontSee('EUR · intero Esercizio');

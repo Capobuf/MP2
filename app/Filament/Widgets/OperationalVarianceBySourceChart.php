@@ -27,7 +27,10 @@ class OperationalVarianceBySourceChart extends EconomicChartWidget
     protected function getData(): array
     {
         $dashboard = $this->economicData();
-        $sources = $dashboard['sources'] ?? [];
+        $sources = array_filter(
+            $dashboard['sources'] ?? [],
+            fn (array $source): bool => Decimal::compare((string) $source['operational_variance'], '0') !== 0,
+        );
         if ($sources === []) {
             return [];
         }
@@ -54,9 +57,11 @@ class OperationalVarianceBySourceChart extends EconomicChartWidget
                     $value < 0 => '#60A5FA',
                     default => '#91A3A8',
                 }, $values),
-                'borderRadius' => 5,
+                'borderWidth' => 0,
+                'hoverBorderWidth' => 0,
+                'borderRadius' => 3,
                 'borderSkipped' => false,
-                'barThickness' => 14,
+                'maxBarThickness' => 10,
             ]],
         ];
     }
@@ -68,14 +73,38 @@ class OperationalVarianceBySourceChart extends EconomicChartWidget
                 indexAxis: 'y',
                 plugins: {
                     legend: { display: false },
-                    tooltip: { padding: 12, callbacks: { label: (context) => `Scostamento Operativo: ${new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(context.parsed.x)}` } },
+                    tooltip: {
+                        mode: 'nearest', axis: 'y', intersect: false,
+                        backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--surface-elevated').trim(),
+                        borderColor: getComputedStyle(document.documentElement).getPropertyValue('--border-strong').trim(),
+                        borderWidth: 1,
+                        titleColor: getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim(),
+                        bodyColor: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim(),
+                        titleFont: { family: getComputedStyle(document.body).fontFamily, weight: 600 },
+                        bodyFont: { family: getComputedStyle(document.body).fontFamily },
+                        cornerRadius: 8, displayColors: false, padding: 12,
+                        callbacks: { label: (context) => `Scostamento Operativo: ${new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(context.parsed.x)}` },
+                    },
                 },
                 scales: {
-                    x: { grid: { color: (context) => context.tick.value === 0 ? 'rgba(247, 251, 251, 0.55)' : 'rgba(145, 163, 168, 0.10)', lineWidth: (context) => context.tick.value === 0 ? 2 : 1 }, ticks: { callback: (value) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', notation: 'compact' }).format(value) } },
+                    x: {
+                        border: { display: false },
+                        grid: { display: true, drawTicks: false, color: (context) => context.tick.value === 0 ? getComputedStyle(document.documentElement).getPropertyValue('--border-strong').trim() : 'rgba(145, 163, 168, 0.08)' },
+                        ticks: {
+                            color: getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim(),
+                            font: { family: getComputedStyle(document.body).fontFamily, size: 11 },
+                            padding: 10, maxTicksLimit: 5,
+                            callback: (value) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', notation: 'compact' }).format(value),
+                        },
+                    },
                     y: {
+                        border: { display: false },
                         grid: { display: false },
                         ticks: {
-                            autoSkip: false,
+                            autoSkip: true,
+                            color: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim(),
+                            font: { family: getComputedStyle(document.body).fontFamily, size: 11 },
+                            padding: 10,
                             callback: function (value) {
                                 const label = this.getLabelForValue(value);
                                 const maxLength = this.chart.width < 480 ? 24 : 42;

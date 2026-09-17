@@ -1740,6 +1740,10 @@ html.fi {
     gap: 10px;
 }
 
+.mp2-economic-summary-grid-current {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .mp2-economic-stat {
     position: relative;
     min-width: 0;
@@ -1832,6 +1836,10 @@ html.fi {
 
 .mp2-economic-chart canvas {
     cursor: pointer;
+}
+
+.mp2-economic-chart-summary canvas {
+    cursor: default;
 }
 
 .mp2-operational-variance-chart .fi-wi-chart-canvas-ctn {

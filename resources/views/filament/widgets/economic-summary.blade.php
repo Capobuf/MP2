@@ -1,9 +1,7 @@
 @php
     use Illuminate\Support\Number;
 
-    $formatMoney = static fn (?string $amount): string => $amount === null
-        ? 'Non selezionato'
-        : Number::currency((float) $amount, in: 'EUR', locale: 'it');
+    $formatMoney = static fn (string $amount): string => Number::currency((float) $amount, in: 'EUR', locale: 'it');
 @endphp
 
 <x-filament-widgets::widget class="mp2-dashboard-economic-summary">
@@ -24,12 +22,14 @@
                 </div>
             </div>
 
-            <dl class="mp2-economic-summary-grid">
-                <div class="mp2-economic-stat mp2-economic-stat-budget">
-                    <dt>Budget Selezionato</dt>
-                    <dd>{{ $formatMoney($dashboard['summary']['budget']) }}</dd>
-                    <p>{{ $dashboard['budget_label'] ?? 'Seleziona una versione nell’header' }}</p>
-                </div>
+            <dl @class(['mp2-economic-summary-grid', 'mp2-economic-summary-grid-current' => ! $dashboard['has_budget']])>
+                @if ($dashboard['has_budget'])
+                    <div class="mp2-economic-stat mp2-economic-stat-budget">
+                        <dt>Budget Selezionato</dt>
+                        <dd>{{ $formatMoney($dashboard['summary']['budget']) }}</dd>
+                        <p>{{ $dashboard['budget_label'] }}</p>
+                    </div>
+                @endif
                 <div class="mp2-economic-stat mp2-economic-stat-allocation">
                     <dt>Allocato Corrente</dt>
                     <dd>{{ $formatMoney($dashboard['summary']['allocation']) }}</dd>

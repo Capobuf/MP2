@@ -2,17 +2,33 @@
 
 namespace App\Filament\Widgets;
 
+use App\Domain\Expenses\Decimal;
 use Filament\Support\RawJs;
 
 class AllocationComparisonScatterChart extends EconomicChartWidget
 {
-    protected ?string $heading = 'Budget → Allocato Corrente';
+    public function chartSurfaceClass(): string
+    {
+        return parent::chartSurfaceClass().(($this->economicData()['has_budget'] ?? false) ? '' : ' mp2-economic-chart-summary');
+    }
 
-    protected ?string $emptyStateHeading = 'Confronto Allocato Non Disponibile';
+    public function getEmptyStateHeading(): string
+    {
+        return ($this->economicData()['has_budget'] ?? false)
+            ? 'Confronto Allocato Non Disponibile'
+            : 'Nessuna Sorgente Disponibile';
+    }
+
+    public function getHeading(): string
+    {
+        return ($this->economicData()['has_budget'] ?? false)
+            ? 'Budget → Allocato Corrente'
+            : 'Sorgenti per Scostamento';
+    }
 
     protected function getType(): string
     {
-        return 'scatter';
+        return ($this->economicData()['has_budget'] ?? false) ? 'scatter' : 'doughnut';
     }
 
     public function getDescription(): ?string
@@ -21,15 +37,34 @@ class AllocationComparisonScatterChart extends EconomicChartWidget
 
         return ($data['has_budget'] ?? false)
             ? 'Ogni Punto È una Sorgente Primaria; la Diagonale Indica Uguaglianza degli Allocati.'
-            : 'Seleziona una versione di Budget nel contesto globale per visualizzare il confronto.';
+            : 'Numero di Sorgenti con Effettivo Inferiore, Uguale o Superiore all’Allocato Corrente.';
     }
 
     /** @return array<string, mixed> */
     protected function getData(): array
     {
         $dashboard = $this->economicData();
-        if (! ($dashboard['has_budget'] ?? false) || ($dashboard['sources'] ?? []) === []) {
+        if (($dashboard['sources'] ?? []) === []) {
             return [];
+        }
+
+        if (! ($dashboard['has_budget'] ?? false)) {
+            $counts = [-1 => 0, 0 => 0, 1 => 0];
+            foreach ($dashboard['sources'] as $source) {
+                $counts[Decimal::compare((string) $source['operational_variance'], '0')]++;
+            }
+
+            return [
+                'labels' => ['Inferiore', 'Uguale', 'Superiore'],
+                'datasets' => [[
+                    'label' => 'Sorgenti',
+                    'data' => array_values($counts),
+                    'backgroundColor' => ['#60A5FA', '#91A3A8', '#EF4444'],
+                    'borderColor' => '#0B1D25',
+                    'borderWidth' => 3,
+                    'hoverOffset' => 8,
+                ]],
+            ];
         }
 
         $points = array_map(fn (array $source): array => [
@@ -68,11 +103,23 @@ class AllocationComparisonScatterChart extends EconomicChartWidget
 
     protected function getOptions(): RawJs
     {
+        if (! ($this->economicData()['has_budget'] ?? false)) {
+            return $this->options(<<<'JS'
+                {
+                    cutout: '68%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 12, boxHeight: 8, padding: 18, font: { family: getComputedStyle(document.body).fontFamily } } },
+                        tooltip: { padding: 12, callbacks: { label: (context) => `Effettivo ${context.label.toLocaleLowerCase('it-IT')} all’Allocato: ${context.parsed} ${context.parsed === 1 ? 'sorgente' : 'sorgenti'}` } },
+                    },
+                }
+                JS);
+        }
+
         return $this->options(<<<'JS'
             {
                 interaction: { mode: 'nearest', intersect: true },
                 plugins: {
-                    legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 16 } },
+                    legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 12, boxHeight: 8, padding: 18, font: { family: getComputedStyle(document.body).fontFamily } } },
                     tooltip: {
                         filter: (item) => item.datasetIndex === 0,
                         padding: 12,
