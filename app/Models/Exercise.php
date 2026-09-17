@@ -152,10 +152,10 @@ class Exercise extends Model
             ? Decimal::sum($this->incomingProjectDeferrals
                 ->where('mode', ProjectDeferralMode::Carryover)
                 ->pluck('carryover_amount'))
-            : Decimal::sum(ProjectDeferral::query()
+            : Decimal::money(ProjectDeferral::query()
                 ->where('destination_exercise_id', $this->id)
                 ->where('mode', ProjectDeferralMode::Carryover->value)
-                ->pluck('carryover_amount'));
+                ->sum('carryover_amount'));
 
         return Decimal::add($this->lineTotal('estimate'), $carryover);
     }
@@ -182,15 +182,13 @@ class Exercise extends Model
             return Decimal::sum($values);
         }
 
-        $values = ExpenseLine::query()
+        return Decimal::money(ExpenseLine::query()
             ->join('expenses', 'expenses.id', '=', 'expense_lines.expense_id')
             ->where('expenses.exercise_id', $this->id)
             ->whereNull('expenses.reversed_at')
             ->whereNull('expense_lines.annulled_at')
             ->where('expense_lines.type', $lineType)
-            ->pluck('expense_lines.amount');
-
-        return Decimal::sum($values->map(fn (mixed $value): string => (string) $value));
+            ->sum('expense_lines.amount'));
     }
 
     /** @return array<string, string> */

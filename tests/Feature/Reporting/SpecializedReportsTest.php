@@ -14,7 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('builds every non comparison specialist family from one canonical source set', function (string $kind): void {
+it('limits specialist totals to their family while preserving company totals', function (string $kind): void {
     $company = Company::factory()->create();
     $viewer = s11ReportingViewer($company);
     $exercise = Exercise::factory()->for($company)->create();
@@ -30,7 +30,8 @@ it('builds every non comparison specialist family from one canonical source set'
     $result = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray($definition));
 
     expect($result->header['kind'])->toBe($kind)
-        ->and($result->totals['actual'])->toBe('10.00');
+        ->and($result->totals['actual'])->toBe(in_array($kind, ['contracts', 'projects', 'carryovers'], true) ? '0.00' : '10.00')
+        ->and($result->totals['current_actual'])->toBe('10.00');
 })->with(['annual_executive', 'operational_variance', 'carryovers', 'contracts', 'projects', 'suppliers']);
 
 it('builds every canonical comparison family with its explicit references', function (): void {
