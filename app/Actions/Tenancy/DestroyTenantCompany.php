@@ -5,6 +5,7 @@ namespace App\Actions\Tenancy;
 use App\Domain\Company\TenantCompanyStatus;
 use App\Models\Company;
 use App\Models\PendingFileDeletion;
+use App\Models\PlatformLifecycleEvent;
 use App\Models\TenantCompany;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -110,6 +111,13 @@ class DestroyTenantCompany
                     throw new \RuntimeException('Not all Tenant users could be deleted.');
                 }
             }
+
+            PlatformLifecycleEvent::query()->create([
+                'operation_id' => $operationId, 'operation' => 'destroy',
+                'actor_id' => $actor->id, 'actor_name' => $actor->name,
+                'tenant_id' => $lockedTenant->getKey(), 'occurred_at' => now('UTC'),
+                'outcome' => 'data_deleted', 'file_count' => count($files),
+            ]);
 
             return $operationId;
         });

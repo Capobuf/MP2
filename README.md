@@ -70,3 +70,29 @@ conteggi di file elaborati, completati e falliti e l'ID operazione, se il comand
 è limitato a una singola operazione. Non registra percorsi, contenuti dei file o
 messaggi delle eccezioni dello storage. Un'esecuzione riuscita non genera errori
 nel log. Il cron può quindi mantenere la redirezione dell'output a `/dev/null`.
+
+## Registro delle operazioni Platform
+
+Il Registro Tenant (`/platform/tenant-lifecycle-log`) è consultabile in sola
+lettura esclusivamente dai Super Admin. Registra Archivio, ripristino e distruzione
+riusciti a partire dall'installazione della relativa migrazione; non ricostruisce
+operazioni precedenti.
+
+La tabella globale `platform_lifecycle_events` conserva senza scadenza automatica
+soltanto ID operazione, operazione, ID e nome storico dell'attore Platform, ID del
+Tenant, timestamp UTC, esito e numero di file affidati alla pulizia. Non conserva
+denominazioni o dati business del Tenant, file, credenziali né contenuti
+ripristinabili. Gli identificatori storici non hanno foreign key verso Tenant o
+account: la loro successiva eliminazione non cancella l'attribuzione. Il registro
+non appartiene alla Timeline del Tenant e sopravvive alla sua distruzione.
+
+Ogni registrazione è nella stessa transazione della modifica: se non può essere
+scritta, l'operazione viene annullata integralmente. Le operazioni rifiutate o
+annullate non producono un esito di successo nel registro.
+
+Per la distruzione, `Dati Eliminati` attesta la cancellazione transazionale dei
+dati. Il conteggio dei file fotografa quelli affidati alla pulizia, non quelli
+ancora pendenti al momento della consultazione. La pulizia successiva usa lo
+stesso ID operazione in `pending_file_deletions`; i suoi fallimenti schedulati
+sono registrati nei log operativi descritti sopra. Il registro non presenta
+questa fase separata come una cancellazione atomica del filesystem.

@@ -4,10 +4,12 @@ namespace App\Actions\Tenancy;
 
 use App\Domain\Company\TenantCompanyStatus;
 use App\Models\Company;
+use App\Models\PlatformLifecycleEvent;
 use App\Models\TenantCompany;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class ArchiveTenantCompany
@@ -29,6 +31,11 @@ class ArchiveTenantCompany
             }
 
             $lockedTenant->update(['status' => TenantCompanyStatus::Archived]);
+            PlatformLifecycleEvent::query()->create([
+                'operation_id' => (string) Str::uuid(), 'operation' => 'archive',
+                'actor_id' => $actor->id, 'actor_name' => $actor->name,
+                'tenant_id' => $lockedTenant->getKey(), 'occurred_at' => now('UTC'), 'outcome' => 'completed',
+            ]);
 
             return $lockedTenant->refresh();
         });
