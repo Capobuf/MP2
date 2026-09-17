@@ -70,6 +70,9 @@ class CompanyAudit extends Page implements HasTable
 
     public ?int $budget = null;
 
+    /** @var array<int, int>|null */
+    private ?array $exerciseYears = null;
+
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
@@ -155,7 +158,7 @@ class CompanyAudit extends Page implements HasTable
                     ->date('d/m/Y'),
                 TextColumn::make('affected_exercise_ids')
                     ->label('Esercizi Interessati')
-                    ->state(fn (AuditEvent $record): string => self::formatExercises($record))
+                    ->state(fn (AuditEvent $record): string => $this->formatExercises($record))
                     ->placeholder('—'),
                 TextColumn::make('beneficiary.email')->label('Beneficiario')->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -189,12 +192,12 @@ class CompanyAudit extends Page implements HasTable
                     ->placeholder('—')->wrap(),
                 TextColumn::make('allocated_impact_by_exercise')
                     ->label('Impatto Allocato')
-                    ->state(fn (AuditEvent $record): string => self::formatImpact($record->allocated_impact_by_exercise, $record))
+                    ->state(fn (AuditEvent $record): string => $this->formatImpact($record->allocated_impact_by_exercise))
                     ->placeholder('—')->wrap()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('actual_impact_by_exercise')
                     ->label('Impatto Effettivo')
-                    ->state(fn (AuditEvent $record): string => self::formatImpact($record->actual_impact_by_exercise, $record))
+                    ->state(fn (AuditEvent $record): string => $this->formatImpact($record->actual_impact_by_exercise))
                     ->placeholder('—')->wrap()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('operation_id')->label('Operazione')->placeholder('—')->copyable()
@@ -211,7 +214,7 @@ class CompanyAudit extends Page implements HasTable
                         Placeholder::make('detail_effective_from')->label('Decorrenza')
                             ->content(fn (AuditEvent $record): string => self::formatEffectiveDate($record)),
                         Placeholder::make('detail_exercises')->label('Esercizi Interessati')
-                            ->content(fn (AuditEvent $record): string => self::formatExercises($record)),
+                            ->content(fn (AuditEvent $record): string => $this->formatExercises($record)),
                         Placeholder::make('detail_actor')->label('Autore')
                             ->content(fn (AuditEvent $record): string => $record->actor->name),
                         Placeholder::make('detail_previous')->label('Valore Precedente')
@@ -219,9 +222,9 @@ class CompanyAudit extends Page implements HasTable
                         Placeholder::make('detail_new')->label('Valore Nuovo')
                             ->content(fn (AuditEvent $record): string => self::formatValue($record, $record->new_value)),
                         Placeholder::make('detail_allocated')->label('Impatto Allocato')
-                            ->content(fn (AuditEvent $record): string => self::formatImpact($record->allocated_impact_by_exercise, $record)),
+                            ->content(fn (AuditEvent $record): string => $this->formatImpact($record->allocated_impact_by_exercise)),
                         Placeholder::make('detail_actual')->label('Impatto Effettivo')
-                            ->content(fn (AuditEvent $record): string => self::formatImpact($record->actual_impact_by_exercise, $record)),
+                            ->content(fn (AuditEvent $record): string => $this->formatImpact($record->actual_impact_by_exercise)),
                         Placeholder::make('detail_reason')->label('Motivo')
                             ->content(fn (AuditEvent $record): string => $record->reason ?? '—'),
                         Placeholder::make('detail_reference')->label('Riferimento')
@@ -484,24 +487,31 @@ class CompanyAudit extends Page implements HasTable
         return $company;
     }
 
-    private static function formatExercises(AuditEvent $event): string
+    /** @return array<int, int> */
+    private function exerciseYears(): array
+    {
+        return $this->exerciseYears ??= Exercise::query()
+            ->where('company_id', $this->company()->id)
+            ->pluck('year', 'id')->all();
+    }
+
+    private function formatExercises(AuditEvent $event): string
     {
         $ids = array_map('intval', $event->affected_exercise_ids ?? []);
         if ($ids === []) {
             return '—';
         }
-        $years = Exercise::query()->where('company_id', $event->company_id)->whereIn('id', $ids)->pluck('year', 'id');
+        $years = $this->exerciseYears();
 
         return collect($ids)->map(fn (int $id): string => isset($years[$id]) ? (string) $years[$id] : '#'.$id)->implode(', ');
     }
 
-    private static function formatImpact(mixed $impact, AuditEvent $event): string
+    private function formatImpact(mixed $impact): string
     {
         if (! is_array($impact) || $impact === []) {
             return '—';
         }
-        $ids = array_map('intval', array_keys($impact));
-        $years = Exercise::query()->where('company_id', $event->company_id)->whereIn('id', $ids)->pluck('year', 'id');
+        $years = $this->exerciseYears();
 
         return collect($impact)->map(function (mixed $amount, int|string $id) use ($years): string {
             $numericId = (int) $id;
