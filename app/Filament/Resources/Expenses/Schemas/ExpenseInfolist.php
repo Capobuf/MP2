@@ -105,7 +105,8 @@ class ExpenseInfolist
                             TextEntry::make('event_type')->label('Evento')->formatStateUsing(
                                 fn (mixed $state): string => ($state instanceof AuditEventType ? $state : AuditEventType::from((string) $state))->label(),
                             ),
-                            TextEntry::make('actor.name')->label('Autore'),
+                            TextEntry::make('actor_name')->label('Autore')
+                                ->state(fn (AuditEvent $record): string => $record->actorLabel()),
                             TextEntry::make('reason')->label('Motivo')->placeholder('—')->wrap(),
                         ])->columnSpanFull(),
                     TextEntry::make('timeline_link')->hiddenLabel()->state('Vedi Timeline completa')
@@ -129,7 +130,7 @@ class ExpenseInfolist
                 ->orWhere(fn (Builder $lineEvent): Builder => $lineEvent
                     ->where('subject_type', ExpenseLine::class)
                     ->whereIn('subject_id', $expense->lines()->select('expense_lines.id'))))
-            ->with(['actor', 'company'])
+            ->with('company')
             ->latest('created_at')
             ->latest('id')
             ->limit(5)

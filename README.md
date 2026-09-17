@@ -96,3 +96,17 @@ ancora pendenti al momento della consultazione. La pulizia successiva usa lo
 stesso ID operazione in `pending_file_deletions`; i suoi fallimenti schedulati
 sono registrati nei log operativi descritti sopra. Il registro non presenta
 questa fase separata come una cancellazione atomica del filesystem.
+
+## Identità nella Timeline
+
+Le modifiche amministrative a nome, email e password degli utenti del Tenant
+producono un evento `Account Modificato` nella stessa transazione del salvataggio.
+Nome ed email riportano soltanto i campi variati, prima e dopo; per la password
+è conservato esclusivamente il fatto della modifica, senza password, hash o token.
+Le variazioni di ruoli mantengono il proprio evento e condividono l'ID operazione
+quando avvengono nello stesso salvataggio.
+
+I nuovi eventi conservano il nome dell'autore al momento della registrazione,
+insieme al suo ID stabile. Gli eventi preesistenti senza questo dato mostrano
+l'ID con l'indicazione «nome storico non disponibile»: non viene attribuito loro
+retroattivamente il nome corrente dell'account.

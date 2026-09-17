@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'operation_id',
     'event_sequence',
     'actor_id',
+    'actor_name',
     'event_type',
     'subject_type',
     'subject_id',
@@ -39,6 +40,7 @@ class AuditEvent extends Model
     {
         static::creating(function (AuditEvent $event): void {
             $event->event_sequence ??= 0;
+            $event->actor_name ??= User::query()->select('name')->findOrFail($event->actor_id)->name;
         });
 
         static::updating(function (): never {
@@ -77,6 +79,13 @@ class AuditEvent extends Model
         }
 
         return $eventType;
+    }
+
+    public function actorLabel(): string
+    {
+        return $this->actor_name === null
+            ? 'Utente #'.$this->actor_id.' (nome storico non disponibile)'
+            : $this->actor_name.' (#'.$this->actor_id.')';
     }
 
     /** @param Builder<self> $query */

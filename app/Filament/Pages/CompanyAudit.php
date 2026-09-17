@@ -151,7 +151,8 @@ class CompanyAudit extends Page implements HasTable
                 TextColumn::make('subject')
                     ->label('Oggetto')
                     ->state(fn (AuditEvent $record): string => self::formatSubject($record)),
-                TextColumn::make('actor.name')->label('Autore')
+                TextColumn::make('actor_name')->label('Autore')
+                    ->state(fn (AuditEvent $record): string => $record->actorLabel())
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('effective_from')
                     ->label('Decorrenza')
@@ -216,7 +217,7 @@ class CompanyAudit extends Page implements HasTable
                         Placeholder::make('detail_exercises')->label('Esercizi Interessati')
                             ->content(fn (AuditEvent $record): string => $this->formatExercises($record)),
                         Placeholder::make('detail_actor')->label('Autore')
-                            ->content(fn (AuditEvent $record): string => $record->actor->name),
+                            ->content(fn (AuditEvent $record): string => $record->actorLabel()),
                         Placeholder::make('detail_previous')->label('Valore Precedente')
                             ->content(fn (AuditEvent $record): string => self::formatValue($record, $record->previous_value)),
                         Placeholder::make('detail_new')->label('Valore Nuovo')
@@ -247,6 +248,19 @@ class CompanyAudit extends Page implements HasTable
 
     private static function formatValue(AuditEvent $event, mixed $value): string
     {
+        if ($event->eventType() === AuditEventType::AccountChanged && is_array($value)) {
+            $parts = [];
+            foreach (['name' => 'Nome', 'email' => 'Email'] as $field => $label) {
+                if (array_key_exists($field, $value)) {
+                    $parts[] = $label.': '.$value[$field];
+                }
+            }
+            if (($value['password_changed'] ?? false) === true) {
+                $parts[] = 'Password modificata';
+            }
+
+            return $parts === [] ? '—' : implode(' · ', $parts);
+        }
         if (
             $event->getRawOriginal('setting') === Setting::UnclassifiedClosingPolicy->value
             && is_string($value)
