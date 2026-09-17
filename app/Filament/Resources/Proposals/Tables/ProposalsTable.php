@@ -20,6 +20,6 @@ class ProposalsTable
             TextColumn::make('planned_allocation')->label('Allocato Pianificato')->state(fn (Proposal $record): string => $record->plannedAllocation())->money('EUR', locale: 'it'),
             TextColumn::make('creator.name')->label('Autore'),
             TextColumn::make('updated_at')->label('Aggiornata')->dateTime('d/m/Y H:i')->sortable(),
-        ])->recordActions([ViewAction::make()])->emptyStateHeading('Nessuna Proposta')->emptyStateDescription('Inizializza una Proposta da un Esercizio Aperto senza Budget.');
+        ])->recordActions([ViewAction::make()])->emptyStateHeading('Nessuna Proposta')->emptyStateDescription('Le Proposte pianificano il Budget iniziale o una Revisione per un Esercizio Aperto.');
     }
 }
