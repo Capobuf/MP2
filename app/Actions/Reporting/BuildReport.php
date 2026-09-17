@@ -3,6 +3,7 @@
 namespace App\Actions\Reporting;
 
 use App\Domain\Company\AuditEventType;
+use App\Domain\Contracts\ContractRenewalSchedule;
 use App\Domain\Contracts\ContractState;
 use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
@@ -28,6 +29,9 @@ use App\Models\ClosingSnapshot;
 use App\Models\ClosingSourceRow;
 use App\Models\Company;
 use App\Models\Contract;
+use App\Models\ContractCondition;
+use App\Models\ContractLifecycleFact;
+use App\Models\ContractRenewalConfiguration;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -269,20 +273,8 @@ final class BuildReport
             CarbonImmutable::now($company->timezone),
         );
         $costCenterHierarchy = CostCenterHierarchy::forCompany((int) $company->id);
-        $sources = [];
-        $expenses = Expense::query()
+        $budgetOriginKeys = BudgetSourceRow::query()
             ->where('company_id', $company->id)
-            ->where('exercise_id', $exercise->id)
-            ->whereNull('project_id')->whereNull('contract_id')
-            ->with(['lines.attachments', 'supplier', 'directCostCenter'])
-            ->orderBy('id')->get();
-        foreach ($expenses as $expense) {
-            $sources[] = $this->expenseSource($expense, $costCenterHierarchy);
-        }
-
-        $budgetProjectKeys = BudgetSourceRow::query()
-            ->where('company_id', $company->id)
-            ->where('source_type', 'project')
             ->whereHas('budget', fn ($query) => $query->where('exercise_id', $exercise->id))
             ->pluck('origin_key')->flip();
         $restoredProjectIds = AuditEvent::query()
@@ -291,12 +283,44 @@ final class BuildReport
             ->where('event_type', AuditEventType::ProjectRestored)
             ->whereBetween('effective_from', [$exercise->year.'-01-01', $exercise->year.'-12-31'])
             ->pluck('subject_id')->flip();
-        $annotatedProjectKeys = HistoricalErrorAnnotation::query()
+        $annotatedOriginKeys = HistoricalErrorAnnotation::query()
             ->where('company_id', $company->id)
             ->get(['affected_sources'])
             ->flatMap(fn (HistoricalErrorAnnotation $annotation): array => $this->affectedSources($annotation))
-            ->where('type', 'project')
             ->pluck('origin_key')->flip();
+
+        $expenseEventIds = AuditEvent::query()
+            ->where('company_id', $company->id)
+            ->where('subject_type', Expense::class)
+            ->whereIn('event_type', [AuditEventType::ExpenseReversed, AuditEventType::ExpenseRestored])
+            ->whereBetween('effective_from', [$exercise->year.'-01-01', $exercise->year.'-12-31'])
+            ->pluck('subject_id')->flip();
+        $restoredContractIds = AuditEvent::query()
+            ->where('company_id', $company->id)
+            ->where('subject_type', Contract::class)
+            ->where('event_type', AuditEventType::ContractRestored)
+            ->whereBetween('effective_from', [$exercise->year.'-01-01', $exercise->year.'-12-31'])
+            ->pluck('subject_id')->flip();
+        $sources = [];
+        $expenses = Expense::query()
+            ->where('company_id', $company->id)
+            ->where('exercise_id', $exercise->id)
+            ->whereNull('project_id')->whereNull('contract_id')
+            ->with(['lines.attachments', 'supplier', 'directCostCenter'])
+            ->orderBy('id')->get();
+        foreach ($expenses as $expense) {
+            $reversedAt = $expense->getAttribute('reversed_at');
+            $reversedInYear = $reversedAt instanceof \DateTimeInterface && (int) $reversedAt->format('Y') === $exercise->year;
+            if (Decimal::compare($expense->allocation(), '0.00') === 0
+                && ! $expense->hasActuals()
+                && ! $budgetOriginKeys->has($expense->originKey())
+                && ! $expenseEventIds->has($expense->id)
+                && ! $reversedInYear
+                && ! $annotatedOriginKeys->has($expense->originKey())) {
+                continue;
+            }
+            $sources[] = $this->expenseSource($expense, $costCenterHierarchy);
+        }
 
         $projects = Project::query()->where('company_id', $company->id)
             ->with(['transitions', 'deferrals', 'classifications.costCenter', 'expenses' => fn ($query) => $query->where('exercise_id', $exercise->id)->with(['lines.attachments', 'supplier', 'directCostCenter'])])
@@ -317,9 +341,9 @@ final class BuildReport
             if (! in_array($state, [ProjectState::Planned, ProjectState::Open], true)
                 && Decimal::compare((string) $totals['allocation'], '0.00') === 0
                 && ! (bool) $totals['has_actuals']
-                && ! $budgetProjectKeys->has($project->originKey())
+                && ! $budgetOriginKeys->has($project->originKey())
                 && ! $restoredProjectIds->has($project->id)
-                && ! $annotatedProjectKeys->has($project->originKey())
+                && ! $annotatedOriginKeys->has($project->originKey())
                 && ! $project->transitions->contains(fn (ProjectTransition $transition): bool => $transition->annulledAt() === null
                     && $transition->effectiveDate()->year === $exercise->year)) {
                 continue;
@@ -359,6 +383,28 @@ final class BuildReport
             $totals = $this->loadedExpenseTotals($contract->expenses);
             $classification = $contract->classifications->firstWhere('exercise_id', $exercise->id);
             $state = $contract->stateAtDate($date->toDateString());
+            if (! in_array($state, [ContractState::Planned, ContractState::Active], true)
+                && Decimal::compare((string) $totals['allocation'], '0.00') === 0
+                && ! (bool) $totals['has_actuals']
+                && ! $budgetOriginKeys->has($contract->originKey())
+                && ! $restoredContractIds->has($contract->id)
+                && ! $annotatedOriginKeys->has($contract->originKey())
+                && ! $contract->conditions->contains(fn (ContractCondition $condition): bool => ! $condition->isAnnulled()
+                    && $condition->validFrom()->toDateString() <= $exercise->year.'-12-31'
+                    && ($condition->validTo() === null || $condition->validTo()->toDateString() >= $exercise->year.'-01-01'))
+                && ! $contract->lifecycleFacts->contains(fn (ContractLifecycleFact $fact): bool => $fact->annulledAt() === null
+                    && ($fact->declaredContractualDate()->year === $exercise->year
+                        || $fact->stateChangeDate()?->year === $exercise->year
+                        || $fact->renewedExpiryDate()?->year === $exercise->year))
+                && ! $contract->renewalConfigurations->contains(function (ContractRenewalConfiguration $configuration) use ($contract, $exercise): bool {
+                    $expiry = $configuration->expiryAnchorDate();
+
+                    return $expiry?->year === $exercise->year
+                        && ContractRenewalSchedule::configurationAtDate($contract->renewalConfigurations, $expiry->toDateString()) === $configuration
+                        && $contract->stateAtDate($expiry->toDateString()) === ContractState::Active;
+                })) {
+                continue;
+            }
             $sources[] = new ReportSource(
                 sourceType: 'contract', originId: $contract->id, originKey: $contract->originKey(), copiedFromOriginKey: null,
                 label: $contract->title, summary: $contract->notes, supplierId: $contract->supplier_id, supplierLabel: $contract->supplier?->legal_name,
