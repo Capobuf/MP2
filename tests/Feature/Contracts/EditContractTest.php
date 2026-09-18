@@ -19,6 +19,8 @@ use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\CostCenter;
 use App\Models\Exercise;
+use App\Models\Expense;
+use App\Models\ExpenseLine;
 use App\Models\Proposal;
 use App\Models\ProposalItem;
 use App\Models\Supplier;
@@ -240,6 +242,68 @@ it('changes one open annual classification and preserves a closed exercise and i
         ->and($snapshot->fresh()->getAttributes())->toBe($before);
 });
 
+it('previews and saves multiple annual classifications together after explicit confirmation', function () {
+    $center = CostCenter::factory()->for($this->company)->create(['name' => 'Servizi IT']);
+    $component = editContractComponent($this->contract)->fillForm(['notes' => 'Centro per entrambi gli anni']);
+    foreach (array_keys($component->get('data.classifications')) as $key) {
+        $component->set("data.classifications.{$key}.cost_center_selection", (string) $center->id);
+    }
+    $component->call('save')->assertHasNoFormErrors()->assertActionMounted('confirmChanges')
+        ->assertMountedActionModalSee('Centro di Costo · 2026')
+        ->assertMountedActionModalSee('Centro di Costo · 2027')
+        ->assertMountedActionModalSee('Servizi IT');
+    expect(array_column($component->get('review.plan'), 'exerciseId'))->toBe([$this->exercise->id, $this->nextExercise->id]);
+    $component->fillForm(['confirmed' => false])->callMountedAction()->assertHasActionErrors(['confirmed']);
+    expect($this->contract->classifications()->whereNotNull('cost_center_id')->count())->toBe(0);
+    $component->fillForm(['confirmed' => true])->callMountedAction()->assertHasNoActionErrors();
+    expect($this->contract->classifications()->where('cost_center_id', $center->id)->count())->toBe(2)
+        ->and($this->contract->fresh()->notes)->toBe('Centro per entrambi gli anni');
+    $events = AuditEvent::query()->where('event_type', AuditEventType::ContractClassificationChanged)->get();
+    expect($events)->toHaveCount(2)
+        ->and($events->pluck('operation_id')->unique())->toHaveCount(2)
+        ->and($events->pluck('affected_exercise_ids')->all())->toBe([[$this->exercise->id], [$this->nextExercise->id]]);
+});
+
+it('rolls back all annual classifications when a later exercise requires a reason', function () {
+    $row = BudgetSourceRow::factory()->create([
+        'budget_snapshot_id' => BudgetSnapshot::factory()->for(Proposal::factory()->for($this->company)->for($this->nextExercise))->create()->id,
+        'company_id' => $this->company->id, 'source_type' => 'contract', 'origin_id' => $this->contract->id, 'origin_key' => $this->contract->originKey(),
+    ]);
+    $snapshot = $row->fresh()->getAttributes();
+    $center = CostCenter::factory()->for($this->company)->create();
+    $component = editContractComponent($this->contract);
+    foreach (array_keys($component->get('data.classifications')) as $key) {
+        $component->set("data.classifications.{$key}.cost_center_selection", (string) $center->id);
+    }
+    $component->call('save')->assertActionMounted('confirmChanges');
+    $events = AuditEvent::count();
+    $revision = $this->exercise->fresh()->revision;
+    $component->fillForm(['confirmed' => true])->callMountedAction()->assertHasActionErrors(['confirmed']);
+    expect($this->contract->classifications()->whereNotNull('cost_center_id')->count())->toBe(0)
+        ->and($this->contract->fresh()->revision)->toBe(0)
+        ->and($this->exercise->fresh()->revision)->toBe($revision)
+        ->and(AuditEvent::count())->toBe($events);
+    $component->fillForm(['confirmed' => true, 'reason' => 'Assegnazione annuale'])->callMountedAction()->assertHasNoActionErrors();
+    expect($this->contract->classifications()->where('cost_center_id', $center->id)->count())->toBe(2)
+        ->and(AuditEvent::query()->where('event_type', AuditEventType::ContractClassificationChanged)->pluck('reason')->all())->toBe(['Assegnazione annuale', 'Assegnazione annuale'])
+        ->and($row->fresh()->getAttributes())->toBe($snapshot);
+});
+
+it('rejects all annual classifications when the second exercise changes after preview', function () {
+    $center = CostCenter::factory()->for($this->company)->create();
+    $component = editContractComponent($this->contract);
+    foreach (array_keys($component->get('data.classifications')) as $key) {
+        $component->set("data.classifications.{$key}.cost_center_selection", (string) $center->id);
+    }
+    $component->call('save')->assertActionMounted('confirmChanges');
+    $this->nextExercise->increment('revision');
+    $events = AuditEvent::count();
+    $component->fillForm(['confirmed' => true])->callMountedAction()->assertHasActionErrors(['confirmed']);
+    expect($this->contract->classifications()->whereNotNull('cost_center_id')->count())->toBe(0)
+        ->and($this->contract->fresh()->revision)->toBe(0)
+        ->and(AuditEvent::count())->toBe($events);
+});
+
 it('rejects unsupported dates and mixed impact groups before any side effect', function (string $field) {
     $events = AuditEvent::count();
     $component = editContractComponent($this->contract)->fillForm(['title' => 'Non salvare']);
@@ -248,12 +312,18 @@ it('rejects unsupported dates and mixed impact groups before any side effect', f
         $component->set("data.conditions.{$key}.valid_from", '02/01/2026');
     } elseif ($field === 'mixed') {
         changeEditAmount($component)->set('data.notice_days', 90);
+    } elseif ($field === 'classifications_and_renewal') {
+        $center = CostCenter::factory()->for($this->company)->create();
+        foreach (array_keys($component->get('data.classifications')) as $key) {
+            $component->set("data.classifications.{$key}.cost_center_selection", (string) $center->id);
+        }
+        $component->set('data.notice_days', 90);
     } else {
         $component->set('data.contractual_start_date', '02/01/2026');
     }
     $component->call('save')->assertHasFormErrors();
     expect(AuditEvent::count())->toBe($events)->and($this->contract->fresh()->title)->toBe('Servizio cloud');
-})->with(['condition', 'start', 'mixed']);
+})->with(['condition', 'start', 'mixed', 'classifications_and_renewal']);
 
 it('refuses an obsolete edit before saving descriptive values', function () {
     $component = editContractComponent($this->contract)->fillForm(['notes' => 'Nota obsoleta']);
@@ -262,15 +332,25 @@ it('refuses an obsolete edit before saving descriptive values', function () {
     expect($this->contract->fresh()->notes)->toBe('Nota concorrente');
 });
 
-it('rolls back economic changes descriptions uploads and audit if a later upload fails', function () {
+it('rolls back impact changes descriptions uploads and audit if a later upload fails', function (string $kind) {
     Storage::fake('local');
     $action = app(SaveContractEdits::class);
     $original = $action->state($this->contract);
     $data = $original;
     $data['title'] = 'Da annullare';
-    $data['conditions'][0]['amount'] = '120.00';
+    if ($kind === 'change') {
+        $data['conditions'][0]['amount'] = '120.00';
+    } elseif ($kind === 'renewal') {
+        $data['automatic_renewal'] = false;
+    } else {
+        $center = CostCenter::factory()->for($this->company)->create();
+        foreach ($data['classifications'] as &$classification) {
+            $classification['cost_center_selection'] = (string) $center->id;
+        }
+        unset($classification);
+    }
     $data['attachments'] = [UploadedFile::fake()->createWithContent('a.txt', 'a'), UploadedFile::fake()->createWithContent('b.txt', 'b')];
-    $review = $action->preview($this->actor, $this->contract, $action->changes($original, $data), ['meaning' => 'change', 'requested_date' => '2026-09-01']);
+    $review = $action->preview($this->actor, $this->contract, $action->changes($original, $data), ['meaning' => 'change', 'requested_date' => '2026-09-01', 'effective_from' => '2026-08-20']);
     $events = AuditEvent::count();
     $fail = true;
     Attachment::creating(function (Attachment $attachment) use (&$fail): void {
@@ -282,9 +362,13 @@ it('rolls back economic changes descriptions uploads and audit if a later upload
     expect(fn () => $action->execute($this->actor, $this->contract, $original, 0, $data, $review, (string) Str::uuid()))->toThrow(RuntimeException::class)
         ->and($this->contract->fresh()->title)->toBe('Servizio cloud')->and($this->contract->fresh()->revision)->toBe(0)
         ->and($this->condition->fresh()->valid_to)->toBeNull()->and(ContractCondition::count())->toBe(1)
+        ->and($this->contract->fresh()->automatic_renewal)->toBeTrue()
+        ->and($this->contract->renewalConfigurations()->count())->toBe(1)
+        ->and($this->contract->classifications()->whereNotNull('cost_center_id')->count())->toBe(0)
+        ->and($this->nextExercise->fresh()->allocation())->toBe('1200.00')
         ->and(Attachment::count())->toBe(0)->and(AuditEvent::count())->toBe($events)
         ->and(Storage::disk('local')->allFiles('attachments'))->toBe([]);
-});
+})->with(['change', 'renewal', 'classification']);
 
 it('requires both material-error declarations and reports a closed-year rejection clearly', function () {
     $component = changeEditAmount(editContractComponent($this->contract))->call('save');
@@ -497,3 +581,283 @@ it('preserves the anchored renewal calendar when only notice changes after a sho
     $renewed = app(ProcessContractRenewals::class)->execute($this->actor, $contract->fresh(), (string) Str::uuid());
     expect($renewed->nextExpiryDate()->toDateString())->toBe('2026-03-31');
 });
+
+it('saves the supported combinations of impact descriptions and uploads through the form', function (string $kind, bool $details, bool $upload) {
+    Storage::fake('local');
+    $component = editContractComponent($this->contract);
+    $center = CostCenter::factory()->for($this->company)->create();
+    if ($details) {
+        $component->fillForm(['title' => 'Titolo combinato', 'notes' => 'Note combinate']);
+    }
+    if ($upload) {
+        $component->fillForm(['attachments' => [UploadedFile::fake()->createWithContent('accordo.txt', 'Contenuto da conservare')]]);
+    }
+    if (in_array($kind, ['change', 'correction'], true)) {
+        changeEditAmount($component);
+    } elseif ($kind === 'renewal') {
+        $component->set('data.automatic_renewal', false);
+    } elseif ($kind === 'classification') {
+        foreach (array_keys($component->get('data.classifications')) as $key) {
+            $component->set("data.classifications.{$key}.cost_center_selection", (string) $center->id);
+        }
+    }
+    $events = AuditEvent::count();
+    $component->call('save')->assertHasNoFormErrors();
+    if ($kind !== 'none') {
+        expect(AuditEvent::count())->toBe($events)
+            ->and($this->contract->fresh()->title)->toBe('Servizio cloud')
+            ->and($this->contract->attachments()->count())->toBe(0);
+        if ($kind !== 'classification') {
+            $component->assertActionMounted('interpretChanges')->fillForm([
+                'meaning' => $kind, 'requested_date' => '01/09/2026', 'effective_from' => '20/08/2026',
+                'reason' => 'Modifica combinata', 'declared_input_error' => true, 'declared_no_new_agreement' => true,
+            ])->callMountedAction()->assertHasNoActionErrors();
+        }
+        $component->assertActionMounted('confirmChanges')->fillForm(['confirmed' => true])->callMountedAction()->assertHasNoActionErrors();
+    }
+    $component->assertNotified();
+    expect($this->contract->fresh()->title)->toBe($details ? 'Titolo combinato' : 'Servizio cloud')
+        ->and($this->contract->fresh()->notes)->toBe($details ? 'Note combinate' : 'Accordo originale')
+        ->and($this->contract->attachments()->count())->toBe((int) $upload)
+        ->and($this->contract->conditions()->count())->toBe($kind === 'change' ? 2 : 1)
+        ->and($this->condition->fresh()->amount)->toBe($kind === 'correction' ? '120.00' : '100.00')
+        ->and($this->contract->fresh()->automatic_renewal)->toBe($kind !== 'renewal')
+        ->and($this->contract->renewalConfigurations()->count())->toBe($kind === 'renewal' ? 2 : 1)
+        ->and($this->contract->classifications()->where('cost_center_id', $center->id)->count())->toBe($kind === 'classification' ? 2 : 0)
+        ->and($this->exercise->fresh()->allocation())->toBe(match ($kind) {
+            'change' => '1280.00', 'correction' => '1440.00', default => '1200.00',
+        })
+        ->and($this->nextExercise->fresh()->allocation())->toBe(match ($kind) {
+            'change', 'correction' => '1440.00', 'renewal' => '0.00', default => '1200.00',
+        });
+    if ($upload) {
+        $attachment = $this->contract->attachments()->sole();
+        expect(Storage::disk('local')->get($attachment->storage_path))->toBe('Contenuto da conservare');
+    }
+    $events = AuditEvent::count();
+    $component->call('save')->assertHasNoFormErrors()->assertActionNotMounted();
+    expect(AuditEvent::count())->toBe($events)->and($this->contract->attachments()->count())->toBe((int) $upload);
+})->with(['none', 'change', 'correction', 'renewal', 'classification'])->with([
+    'impact only' => [false, false], 'with descriptions' => [true, false],
+    'with upload' => [false, true], 'with descriptions and upload' => [true, true],
+]);
+
+it('rejects every mixed impact combination without saving descriptions or uploads', function (array $groups) {
+    Storage::fake('local');
+    $component = editContractComponent($this->contract)->fillForm([
+        'title' => 'Non salvare', 'attachments' => [UploadedFile::fake()->createWithContent('accordo.txt', 'Non salvare')],
+    ]);
+    if (in_array('condition', $groups, true)) {
+        changeEditAmount($component);
+    }
+    if (in_array('renewal', $groups, true)) {
+        $component->set('data.notice_days', 60);
+    }
+    if (in_array('classification', $groups, true)) {
+        $center = CostCenter::factory()->for($this->company)->create();
+        foreach (array_keys($component->get('data.classifications')) as $key) {
+            $component->set("data.classifications.{$key}.cost_center_selection", (string) $center->id);
+        }
+    }
+    $events = AuditEvent::count();
+    $component->call('save')->assertHasFormErrors(['conditions'])->assertActionNotMounted();
+    expect($this->contract->fresh()->title)->toBe('Servizio cloud')
+        ->and($this->contract->fresh()->revision)->toBe(0)
+        ->and($this->condition->fresh()->amount)->toBe('100.00')
+        ->and($this->contract->fresh()->notice_days)->toBe(30)
+        ->and($this->contract->classifications()->whereNotNull('cost_center_id')->count())->toBe(0)
+        ->and($this->contract->attachments()->count())->toBe(0)
+        ->and(AuditEvent::count())->toBe($events)
+        ->and(Storage::disk('local')->allFiles('attachments'))->toBe([]);
+})->with([
+    'condition and renewal' => [['condition', 'renewal']],
+    'condition and classifications' => [['condition', 'classification']],
+    'renewal and classifications' => [['renewal', 'classification']],
+    'all impact groups' => [['condition', 'renewal', 'classification']],
+]);
+
+it('allows cancelling a review restoring impact values and saving only descriptions', function (string $kind) {
+    $component = editContractComponent($this->contract)->fillForm(['title' => 'Solo titolo']);
+    if ($kind === 'condition') {
+        changeEditAmount($component)->call('save')->fillForm(['meaning' => 'change', 'requested_date' => '01/09/2026'])->callMountedAction();
+    } elseif ($kind === 'renewal') {
+        $component->set('data.notice_days', 60)->call('save')->fillForm(['effective_from' => '20/08/2026'])->callMountedAction();
+    } else {
+        $center = CostCenter::factory()->for($this->company)->create();
+        foreach (array_keys($component->get('data.classifications')) as $key) {
+            $component->set("data.classifications.{$key}.cost_center_selection", (string) $center->id);
+        }
+        $component->call('save');
+    }
+    $component->assertActionMounted('confirmChanges')->call('unmountAction');
+    expect($this->contract->fresh()->revision)->toBe(0);
+    changeEditAmount($component, '100.00')->set('data.notice_days', 30);
+    foreach (array_keys($component->get('data.classifications')) as $key) {
+        $component->set("data.classifications.{$key}.cost_center_selection", '__unclassified__');
+    }
+    $component->call('save')->assertHasNoFormErrors()->assertActionNotMounted();
+    expect($this->contract->fresh()->title)->toBe('Solo titolo')
+        ->and($this->contract->fresh()->revision)->toBe(1)
+        ->and($this->condition->fresh()->amount)->toBe('100.00')
+        ->and($this->contract->classifications()->whereNotNull('cost_center_id')->count())->toBe(0);
+})->with(['condition', 'renewal', 'classification']);
+
+it('does not apply a stale confirmation after all reviewed impact changes have been removed', function () {
+    $component = changeEditAmount(editContractComponent($this->contract))->call('save')
+        ->fillForm(['meaning' => 'change', 'requested_date' => '01/09/2026'])->callMountedAction()->assertActionMounted('confirmChanges');
+    changeEditAmount($component, '100.00')->set('data.title', 'Titolo mai rivisto');
+    $events = AuditEvent::count();
+    $component->fillForm(['confirmed' => true])->callMountedAction()->assertHasActionErrors(['confirmed']);
+    expect($this->contract->fresh()->title)->toBe('Servizio cloud')->and(AuditEvent::count())->toBe($events);
+});
+
+it('saves each transition between fixed indefinite and undefined contractual duration', function (string $from, string $to) {
+    $contract = app(CreateContractAction::class)->execute($this->actor, $this->company, [
+        'title' => 'Durata da cambiare', 'supplier_id' => $this->contract->supplier_id,
+        'contractual_start_date' => '2026-01-01', 'automatic_renewal' => $from !== 'indefinite',
+        'next_expiry_date' => $from === 'fixed' ? '2026-12-31' : null,
+        'renewal_duration_months' => $from === 'fixed' ? 12 : null,
+        'notice_days' => $from === 'fixed' ? 30 : null,
+        'conditions' => [['amount' => '100.00', 'cycle' => 'monthly', 'attribution_mode' => 'cycle_start', 'valid_from' => '2026-01-01']],
+    ], (string) Str::uuid());
+    $component = editContractComponent($contract)->set('data.duration_type', $to);
+    if ($to === 'fixed') {
+        $component->set('data.next_expiry_date', '31/12/2026')->set('data.automatic_renewal', true)
+            ->set('data.renewal_duration_months', 6)->set('data.notice_days', 0);
+    }
+    $component->call('save')->assertHasNoFormErrors()->assertActionMounted('interpretChanges')
+        ->fillForm(['effective_from' => '20/08/2026'])->callMountedAction()->assertHasNoActionErrors()
+        ->assertActionMounted('confirmChanges')->fillForm(['confirmed' => true])->callMountedAction()->assertHasNoActionErrors();
+    expect($contract->fresh()->automatic_renewal)->toBe($to !== 'indefinite')
+        ->and($contract->fresh()->nextExpiryDate()?->toDateString())->toBe($to === 'fixed' ? '2026-12-31' : null)
+        ->and($contract->fresh()->renewal_duration_months)->toBe($to === 'fixed' ? 6 : null)
+        ->and($contract->fresh()->notice_days)->toBe($to === 'fixed' ? 0 : null)
+        ->and($contract->renewalConfigurations()->count())->toBe(2);
+    $events = AuditEvent::count();
+    $component->call('save')->assertHasNoFormErrors()->assertActionNotMounted();
+    expect(AuditEvent::count())->toBe($events);
+})->with([
+    ['fixed', 'indefinite'], ['fixed', 'undefined'], ['indefinite', 'fixed'],
+    ['indefinite', 'undefined'], ['undefined', 'fixed'], ['undefined', 'indefinite'],
+]);
+
+it('changes all economic terms of one condition together with the selected meaning', function (string $meaning) {
+    $component = editContractComponent($this->contract);
+    $key = array_key_first($component->get('data.conditions'));
+    $component->set("data.conditions.{$key}.amount", '120.00')->set("data.conditions.{$key}.cycle", 'quarterly')
+        ->set("data.conditions.{$key}.attribution_mode", 'cycle_end')->call('save')->assertActionMounted('interpretChanges')
+        ->fillForm([
+            'meaning' => $meaning, 'requested_date' => '01/09/2026', 'reason' => 'Termini trascritti',
+            'declared_input_error' => true, 'declared_no_new_agreement' => true,
+        ])->callMountedAction()->assertHasNoActionErrors()->assertActionMounted('confirmChanges')
+        ->fillForm(['confirmed' => true])->callMountedAction()->assertHasNoActionErrors();
+    $condition = $this->contract->conditions()->reorder()->latest('id')->first();
+    expect($condition->amount)->toBe('120.00')->and($condition->cycle)->toBe('quarterly')
+        ->and($condition->attribution_mode)->toBe('cycle_end')
+        ->and($this->contract->conditions()->count())->toBe($meaning === 'change' ? 2 : 1)
+        ->and($this->exercise->fresh()->allocation())->toBe($meaning === 'change' ? '920.00' : '360.00')
+        ->and($this->nextExercise->fresh()->allocation())->toBe('480.00');
+})->with(['change', 'correction']);
+
+it('rejects edits to two economic conditions together', function () {
+    $this->condition->update(['valid_to' => '2026-08-31']);
+    ContractCondition::factory()->for($this->contract)->create([
+        'company_id' => $this->company->id, 'valid_from' => '2026-09-01', 'valid_to' => null, 'amount' => '100.00',
+    ]);
+    $component = editContractComponent($this->contract)->fillForm(['title' => 'Non salvare']);
+    foreach (array_keys($component->get('data.conditions')) as $key) {
+        $component->set("data.conditions.{$key}.amount", '120.00');
+    }
+    $events = AuditEvent::count();
+    $component->call('save')->assertHasFormErrors(['conditions']);
+    expect($this->contract->conditions()->pluck('amount')->all())->toBe(['100.00', '100.00'])
+        ->and($this->contract->fresh()->title)->toBe('Servizio cloud')->and(AuditEvent::count())->toBe($events);
+});
+
+it('handles supplier changes combined with other edits before the first economic use', function (string $kind) {
+    Storage::fake('local');
+    $contract = app(CreateContractAction::class)->execute($this->actor, $this->company, [
+        'title' => 'Ancora inutilizzato', 'supplier_id' => $this->contract->supplier_id,
+        'contractual_start_date' => '2026-01-01', 'automatic_renewal' => true,
+        'conditions' => [['amount' => '0.00', 'cycle' => 'monthly', 'attribution_mode' => 'cycle_start', 'valid_from' => '2026-01-01']],
+    ], (string) Str::uuid());
+    $supplier = Supplier::factory()->for($this->company)->create();
+    $center = CostCenter::factory()->for($this->company)->create();
+    $component = editContractComponent($contract)->fillForm([
+        'supplier_id' => $supplier->id, 'title' => 'Nuovo fornitore',
+        'attachments' => [UploadedFile::fake()->createWithContent('accordo.txt', 'Accordo')],
+    ]);
+    if ($kind === 'condition') {
+        changeEditAmount($component);
+    } elseif ($kind === 'renewal') {
+        $component->set('data.duration_type', 'indefinite');
+    } elseif ($kind === 'classification') {
+        foreach (array_keys($component->get('data.classifications')) as $key) {
+            $component->set("data.classifications.{$key}.cost_center_selection", (string) $center->id);
+        }
+    }
+    $events = AuditEvent::count();
+    $component->call('save');
+    if (in_array($kind, ['condition', 'renewal'], true)) {
+        $component->assertHasFormErrors(['supplier_id']);
+        expect($contract->fresh()->supplier_id)->toBe($this->contract->supplier_id)
+            ->and($contract->fresh()->title)->toBe('Ancora inutilizzato')
+            ->and($contract->attachments()->count())->toBe(0)->and(AuditEvent::count())->toBe($events);
+
+        return;
+    }
+    $component->assertHasNoFormErrors();
+    if ($kind === 'classification') {
+        $component->assertActionMounted('confirmChanges')->fillForm(['confirmed' => true])->callMountedAction()->assertHasNoActionErrors();
+    }
+    expect($contract->fresh()->supplier_id)->toBe($supplier->id)->and($contract->fresh()->title)->toBe('Nuovo fornitore')
+        ->and($contract->attachments()->count())->toBe(1)
+        ->and($contract->classifications()->where('cost_center_id', $center->id)->count())->toBe($kind === 'classification' ? 2 : 0);
+})->with(['none', 'classification', 'condition', 'renewal']);
+
+it('reclassifies different annual centers including Unclassified and actuals without changing amounts', function () {
+    $old = CostCenter::factory()->for($this->company)->create();
+    $new = CostCenter::factory()->for($this->company)->create();
+    $this->contract->classifications()->update(['cost_center_id' => $old->id]);
+    $expense = Expense::factory()->forExercise($this->nextExercise)->for($this->contract)->create(['origin' => 'manual', 'direct_cost_center_id' => null]);
+    $actual = ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '75.00']);
+    $before = $actual->fresh()->getAttributes();
+    $component = editContractComponent($this->contract);
+    $keys = array_keys($component->get('data.classifications'));
+    $component->set("data.classifications.{$keys[0]}.cost_center_selection", (string) $new->id)
+        ->set("data.classifications.{$keys[1]}.cost_center_selection", '__unclassified__')
+        ->call('save')->assertActionMounted('confirmChanges');
+    expect(array_column($component->get('review.plan'), 'actual'))->toBe(['0.00', '75.00']);
+    $component->fillForm(['confirmed' => true])->callMountedAction()->assertHasActionErrors(['confirmed']);
+    expect($this->contract->classifications()->where('cost_center_id', $old->id)->count())->toBe(2);
+    $component->fillForm(['confirmed' => true, 'reason' => 'Correzione centri annuali'])->callMountedAction()->assertHasNoActionErrors();
+    expect($this->contract->classifications()->where('exercise_id', $this->exercise->id)->value('cost_center_id'))->toBe($new->id)
+        ->and($this->contract->classifications()->where('exercise_id', $this->nextExercise->id)->value('cost_center_id'))->toBeNull()
+        ->and($actual->fresh()->getAttributes())->toBe($before)
+        ->and($this->nextExercise->fresh()->actual())->toBe('75.00');
+});
+
+it('rejects a multi-year classification confirmation when its reviewed context changes', function (string $change) {
+    $center = CostCenter::factory()->for($this->company)->create();
+    $component = editContractComponent($this->contract)->fillForm(['title' => 'Non salvare']);
+    $keys = array_keys($component->get('data.classifications'));
+    foreach ($keys as $key) {
+        $component->set("data.classifications.{$key}.cost_center_selection", (string) $center->id);
+    }
+    $component->call('save')->assertActionMounted('confirmChanges');
+    if ($change === 'form') {
+        $component->set("data.classifications.{$keys[1]}.cost_center_selection", '__unclassified__');
+    } elseif ($change === 'closed') {
+        closeExerciseFixture($this->nextExercise, $this->actor);
+    } elseif ($change === 'archived') {
+        $center->update(['archived_at' => now()]);
+    } else {
+        $expense = Expense::factory()->forExercise($this->nextExercise)->for($this->contract)->create(['origin' => 'manual', 'direct_cost_center_id' => null]);
+        ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '75.00']);
+    }
+    $events = AuditEvent::count();
+    $component->fillForm(['confirmed' => true, 'reason' => 'Riclassificazione'])->callMountedAction()->assertHasActionErrors(['confirmed']);
+    expect($this->contract->classifications()->whereNotNull('cost_center_id')->count())->toBe(0)
+        ->and($this->contract->fresh()->title)->toBe('Servizio cloud')
+        ->and(AuditEvent::count())->toBe($events);
+})->with(['form', 'closed', 'archived', 'actual']);

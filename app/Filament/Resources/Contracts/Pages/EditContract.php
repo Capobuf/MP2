@@ -200,6 +200,7 @@ class EditContract extends EditRecord
     {
         $this->operationId = (string) Str::uuid();
         $this->record->refresh();
+        $this->cacheSchema('form');
         $this->fillForm();
         $this->review = null;
     }

@@ -100,8 +100,8 @@ final class SaveContractEdits
         if (array_key_exists('supplier_id', $changes['details']) && ($changes['conditions'] !== [] || $changes['renewal'] !== [])) {
             throw ValidationException::withMessages(['supplier_id' => 'Salva prima il cambio di Fornitore, poi le modifiche economiche o contrattuali: queste possono determinare il primo utilizzo economico.']);
         }
-        if (count($changes['conditions']) + count($changes['classifications']) + (int) ($changes['renewal'] !== []) > 1) {
-            throw ValidationException::withMessages(['conditions' => 'Salva separatamente ogni condizione economica, la modifica dei termini contrattuali e ogni classificazione annuale: ciascuna richiede la propria anteprima. Titolo, note e allegati possono essere salvati insieme.']);
+        if (count($changes['conditions']) + (int) ($changes['classifications'] !== []) + (int) ($changes['renewal'] !== []) > 1) {
+            throw ValidationException::withMessages(['conditions' => 'Salva separatamente ogni condizione economica, la modifica dei termini contrattuali e le classificazioni annuali. Le classificazioni di più Esercizi possono essere confermate insieme, dopo averne rivisto l’impatto. Titolo, note e allegati possono essere salvati insieme.']);
         }
 
         return $changes;
@@ -154,10 +154,12 @@ final class SaveContractEdits
             }
             $review = ['kind' => $plan->operationKind, 'input' => $input, 'plan' => $plan->toArray(), 'reason' => $reason];
         } elseif ($changes['classifications'] !== []) {
-            $id = array_key_first($changes['classifications']);
-            $exercise = $contract->company->exercises()->findOrFail($id);
-            $plan = app(UpdateContractClassification::class)->preview($actor, $contract, $exercise, $changes['classifications'][$id]);
-            $review = ['kind' => 'classification', 'input' => [], 'plan' => $plan->toArray(), 'reason' => $reason];
+            $plans = [];
+            foreach ($changes['classifications'] as $exerciseId => $costCenterId) {
+                $exercise = $contract->company->exercises()->findOrFail($exerciseId);
+                $plans[] = app(UpdateContractClassification::class)->preview($actor, $contract, $exercise, $costCenterId)->toArray();
+            }
+            $review = ['kind' => 'classification', 'input' => [], 'plan' => $plans, 'reason' => $reason];
         } elseif ($changes['renewal'] !== []) {
             if ($contract->nextExpiryDate() !== null && $contract->nextExpiryDate()->toDateString() <= now($contract->company->timezone)->toDateString()) {
                 throw ValidationException::withMessages(['renewal' => 'Sono presenti scadenze da elaborare. Attendi l’elaborazione automatica dei rinnovi e ricarica il Contratto prima di modificarne i termini.']);
@@ -214,6 +216,9 @@ final class SaveContractEdits
                 }
                 $changes = $this->changes($original, $data);
                 $hasImpact = $changes['conditions'] !== [] || $changes['classifications'] !== [] || $changes['renewal'] !== [];
+                if ($review !== null && ! $hasImpact) {
+                    throw ValidationException::withMessages(['conditions' => 'Le modifiche sono cambiate dopo l’anteprima. Annulla la conferma e rivedi le modifiche.']);
+                }
                 if ($hasImpact) {
                     if ($review === null) {
                         throw ValidationException::withMessages(['conditions' => 'Conferma prima l’anteprima delle modifiche.']);
@@ -233,10 +238,13 @@ final class SaveContractEdits
                             $action->execute($actor, $locked, $condition, $review['input'], $plan->fingerprint(), $id);
                         }
                     } elseif ($review['kind'] === 'classification') {
-                        $exercise = Exercise::query()->findOrFail($review['plan']['exerciseId']);
                         $action = app(UpdateContractClassification::class);
-                        $plan = $action->preview($actor, $locked, $exercise, $review['plan']['newCostCenterId']);
-                        $action->confirm($actor, $locked, $plan, $id, $review['reason']);
+                        foreach ($review['plan'] as $classification) {
+                            $exercise = Exercise::query()->findOrFail($classification['exerciseId']);
+                            $plan = $action->preview($actor, $locked, $exercise, $classification['newCostCenterId']);
+                            $action->confirm($actor, $locked, $plan, Uuid::uuid5($operationId, 'classification:'.$exercise->id)->toString(), $review['reason']);
+                            $locked->refresh();
+                        }
                     } else {
                         app(UpdateContractRenewal::class)->execute($actor, $locked, $review['input'] + ['impact_confirmed' => true], $id);
                     }

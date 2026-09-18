@@ -38,16 +38,18 @@
                 @endforeach
             </section>
         @elseif ($review['kind'] === 'classification')
-            <section class="space-y-2">
-                <h3 class="font-semibold">Centro di Costo · {{ collect($review['exercises'])->firstWhere('id', $plan['exerciseId'])['year'] }}</h3>
-                <p>{{ $center($plan['oldCostCenterId']) }} → {{ $center($plan['newCostCenterId']) }}</p>
-                <p>L’intero Esercizio viene riclassificato, compresi gli Effettivi.</p>
-                <p>Allocato: {{ $money($plan['allocation']) }} · Effettivo: {{ $money($plan['actual']) }}</p>
-                <p>Spese interessate: {{ count($plan['expenseIds']) }}</p>
-                @foreach ($contract->expenses()->whereIn('id', $plan['expenseIds'])->get() as $expense)
-                    <p>{{ $expense->description }}</p>
-                @endforeach
-            </section>
+            @foreach ($review['plan'] as $plan)
+                <section class="space-y-2">
+                    <h3 class="font-semibold">Centro di Costo · {{ collect($review['exercises'])->firstWhere('id', $plan['exerciseId'])['year'] }}</h3>
+                    <p>{{ $center($plan['oldCostCenterId']) }} → {{ $center($plan['newCostCenterId']) }}</p>
+                    <p>L’intero Esercizio viene riclassificato, compresi gli Effettivi.</p>
+                    <p>Allocato: {{ $money($plan['allocation']) }} · Effettivo: {{ $money($plan['actual']) }}</p>
+                    <p>Spese interessate: {{ count($plan['expenseIds']) }}</p>
+                    @foreach ($contract->expenses()->whereIn('id', $plan['expenseIds'])->get() as $expense)
+                        <p>{{ $expense->description }}</p>
+                    @endforeach
+                </section>
+            @endforeach
         @elseif ($review['kind'] === 'renewal')
             <section class="space-y-2">
                 <h3 class="font-semibold">Termini Contrattuali</h3>
