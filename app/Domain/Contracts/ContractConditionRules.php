@@ -37,7 +37,9 @@ final class ContractConditionRules
             $endsBefore = $to !== null && $to->lessThan($otherFrom);
             $startsAfter = $otherTo !== null && $from->greaterThan($otherTo);
             if (! $endsBefore && ! $startsAfter) {
-                throw ValidationException::withMessages(['valid_from' => 'Le condizioni valide dello stesso Contratto non possono sovrapporsi.']);
+                throw ValidationException::withMessages([
+                    'valid_from' => 'Esiste già una condizione valida in questo periodo. Per modificare l’accordo corrente utilizza la modifica del Contratto.',
+                ]);
             }
         }
     }

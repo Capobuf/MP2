@@ -16,10 +16,12 @@ use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ContractConditionsRelationManager extends RelationManager
 {
@@ -51,13 +53,27 @@ class ContractConditionsRelationManager extends RelationManager
         ])->headerActions([
             Action::make('createCondition')->label('Nuova Condizione')->visible(fn (): bool => $this->canMutate())
                 ->form($this->fields())
-                ->action(function (array $data): void {
+                ->successNotificationTitle('Condizione Creata')
+                ->action(function (array $data, Schema $schema): void {
                     $actor = auth()->user();
                     $contract = $this->getOwnerRecord();
                     abort_unless($actor instanceof User && $contract instanceof Contract, 403);
                     $operationId = (string) $data['operation_id'];
                     unset($data['operation_id']);
-                    app(CreateContractCondition::class)->execute($actor, $contract, $data, $operationId);
+                    try {
+                        app(CreateContractCondition::class)->execute($actor, $contract, $data, $operationId);
+                    } catch (ValidationException $exception) {
+                        $messages = [];
+                        foreach ($exception->errors() as $field => $fieldMessages) {
+                            $field = in_array($field, ['amount', 'cycle', 'attribution_mode', 'valid_from', 'valid_to', 'reason'], true)
+                                ? $field
+                                : 'valid_from';
+                            $path = $schema->getStatePath().'.'.$field;
+                            $messages[$path] = [...($messages[$path] ?? []), ...$fieldMessages];
+                        }
+
+                        throw ValidationException::withMessages($messages);
+                    }
                     $contract->refresh();
                 }),
         ])->recordActions([
