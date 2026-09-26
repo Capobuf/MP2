@@ -286,7 +286,6 @@ final class BuildReport
             ->pluck('subject_id')->flip();
         $historicalAnnotations = HistoricalErrorAnnotation::query()
             ->where('company_id', $company->id)
-            ->where('exercise_id', $exercise->id)
             ->get(['id', 'kind', 'reason', 'affected_sources']);
         $annotatedOriginKeys = $historicalAnnotations
             ->flatMap(fn (HistoricalErrorAnnotation $annotation): array => $this->affectedSources($annotation))
