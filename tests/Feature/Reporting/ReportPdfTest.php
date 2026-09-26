@@ -261,6 +261,8 @@ it('limits the contracts chart to the eight highest allocations without truncati
 
     $html = view('reports.contracts', compact('document'))->render();
     $svg = base64_decode(explode(',', collect($document['charts'])->firstWhere('id', 'contract-values')['image'], 2)[1], true);
+    $portraitDocument = app(ReportPdfComposer::class)->compose($result, $company, ['orientation' => 'portrait']);
+    $portraitSvg = base64_decode(explode(',', collect($portraitDocument['charts'])->firstWhere('id', 'contract-values')['image'], 2)[1], true);
     preg_match_all('/<text[^>]*>(.*?)<\/text>/s', $svg, $texts);
 
     expect($chart['description'])->toBe('Visualizzati 8 di 9 contratti · ordinati per Allocato decrescente.')
@@ -268,7 +270,9 @@ it('limits the contracts chart to the eight highest allocations without truncati
         ->and($html)->toContain($chart['description'], 'Contratto 1', 'Contratto 9')
         ->and($texts[1])->not->toContain(Number::currency(0, in: 'EUR', locale: 'it'))
         ->and($svg)->not->toContain('width="0"')
-        ->and($svg)->toContain('90,00', '20,00');
+        ->and($svg)->toContain('90,00', '20,00')
+        ->and((string) simplexml_load_string($svg)['viewBox'])->toBe('0 0 1400 '.(34 + 8 * 36))
+        ->and((string) simplexml_load_string($portraitSvg)['viewBox'])->toBe('0 0 1000 '.(34 + 5 * 44));
 
     expect($document['contracts'])->toHaveCount(9)
         ->and($chart['data']['labels'])->toHaveCount(8)
@@ -888,6 +892,70 @@ it('draws signed operational variance on opposite sides of zero and orders by ma
         ->and($svg)->toContain('+1.250,00', '-1.000,00', '0,00')
         ->and($composer->chartDefinitions($result, $orientation)[0]['data']['datasets'][0]['data'])->toBe([1250.0, -1000.0, 750.0, -500.0, 0.0]);
 })->with(['portrait', 'landscape']);
+
+it('keeps four annual cost center series and their legend within separate SVG rows', function (string $orientation): void {
+    $result = pdfFamilyFixture('annual_executive');
+    $composer = app(ReportPdfComposer::class);
+    $definition = collect($composer->chartDefinitions($result, $orientation))->firstWhere('id', 'annual-cost-centers');
+    $chart = collect($composer->compose($result, Company::factory()->make(), compact('orientation'))['charts'])->firstWhere('id', 'annual-cost-centers');
+    $xml = simplexml_load_string(base64_decode(explode(',', $chart['image'], 2)[1]));
+    $xml->registerXPathNamespace('svg', 'http://www.w3.org/2000/svg');
+    $legend = $xml->xpath('/svg:svg/svg:text[@font-size="16" and not(@text-anchor)]');
+    $amounts = $xml->xpath('/svg:svg/svg:text[@text-anchor="end"]');
+    $marks = $xml->xpath('/svg:svg/svg:rect[@class="positive" or @class="negative"] | /svg:svg/svg:circle[@class="zero-value"]');
+    $categoryLabels = $xml->xpath('/svg:svg/svg:text[@font-size="18"]');
+    $categoryCount = count($definition['data']['labels']);
+    $height = (int) explode(' ', (string) $xml['viewBox'])[3];
+
+    expect($definition['data']['datasets'])->toHaveCount(4)
+        ->and($categoryCount)->toBe($orientation === 'portrait' ? 5 : 8)
+        ->and($legend)->toHaveCount(4)
+        ->and(array_map(fn (SimpleXMLElement $text): string => (string) $text, $legend))->toBe(array_column($definition['data']['datasets'], 'label'))
+        ->and(count(array_unique(array_map(fn (SimpleXMLElement $text): string => (string) $text['y'], $legend))))->toBeGreaterThan(1)
+        ->and($amounts)->toHaveCount($categoryCount * 4)
+        ->and($marks)->toHaveCount($categoryCount * 4)
+        ->and($categoryLabels)->toHaveCount($categoryCount * 2)
+        ->and($height)->toBeGreaterThan((float) $amounts[array_key_last($amounts)]['y']);
+
+    foreach ($legend as $index => $item) {
+        foreach (array_slice($legend, $index + 1) as $next) {
+            if ((string) $item['y'] === (string) $next['y']) {
+                expect((float) $next['x'] - (float) $item['x'])->toBeGreaterThanOrEqual(20 + mb_strlen((string) $item) * 10);
+            }
+        }
+    }
+    expect(max(array_map(fn (SimpleXMLElement $text): float => (float) $text['y'], $legend)))
+        ->toBeLessThan((float) $xml->xpath('/svg:svg/svg:line[@class="zero-axis"]')[0]['y1']);
+
+    for ($row = 0; $row < $categoryCount - 1; $row++) {
+        $lastAmount = (float) $amounts[$row * 4 + 3]['y'];
+        $nextAmountTop = (float) $amounts[($row + 1) * 4]['y'] - 16;
+        $nextLabelTop = (float) $categoryLabels[($row + 1) * 2]['y'] - 18;
+        $lastMark = $marks[$row * 4 + 3];
+        $lastMarkBottom = isset($lastMark['height'])
+            ? (float) $lastMark['y'] + (float) $lastMark['height']
+            : (float) $lastMark['cy'] + (float) $lastMark['r'];
+
+        expect($lastAmount)->toBeLessThan(min($nextAmountTop, $nextLabelTop))
+            ->and($lastMarkBottom)->toBeLessThan(min($nextAmountTop, $nextLabelTop));
+    }
+})->with(['portrait', 'landscape']);
+
+it('preserves the SVG rows for one and two monetary series', function (string $kind, string $chartId, int $seriesCount): void {
+    $result = pdfFamilyFixture($kind, 3);
+    $chart = collect(app(ReportPdfComposer::class)->compose($result, Company::factory()->make())['charts'])->firstWhere('id', $chartId);
+    $xml = simplexml_load_string(base64_decode(explode(',', $chart['image'], 2)[1]));
+    $xml->registerXPathNamespace('svg', 'http://www.w3.org/2000/svg');
+    $amounts = $xml->xpath('/svg:svg/svg:text[@text-anchor="end"]');
+    $height = (int) explode(' ', (string) $xml['viewBox'])[3];
+
+    expect($amounts)->toHaveCount(3 * $seriesCount)
+        ->and($height)->toBe(42 + 3 * ($seriesCount === 1 ? 44 : 46))
+        ->and((float) $amounts[array_key_last($amounts)]['y'])->toBeLessThan($height);
+})->with([
+    ['carryovers', 'carryover-values', 1],
+    ['projects', 'project-values', 2],
+]);
 
 it('limits dense charts by the declared measure while retaining complete tables', function (string $kind, string $chartId, string $block, string $orientation): void {
     $result = pdfFamilyFixture($kind);

@@ -69,6 +69,34 @@ it('creates a complete contract through the form and approves its calculated est
     ['annual', 'cycle_start', '120.50'], ['annual', 'cycle_end', '0.00'],
 ]);
 
+it('creates and selects a Supplier inline in a planned Contract', function (): void {
+    grantTestPermissions([
+        'company_id' => $this->proposal->company_id,
+        'user' => $this->user,
+        'permissions' => TestPermissions::MANAGE_MASTER_DATA,
+    ]);
+
+    $component = Livewire::test(ViewProposal::class, ['record' => $this->proposal->id])
+        ->mountAction(TestAction::make('createPlannedContract')->table())
+        ->assertFormComponentActionVisible('supplier_id', 'createOption', formName: 'mountedActionSchema0')
+        ->callFormComponentAction('supplier_id', 'createOption', [
+            'legal_name' => 'Fornitore proposta inline',
+            'vat_number' => 'IT12345678901',
+            'notes' => 'Creato dalla Proposta',
+        ], formName: 'mountedActionSchema0');
+
+    $supplier = Supplier::query()->where('legal_name', 'Fornitore proposta inline')->sole();
+    $component->assertSchemaStateSet(['supplier_id' => $supplier->id], 'mountedActionSchema0');
+
+    expect($supplier->company_id)->toBe($this->proposal->company_id);
+});
+
+it('hides planned Contract inline Supplier creation without permission', function (): void {
+    Livewire::test(ViewProposal::class, ['record' => $this->proposal->id])
+        ->mountAction(TestAction::make('createPlannedContract')->table())
+        ->assertFormComponentActionHidden('supplier_id', 'createOption', formName: 'mountedActionSchema0');
+});
+
 it('requires a first amount and rejects negative amounts without creating a partial contract', function (mixed $amount): void {
     Livewire::test(ViewProposal::class, ['record' => $this->proposal->id])
         ->callAction(TestAction::make('createPlannedContract')->table(), data: [

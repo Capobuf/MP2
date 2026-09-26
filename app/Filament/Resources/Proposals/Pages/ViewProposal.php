@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Proposals\Pages;
 
+use App\Actions\MasterData\CreateSupplier;
 use App\Actions\Operations\UploadAttachment;
 use App\Actions\Proposals\AcknowledgeProposalSource;
 use App\Actions\Proposals\ApproveProposal;
@@ -250,7 +251,23 @@ class ViewProposal extends ViewRecord implements HasTable
                     $this->refreshProposal('Progetto Pianificato Aggiunto');
                 }),
                 Action::make('createPlannedContract')->label('Nuovo Contratto Pianificato')->visible(fn (): bool => $this->canPlan())->form([
-                    TextInput::make('title')->label('Titolo')->required()->maxLength(255), Select::make('supplier_id')->label('Fornitore')->options(fn (): array => Supplier::query()->where('company_id', $this->proposal()->company_id)->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all())->required(), DateInput::make('contractual_start_date')->label('Inizio Contrattuale')->required(), DateInput::make('next_expiry_date')->label('Prossima Scadenza'), Toggle::make('automatic_renewal')->label('Rinnovo Automatico')->default(false), TextInput::make('renewal_duration_months')->label('Durata Rinnovo (Mesi)')->integer()->minValue(1), TextInput::make('notice_days')->label('Preavviso (Giorni)')->integer()->minValue(0)->default(0), Textarea::make('notes')->label('Note'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
+                    TextInput::make('title')->label('Titolo')->required()->maxLength(255),
+                    Select::make('supplier_id')->label('Fornitore')
+                        ->options(fn (): array => Supplier::query()->where('company_id', $this->proposal()->company_id)->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all())
+                        ->searchable()
+                        ->createOptionForm([
+                            TextInput::make('legal_name')->label('Ragione Sociale')->required()->maxLength(255),
+                            TextInput::make('vat_number')->label('Partita IVA')->maxLength(64),
+                            Textarea::make('notes')->label('Note'),
+                        ])
+                        ->createOptionUsing(fn (array $data): int => app(CreateSupplier::class)
+                            ->execute($this->actor(), $this->proposal()->company, $data, (string) Str::uuid())->id)
+                        ->createOptionAction(fn (Action $action): Action => $action
+                            ->label('Crea Fornitore')
+                            ->modalHeading('Nuovo Fornitore')
+                            ->visible(fn (): bool => $this->canCreateSupplier()))
+                        ->required(),
+                    DateInput::make('contractual_start_date')->label('Inizio Contrattuale')->required(), DateInput::make('next_expiry_date')->label('Prossima Scadenza'), Toggle::make('automatic_renewal')->label('Rinnovo Automatico')->default(false), TextInput::make('renewal_duration_months')->label('Durata Rinnovo (Mesi)')->integer()->minValue(1), TextInput::make('notice_days')->label('Preavviso (Giorni)')->integer()->minValue(0)->default(0), Textarea::make('notes')->label('Note'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
                     DecimalInput::make('amount')->label('Importo Netto IVA per Ciclo')->minValue(0)->required(), Select::make('cycle')->label('Ciclo')->options(['monthly' => 'Mensile', 'quarterly' => 'Trimestrale', 'semiannual' => 'Semestrale', 'annual' => 'Annuale'])->required(), Select::make('attribution_mode')->label('Attribuzione Stima')->options(['cycle_start' => 'Inizio Ciclo', 'cycle_end' => 'Fine Ciclo'])->required(), DateInput::make('valid_to')->label('Prima Condizione Valida fino al'),
                 ])->modalDescription('La prima condizione economica decorre dall’Inizio Contrattuale. L’importo è riferito al ciclo selezionato.')->action(function (array $data): void {
                     app(PlanContract::class)->createWithCondition($this->actor(), $this->proposal(), ['title' => $data['title'], 'notes' => $data['notes'] ?? null, 'supplier_id' => (int) $data['supplier_id'], 'contractual_start_date' => $data['contractual_start_date'], 'next_expiry_date' => $data['next_expiry_date'] ?? null, 'automatic_renewal' => (bool) ($data['automatic_renewal'] ?? false), 'renewal_duration_months' => filled($data['renewal_duration_months'] ?? null) ? (int) $data['renewal_duration_months'] : null, 'notice_days' => (int) ($data['notice_days'] ?? 0), 'exercise_id' => $this->proposal()->exercise_id, 'cost_center_id' => null], ['amount' => Decimal::money($data['amount']), 'cycle' => $data['cycle'], 'attribution_mode' => $data['attribution_mode'], 'valid_to' => $data['valid_to'], 'reason' => null], $data['operation_id'], (int) $data['proposal_revision']);
@@ -591,6 +608,11 @@ class ViewProposal extends ViewRecord implements HasTable
     private function canPlan(): bool
     {
         return $this->proposal()->status->value === 'draft' && auth()->user()?->can('update', $this->proposal()) === true;
+    }
+
+    private function canCreateSupplier(): bool
+    {
+        return auth()->user()?->can('create', [Supplier::class, $this->proposal()->company]) === true;
     }
 
     private function canRealign(ProposalItem $item): bool

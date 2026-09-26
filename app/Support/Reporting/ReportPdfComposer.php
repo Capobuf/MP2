@@ -702,20 +702,24 @@ final class ReportPdfComposer
      */
     private function contractBarChart(string $id, string $heading, string $description, array $labels, array $series, string $orientation): array
     {
-        $rowHeight = $orientation === 'portrait' ? 44 : 36;
-        $height = 34 + count($labels) * $rowHeight;
+        $rowHeight = max($orientation === 'portrait' ? 44 : 36, count($series) * 17 + 2);
         $canvasWidth = $orientation === 'portrait' ? 1000 : 1400;
         $plotX = 380;
+        $legendWidth = max(180, 20 + max(array_map(fn (array $dataset): int => mb_strlen($dataset['label']), $series)) * 10);
+        $legendColumns = max(1, intdiv($canvasWidth - $plotX, $legendWidth));
+        $plotTop = (int) ceil(count($series) / $legendColumns) * 20 + 12;
+        $height = $plotTop + 2 + count($labels) * $rowHeight;
         $maxBarWidth = $canvasWidth - $plotX - 160;
         $max = max(1.0, ...array_map('abs', array_merge(...array_column($series, 'values'))));
         $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '.$canvasWidth.' '.$height.'">';
         foreach ($series as $index => $dataset) {
-            $legendX = $plotX + $index * 180;
-            $svg .= '<rect x="'.$legendX.'" y="3" width="12" height="12" fill="'.$dataset['colors'][0].'"/>';
-            $svg .= '<text x="'.($legendX + 20).'" y="15" font-family="Geist" font-size="15" fill="#15323b">'.$this->escape($dataset['label']).'</text>';
+            $legendX = $plotX + ($index % $legendColumns) * $legendWidth;
+            $legendY = intdiv($index, $legendColumns) * 20;
+            $svg .= '<rect x="'.$legendX.'" y="'.($legendY + 3).'" width="12" height="12" fill="'.$dataset['colors'][0].'"/>';
+            $svg .= '<text x="'.($legendX + 20).'" y="'.($legendY + 15).'" font-family="Geist" font-size="15" fill="#15323b">'.$this->escape($dataset['label']).'</text>';
         }
         foreach ($labels as $row => $label) {
-            $y = 32 + $row * $rowHeight;
+            $y = $plotTop + $row * $rowHeight;
             $firstLine = mb_substr($label, 0, 38);
             $lastSpace = mb_strrpos($firstLine, ' ');
             $splitAt = mb_strlen($label) > 38 && $lastSpace !== false ? $lastSpace : 38;
@@ -749,10 +753,14 @@ final class ReportPdfComposer
     {
         $portrait = $orientation === 'portrait';
         $canvasWidth = $portrait ? 1000 : 1400;
-        $rowHeight = count($series) > 1 ? ($portrait ? 56 : 46) : ($portrait ? 50 : 44);
-        $height = 42 + count($labels) * $rowHeight;
+        $rowHeight = max($portrait ? (count($series) > 1 ? 56 : 50) : 44, count($series) * 23);
         $plotX = $portrait ? 350 : 470;
         $plotEnd = $canvasWidth - 175;
+        $legend = $divergent ? [['label' => 'Negativo (−)'], ['label' => 'Positivo (+)']] : $series;
+        $legendWidth = max(190, 20 + max(array_map(fn (array $dataset): int => mb_strlen($dataset['label']), $legend)) * 10);
+        $legendColumns = max(1, intdiv($canvasWidth - $plotX, $legendWidth));
+        $plotTop = (int) ceil(count($legend) / $legendColumns) * 22 + 20;
+        $height = $plotTop + count($labels) * $rowHeight;
         $values = array_merge(...array_column($series, 'values'));
         $minimum = min(0.0, ...$values);
         $maximum = max(1.0, ...$values);
@@ -763,17 +771,17 @@ final class ReportPdfComposer
         $scale = ($plotEnd - $plotX) / ($maximum - $minimum);
         $zero = $plotX - $minimum * $scale;
         $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '.$canvasWidth.' '.$height.'">';
-        $legend = $divergent ? [['label' => 'Negativo (−)'], ['label' => 'Positivo (+)']] : $series;
         foreach ($legend as $index => $dataset) {
             $color = $divergent ? ['#60a5fa', '#15323b'][$index] : $dataset['colors'][0];
-            $legendX = $plotX + $index * 190;
-            $svg .= '<rect x="'.$legendX.'" y="0" width="12" height="12" fill="'.$color.'"/>';
-            $svg .= '<text x="'.($legendX + 20).'" y="12" font-family="Geist" font-size="16" fill="#15323b">'.$this->escape($dataset['label']).'</text>';
+            $legendX = $plotX + ($index % $legendColumns) * $legendWidth;
+            $legendY = intdiv($index, $legendColumns) * 22;
+            $svg .= '<rect x="'.$legendX.'" y="'.$legendY.'" width="12" height="12" fill="'.$color.'"/>';
+            $svg .= '<text x="'.($legendX + 20).'" y="'.($legendY + 12).'" font-family="Geist" font-size="16" fill="#15323b">'.$this->escape($dataset['label']).'</text>';
         }
-        $svg .= '<line class="zero-axis" x1="'.$zero.'" x2="'.$zero.'" y1="32" y2="'.$height.'" stroke="#91a3a8" stroke-width="1.5"/>';
-        $svg .= '<text x="'.$zero.'" y="28" text-anchor="middle" font-family="Geist" font-size="14" fill="#526762">0</text>';
+        $svg .= '<line class="zero-axis" x1="'.$zero.'" x2="'.$zero.'" y1="'.($plotTop - 10).'" y2="'.$height.'" stroke="#91a3a8" stroke-width="1.5"/>';
+        $svg .= '<text x="'.$zero.'" y="'.($plotTop - 14).'" text-anchor="middle" font-family="Geist" font-size="14" fill="#526762">0</text>';
         foreach ($labels as $row => $label) {
-            $y = 42 + $row * $rowHeight;
+            $y = $plotTop + $row * $rowHeight;
             $lineLength = $portrait ? 32 : 44;
             $firstLine = mb_substr($label, 0, $lineLength);
             $space = mb_strrpos($firstLine, ' ');
