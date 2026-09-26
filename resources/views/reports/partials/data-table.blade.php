@@ -31,6 +31,14 @@
             @endif
                 <td>
                     <span class="source-name">{{ $row['label'] }}</span>
+                    @if ($group === 'comparisons')
+                        <span class="cell-secondary">
+                            {{ ['expense' => 'Spesa autonoma', 'project' => 'Progetto', 'contract' => 'Contratto'][$row['source_type'] ?? ''] ?? ($row['source_type'] ?? 'Sorgente') }}
+                            @if ($row['cost_center'] ?? null) · {{ $row['cost_center'] }} @endif
+                            @if ($row['supplier'] ?? null) · {{ $row['supplier'] }} @endif
+                        </span>
+                        @if ($row['derived_from_origin_key'] ?? null)<span class="cell-secondary">Derivata da {{ $row['derived_from_origin_key'] }}</span>@endif
+                    @endif
                     @if ($secondaryColumns !== [])
                         <span class="row-metadata">
                             @foreach ($secondaryColumns as $column)

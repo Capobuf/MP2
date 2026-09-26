@@ -37,9 +37,13 @@
         @php($knownKeys = ['id', 'expense_id', 'source', 'description', 'supplier_id', 'supplier_label', 'supplier', 'allocation', 'actual', 'has_actuals', 'lines', 'archived_or_reversed'])
     @elseif ($source['source_type'] === 'project')
         <dl class="mp2-report-detail-facts">
-            <div><dt>Residuo</dt><dd>{{ $money($source['residual']) }}</dd></div>
-            <div><dt>Risparmio</dt><dd>{{ $money($source['saving']) }}</dd></div>
-            <div><dt>Allocato Non Utilizzato</dt><dd>{{ $money($source['unused']) }}</dd></div>
+            @if (in_array($source['state'], ['planned', 'open'], true))
+                <div><dt>Residuo</dt><dd>{{ $money($source['residual']) }}</dd></div>
+            @elseif ($source['state'] === 'closed')
+                <div><dt>Risparmio</dt><dd>{{ $money($source['saving']) }}</dd></div>
+            @elseif ($source['state'] === 'cancelled')
+                <div><dt>Allocato Non Utilizzato</dt><dd>{{ $money($source['unused']) }}</dd></div>
+            @endif
             <div><dt>Riporto</dt><dd>{{ $money($source['carryover']) }}</dd></div>
             <div><dt>Archivio</dt><dd>{{ ($detail['archived_or_reversed'] ?? false) ? 'Archiviato' : 'Non archiviato' }}</dd></div>
             <div><dt>Presenza di Rinvio</dt><dd>{{ ($detail['deferred'] ?? false) ? 'Sì' : 'No' }}</dd></div>

@@ -60,10 +60,18 @@ final class ReportAggregator
                     'allocation' => '0.00',
                     'actual' => '0.00',
                     'sources' => [],
+                    'components' => [],
                 ];
                 $buckets[$key]['allocation'] = Decimal::add($buckets[$key]['allocation'], (string) ($expense['allocation'] ?? '0.00'));
                 $buckets[$key]['actual'] = Decimal::add($buckets[$key]['actual'], (string) ($expense['actual'] ?? '0.00'));
                 $buckets[$key]['sources'][] = $expense['source'] ?? $source->label;
+                $buckets[$key]['components'][] = [
+                    'source_type' => $source->sourceType,
+                    'source_label' => $source->label,
+                    'expense_label' => $expense['source'] ?? $source->label,
+                    'allocation' => (string) ($expense['allocation'] ?? '0.00'),
+                    'actual' => (string) ($expense['actual'] ?? '0.00'),
+                ];
             }
 
             if (Decimal::compare($source->receivedCarryover, '0.00') !== 0) {
@@ -74,9 +82,17 @@ final class ReportAggregator
                     'allocation' => '0.00',
                     'actual' => '0.00',
                     'sources' => [],
+                    'components' => [],
                 ];
                 $buckets[$key]['allocation'] = Decimal::add($buckets[$key]['allocation'], $source->receivedCarryover);
                 $buckets[$key]['sources'][] = $source->label;
+                $buckets[$key]['components'][] = [
+                    'source_type' => 'carryover',
+                    'source_label' => $source->label,
+                    'expense_label' => 'Riporto',
+                    'allocation' => $source->receivedCarryover,
+                    'actual' => '0.00',
+                ];
             }
         }
 

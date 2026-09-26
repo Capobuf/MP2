@@ -1,6 +1,8 @@
 <?php
 
+use App\Domain\Company\AuditEventType;
 use App\Filament\Pages\Reports;
+use App\Models\AuditEvent;
 use App\Models\BudgetSnapshot;
 use App\Models\BudgetSourceRow;
 use App\Models\Company;
@@ -16,6 +18,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -352,10 +355,12 @@ it('renders canonical classification and structured detail without raw json or f
         ->set('kind', 'budget_current_allocation')
         ->set('budgetId', $budget->id)
         ->assertHasNoErrors()
+        ->assertSee('Evoluzione del Piano per Sorgente')
         ->assertSee('Modificato')
-        ->assertSee('Senza Effettivi')
+        ->assertDontSee('Senza Effettivi')
         ->assertSee('Variazione non sufficientemente spiegata')
-        ->assertSee('Riga leggibile')
+        ->assertDontSee('Riga leggibile')
+        ->assertDontSee('Sorgenti Economiche dell’Esercizio')
         ->assertDontSeeHtml('<pre>');
 
     Livewire::test(Reports::class)
@@ -426,6 +431,21 @@ it('shows only budget references and their variation in budget versions KPIs', f
     $expense = Expense::factory()->forExercise($exercise)->create();
     $initialBudget = reportingUiBudget($company, $exercise, $expense, '100.00');
     $finalBudget = reportingUiBudget($company, $exercise, $expense, '115.00', 2);
+    AuditEvent::query()->create([
+        'company_id' => $company->id,
+        'operation_id' => (string) Str::uuid(),
+        'actor_id' => $viewer->id,
+        'event_type' => AuditEventType::ProposalApproved,
+        'subject_type' => Proposal::class,
+        'subject_id' => $finalBudget->proposal_id,
+        'affected_exercise_ids' => [$exercise->id],
+        'effective_from' => '2026-01-01',
+        'allocated_impact_by_exercise' => [],
+        'actual_impact_by_exercise' => [],
+        'reason' => 'Adeguamento annuale approvato',
+        'reference_type' => BudgetSnapshot::class,
+        'reference_id' => $finalBudget->id,
+    ]);
     reportingUiContext($company, $viewer);
 
     Livewire::test(Reports::class)
@@ -437,6 +457,8 @@ it('shows only budget references and their variation in budget versions KPIs', f
         ->assertSee('Budget v1')
         ->assertSee('Budget v2')
         ->assertSee('Variazione fra Budget')
+        ->assertSee('Motivazione della Revisione')
+        ->assertSee('Adeguamento annuale approvato')
         ->assertDontSee('Effettivo del Riferimento')
         ->assertDontSee('Scostamento Operativo del Riferimento');
 });

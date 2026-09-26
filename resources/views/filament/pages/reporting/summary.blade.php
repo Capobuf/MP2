@@ -15,17 +15,16 @@
     </div>
 
     @if ($kind === 'annual_executive')
-        <dl class="mp2-report-primary-kpis">
+        <dl class="mp2-report-primary-kpis mp2-report-primary-kpis-executive">
+            <div class="mp2-report-primary-kpi mp2-report-kpi-budget">
+                <dt>Budget Iniziale Approvato</dt>
+                <dd>{{ $availability['initial_budget'] ? $money($report['totals']['initial_budget']) : 'Non disponibile' }}</dd>
+                <dd class="mp2-report-kpi-note">Prima versione approvata</dd>
+            </div>
             <div class="mp2-report-primary-kpi mp2-report-kpi-budget">
                 <dt>Budget Approvato Corrente</dt>
                 <dd>{{ $availability['current_budget'] ? $money($report['totals']['current_budget']) : 'Non disponibile' }}</dd>
-                <dd class="mp2-report-kpi-note">
-                    @if ($availability['initial_budget'])
-                        Budget iniziale {{ $money($report['totals']['initial_budget']) }}
-                    @else
-                        Nessun Budget approvato disponibile
-                    @endif
-                </dd>
+                <dd class="mp2-report-kpi-note">Ultima versione approvata</dd>
             </div>
             <div class="mp2-report-primary-kpi mp2-report-kpi-allocation">
                 <dt>Allocato Corrente</dt>
@@ -91,6 +90,11 @@
                 <dt>Sorgenti Confrontate</dt><dd>{{ $report['comparison_totals']['source_count'] }}</dd>
             </div>
         </dl>
+        @if ($kind === 'budget_versions' && filled($report['header']['revision_reason'] ?? null))
+            <dl class="mp2-report-secondary-kpis">
+                <div><dt>Motivazione della Revisione</dt><dd>{{ $report['header']['revision_reason'] }}</dd></div>
+            </dl>
+        @endif
     @elseif ($kind === 'operational_variance')
         <dl class="mp2-report-primary-kpis mp2-report-primary-kpis-compact">
             <div class="mp2-report-primary-kpi mp2-report-kpi-allocation"><dt>Allocato Corrente</dt><dd>{{ $money($report['totals']['allocation']) }}</dd></div>
@@ -117,7 +121,7 @@
             <div class="mp2-report-primary-kpi"><dt>Riporto</dt><dd>{{ $money($report['specialist_totals']['carryover']) }}</dd></div>
             <div class="mp2-report-primary-kpi mp2-report-kpi-allocation"><dt>Allocato</dt><dd>{{ $money($report['specialist_totals']['allocation']) }}</dd></div>
             <div class="mp2-report-primary-kpi mp2-report-kpi-actual"><dt>Effettivo</dt><dd>{{ $money($report['specialist_totals']['actual']) }}</dd></div>
-            <div class="mp2-report-primary-kpi"><dt>Progetti con Riporto</dt><dd>{{ $report['specialist_totals']['item_count'] }}</dd></div>
+            <div class="mp2-report-primary-kpi"><dt>Progetti Analizzati</dt><dd>{{ $report['specialist_totals']['item_count'] }}</dd></div>
         </dl>
     @endif
 

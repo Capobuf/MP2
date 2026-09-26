@@ -121,7 +121,7 @@ it('normalizes configurable blocks and columns and escapes all report values', f
         ->and($chartSvg)->toBeString()
         ->and($chartSvg)->toContain(...$chartDefinitions[0]['data']['labels'])
         ->and($chartSvg)->toContain(...array_map('strval', array_merge(...array_column($chartDefinitions[0]['data']['datasets'], 'data'))))
-        ->and($html)->toContain('&lt;Azienda sicura&gt;', '&lt;script&gt;alert(1)&lt;/script&gt;', 'Dettaglio e riconciliazione', '15,00')
+        ->and($html)->toContain('&lt;Azienda sicura&gt;', '&lt;script&gt;alert(1)&lt;/script&gt;', 'Riconciliazione delle sorgenti', '15,00')
         ->and($html)->not->toContain('<script>alert(1)</script>', 'hostile-column', 'http://', 'https://');
 });
 
@@ -219,7 +219,7 @@ it('composes the dedicated contracts document with validated orientation and spe
             ['state' => 'cancelled', 'label' => 'Annullato', 'count' => 0],
         ])
         ->and(array_column($landscape['kpis'], 'label'))->toBe([
-            'Contratti', 'Allocato', 'Effettivo', 'Scostamento operativo', 'Contratti in scadenza',
+            'Contratti', 'Allocato', 'Effettivo', 'Scostamento operativo',
         ])
         ->and($landscapeHtml)->toContain('class="portfolio-summary"', 'class="economic-summary"', 'Registro contratti')
         ->and($portraitHtml)->toContain('class="portfolio-summary"', 'class="economic-summary"', 'class="contract-secondary"')
@@ -321,7 +321,7 @@ it('keeps contract PDF text inside its cells and preserves supplier words', func
         ->and($check->successful())->toBeTrue($check->output());
 })->with(['landscape', 'portrait']);
 
-it('counts deadlines in the inclusive next 90 days from the report reference date', function (): void {
+it('does not introduce an implicit contract deadline threshold', function (): void {
     $company = Company::factory()->create();
     $viewer = s11ReportingViewer($company);
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
@@ -347,15 +347,9 @@ it('counts deadlines in the inclusive next 90 days from the report reference dat
         ],
     ]));
     $document = app(ReportPdfComposer::class)->compose($result, $company);
-    $kpi = collect($document['kpis'])->firstWhere('id', 'kpi:contracts_expiring');
-
     expect($result->header['reference_date'])->toBe('2026-03-01')
-        ->and($kpi)->toMatchArray([
-            'label' => 'Contratti in scadenza',
-            'value' => 2,
-            'formatted' => '2',
-            'description' => 'nei prossimi 90 giorni',
-        ]);
+        ->and(array_column($document['kpis'], 'id'))->not->toContain('kpi:contracts_expiring')
+        ->and(array_column($document['kpis'], 'label'))->not->toContain('Contratti in scadenza');
 });
 
 it('uses only the four canonical contract states in the static distribution', function (): void {
@@ -733,7 +727,7 @@ it('composes only selected KPI groups charts and columns without empty layout ce
     $composer = app(ReportPdfComposer::class);
     foreach (['portrait', 'landscape'] as $orientation) {
         foreach ([[], ['chart:contract-values'], ['chart:contract-states'], ['chart:contract-values', 'chart:contract-states']] as $charts) {
-            foreach ([[], ['kpi:specialist_count'], ['kpi:specialist_actual'], ['kpi:contracts_expiring', 'kpi:specialist_variance']] as $kpis) {
+            foreach ([[], ['kpi:specialist_count'], ['kpi:specialist_actual'], ['kpi:specialist_count', 'kpi:specialist_variance']] as $kpis) {
                 $document = $composer->compose($result, $company, [
                     'orientation' => $orientation,
                     'blocks' => ['table:contracts', ...$charts, ...$kpis],
@@ -816,10 +810,11 @@ function pdfFamilyFixture(string $kind, int $count = 12, bool $annualComparison 
     return new ReportResult(
         ReportDefinition::fromArray($definition),
         [
-            'company_name' => 'MP2 · Azienda di verifica', 'exercise_year' => 2026, 'kind' => $kind, 'title' => $family->label(),
+            'company_name' => 'MP2 · Azienda di verifica', 'exercise_id' => 1, 'exercise_year' => 2026, 'kind' => $kind, 'title' => $family->label(),
             'initial_reference_label' => $isComparison ? ($family === ReportKind::Exercises ? 'Situazione Corrente · Esercizio 2026' : 'Budget v1 · Budget Iniziale · Esercizio 2026') : null,
             'final_reference_label' => $family === ReportKind::BudgetVersions ? 'Budget v2 · Revisione · Esercizio 2026' : 'Situazione Corrente · Esercizio '.($family === ReportKind::Exercises ? 2027 : 2026),
             'actual_reference' => isset($definition['actual_reference']) ? 'Effettivo Corrente' : null,
+            'revision_reason' => $family === ReportKind::BudgetVersions ? 'Adeguamento annuale approvato' : null,
             'reference_date' => '2026-09-07', 'generated_at' => '2026-09-07 10:30:00',
             'currency' => 'EUR', 'amount_basis' => 'Importi netti IVA', 'date_from' => null, 'date_to' => null, 'filter_labels' => [],
             'availability' => ['initial_budget' => true, 'current_budget' => true, 'selected_budget' => $isComparison, 'closing' => false],
@@ -842,6 +837,37 @@ function pdfDocumentXPath(string $html): DOMXPath
 
     return new DOMXPath($dom);
 }
+
+it('uses the semantic main block for each non-contract report family without duplicate source tables', function (
+    string $kind,
+    string $mainBlock,
+    bool $hasSourceTable,
+    string $heading,
+): void {
+    $result = pdfFamilyFixture($kind);
+    $document = app(ReportPdfComposer::class)->compose($result, Company::factory()->make());
+    $html = view('reports.pdf', compact('document'))->render();
+
+    expect($document['selected_blocks'])->toContain($mainBlock)
+        ->and(in_array('table:sources', $document['selected_blocks'], true))->toBe($hasSourceTable)
+        ->and($html)->toContain($heading);
+    if ($kind === 'annual_executive') {
+        expect($document['selected_blocks'])->not->toContain('table:comparisons');
+    }
+    if ($kind === 'budget_versions') {
+        expect($html)->toContain('Motivazione revisione', 'Adeguamento annuale approvato');
+    }
+})->with([
+    ['annual_executive', 'table:cost-centers', true, 'Analisi per Centro di Costo'],
+    ['budget_actual', 'table:comparisons', false, 'Budget e Actual per sorgente'],
+    ['budget_current_allocation', 'table:comparisons', false, 'Evoluzione del piano per sorgente'],
+    ['budget_versions', 'table:comparisons', false, 'Variazioni fra le versioni'],
+    ['exercises', 'table:comparisons', false, 'Confronto della misura per sorgente'],
+    ['operational_variance', 'table:sources', true, 'Scostamento per sorgente'],
+    ['projects', 'section:progetti', false, 'Saldo applicabile'],
+    ['carryovers', 'section:riporti', false, 'Massimo riportabile'],
+    ['suppliers', 'section:aggregazione-per-fornitore', false, 'Composizione'],
+]);
 
 it('renders every non contract family with real WeasyPrint in both orientations', function (string $kind, string $orientation): void {
     if (! app(WeasyPrintRuntime::class)->status()['available']) {
@@ -953,7 +979,7 @@ it('preserves the SVG rows for one and two monetary series', function (string $k
         ->and($height)->toBe(42 + 3 * ($seriesCount === 1 ? 44 : 46))
         ->and((float) $amounts[array_key_last($amounts)]['y'])->toBeLessThan($height);
 })->with([
-    ['carryovers', 'carryover-values', 1],
+    ['carryovers', 'carryover-values', 2],
     ['projects', 'project-values', 2],
 ]);
 
@@ -974,8 +1000,9 @@ it('limits dense charts by the declared measure while retaining complete tables'
     rsort($sorted);
     expect($rank)->toBe($sorted);
     if ($kind === 'carryovers') {
-        expect($definition['data']['datasets'])->toHaveCount(1)
+        expect($definition['data']['datasets'])->toHaveCount(2)
             ->and($definition['data']['datasets'][0]['label'])->toBe('Riporto')
+            ->and($definition['data']['datasets'][1]['label'])->toBe('Riprogrammato')
             ->and($definition['data']['labels'][0])->toStartWith('Progetto 1 ·');
     }
     if ($kind === 'suppliers') {

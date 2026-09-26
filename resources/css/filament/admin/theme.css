@@ -3419,6 +3419,10 @@ html.fi {
     margin-top: 16px;
 }
 
+.mp2-report-primary-kpis-executive {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .mp2-report-primary-kpi {
     position: relative;
     min-width: 0;
@@ -3614,6 +3618,37 @@ html.fi {
     color: var(--mp2-text-muted);
     font-size: 0.6875rem;
     font-weight: 500;
+}
+
+.mp2-report-cell-label,
+.mp2-report-cell-value {
+    display: block;
+}
+
+.mp2-report-cell-label {
+    color: var(--mp2-text-muted);
+    font-size: 0.6875rem;
+    line-height: 1rem;
+}
+
+.mp2-report-cell-value {
+    color: var(--mp2-text-primary);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+}
+
+.mp2-report-projects-table {
+    min-width: 920px;
+}
+
+.mp2-report-operational-table {
+    min-width: 820px;
+}
+
+.mp2-report-cost-centers-table,
+.mp2-report-carryovers-table {
+    min-width: 980px;
 }
 
 .mp2-report-table tbody tr:hover {
@@ -3903,6 +3938,10 @@ html.fi {
 @media (max-width: 1199px) {
     .mp2-report-header-meta,
     .mp2-report-secondary-kpis {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .mp2-report-primary-kpis-executive {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }

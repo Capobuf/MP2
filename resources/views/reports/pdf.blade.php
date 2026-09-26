@@ -99,11 +99,12 @@
             @endif
             <div class="header-copy"><p class="company-name">{{ $header['company_name'] }}</p><h1>{{ $header['title'] }}</h1></div>
         </div>
-        @if ($header['initial_reference_label'] || $header['final_reference_label'] || $header['actual_reference'] || $header['date_from'] || $header['filter_labels'] !== [])
+        @if ($header['initial_reference_label'] || $header['final_reference_label'] || $header['actual_reference'] || ($header['revision_reason'] ?? null) || $header['date_from'] || $header['filter_labels'] !== [])
             <div class="header-meta">
                 @if ($header['initial_reference_label'])<p><strong>Riferimento iniziale</strong> · {{ $header['initial_reference_label'] }}</p>@endif
                 @if ($header['final_reference_label'])<p><strong>Riferimento finale</strong> · {{ $header['final_reference_label'] }}</p>@endif
                 @if ($header['actual_reference'])<p><strong>Effettivo</strong> · {{ $header['actual_reference'] }}</p>@endif
+                @if ($header['revision_reason'] ?? null)<p><strong>Motivazione revisione</strong> · {{ $header['revision_reason'] }}</p>@endif
                 @if ($header['date_from'])<p><strong>Intervallo selezionato</strong> · dal {{ $date($header['date_from']) }} al {{ $date($header['date_to']) }}</p>@endif
                 @if ($header['filter_labels'] !== [])<p><strong>Filtri</strong> · {{ implode(' · ', $header['filter_labels']) }}</p>@endif
             </div>
@@ -147,7 +148,7 @@
     @endif
 
     @if (in_array('table:comparisons', $document['selected_blocks'], true))
-        <h2 class="section-title">Confronto</h2>
+        <h2 class="section-title">{{ $document['comparison_table_title'] }}</h2>
         @include('reports.partials.data-table', ['rows' => $document['comparisons'], 'group' => 'comparisons', 'block' => 'table:comparisons', 'primaryLabel' => 'Sorgente', 'projectBalances' => false])
     @endif
 
@@ -156,14 +157,23 @@
             <h2 class="section-title">{{ $section['title'] }}</h2>
             @if ($header['kind'] === 'suppliers')
                 @include('reports.partials.suppliers-table', ['rows' => $section['rows'], 'block' => $section['id']])
+            @elseif ($header['kind'] === 'projects')
+                @include('reports.partials.projects-table', ['rows' => $section['rows'], 'block' => $section['id'], 'exerciseId' => $document['header']['exercise_id']])
+            @elseif ($header['kind'] === 'carryovers')
+                @include('reports.partials.carryovers-table', ['rows' => $section['rows'], 'block' => $section['id']])
             @else
                 @include('reports.partials.data-table', ['rows' => $section['rows'], 'group' => 'sources', 'block' => $section['id'], 'primaryLabel' => 'Progetto', 'projectBalances' => true])
             @endif
         @endif
     @endforeach
 
+    @if (in_array('table:cost-centers', $document['selected_blocks'], true))
+        <h2 class="section-title">Analisi per Centro di Costo</h2>
+        @include('reports.partials.cost-centers-table', ['rows' => $document['cost_centers'], 'block' => 'table:cost-centers'])
+    @endif
+
     @if (in_array('table:sources', $document['selected_blocks'], true))
-        <h2 class="section-title">Dettaglio e riconciliazione</h2>
+        <h2 class="section-title">{{ $document['source_table_title'] }}</h2>
         @include('reports.partials.data-table', ['rows' => $document['sources'], 'group' => 'sources', 'block' => 'table:sources', 'primaryLabel' => 'Sorgente', 'projectBalances' => false])
     @endif
 

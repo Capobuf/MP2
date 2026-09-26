@@ -31,6 +31,7 @@
 @else
     <dl class="mp2-report-key-values">
         @foreach ($data as $key => $value)
+            @continue(in_array($key, ['id', 'company_id', 'project_id', 'contract_id', 'expense_id', 'source_exercise_id', 'destination_exercise_id', 'reprogramming_operation_id'], true))
             <div>
                 <dt>{{ $labels[$key] ?? str($key)->replace('_', ' ')->ucfirst() }}</dt>
                 <dd>

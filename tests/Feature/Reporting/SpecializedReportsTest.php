@@ -9,6 +9,8 @@ use App\Models\Contract;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
+use App\Models\Project;
+use App\Models\ProjectDeferral;
 use App\Models\Proposal;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -118,4 +120,39 @@ it('labels contract expiry only for an explicitly selected interval', function (
     expect($withInterval->sections[0]['rows'][0]['labels'])
         ->toContain('Scadenza Contrattuale entro l’Intervallo Selezionato')
         ->and($withoutInterval->sections[0]['rows'][0]['labels'])->toBe([]);
+});
+
+it('builds carryover rows around the exercise passage and recorded transfer mode', function (): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $sourceExercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $destinationExercise = Exercise::factory()->for($company)->create(['year' => 2027]);
+    $project = Project::factory()->for($company)->create([
+        'title' => 'Progetto con riporto',
+        'initial_state' => 'open',
+        'initial_effective_date' => '2026-01-01',
+    ]);
+    $expense = Expense::factory()->forExercise($sourceExercise)->for($project)->create();
+    ExpenseLine::factory()->for($expense)->create(['amount' => '100.00']);
+    ExpenseLine::factory()->for($expense)->actual()->create(['amount' => '40.00']);
+    ProjectDeferral::factory()->for($company)->for($project)
+        ->for($sourceExercise, 'sourceExercise')->for($destinationExercise, 'destinationExercise')
+        ->carryover('25.00')->create();
+
+    $result = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray([
+        'company_id' => $company->id,
+        'exercise_id' => $sourceExercise->id,
+        'kind' => 'carryovers',
+    ]));
+    $row = $result->sections[0]['rows'][0];
+
+    expect($row)->toMatchArray([
+        'label' => 'Progetto con riporto',
+        'source_exercise_year' => 2026,
+        'destination_exercise_year' => 2027,
+        'mode' => 'carryover',
+        'provisional_carryover' => '25.00',
+        'consolidated_carryover' => null,
+        'maximum_transferable' => '60.00',
+    ]);
 });

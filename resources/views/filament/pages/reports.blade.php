@@ -31,19 +31,36 @@
             @if ($report)
                 <div class="mp2-report-result" wire:loading.class="mp2-report-result-updating">
                     @include('filament.pages.reporting.summary')
-                    @include('filament.pages.reporting.charts')
 
-                    @if ($report['sources'] === [])
-                        <section class="mp2-report-empty" aria-labelledby="report-empty-title">
-                            <h3 id="report-empty-title">Nessun Dato</h3>
-                            <p>Nessun dato per i riferimenti e i filtri selezionati.</p>
-                        </section>
+                    @if ($kind === 'annual_executive')
+                        @include('filament.pages.reporting.charts')
+                        @include('filament.pages.reporting.cost-centers-table')
+                        @if ($report['sources'] !== [])
+                            @include('filament.pages.reporting.sources-table', [
+                                'kicker' => 'Riconciliazione',
+                                'title' => 'Sorgenti Economiche dell’Esercizio',
+                            ])
+                        @else
+                            @include('filament.pages.reporting.empty')
+                        @endif
+                    @elseif (in_array($kind, ['budget_actual', 'budget_current_allocation', 'budget_versions', 'exercises'], true))
+                        @include('filament.pages.reporting.charts')
+                        @if ($report['comparisons'] !== [])
+                            @include('filament.pages.reporting.comparisons-table')
+                        @else
+                            @include('filament.pages.reporting.empty')
+                        @endif
+                    @elseif ($kind === 'operational_variance')
+                        @include('filament.pages.reporting.charts')
+                        @if ($report['sources'] !== [])
+                            @include('filament.pages.reporting.operational-table')
+                        @else
+                            @include('filament.pages.reporting.empty')
+                        @endif
                     @else
-                        @include('filament.pages.reporting.sources-table')
+                        @include('filament.pages.reporting.charts')
+                        @include('filament.pages.reporting.sections')
                     @endif
-
-                    @include('filament.pages.reporting.comparisons-table')
-                    @include('filament.pages.reporting.sections')
                 </div>
             @endif
         @endif

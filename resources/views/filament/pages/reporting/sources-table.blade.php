@@ -6,8 +6,8 @@
 <section class="mp2-report-table-section" aria-labelledby="report-sources-title">
     <div class="mp2-report-section-heading">
         <div>
-            <p class="mp2-report-kicker">Dettaglio</p>
-            <h3 id="report-sources-title">Sorgenti Economiche</h3>
+            <p class="mp2-report-kicker">{{ $kicker ?? 'Dettaglio' }}</p>
+            <h3 id="report-sources-title">{{ $title ?? 'Sorgenti Economiche' }}</h3>
         </div>
         <p>{{ count($report['sources']) }} sorgenti</p>
     </div>

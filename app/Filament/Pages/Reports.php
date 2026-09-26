@@ -538,7 +538,7 @@ class Reports extends Page
 
     public function sourceTypeLabel(string $type): string
     {
-        return ['expense' => 'Spesa Autonoma', 'project' => 'Progetto', 'contract' => 'Contratto'][$type] ?? $type;
+        return ['expense' => 'Spesa Autonoma', 'project' => 'Progetto', 'contract' => 'Contratto', 'carryover' => 'Riporto'][$type] ?? $type;
     }
 
     public function stateLabel(?string $state): string
@@ -608,9 +608,19 @@ class Reports extends Page
     /** @return array<string, mixed> */
     private function serializeResult(ReportResult $result): array
     {
+        $hideActualSemantics = in_array($result->definition->kind, [
+            ReportKind::BudgetCurrentAllocation,
+            ReportKind::BudgetVersions,
+        ], true);
+        $hiddenActualLabels = [
+            SecondaryLabel::PlannedNotOccurred,
+            SecondaryLabel::WithoutActuals,
+            SecondaryLabel::LateCorrection,
+        ];
         $source = fn (ReportSource $item): array => [
             'source_type' => $item->sourceType, 'origin_id' => $item->originId,
-            'origin_key' => $item->originKey, 'label' => $item->label, 'summary' => $item->summary,
+            'origin_key' => $item->originKey, 'copied_from_origin_key' => $item->copiedFromOriginKey,
+            'label' => $item->label, 'summary' => $item->summary,
             'cost_center' => $item->costCenterLabel, 'supplier' => $item->supplierLabel, 'state' => $item->state,
             'allocation' => $item->allocation, 'actual' => $item->actual,
             'operational_variance' => Decimal::subtract($item->actual, $item->allocation),
@@ -619,15 +629,30 @@ class Reports extends Page
             'detail' => $item->detail, 'corrections' => $item->corrections, 'annotations' => $item->annotations,
         ];
         $sources = array_map($source, $result->sources);
-        $comparisons = array_map(fn (array $row): array => [
-            'origin_key' => $row['origin_key'], 'label' => $row['label'],
-            'initial_value' => $row['initial_value'], 'final_value' => $row['final_value'], 'delta' => $row['delta'],
-            'category' => $row['category']->label(), 'category_key' => $row['category']->value,
-            'dimensions' => array_map(fn ($dimension): string => $dimension->label(), $row['dimensions']),
-            'labels' => array_map(fn ($label): string => $label->label(), $row['labels']),
-            'derived_from_origin_key' => $row['derived_from_origin_key'],
-            'insufficiently_explained' => $row['insufficiently_explained'],
-        ], $result->comparisons);
+        $comparisons = array_map(function (array $row) use ($hideActualSemantics, $hiddenActualLabels): array {
+            /** @var ReportSource|null $displaySource */
+            $displaySource = $row['final_source'] ?? $row['initial_source'] ?? null;
+            $dimensions = $hideActualSemantics
+                ? array_values(array_filter($row['dimensions'], fn ($dimension): bool => $dimension->value !== 'actual'))
+                : $row['dimensions'];
+            $labels = $hideActualSemantics
+                ? array_values(array_filter($row['labels'], fn ($label): bool => ! in_array($label, $hiddenActualLabels, true)))
+                : $row['labels'];
+
+            return [
+                'origin_key' => $row['origin_key'], 'label' => $row['label'],
+                'source_type' => $displaySource?->sourceType,
+                'cost_center' => $displaySource?->costCenterLabel,
+                'supplier' => $displaySource?->supplierLabel,
+                'state' => $displaySource?->state,
+                'initial_value' => $row['initial_value'], 'final_value' => $row['final_value'], 'delta' => $row['delta'],
+                'category' => $row['category']->label(), 'category_key' => $row['category']->value,
+                'dimensions' => array_map(fn ($dimension): string => $dimension->label(), $dimensions),
+                'labels' => array_map(fn ($label): string => $label->label(), $labels),
+                'derived_from_origin_key' => $row['derived_from_origin_key'],
+                'insufficiently_explained' => $row['insufficiently_explained'],
+            ];
+        }, $result->comparisons);
         $sections = array_map(fn (array $section): array => [
             'title' => $section['title'],
             'rows' => array_map(fn (mixed $row): array => $row instanceof ReportSource ? $source($row) : $row, $section['rows']),
@@ -647,11 +672,13 @@ class Reports extends Page
                 'label' => $category->label(),
                 'count' => (int) ($result->categoryCounts[$category->value] ?? 0),
             ])->filter(fn (array $item): bool => $item['count'] > 0)->values()->all(),
-            'label_items' => collect(SecondaryLabel::cases())->map(fn (SecondaryLabel $label): array => [
-                'key' => $label->value,
-                'label' => $label->label(),
-                'count' => (int) ($result->labelCounts[$label->value] ?? 0),
-            ])->filter(fn (array $item): bool => $item['count'] > 0)->values()->all(),
+            'label_items' => collect(SecondaryLabel::cases())
+                ->reject(fn (SecondaryLabel $label): bool => $hideActualSemantics && in_array($label, $hiddenActualLabels, true))
+                ->map(fn (SecondaryLabel $label): array => [
+                    'key' => $label->value,
+                    'label' => $label->label(),
+                    'count' => (int) ($result->labelCounts[$label->value] ?? 0),
+                ])->filter(fn (array $item): bool => $item['count'] > 0)->values()->all(),
             'sections' => $sections,
             'comparison_totals' => $comparisonTotals,
             'specialist_totals' => $this->specialistTotals($result->definition->kind, $sections),
@@ -768,16 +795,21 @@ class Reports extends Page
                 ],
             );
         } elseif ($kind === ReportKind::Carryovers) {
-            $sources = array_values(array_filter($result->sources, fn (ReportSource $source): bool => $source->sourceType === 'project'));
-            if ($sources !== []) {
+            $rows = $result->sections[0]['rows'] ?? [];
+            $carryovers = array_map(fn (mixed $row): float => (float) ($row instanceof ReportSource
+                ? $row->carryover
+                : ($row['provisional_carryover'] ?? $row['consolidated_carryover'] ?? $row['carryover'] ?? '0.00')), $rows);
+            $reprogrammed = array_map(fn (mixed $row): float => (float) ($row instanceof ReportSource
+                ? '0.00'
+                : ($row['reprogrammed_amount'] ?? '0.00')), $rows);
+            if ($rows !== [] && (array_sum($carryovers) !== 0.0 || array_sum($reprogrammed) !== 0.0)) {
                 $charts[] = $this->groupedBarChart(
-                    'carryover-values', 'Riporti per Progetto',
-                    'Riporto Insieme ad Allocato ed Effettivo Già Disponibili nel Risultato.',
-                    array_map(fn (ReportSource $source): string => $source->label, $sources),
+                    'carryover-values', 'Trasferimenti per Progetto',
+                    'Importi di Riporto e Riprogrammazione registrati.',
+                    array_map(fn (mixed $row): string => $row instanceof ReportSource ? $row->label : (string) $row['label'], $rows),
                     [
-                        ['label' => 'Riporto', 'data' => array_map(fn (ReportSource $source): float => (float) $source->carryover, $sources), 'color' => '#F59E0B'],
-                        ['label' => 'Allocato', 'data' => array_map(fn (ReportSource $source): float => (float) $source->allocation, $sources), 'color' => '#39D5C4'],
-                        ['label' => 'Effettivo', 'data' => array_map(fn (ReportSource $source): float => (float) $source->actual, $sources), 'color' => '#60A5FA'],
+                        ['label' => 'Riporto', 'data' => $carryovers, 'color' => '#F59E0B'],
+                        ['label' => 'Riprogrammato', 'data' => $reprogrammed, 'color' => '#60A5FA'],
                     ],
                 );
             }

@@ -51,7 +51,14 @@ it('aggregates received carryover by Supplier while retaining outgoing carryover
         ->and($destinationProject->allocation)->toBe('25.00')
         ->and($destinationProject->carryover)->toBe('0.00')
         ->and($destinationProject->receivedCarryover)->toBe('25.00')
-        ->and(collect($destinationYear->sections[0]['rows'])->sole()['allocation'])->toBe('25.00');
+        ->and(collect($destinationYear->sections[0]['rows'])->sole()['allocation'])->toBe('25.00')
+        ->and(collect($destinationYear->sections[0]['rows'])->sole()['components'])->toBe([[
+            'source_type' => 'carryover',
+            'source_label' => $project->title,
+            'expense_label' => 'Riporto',
+            'allocation' => '25.00',
+            'actual' => '0.00',
+        ]]);
 });
 
 it('maps received and outgoing carryover from supported historical references', function (): void {

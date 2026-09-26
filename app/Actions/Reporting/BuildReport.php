@@ -100,7 +100,7 @@ final class BuildReport
             ->countBy()
             ->all();
         $totals = $this->aggregator->executive($sources);
-        $sections = $this->sections($definition, $sources);
+        $sections = $this->sections($definition, $sources, $exercise);
 
         return new ReportResult(
             $definition,
@@ -284,9 +284,11 @@ final class BuildReport
             ->where('event_type', AuditEventType::ProjectRestored)
             ->whereBetween('effective_from', [$exercise->year.'-01-01', $exercise->year.'-12-31'])
             ->pluck('subject_id')->flip();
-        $annotatedOriginKeys = HistoricalErrorAnnotation::query()
+        $historicalAnnotations = HistoricalErrorAnnotation::query()
             ->where('company_id', $company->id)
-            ->get(['affected_sources'])
+            ->where('exercise_id', $exercise->id)
+            ->get(['id', 'kind', 'reason', 'affected_sources']);
+        $annotatedOriginKeys = $historicalAnnotations
             ->flatMap(fn (HistoricalErrorAnnotation $annotation): array => $this->affectedSources($annotation))
             ->pluck('origin_key')->flip();
 
@@ -320,7 +322,11 @@ final class BuildReport
             });
         $expenses->load(['lines.attachments', 'supplier', 'directCostCenter']);
         foreach ($expenses as $expense) {
-            $sources[] = $this->expenseSource($expense, $costCenterHierarchy);
+            $sources[] = $this->expenseSource(
+                $expense,
+                $costCenterHierarchy,
+                $this->annotationsForOriginKey($historicalAnnotations, $expense->originKey()),
+            );
         }
 
         $projects = $this->currentSourceQuery(Project::query(), 'project', $exercise, $definition, $costCenterHierarchy)
@@ -341,7 +347,13 @@ final class BuildReport
                     || $project->transitions->contains(fn (ProjectTransition $transition): bool => $transition->annulledAt() === null
                         && $transition->effectiveDate()->year === $exercise->year);
             });
-        $projects->load(['transitions', 'deferrals', 'classifications.costCenter', 'expenses' => fn ($query) => $query->where('exercise_id', $exercise->id)->with(['lines.attachments', 'supplier', 'directCostCenter'])]);
+        $projects->load([
+            'transitions',
+            'deferrals.sourceExercise:id,year',
+            'deferrals.destinationExercise:id,year',
+            'classifications.costCenter',
+            'expenses' => fn ($query) => $query->where('exercise_id', $exercise->id)->with(['lines.attachments', 'supplier', 'directCostCenter']),
+        ]);
         foreach ($projects as $project) {
             $totals = $this->loadedExpenseTotals($project->expenses);
             $incomingCarryover = Decimal::sum($project->deferrals
@@ -373,13 +385,25 @@ final class BuildReport
                 detail: [
                     'expenses' => $project->expenses->map(fn (Expense $expense): array => $this->expenseDetail($expense))->all(),
                     'transitions' => $project->transitions->map(fn ($transition): array => $transition->toArray())->all(),
-                    'deferrals' => $project->deferrals->map(fn ($deferral): array => $deferral->toArray())->all(),
+                    'deferrals' => $project->deferrals->map(fn (ProjectDeferral $deferral): array => [
+                        'id' => $deferral->id,
+                        'source_exercise_id' => $deferral->source_exercise_id,
+                        'destination_exercise_id' => $deferral->destination_exercise_id,
+                        'mode' => $deferral->mode->value,
+                        'carryover_amount' => (string) $deferral->carryover_amount,
+                        'carryover_state' => $deferral->carryover_state,
+                        'reprogrammed_amount' => (string) $deferral->reprogrammed_amount,
+                        'reprogramming_effects' => $deferral->reprogramming_effects,
+                        'source_exercise_year' => $deferral->sourceExercise->year,
+                        'destination_exercise_year' => $deferral->destinationExercise->year,
+                    ])->all(),
                     'residual' => in_array($state?->value, ['planned', 'open'], true) ? $residual : '0.00',
                     'saving' => $state?->value === 'closed' ? $balance : '0.00',
                     'unused_allocation' => $state?->value === 'cancelled' ? $balance : '0.00',
                     'archived_or_reversed' => $project->isArchived(),
                     'deferred' => $carryover !== '0.00',
                 ],
+                annotations: $this->annotationsForOriginKey($historicalAnnotations, $project->originKey()),
             );
         }
 
@@ -440,6 +464,7 @@ final class BuildReport
                     'operational_variance' => Decimal::subtract((string) $totals['actual'], (string) $totals['allocation']),
                     'archived_or_reversed' => $contract->isArchived(),
                 ],
+                annotations: $this->annotationsForOriginKey($historicalAnnotations, $contract->originKey()),
             );
         }
 
@@ -522,7 +547,8 @@ final class BuildReport
         ];
     }
 
-    private function expenseSource(Expense $expense, CostCenterHierarchy $hierarchy): ReportSource
+    /** @param array<int, array<string, mixed>> $annotations */
+    private function expenseSource(Expense $expense, CostCenterHierarchy $hierarchy, array $annotations): ReportSource
     {
         return new ReportSource(
             sourceType: 'expense', originId: $expense->id, originKey: $expense->originKey(), copiedFromOriginKey: $expense->copied_from_origin_key,
@@ -532,6 +558,7 @@ final class BuildReport
             state: $expense->isReversed() ? 'reversed' : 'active', allocation: $expense->allocation(), actual: $expense->actual(), hasActuals: $expense->hasActuals(),
             costCenterLineage: $expense->direct_cost_center_id === null ? [] : $hierarchy->lineage((int) $expense->direct_cost_center_id),
             detail: [...$this->expenseDetail($expense), 'archived_or_reversed' => $expense->isReversed()],
+            annotations: $annotations,
         );
     }
 
@@ -622,6 +649,15 @@ final class BuildReport
             ->where('company_id', $company->id)
             ->where('exercise_id', $exercise->id)
             ->exists();
+        $revisionReason = $definition->kind === ReportKind::BudgetVersions
+            && $definition->finalReference?->budgetSnapshotId !== null
+                ? AuditEvent::query()
+                    ->where('company_id', $company->id)
+                    ->where('event_type', AuditEventType::ProposalApproved)
+                    ->where('reference_type', BudgetSnapshot::class)
+                    ->where('reference_id', $definition->finalReference->budgetSnapshotId)
+                    ->value('reason')
+                : null;
 
         return [
             'company_id' => $company->id,
@@ -637,6 +673,7 @@ final class BuildReport
             'final_reference_label' => $this->referenceLabel($company, $definition->finalReference),
             'budget_version' => $budget?->version,
             'budget_purpose' => $budget?->purpose->label(),
+            'revision_reason' => $revisionReason,
             'initial_budget_label' => $budgets->first() instanceof BudgetSnapshot
                 ? 'Budget v'.$budgets->first()->version.' · '.$budgets->first()->purpose->label()
                 : null,
@@ -694,15 +731,92 @@ final class BuildReport
      * @param  array<int, ReportSource>  $sources
      * @return array<int, array<string, mixed>>
      */
-    private function sections(ReportDefinition $definition, array $sources): array
+    private function sections(ReportDefinition $definition, array $sources, Exercise $exercise): array
     {
         return match ($definition->kind) {
             ReportKind::Suppliers => [['title' => 'Aggregazione per Fornitore', 'rows' => $this->aggregator->suppliers($sources)]],
             ReportKind::Contracts => [['title' => 'Contratti', 'rows' => $this->contractRows($definition, $sources)]],
             ReportKind::Projects => [['title' => 'Progetti', 'rows' => array_values(array_filter($sources, fn (ReportSource $source): bool => $source->sourceType === 'project'))]],
-            ReportKind::Carryovers => [['title' => 'Riporti', 'rows' => array_values(array_filter($sources, fn (ReportSource $source): bool => $source->sourceType === 'project'))]],
+            ReportKind::Carryovers => [['title' => 'Riporti', 'rows' => $this->carryoverRows($definition, $sources, $exercise->year)]],
             default => [],
         };
+    }
+
+    /**
+     * @param  array<int, ReportSource>  $sources
+     * @return array<int, array<string, mixed>>
+     */
+    private function carryoverRows(ReportDefinition $definition, array $sources, int $exerciseYear): array
+    {
+        return collect($sources)
+            ->filter(fn (ReportSource $source): bool => $source->sourceType === 'project')
+            ->map(function (ReportSource $source) use ($definition, $exerciseYear): array {
+                $deferrals = is_array($source->detail['deferrals'] ?? null) ? $source->detail['deferrals'] : [];
+                $deferral = collect($deferrals)->first(
+                    fn (mixed $item): bool => is_array($item)
+                        && (int) ($item['source_exercise_id'] ?? 0) === $definition->exerciseId,
+                );
+                $deferral = is_array($deferral) ? $deferral : [];
+                $mode = ProjectDeferralMode::tryFrom((string) (
+                    $deferral['mode']
+                    ?? $source->detail['deferral_mode']
+                    ?? ProjectDeferralMode::None->value
+                )) ?? ProjectDeferralMode::None;
+                $carryoverState = is_string($deferral['carryover_state'] ?? null)
+                    ? $deferral['carryover_state']
+                    : null;
+                $provisional = $mode === ProjectDeferralMode::Carryover && $carryoverState === 'provisional'
+                    ? (string) ($deferral['carryover_amount'] ?? '0.00')
+                    : null;
+                $consolidated = $mode === ProjectDeferralMode::Carryover
+                    ? ($carryoverState === 'consolidated'
+                        ? (string) ($deferral['carryover_amount'] ?? '0.00')
+                        : (isset($source->detail['consolidated_carryover'])
+                            ? (string) $source->detail['consolidated_carryover']
+                            : null))
+                    : null;
+                $decision = is_array($source->detail['closing_decision'] ?? null)
+                    ? $source->detail['closing_decision']
+                    : null;
+
+                return [
+                    'label' => $source->label,
+                    'summary' => $source->summary,
+                    'source_type' => $source->sourceType,
+                    'origin_key' => $source->originKey,
+                    'cost_center' => $source->costCenterLabel,
+                    'supplier' => $source->supplierLabel,
+                    'state' => $source->state,
+                    'allocation' => $source->allocation,
+                    'actual' => $source->actual,
+                    'operational_variance' => Decimal::subtract($source->actual, $source->allocation),
+                    'residual' => $source->residual,
+                    'saving' => $source->saving,
+                    'unused' => $source->unused,
+                    'carryover' => $source->carryover,
+                    'received_carryover' => $source->receivedCarryover,
+                    'maximum_transferable' => ProjectDeferralValues::maximumTransferable($source->allocation, $source->actual),
+                    'mode' => $mode->value,
+                    'mode_label' => $mode->label(),
+                    'source_exercise_year' => $deferral['source_exercise_year'] ?? $exerciseYear,
+                    'destination_exercise_year' => $deferral['destination_exercise_year'] ?? null,
+                    'reprogrammed_amount' => $mode === ProjectDeferralMode::Reprogramming
+                        ? (string) ($deferral['reprogrammed_amount'] ?? $source->detail['reprogrammed_amount'] ?? '0.00')
+                        : '0.00',
+                    'provisional_carryover' => $provisional,
+                    'consolidated_carryover' => $consolidated,
+                    'carryover_difference' => $provisional !== null && $consolidated !== null
+                        ? Decimal::subtract($consolidated, $provisional)
+                        : null,
+                    'decision' => $decision,
+                    'decision_reason' => is_string($decision['reason'] ?? null) ? $decision['reason'] : null,
+                    'detail' => $source->detail,
+                    'corrections' => $source->corrections,
+                    'annotations' => $source->annotations,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**
@@ -746,6 +860,8 @@ final class BuildReport
 
                     'labels' => $labels,
                     'detail' => $source->detail,
+                    'corrections' => $source->corrections,
+                    'annotations' => $source->annotations,
                 ];
             })
             ->values()
@@ -862,6 +978,26 @@ final class BuildReport
         $sources = $annotation->getAttribute('affected_sources');
 
         return is_array($sources) ? $sources : [];
+    }
+
+    /**
+     * @param  Collection<int, HistoricalErrorAnnotation>  $annotations
+     * @return array<int, array<string, mixed>>
+     */
+    private function annotationsForOriginKey(Collection $annotations, string $originKey): array
+    {
+        return $annotations
+            ->filter(fn (HistoricalErrorAnnotation $annotation): bool => collect($this->affectedSources($annotation))
+                ->contains(fn (array $source): bool => ($source['origin_key'] ?? null) === $originKey))
+            ->map(fn (HistoricalErrorAnnotation $annotation): array => [
+                'id' => $annotation->id,
+                'kind' => (string) $annotation->getRawOriginal('kind'),
+                'reason' => $annotation->reason,
+                'economic_impact' => '0.00',
+                'affected_sources' => $this->affectedSources($annotation),
+            ])
+            ->values()
+            ->all();
     }
 
     /**

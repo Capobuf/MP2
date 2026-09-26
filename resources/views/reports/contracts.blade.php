@@ -38,7 +38,7 @@
         $showStateChart = $stateChart && in_array('chart:contract-states', $document['selected_blocks'], true);
         $showTable = in_array('table:contracts', $document['selected_blocks'], true);
         $showDetails = in_array('details:contracts', $document['selected_blocks'], true);
-        $portfolioKpis = array_values(array_filter($selectedKpis, fn (array $kpi): bool => in_array($kpi['id'], ['kpi:specialist_count', 'kpi:contracts_expiring'], true)));
+        $portfolioKpis = array_values(array_filter($selectedKpis, fn (array $kpi): bool => $kpi['id'] === 'kpi:specialist_count'));
         $economicKpis = array_values(array_filter($selectedKpis, fn (array $kpi): bool => in_array($kpi['id'], ['kpi:specialist_allocation', 'kpi:specialist_actual', 'kpi:specialist_variance'], true)));
         $renderColumns = $portrait
             ? array_values(array_intersect($contractColumns, ['deadline', 'allocation', 'actual', 'operational_variance']))
@@ -403,6 +403,14 @@
                             @endforeach
                         </tbody>
                     </table>
+                @endif
+
+                @if ($contract['corrections'] !== [] || $contract['annotations'] !== [])
+                    <h3 class="detail-section-title">Correzioni e Annotazioni</h3>
+                    @include('reports.partials.structured-value', ['value' => [
+                        'Correzioni tardive' => $contract['corrections'],
+                        'Annotazioni di errore storico' => $contract['annotations'],
+                    ]])
                 @endif
             </article>
         @empty

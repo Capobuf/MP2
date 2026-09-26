@@ -12,7 +12,6 @@ use App\Domain\Reporting\ReportKind;
 use App\Domain\Reporting\ReportResult;
 use App\Domain\Reporting\ReportSource;
 use App\Models\Company;
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Number;
 use Illuminate\Support\Str;
@@ -26,8 +25,9 @@ final class ReportPdfComposer
     public function compose(ReportResult $result, Company $company, array $configuration = []): array
     {
         $orientation = $this->orientation($configuration);
+        $kind = $result->definition->kind;
         $sources = array_map(fn (ReportSource $source): array => $this->source($source), $result->sources);
-        $comparisons = array_map(fn (array $row): array => $this->comparison($row), $result->comparisons);
+        $comparisons = array_map(fn (array $row): array => $this->comparison($row, $kind), $result->comparisons);
         $sections = array_map(fn (array $section): array => [
             'id' => 'section:'.Str::slug((string) $section['title']),
             'title' => (string) $section['title'],
@@ -63,8 +63,16 @@ final class ReportPdfComposer
             $availableBlocks[] = $this->option('table:contracts', 'Elenco contratti', 'table');
             $availableBlocks[] = $this->option('details:contracts', 'Approfondimenti contratti', 'detail');
         } elseif (! $isContracts && $sources !== []) {
-            $availableBlocks[] = $this->option('table:sources', 'Dettaglio e riconciliazione', 'table');
+            $sourceTableLabel = match ($kind) {
+                ReportKind::AnnualExecutive => 'Riconciliazione delle sorgenti',
+                ReportKind::OperationalVariance => 'Scostamento per sorgente',
+                default => 'Dettaglio e riconciliazione',
+            };
+            $availableBlocks[] = $this->option('table:sources', $sourceTableLabel, 'table');
             $availableBlocks[] = $this->option('details:sources', 'Approfondimenti delle sorgenti', 'detail');
+        }
+        if ($kind === ReportKind::AnnualExecutive && $result->costCenters !== []) {
+            $availableBlocks[] = $this->option('table:cost-centers', 'Analisi per Centro di Costo', 'table');
         }
         if ($comparisons !== []) {
             $availableBlocks[] = $this->option('table:comparisons', 'Confronto', 'table');
@@ -91,17 +99,30 @@ final class ReportPdfComposer
                 $availableColumns[] = $this->option('column:contracts:'.$key, $label, 'contracts');
             }
         } elseif ($sources !== []) {
-            foreach ([
-                'cost_center' => 'Centro di costo', 'supplier' => 'Fornitore', 'state' => 'Stato',
-                'allocation' => 'Allocato', 'actual' => 'Effettivo', 'operational_variance' => 'Scostamento',
-                'carryover' => 'Riporto',
-            ] as $key => $label) {
+            $sourceColumns = $kind === ReportKind::OperationalVariance
+                ? [
+                    'state' => 'Stato', 'allocation' => 'Allocato Corrente',
+                    'actual' => 'Effettivo Corrente', 'operational_variance' => 'Scostamento Operativo',
+                ]
+                : [
+                    'cost_center' => 'Centro di costo', 'supplier' => 'Fornitore', 'state' => 'Stato',
+                    'allocation' => 'Allocato', 'actual' => 'Effettivo', 'operational_variance' => 'Scostamento',
+                    'carryover' => 'Riporto',
+                ];
+            foreach ($sourceColumns as $key => $label) {
                 $availableColumns[] = $this->option('column:sources:'.$key, $label, 'sources');
             }
         }
         if ($comparisons !== []) {
+            [$initialColumnLabel, $finalColumnLabel] = match ($kind) {
+                ReportKind::BudgetActual => ['Budget', (string) ($result->header['actual_reference'] ?? 'Actual')],
+                ReportKind::BudgetCurrentAllocation => ['Budget', 'Allocato Corrente'],
+                ReportKind::BudgetVersions => ['Budget Iniziale', 'Budget Finale'],
+                ReportKind::Exercises => ['Esercizio Iniziale', 'Esercizio Finale'],
+                default => ['Iniziale', 'Finale'],
+            };
             foreach ([
-                'initial_value' => 'Iniziale', 'final_value' => 'Finale', 'delta' => 'Delta',
+                'initial_value' => $initialColumnLabel, 'final_value' => $finalColumnLabel, 'delta' => 'Delta',
                 'category' => 'Categoria', 'dimensions' => 'Dimensioni', 'labels' => 'Etichette',
             ] as $key => $label) {
                 $availableColumns[] = $this->option('column:comparisons:'.$key, $label, 'comparisons');
@@ -110,7 +131,18 @@ final class ReportPdfComposer
 
         $blockIds = array_column($availableBlocks, 'id');
         $defaultBlocks = array_values(array_diff($blockIds, ['details:contracts', 'details:sources']));
-        if (in_array($result->definition->kind, [ReportKind::Projects, ReportKind::Carryovers, ReportKind::Suppliers], true)) {
+        if ($kind === ReportKind::AnnualExecutive) {
+            $defaultBlocks = array_values(array_diff($defaultBlocks, ['table:comparisons']));
+        }
+        if (in_array($kind, [
+            ReportKind::BudgetActual,
+            ReportKind::BudgetCurrentAllocation,
+            ReportKind::BudgetVersions,
+            ReportKind::Exercises,
+            ReportKind::Projects,
+            ReportKind::Carryovers,
+            ReportKind::Suppliers,
+        ], true)) {
             $defaultBlocks = array_values(array_diff($defaultBlocks, ['table:sources']));
         }
         $selectedBlocks = $this->selection($configuration, 'blocks', $blockIds, $defaultBlocks);
@@ -136,6 +168,14 @@ final class ReportPdfComposer
             'available_columns' => $availableColumns,
             'selected_blocks' => $selectedBlocks,
             'selected_columns' => $selectedColumns,
+            'source_table_title' => $sourceTableLabel ?? 'Dettaglio e riconciliazione',
+            'comparison_table_title' => match ($kind) {
+                ReportKind::BudgetActual => 'Budget e Actual per sorgente',
+                ReportKind::BudgetCurrentAllocation => 'Evoluzione del piano per sorgente',
+                ReportKind::BudgetVersions => 'Variazioni fra le versioni',
+                ReportKind::Exercises => 'Confronto della misura per sorgente',
+                default => 'Confronto',
+            },
         ];
     }
 
@@ -223,12 +263,13 @@ final class ReportPdfComposer
 
         if ($kind === ReportKind::AnnualExecutive) {
             $items = [
+                ['initial_budget', 'Budget Iniziale Approvato', $availability['initial_budget'] ? $totals['initial_budget'] : 'Non disponibile', true],
                 ['current_budget', 'Budget Approvato Corrente', $availability['current_budget'] ? $totals['current_budget'] : 'Non disponibile', true],
                 ['current_allocation', 'Allocato Corrente', $totals['current_allocation'], true],
                 ['selected_actual', (string) $result->header['actual_reference'], $totals['selected_actual'], true],
                 ['current_operational_variance', 'Scostamento Operativo', $totals['current_operational_variance'], true],
-                ['current_actual', 'Effettivo Corrente', $totals['current_actual'], true],
             ];
+            $items[] = ['current_actual', 'Effettivo Corrente', $totals['current_actual'], true];
             if ($availability['selected_budget']) {
                 $items[] = ['allocation_vs_selected_budget', 'Variazione Allocato vs Budget Selezionato', $totals['allocation_vs_selected_budget'], true];
                 $items[] = ['selected_budget_actual_variance', 'Varianza Budget vs Actual Selezionato', $totals['selected_budget_actual_variance'], true];
@@ -281,24 +322,11 @@ final class ReportPdfComposer
                     ['specialist_count', 'Bucket Fornitore', $specialist['item_count'], false],
                 ];
             } elseif ($kind === ReportKind::Contracts) {
-                $referenceDate = $result->definition->finalReference->referenceDate
-                    ?? CarbonImmutable::parse((string) $result->header['reference_date']);
-                $expiringBy = $referenceDate->addDays(90);
-                /** @var array<int, array<string, mixed>> $contractRows */
-                $contractRows = $sections[0]['rows'] ?? [];
-                $expiring = count(array_filter($contractRows, function (array $row) use ($referenceDate, $expiringBy): bool {
-                    $deadline = $row['deadline'] ?? null;
-
-                    return is_string($deadline)
-                        && $deadline !== ''
-                        && CarbonImmutable::parse($deadline)->betweenIncluded($referenceDate, $expiringBy);
-                }));
                 $items = [
                     ['specialist_count', 'Contratti', $specialist['item_count'], false],
                     ['specialist_allocation', 'Allocato', $specialist['allocation'], true],
                     ['specialist_actual', 'Effettivo', $specialist['actual'], true],
                     ['specialist_variance', 'Scostamento operativo', $specialist['operational_variance'], true],
-                    ['contracts_expiring', 'Contratti in scadenza', $expiring, false, 'nei prossimi 90 giorni'],
                 ];
             } elseif ($kind === ReportKind::Projects) {
                 $items = [
@@ -312,7 +340,7 @@ final class ReportPdfComposer
                     ['specialist_carryover', 'Riporto', $specialist['carryover'], true],
                     ['specialist_allocation', 'Allocato', $specialist['allocation'], true],
                     ['specialist_actual', 'Effettivo', $specialist['actual'], true],
-                    ['specialist_count', 'Progetti con Riporto', $specialist['item_count'], false],
+                    ['specialist_count', 'Progetti Analizzati', $specialist['item_count'], false],
                 ];
             }
         }
@@ -324,9 +352,9 @@ final class ReportPdfComposer
             'formatted' => $item[3] && is_numeric($item[2])
                 ? Number::currency((float) $item[2], in: 'EUR', locale: 'it')
                 : (string) $item[2],
-            'description' => $item[4] ?? null,
+            'description' => null,
             'group' => ! $item[3] ? 'context' : (in_array($item[0], [
-                'current_budget', 'current_allocation', 'selected_actual', 'comparison_initial', 'comparison_final',
+                'initial_budget', 'current_budget', 'current_allocation', 'selected_actual', 'comparison_initial', 'comparison_final',
                 'comparison_delta', 'allocation', 'actual', 'operational_variance',
                 'specialist_carryover', 'specialist_allocation', 'specialist_actual', 'specialist_variance',
             ], true) ? 'economic' : 'secondary'),
@@ -336,14 +364,30 @@ final class ReportPdfComposer
     /** @param array<string, mixed> $row
      * @return array<string, mixed>
      */
-    private function comparison(array $row): array
+    private function comparison(array $row, ReportKind $kind): array
     {
+        /** @var ReportSource|null $displaySource */
+        $displaySource = $row['final_source'] ?? $row['initial_source'] ?? null;
+        $hideActualSemantics = in_array($kind, [ReportKind::BudgetCurrentAllocation, ReportKind::BudgetVersions], true);
+        $dimensions = $hideActualSemantics
+            ? array_values(array_filter($row['dimensions'], fn ($value): bool => $value->value !== 'actual'))
+            : $row['dimensions'];
+        $labels = $hideActualSemantics
+            ? array_values(array_filter($row['labels'], fn ($value): bool => ! in_array($value->value, [
+                'planned_not_occurred', 'without_actuals', 'late_correction',
+            ], true)))
+            : $row['labels'];
+
         return [
             'origin_key' => $row['origin_key'], 'label' => $row['label'],
+            'source_type' => $displaySource?->sourceType,
+            'cost_center' => $displaySource?->costCenterLabel,
+            'supplier' => $displaySource?->supplierLabel,
             'initial_value' => $row['initial_value'], 'final_value' => $row['final_value'], 'delta' => $row['delta'],
             'category' => $row['category']->label(),
-            'dimensions' => array_map(fn ($value): string => $value->label(), $row['dimensions']),
-            'labels' => array_map(fn ($value): string => $value->label(), $row['labels']),
+            'dimensions' => array_map(fn ($value): string => $value->label(), $dimensions),
+            'labels' => array_map(fn ($value): string => $value->label(), $labels),
+            'derived_from_origin_key' => $row['derived_from_origin_key'],
             'insufficiently_explained' => $row['insufficiently_explained'],
         ];
     }
@@ -533,14 +577,21 @@ final class ReportPdfComposer
                 ],
             );
         } elseif ($kind === ReportKind::Carryovers) {
-            $sources = array_values(array_filter($result->sources, fn (ReportSource $source): bool => $source->sourceType === 'project'));
-            if ($sources !== []) {
+            $rows = $result->sections[0]['rows'] ?? [];
+            $carryovers = array_map(fn (mixed $row): float => (float) ($row instanceof ReportSource
+                ? $row->carryover
+                : ($row['provisional_carryover'] ?? $row['consolidated_carryover'] ?? $row['carryover'] ?? '0.00')), $rows);
+            $reprogrammed = array_map(fn (mixed $row): float => (float) ($row instanceof ReportSource
+                ? '0.00'
+                : ($row['reprogrammed_amount'] ?? '0.00')), $rows);
+            if ($rows !== [] && (array_sum($carryovers) !== 0.0 || array_sum($reprogrammed) !== 0.0)) {
                 $charts[] = $this->groupedBarChart(
-                    'carryover-values', 'Riporti per Progetto',
-                    'Riporto per Progetto.',
-                    array_map(fn (ReportSource $source): string => $source->label, $sources),
+                    'carryover-values', 'Trasferimenti per Progetto',
+                    'Importi di Riporto e Riprogrammazione registrati.',
+                    array_map(fn (mixed $row): string => $row instanceof ReportSource ? $row->label : (string) $row['label'], $rows),
                     [
-                        ['label' => 'Riporto', 'data' => array_map(fn (ReportSource $source): float => (float) $source->carryover, $sources), 'color' => '#39D5C4'],
+                        ['label' => 'Riporto', 'data' => $carryovers, 'color' => '#F59E0B'],
+                        ['label' => 'Riprogrammato', 'data' => $reprogrammed, 'color' => '#60A5FA'],
                     ],
                 );
             }
@@ -894,6 +945,8 @@ final class ReportPdfComposer
             'renewal_configurations' => $this->contractRenewalConfigurations($detail['cycles'] ?? []),
             'events' => $this->contractEvents($detail['events'] ?? []),
             'expenses' => $this->contractExpenses($detail['expenses'] ?? []),
+            'corrections' => $this->normalizeValue($row['corrections'] ?? []),
+            'annotations' => $this->normalizeValue($row['annotations'] ?? []),
         ];
     }
 
