@@ -507,6 +507,53 @@ it('renders the canonical current agreement and selected Exercise economics', fu
         ->assertActionVisible('edit');
 });
 
+it('explains elapsed conditions and annual allocation without presenting a past expiry as upcoming', function () {
+    CarbonImmutable::setTestNow('2026-09-28 10:00:00 Europe/Rome');
+    $manager = User::factory()->create();
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    grantContractResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $contract = Contract::factory()->for($company)->create([
+        'contractual_start_date' => '2025-09-15',
+        'next_expiry_date' => '2026-09-15',
+        'renewal_anchor_date' => '2026-09-15',
+        'notes' => 'Rinnovo proposto a 6.467,88 euro, ancora in trattativa.',
+    ]);
+    ContractLifecycleFact::factory()->forContract($contract)->create([
+        'declared_contractual_date' => '2025-09-15',
+        'state_change_date' => '2025-09-15',
+    ]);
+    $condition = ContractCondition::factory()->forContract($contract)->create([
+        'amount' => '6000.00', 'cycle' => 'annual', 'attribution_mode' => 'cycle_start',
+        'valid_from' => '2025-09-15', 'valid_to' => '2026-09-15',
+    ]);
+    $this->actingAs($manager);
+    Filament::setTenant($company->tenantCompany);
+    app(ExerciseContext::class)->select($company, $exercise->id);
+
+    Livewire::test(ViewContract::class, ['record' => $contract->getRouteKey()])
+        ->assertSuccessful()
+        ->assertSee('Scadenza Registrata')
+        ->assertSee('Scadenza trascorsa')
+        ->assertDontSee('Prossima Scadenza')
+        ->assertSee('Nessuna condizione economica vigente al 28/09/2026')
+        ->assertSee('L’ultima condizione è terminata il 15/09/2026')
+        ->assertSee('Il rinnovo automatico non prolunga le condizioni con una data finale')
+        ->assertSee('L’Allocato comprende i cicli attribuiti all’intero Esercizio')
+        ->assertSee('6.000,00')
+        ->assertSee('Note del Contratto')
+        ->assertSee($contract->notes);
+
+    Livewire::test(ContractConditionsRelationManager::class, ['ownerRecord' => $contract, 'pageClass' => ViewContract::class])
+        ->assertCanSeeTableRecords([$condition])
+        ->assertSee('Valida')
+        ->assertSee('Periodo terminato');
+
+    expect($contract->fresh()->nextExpiryDate()->toDateString())->toBe('2026-09-15')
+        ->and($condition->fresh()->validTo()->toDateString())->toBe('2026-09-15')
+        ->and($contract->conditions()->count())->toBe(1);
+});
+
 it('previews a long annual allocation composition and exposes every cycle on demand', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create(['timezone' => 'Europe/Rome']);

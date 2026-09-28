@@ -26,7 +26,7 @@ class ChangeContractCondition
     /** @param array<string, mixed> $input */
     public function preview(Contract $contract, ContractCondition $condition, array $input): ContractEconomicChangePlan
     {
-        $validated = $this->validate($input);
+        $validated = $this->validate($input, $contract);
         $this->assertOwnership($contract, $condition);
         $exercises = Exercise::query()->where('company_id', $contract->company_id)->orderBy('id')->get();
 
@@ -38,6 +38,8 @@ class ChangeContractCondition
                 $validated['requested_date'],
                 CarbonImmutable::now($contract->company->timezone)->toDateString(),
                 $exercises,
+                succession: (bool) $validated['succession'],
+                validTo: $validated['valid_to'],
             );
         } catch (\DomainException $exception) {
             throw ValidationException::withMessages(['effective_date' => $exception->getMessage()]);
@@ -54,7 +56,7 @@ class ChangeContractCondition
         string $confirmedEffectiveDate,
         string $operationId,
     ): ContractCondition {
-        $validated = $this->validate($input + ['operation_id' => $operationId]);
+        $validated = $this->validate($input + ['operation_id' => $operationId], $contract);
 
         return DB::transaction(function () use ($actor, $contract, $condition, $validated, $fingerprint, $confirmedEffectiveDate): ContractCondition {
             $company = Company::query()->lockForUpdate()->findOrFail($contract->company_id);
@@ -79,6 +81,7 @@ class ChangeContractCondition
             }
 
             $lockedContract->setRelation('conditions', $conditions);
+            $this->assertOwnership($lockedContract, $lockedCondition);
             $lockedContract->setRelation('lifecycleFacts', $lockedContract->lifecycleFacts()->orderBy('id')->lockForUpdate()->get());
             try {
                 $plan = ContractEconomicChangePlan::forChange(
@@ -88,6 +91,8 @@ class ChangeContractCondition
                     $validated['requested_date'],
                     CarbonImmutable::now($company->timezone)->toDateString(),
                     $exercises,
+                    succession: (bool) $validated['succession'],
+                    validTo: $validated['valid_to'],
                 );
             } catch (\DomainException $exception) {
                 throw ValidationException::withMessages(['effective_date' => $exception->getMessage()]);
@@ -97,7 +102,7 @@ class ChangeContractCondition
             }
 
             $before = $plan->oldTerms;
-            $originalValidTo = $lockedCondition->validTo()?->toDateString();
+            $newValidTo = $plan->newTerms['valid_to'];
             if ($plan->futureReplacement) {
                 $lockedCondition->forceFill([
                     'annulled_at' => now(),
@@ -117,7 +122,7 @@ class ChangeContractCondition
                 'cycle' => $validated['cycle'],
                 'attribution_mode' => $validated['attribution_mode'],
                 'valid_from' => $plan->effectiveDate,
-                'valid_to' => $originalValidTo,
+                'valid_to' => $newValidTo,
                 'reason' => $validated['reason'],
                 'created_by_id' => $actor->id,
             ]);
@@ -132,7 +137,7 @@ class ChangeContractCondition
                 'subject_id' => $newCondition->id,
                 'affected_exercise_ids' => array_map('intval', array_keys($plan->exerciseImpacts)),
                 'effective_from' => $plan->effectiveDate,
-                'effective_to' => $originalValidTo,
+                'effective_to' => $newValidTo,
                 'previous_value' => $before,
                 'new_value' => [
                     'condition' => $newCondition->only(['id', 'amount', 'cycle', 'attribution_mode', 'valid_from', 'valid_to', 'reason']),
@@ -142,6 +147,7 @@ class ChangeContractCondition
                     'delay_reason' => $plan->delayReason,
                     'prorata_applied' => false,
                     'future_replacement' => $plan->futureReplacement,
+                    'operation_kind' => $plan->operationKind,
                     'impact_fingerprint' => $plan->fingerprint(),
                     'exercise_impacts' => $plan->exerciseImpacts,
                 ],
@@ -159,9 +165,9 @@ class ChangeContractCondition
     }
 
     /** @param array<string, mixed> $input
-     * @return array{requested_date: string, amount: string, cycle: string, attribution_mode: string, reason: ?string, operation_id?: string}
+     * @return array{requested_date: string, amount: string, cycle: string, attribution_mode: string, reason: ?string, succession: bool, valid_to: ?string, operation_id?: string}
      */
-    private function validate(array $input): array
+    private function validate(array $input, Contract $contract): array
     {
         $payload = [
             'requested_date' => $input['requested_date'] ?? null,
@@ -169,20 +175,24 @@ class ChangeContractCondition
             'cycle' => $input['cycle'] ?? null,
             'attribution_mode' => $input['attribution_mode'] ?? null,
             'reason' => $this->nullableTrim($input['reason'] ?? null),
+            'succession' => $input['succession'] ?? false,
+            'valid_to' => ($input['valid_to'] ?? null) ?: null,
         ];
         $rules = [
             'requested_date' => ['required', 'date_format:Y-m-d'],
             'amount' => ['required', 'decimal:0,2', 'min:0'],
             'cycle' => ['required', Rule::enum(ContractCycleType::class)],
             'attribution_mode' => ['required', Rule::enum(ContractAttributionMode::class)],
-            'reason' => ['nullable', 'string'],
+            'reason' => [Rule::requiredIf(($input['succession'] ?? false) && ($input['requested_date'] ?? '') <= now($contract->company->timezone)->toDateString()), 'nullable', 'string'],
+            'succession' => ['required', 'boolean'],
+            'valid_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:requested_date'],
         ];
         if (array_key_exists('operation_id', $input)) {
             $payload['operation_id'] = $input['operation_id'];
             $rules['operation_id'] = ['required', 'uuid'];
         }
 
-        /** @var array{requested_date: string, amount: string, cycle: string, attribution_mode: string, reason: ?string, operation_id?: string} $validated */
+        /** @var array{requested_date: string, amount: string, cycle: string, attribution_mode: string, reason: ?string, succession: bool, valid_to: ?string, operation_id?: string} $validated */
         $validated = Validator::make($payload, $rules)->validate();
 
         return $validated;

@@ -60,7 +60,8 @@ class ContractsTable
                 ->money('EUR', locale: 'it')->alignment(Alignment::End),
             TextColumn::make('variance')->label('Scostamento')->state(fn (Contract $record): string => $annual($record)['variance'])
                 ->money('EUR', locale: 'it')->alignment(Alignment::End),
-            TextColumn::make('next_expiry_date')->label('Prossima Scadenza')->date('d/m/Y')->placeholder('Scadenza non definita')->sortable(),
+            TextColumn::make('next_expiry_date')->label('Scadenza Contrattuale')->date('d/m/Y')->placeholder('Scadenza non definita')->sortable()
+                ->description(fn (Contract $record): ?string => $record->nextExpiryDate() !== null && $record->nextExpiryDate()->toDateString() < now($record->company->timezone)->toDateString() ? 'Scadenza trascorsa' : null),
             TextColumn::make('automatic_renewal')->label('Rinnovo Automatico')->formatStateUsing(fn (bool $state): string => $state ? 'Sì' : 'No'),
             TextColumn::make('contractual_start_date')->label('Data Inizio')->date('d/m/Y')->sortable()
                 ->toggleable(isToggledHiddenByDefault: true),

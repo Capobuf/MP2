@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Contracts\Schemas;
 use App\Domain\Contracts\ContractAnnualAllocation;
 use App\Domain\Contracts\ContractAttributionMode;
 use App\Domain\Contracts\ContractCycleType;
+use App\Domain\Contracts\ContractState;
 use App\Domain\Contracts\ContractStateTimeline;
 use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
@@ -48,8 +49,17 @@ class ContractInfolist
         )->values()->all();
 
         $selectedRow = collect($annualRows)->firstWhere('selected', true);
+        $lastCondition = $contract->conditions
+            ->filter(fn (ContractCondition $condition): bool => ! $condition->isAnnulled()
+                && $condition->validTo()?->startOfDay()->lessThan($today))
+            ->sortByDesc('valid_to')
+            ->first();
 
         return [
+            'today' => $today->format('d/m/Y'),
+            'is_active' => $contract->stateAtDate($today->toDateString()) === ContractState::Active,
+            'last_condition_end' => $lastCondition?->validTo()?->format('d/m/Y'),
+            'notes' => $contract->notes,
             'condition' => $currentCondition instanceof ContractCondition ? [
                 'amount' => self::money($currentCondition->amount),
                 'cycle' => ContractCycleType::from($currentCondition->cycle)->label(),

@@ -42,7 +42,17 @@ class ContractConditionsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table->columns([
-            TextColumn::make('status')->label('Stato')->state(fn (ContractCondition $record): string => $record->isAnnulled() ? 'Annullata' : 'Attiva')->badge(),
+            TextColumn::make('status')->label('Stato')->state(fn (ContractCondition $record): string => $record->isAnnulled() ? 'Annullata' : 'Valida')->badge()
+                ->description(function (ContractCondition $record): ?string {
+                    if ($record->isAnnulled()) {
+                        return null;
+                    }
+                    $today = now($record->contract->company->timezone)->toDateString();
+
+                    return $record->validFrom()->toDateString() > $today
+                        ? 'Decorrenza futura'
+                        : ($record->validTo() !== null && $record->validTo()->toDateString() < $today ? 'Periodo terminato' : 'Vigente oggi');
+                }),
             TextColumn::make('amount')->label('Importo')->money('EUR', locale: 'it'),
             TextColumn::make('cycle')->label('Ciclo')->formatStateUsing(fn (string $state): string => ContractCycleType::from($state)->label()),
             TextColumn::make('attribution_mode')->label('Attribuzione')->formatStateUsing(fn (string $state): string => ContractAttributionMode::from($state)->label()),

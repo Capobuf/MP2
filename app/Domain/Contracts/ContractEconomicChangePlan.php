@@ -96,7 +96,46 @@ final readonly class ContractEconomicChangePlan
         string $requestedDate,
         string $confirmationDate,
         iterable $exercises,
+        bool $succession = false,
+        ?string $validTo = null,
     ): self {
+        if ($succession) {
+            $exercises = collect($exercises)->all();
+            $start = CarbonImmutable::parse($condition->validFrom())->startOfDay();
+            $requested = CarbonImmutable::parse($requestedDate)->startOfDay();
+            $months = ($requested->year - $start->year) * 12 + $requested->month - $start->month;
+            $cycleMonths = ContractCycleType::from($condition->cycle)->months();
+            if ($months <= 0 || $months % $cycleMonths !== 0 || ! ContractCycle::anchoredDate($start, $months)->equalTo($requested)) {
+                throw ValidationException::withMessages(['requested_date' => 'La nuova condizione deve iniziare a un confine del ciclo precedente, dopo il primo ciclo. Non sono ammessi prorata.']);
+            }
+            $minimum = CarbonImmutable::parse($confirmationDate)->addMonthNoOverflow()->startOfMonth()->toDateString();
+            if ($requestedDate > $confirmationDate && $requestedDate < $minimum) {
+                throw ValidationException::withMessages(['requested_date' => 'Una variazione futura può iniziare dal primo giorno del mese successivo alla conferma.']);
+            }
+            if ($requestedDate <= $confirmationDate && ! collect($exercises)->contains(fn (Exercise $exercise): bool => $exercise->year === $requested->year && $exercise->isOpen())) {
+                throw ValidationException::withMessages(['requested_date' => 'La decorrenza già avvenuta deve appartenere a un Esercizio Aperto.']);
+            }
+            $contract->loadMissing(['conditions', 'lifecycleFacts', 'renewalConfigurations']);
+            ContractConditionRules::assertMayPersist($contract, $requestedDate, $validTo, $contract->conditions, $condition->id);
+            ContractConditionRules::assertCurrentlyActive($contract, $requestedDate);
+            foreach ($exercises as $exercise) {
+                if (! $exercise->isOpen() && ContractClosedHistoryGuard::periodOverlapsYear($requestedDate, $validTo, $exercise->year)) {
+                    throw ValidationException::withMessages(['exercises' => 'La nuova condizione non può interessare un Esercizio Chiuso.']);
+                }
+            }
+
+            return self::build(
+                operationKind: 'succession', contract: $contract, condition: $condition,
+                newTerms: $newTerms + ['valid_to' => $validTo], exercises: $exercises,
+                effectiveDate: $requestedDate, requestedDate: $requestedDate,
+                minimumDate: $requestedDate <= $confirmationDate ? null : $minimum,
+                delayReason: $requestedDate <= $confirmationDate
+                    ? 'Registrazione di una variazione già avvenuta: viene mantenuta la decorrenza reale indicata.'
+                    : 'La nuova condizione decorre dalla data indicata, senza differimenti.',
+                futureReplacement: false,
+            );
+        }
+
         $boundary = self::boundary(
             ['cycle' => (string) $condition->cycle, 'valid_from' => $condition->validFrom()->toDateString()],
             $requestedDate,
@@ -195,14 +234,14 @@ final readonly class ContractEconomicChangePlan
             }
         }
 
-        if ($operationKind === 'change') {
+        if (in_array($operationKind, ['change', 'succession'], true)) {
             $afterConditions[] = [
                 'id' => 0,
                 'amount' => $newTerms['amount'],
                 'cycle' => $newTerms['cycle'],
                 'attribution_mode' => $newTerms['attribution_mode'],
                 'valid_from' => $effectiveDate,
-                'valid_to' => $condition->validTo()?->toDateString(),
+                'valid_to' => $newTerms['valid_to'],
                 'annulled_at' => null,
             ];
         }
@@ -224,9 +263,11 @@ final readonly class ContractEconomicChangePlan
             if (Decimal::compare($before->amount, $after->amount) === 0 && $before->composition === $after->composition) {
                 continue;
             }
-            if ($operationKind === 'correction' && ! $exercise->isOpen()) {
+            if (in_array($operationKind, ['correction', 'succession'], true) && ! $exercise->isOpen()) {
                 throw ValidationException::withMessages([
-                    'exercises' => 'La correzione materiale richiede che ogni Esercizio economicamente interessato sia Aperto.',
+                    'exercises' => $operationKind === 'correction'
+                        ? 'La correzione materiale richiede che ogni Esercizio economicamente interessato sia Aperto.'
+                        : 'La nuova condizione richiede che ogni Esercizio economicamente interessato sia Aperto.',
                 ]);
             }
             if (! $exercise->isOpen()) {

@@ -101,7 +101,7 @@ class EditContract extends EditRecord
     public function interpretChangesAction(): Action
     {
         return Action::make('interpretChanges')
-            ->modalHeading($this->changes['conditions'] !== [] ? 'Hai modificato le condizioni economiche' : 'Hai modificato i termini contrattuali')
+            ->modalHeading($this->isAddingCondition() ? 'Hai aggiunto una condizione economica' : ($this->changes['conditions'] !== [] ? 'Hai modificato le condizioni economiche' : 'Hai modificato i termini contrattuali'))
             ->modalSubmitActionLabel('Rivedi le modifiche')
             ->fillForm(fn (): array => [
                 'requested_date' => now($this->contractRecord()->company->timezone)->addMonthNoOverflow()->startOfMonth()->toDateString(),
@@ -112,9 +112,9 @@ class EditContract extends EditRecord
                 Radio::make('meaning')->label('Come deve essere interpretata la modifica?')
                     ->options(['correction' => 'Il dato precedente era errato', 'change' => 'L’accordo è cambiato'])
                     ->descriptions(['correction' => 'Corregge i valori originari, senza una nuova decorrenza.', 'change' => 'Registra nuovi termini dalla prima decorrenza consentita.'])
-                    ->required()->live()->visible(fn (): bool => $this->changes['conditions'] !== []),
+                    ->required()->live()->visible(fn (): bool => $this->changes['conditions'] !== [] && ! $this->isAddingCondition()),
                 DateInput::make('requested_date')->label('Da quando è richiesto il nuovo accordo?')
-                    ->required()->visible(fn (Get $get): bool => $this->changes['conditions'] !== [] && $get('meaning') === 'change'),
+                    ->required()->visible(fn (Get $get): bool => ! $this->isAddingCondition() && $this->changes['conditions'] !== [] && $get('meaning') === 'change'),
                 Checkbox::make('declared_input_error')->label('Il valore precedente non rappresentava l’accordo reale')
                     ->accepted()->visible(fn (Get $get): bool => $get('meaning') === 'correction'),
                 Checkbox::make('declared_no_new_agreement')->label('La correzione non introduce una nuova decorrenza contrattuale')
@@ -123,8 +123,8 @@ class EditContract extends EditRecord
                     ->helperText('È supportata la configurazione corrente, successiva alle scadenze già elaborate. Le configurazioni con efficacia futura non sono modificabili da questa schermata.')
                     ->required()->visible(fn (): bool => $this->changes['renewal'] !== []),
                 Textarea::make('reason')->label('Motivo della modifica')
-                    ->required(fn (Get $get): bool => $get('meaning') === 'correction' || ($this->changes['renewal'] !== [] && $this->contractRecord()->company->exercises()->open()->whereHas('budgets')->exists()))
-                    ->helperText('Obbligatorio per una correzione e quando la modifica interessa un Budget approvato.'),
+                    ->required(fn (Get $get): bool => $get('meaning') === 'correction' || $this->isAddingCondition() || ($this->changes['renewal'] !== [] && $this->contractRecord()->company->exercises()->open()->whereHas('budgets')->exists()))
+                    ->helperText('Indica il motivo della variazione. Per una decorrenza già trascorsa, descrivi l’accordo già in vigore.'),
             ])
             ->action(function (array $data): void {
                 try {
@@ -152,7 +152,7 @@ class EditContract extends EditRecord
                 Textarea::make('reason')->label('Motivo della riclassificazione')
                     ->visible(fn (): bool => ($this->review['kind'] ?? null) === 'classification')
                     ->helperText('Obbligatorio se sono presenti Effettivi o un Budget approvato.'),
-                Checkbox::make('confirmed')->label(fn (): string => ($this->review['kind'] ?? null) === 'change'
+                Checkbox::make('confirmed')->label(fn (): string => in_array($this->review['kind'] ?? null, ['change', 'succession'], true)
                     ? 'Confermo la decorrenza effettiva mostrata e l’assenza di prorata'
                     : 'Confermo l’impatto mostrato sugli Esercizi Aperti')
                     ->accepted()->required(),
@@ -226,6 +226,13 @@ class EditContract extends EditRecord
         abort_unless($actor instanceof User, 403);
 
         return $actor;
+    }
+
+    private function isAddingCondition(): bool
+    {
+        $conditions = $this->changes['conditions'] ?? [];
+
+        return (bool) ($conditions[array_key_first($conditions)]['succession'] ?? false);
     }
 
     private function contractRecord(): Contract

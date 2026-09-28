@@ -63,6 +63,10 @@ class PlatformPanelProvider extends PanelProvider
                 'info' => Color::hex('#60A5FA'),
             ])
             ->maxContentWidth(Width::Full)
+            ->renderHook(
+                PanelsRenderHook::SCRIPTS_AFTER,
+                fn () => view('filament.components.select-labels-script'),
+            )
             ->sidebarWidth('14rem')
             ->collapsedSidebarWidth('3rem')
             ->renderHook(

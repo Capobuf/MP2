@@ -1,6 +1,12 @@
 <?php
 
 return [
+    'section' => [
+        'actions' => [
+            'collapse' => ['label' => 'Comprimi sezione'],
+            'expand' => ['label' => 'Espandi sezione'],
+        ],
+    ],
     'wizard' => [
         'actions' => [
             'previous_step' => [

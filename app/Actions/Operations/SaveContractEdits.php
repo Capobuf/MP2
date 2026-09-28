@@ -12,6 +12,7 @@ use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\Exercise;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -57,19 +58,43 @@ final class SaveContractEdits
         if (($data['contractual_start_date'] ?? null) !== $original['contractual_start_date']) {
             throw ValidationException::withMessages(['contractual_start_date' => 'La data di inizio originaria non è correggibile. Gestisci gli eventi futuri dal Ciclo di Vita.']);
         }
-        $conditions = collect($this->rows($data['conditions'] ?? [], 'conditions'))->keyBy('id');
-        if ($conditions->count() !== count($original['conditions']) || count($data['conditions'] ?? []) !== $conditions->count()) {
-            throw ValidationException::withMessages(['conditions' => 'Per aggiungere o annullare condizioni usa le operazioni nella scheda del Contratto.']);
+        $rows = collect($this->rows($data['conditions'] ?? [], 'conditions'));
+        $newConditions = $rows->filter(fn (array $row): bool => blank($row['id'] ?? null));
+        $conditions = $rows->reject(fn (array $row): bool => blank($row['id'] ?? null))->keyBy('id');
+        if ($conditions->count() !== count($original['conditions']) || $rows->count() !== $conditions->count() + $newConditions->count() || $newConditions->count() > 1) {
+            throw ValidationException::withMessages(['conditions' => 'Aggiungi una condizione alla volta. Le condizioni esistenti non possono essere rimosse.']);
         }
+        $last = collect($this->rows($original['conditions'], 'conditions'))->sortBy('valid_from')->last();
         foreach ($original['conditions'] as $before) {
             $after = $conditions->get($before['id']);
-            if (! is_array($after) || ($after['valid_from'] ?? null) !== $before['valid_from'] || ($after['valid_to'] ?? null) !== $before['valid_to']) {
+            $appending = $newConditions->isNotEmpty() && $before['id'] === $last['id'];
+            if (! is_array($after) || ($after['valid_from'] ?? null) !== $before['valid_from'] || (! $appending && ($after['valid_to'] ?? null) !== $before['valid_to'])) {
                 throw ValidationException::withMessages(['conditions' => 'Le date delle condizioni esistenti non sono correggibili. La decorrenza di un nuovo accordo viene calcolata al salvataggio.']);
             }
             $terms = ['amount' => Decimal::money((string) $after['amount']), 'cycle' => $after['cycle'], 'attribution_mode' => $after['attribution_mode']];
             if ($terms !== array_intersect_key($before, $terms)) {
                 $changes['conditions'][$before['id']] = $terms;
             }
+        }
+        if ($newConditions->isNotEmpty()) {
+            if ($last === null || $changes['conditions'] !== []) {
+                throw ValidationException::withMessages(['conditions' => 'Aggiungi una condizione alla volta, mantenendo gli importi e le frequenze delle condizioni precedenti.']);
+            }
+            $end = $conditions->get($last['id'])['valid_to'] ?? null;
+            $next = $newConditions->sole();
+            $dates = validator(['previous_valid_to' => $end, 'valid_from' => $next['valid_from'] ?? null], [
+                'previous_valid_to' => ['required', 'date_format:Y-m-d', 'after_or_equal:'.$last['valid_from']],
+                'valid_from' => ['required', 'date_format:Y-m-d'],
+            ])->validate();
+            if (CarbonImmutable::parse($dates['previous_valid_to'])->addDay()->toDateString() !== $dates['valid_from']) {
+                throw ValidationException::withMessages(['conditions' => 'La nuova condizione deve iniziare il giorno successivo alla fine della precedente.']);
+            }
+            $changes['conditions'][$last['id']] = [
+                'amount' => $next['amount'] ?? null, 'cycle' => $next['cycle'] ?? null,
+                'attribution_mode' => $next['attribution_mode'] ?? null,
+                'requested_date' => $dates['valid_from'], 'valid_to' => ($next['valid_to'] ?? null) ?: null,
+                'succession' => true,
+            ];
         }
         $classifications = collect($this->rows($data['classifications'] ?? [], 'classifications'))->keyBy('exercise_id');
         if ($classifications->count() !== count($original['classifications']) || count($data['classifications'] ?? []) !== $classifications->count()) {
@@ -139,7 +164,10 @@ final class SaveContractEdits
             $id = array_key_first($changes['conditions']);
             $condition = $contract->conditions()->active()->findOrFail($id);
             $input = $changes['conditions'][$id] + $decisions + ['reason' => $reason];
-            if (($decisions['meaning'] ?? null) === 'correction') {
+            if ($input['succession'] ?? false) {
+                $input['meaning'] = 'succession';
+                $plan = app(ChangeContractCondition::class)->preview($contract, $condition, $input);
+            } elseif (($decisions['meaning'] ?? null) === 'correction') {
                 $plan = app(CorrectContractCondition::class)->preview($contract, $condition, $input);
             } elseif (($decisions['meaning'] ?? null) === 'change') {
                 $plan = app(ChangeContractCondition::class)->preview($contract, $condition, $input);
@@ -228,11 +256,11 @@ final class SaveContractEdits
                         throw ValidationException::withMessages(['conditions' => 'L’impatto è cambiato dopo l’anteprima. Annulla la conferma e rivedi le modifiche.']);
                     }
                     $id = Uuid::uuid5($operationId, 'impact')->toString();
-                    if (in_array($review['kind'], ['change', 'correction'], true)) {
+                    if (in_array($review['kind'], ['change', 'correction', 'succession'], true)) {
                         $condition = $locked->conditions()->findOrFail($review['plan']['conditionId']);
-                        $action = app($review['kind'] === 'change' ? ChangeContractCondition::class : CorrectContractCondition::class);
+                        $action = app($review['kind'] === 'correction' ? CorrectContractCondition::class : ChangeContractCondition::class);
                         $plan = $action->preview($locked, $condition, $review['input']);
-                        if ($review['kind'] === 'change') {
+                        if ($review['kind'] !== 'correction') {
                             $action->execute($actor, $locked, $condition, $review['input'], $plan->fingerprint(), $plan->effectiveDate, $id);
                         } else {
                             $action->execute($actor, $locked, $condition, $review['input'], $plan->fingerprint(), $id);

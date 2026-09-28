@@ -21,14 +21,19 @@
                 @endforeach
             </section>
         @endif
-        @if (in_array($review['kind'], ['change', 'correction'], true))
+        @if (in_array($review['kind'], ['change', 'correction', 'succession'], true))
             <section class="space-y-2">
-                <h3 class="font-semibold">Condizioni Economiche · {{ $review['kind'] === 'change' ? 'L’accordo è cambiato' : 'Correzione del dato precedente' }}</h3>
+                <h3 class="font-semibold">Condizioni Economiche · {{ $review['kind'] === 'correction' ? 'Correzione del dato precedente' : 'L’accordo è cambiato' }}</h3>
                 <p>{{ $money($plan['oldTerms']['amount']) }} → {{ $money($plan['newTerms']['amount']) }}</p>
                 <p>Frequenza: {{ \App\Domain\Contracts\ContractCycleType::from($plan['oldTerms']['cycle'])->label() }} → {{ \App\Domain\Contracts\ContractCycleType::from($plan['newTerms']['cycle'])->label() }}</p>
                 <p>Attribuzione: {{ \App\Domain\Contracts\ContractAttributionMode::from($plan['oldTerms']['attribution_mode'])->label() }} → {{ \App\Domain\Contracts\ContractAttributionMode::from($plan['newTerms']['attribution_mode'])->label() }}</p>
-                @if ($review['kind'] === 'change')
+                @if ($review['kind'] === 'change' || ($review['kind'] === 'succession' && $plan['minimumDate'] !== null))
                     <p>Data richiesta: {{ $date($plan['requestedDate']) }} · Data minima: {{ $date($plan['minimumDate']) }}</p>
+                @endif
+                @if ($review['kind'] === 'succession')
+                    <p>Condizione precedente: {{ $date($plan['oldTerms']['valid_from']) }} → {{ $date(\Carbon\CarbonImmutable::parse($plan['effectiveDate'])->subDay()) }}</p>
+                    <p>Nuova condizione: {{ $date($plan['effectiveDate']) }} → {{ $plan['newTerms']['valid_to'] ? $date($plan['newTerms']['valid_to']) : 'Senza termine' }}</p>
+                    <p>La scadenza del Contratto resta invariata.</p>
                 @endif
                 <p><strong>Decorrenza effettiva: {{ $date($plan['effectiveDate']) }}</strong></p>
                 <p>{{ $plan['delayReason'] }}</p>

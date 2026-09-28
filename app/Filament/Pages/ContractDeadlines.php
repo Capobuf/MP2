@@ -66,7 +66,8 @@ class ContractDeadlines extends Page implements HasTable
                     ->url(fn (Contract $record): string => SupplierResource::getUrl('view', ['record' => $record->supplier])),
                 TextColumn::make('current_state')->label('Stato')->state(fn (Contract $record): string => $this->deadline($record)->state->label())->badge(),
                 TextColumn::make('contractual_start_date')->label('Inizio')->date('d/m/Y'),
-                TextColumn::make('next_expiry_date')->label('Prossima Scadenza')->date('d/m/Y')->placeholder('Scadenza non definita'),
+                TextColumn::make('next_expiry_date')->label('Scadenza Contrattuale')->date('d/m/Y')->placeholder('Scadenza non definita')
+                    ->description(fn (Contract $record): ?string => $this->deadline($record)->daysUntilExpiry < 0 ? 'Scadenza trascorsa' : null),
                 TextColumn::make('automatic_renewal')->label('Rinnovo Automatico')->formatStateUsing(fn (bool $state): string => $state ? 'Sì' : 'No'),
                 TextColumn::make('renewal_duration_months')->label('Durata Rinnovo')->suffix(' mesi')->placeholder('—'),
                 TextColumn::make('notice_days')->label('Preavviso')->suffix(' giorni')->placeholder('—'),

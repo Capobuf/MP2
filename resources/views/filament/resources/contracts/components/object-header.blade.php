@@ -4,6 +4,7 @@
         'planned' => 'info',
         default => 'neutral',
     };
+    $expiryElapsed = $contract->nextExpiryDate()?->startOfDay()->lessThan($today) ?? false;
 @endphp
 
 <x-mp2.object-header
@@ -48,11 +49,14 @@
 
         <div class="mp2-object-time-point mp2-object-time-end {{ $contract->nextExpiryDate() === null ? 'mp2-object-time-undefined' : '' }}">
             <span class="mp2-object-time-node" aria-hidden="true"></span>
-            <span class="mp2-object-time-label">Prossima Scadenza</span>
+            <span class="mp2-object-time-label">{{ $expiryElapsed ? 'Scadenza Registrata' : 'Prossima Scadenza' }}</span>
             @if ($contract->nextExpiryDate() !== null)
                 <time datetime="{{ $contract->nextExpiryDate()?->toDateString() }}">
                     {{ $contract->nextExpiryDate()?->format('d/m/Y') }}
                 </time>
+                @if ($expiryElapsed)
+                    <span class="mp2-contract-muted-copy">Scadenza trascorsa</span>
+                @endif
             @else
                 <strong>Scadenza Non Definita</strong>
             @endif

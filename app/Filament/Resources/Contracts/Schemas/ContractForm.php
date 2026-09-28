@@ -48,6 +48,7 @@ class ContractForm
     public static function configure(Schema $schema, ?Contract $contract = null): Schema
     {
         $editing = $contract !== null;
+        $lastConditionId = $contract?->conditions()->active()->reorder()->orderByDesc('valid_from')->value('id');
 
         return $schema->components([
             Section::make('Dati Principali')
@@ -86,6 +87,7 @@ class ContractForm
                 ->description('Ogni riga definisce un importo ricorrente; non sono calcolati prorata. “Valida fino al” termina solo quella condizione economica: non determina la scadenza del Contratto.')
                 ->schema([
                     Repeater::make('conditions')
+                        ->label('Condizioni Economiche')
                         ->hiddenLabel()
                         ->schema([
                             Hidden::make('id')->visible($editing),
@@ -106,9 +108,13 @@ class ContractForm
                                     );
                                     self::syncSuggestedContractualTerms($get, $set, $get('../../conditions'), '../../');
                                 }),
-                            DateInput::make('valid_to')->label('Valida fino al')->readOnly($editing)
+                            DateInput::make('valid_to')->label('Valida fino al')
+                                ->readOnly(fn (Get $get): bool => $editing && filled($get('id')) && ((int) $get('id') !== $lastConditionId || ! self::hasNewCondition($get('../../conditions'))))
+                                ->required(fn (Get $get): bool => $editing && filled($get('id')) && (int) $get('id') === $lastConditionId && self::hasNewCondition($get('../../conditions')))
                                 ->placeholder('Fino a variazione')
-                                ->afterStateUpdated(fn (Get $get, Set $set) => $editing ? null : self::syncSuggestedContractualTerms($get, $set, $get('../../conditions'), '../../')),
+                                ->afterStateUpdated(fn (Get $get, Set $set) => $editing
+                                    ? self::syncSuccessorStart($set, $get('../../conditions'), $lastConditionId, '../../')
+                                    : self::syncSuggestedContractualTerms($get, $set, $get('../../conditions'), '../../')),
                         ])
                         ->table([
                             TableColumn::make('Importo per ciclo')->alignment(Alignment::Center)->markAsRequired(),
@@ -117,8 +123,10 @@ class ContractForm
                             TableColumn::make('Valida dal')->alignment(Alignment::Center)->markAsRequired(),
                             TableColumn::make('Valida fino al')->alignment(Alignment::Center),
                         ])
-                        ->afterStateUpdated(function (Get $get, Set $set, mixed $state) use ($editing): void {
+                        ->afterStateUpdated(function (Get $get, Set $set, mixed $state) use ($editing, $lastConditionId): void {
                             if ($editing) {
+                                self::syncSuccessorStart($set, $state, $lastConditionId);
+
                                 return;
                             }
                             self::syncSuggestedContractualStart($get, $set, $state);
@@ -126,8 +134,22 @@ class ContractForm
                         })
                         ->defaultItems(1)
                         ->minItems($editing ? 0 : 1)
-                        ->addable(! $editing)->deletable(! $editing)
-                        ->helperText($editing ? 'Le date delle condizioni esistenti non sono correggibili. Per un nuovo accordo, modifica importo, frequenza o attribuzione: al salvataggio potrai indicare la decorrenza richiesta. Nuove condizioni e annullamenti restano nella scheda del Contratto.' : null)
+                        ->addable(fn (Get $get): bool => ! $editing || ($lastConditionId !== null && ! self::hasNewCondition($get('conditions'))))
+                        ->deleteAction(fn (Action $action): Action => $action
+                            ->visible(fn (array $arguments, Repeater $component): bool => ! $editing || blank($component->getRawState()[$arguments['item']]['id'] ?? null))
+                            ->after(function (Repeater $component) use ($contract, $lastConditionId): void {
+                                if ($contract === null) {
+                                    return;
+                                }
+                                $rows = $component->getRawState();
+                                foreach ($rows as &$row) {
+                                    if (($row['id'] ?? null) === $lastConditionId) {
+                                        $row['valid_to'] = DateInput::toDisplay($contract->conditions()->findOrFail($lastConditionId)->validTo());
+                                    }
+                                }
+                                $component->rawState($rows);
+                            }))
+                        ->helperText($editing ? 'Aggiungi una condizione e indica quando termina la precedente: la nuova partirà dal giorno successivo. Puoi registrare variazioni già avvenute negli Esercizi Aperti, senza prorata. Salva una nuova condizione alla volta. Per correggere un importo inserito male, modifica la riga esistente.' : null)
                         ->addActionLabel('Aggiungi condizione')
                         ->reorderable(false)
                         ->extraAttributes(['class' => 'mp2-economic-conditions'])
@@ -296,6 +318,26 @@ class ContractForm
                 ->label('Crea Centro di Costo')
                 ->modalHeading('Nuovo Centro di Costo')
                 ->visible(fn (): bool => self::canCreateCostCenter()));
+    }
+
+    private static function hasNewCondition(mixed $conditions): bool
+    {
+        return collect(is_array($conditions) ? $conditions : [])->contains(fn (array $condition): bool => blank($condition['id'] ?? null));
+    }
+
+    private static function syncSuccessorStart(Set $set, mixed $conditions, ?int $lastConditionId, string $rootPath = ''): void
+    {
+        $rows = collect(is_array($conditions) ? $conditions : []);
+        $previous = $rows->firstWhere('id', $lastConditionId);
+        $end = self::dateString($previous['valid_to'] ?? null);
+        $start = $end !== null && validator(['date' => $end], ['date' => 'date_format:Y-m-d'])->passes()
+            ? CarbonImmutable::parse($end)->addDay()->format('d/m/Y')
+            : null;
+        foreach ($rows as $key => $row) {
+            if (blank($row['id'] ?? null)) {
+                $set($rootPath.'conditions.'.$key.'.valid_from', $start);
+            }
+        }
     }
 
     private static function canCreateSupplier(): bool

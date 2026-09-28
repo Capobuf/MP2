@@ -145,12 +145,13 @@ class ContractCondition extends Model
         $afterTo = self::dateString($condition->getAttribute('valid_to'));
         $beforeAnnulled = $condition->getRawOriginal('annulled_at') !== null;
         $afterAnnulled = $condition->getAttribute('annulled_at') !== null;
-        $termsChanged = $condition->isDirty(['amount', 'cycle', 'attribution_mode', 'valid_from', 'valid_to']);
+        $termsChanged = $condition->isDirty(['amount', 'cycle', 'attribution_mode', 'valid_from']);
 
         foreach (ContractClosedHistoryGuard::closedYears((int) $condition->company_id) as $year) {
             $beforeApplies = ! $beforeAnnulled && ContractClosedHistoryGuard::periodOverlapsYear($beforeFrom, $beforeTo, $year);
             $afterApplies = ! $afterAnnulled && ContractClosedHistoryGuard::periodOverlapsYear($afterFrom, $afterTo, $year);
-            if ($beforeApplies !== $afterApplies || ($termsChanged && ($beforeApplies || $afterApplies))) {
+            $endChangedInYear = min($beforeTo ?? $year.'-12-31', $year.'-12-31') !== min($afterTo ?? $year.'-12-31', $year.'-12-31');
+            if ($beforeApplies !== $afterApplies || (($termsChanged || $endChangedInYear) && ($beforeApplies || $afterApplies))) {
                 throw ValidationException::withMessages([
                     'contract' => 'La modifica ordinaria riscriverebbe condizioni economiche di un Esercizio Chiuso.',
                 ]);

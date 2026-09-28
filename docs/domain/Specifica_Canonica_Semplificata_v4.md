@@ -61,7 +61,7 @@ La versione 4.0:
 - applica atomicamente le operazioni a tutti gli Esercizi Aperti interessati;
 - separa il rinnovo contrattuale dal ciclo di fatturazione;
 - mantiene il rinnovo automatico e introduce le scadenze contrattuali informative;
-- applica le modifiche economiche contrattuali dal primo confine di ciclo utile, non prima del primo giorno del mese successivo, comunicandolo esplicitamente all'utente;
+- applica le modifiche economiche contrattuali future dal primo confine di ciclo utile, non prima del primo giorno del mese successivo; consente la registrazione di variazioni già avvenute negli Esercizi Aperti secondo il §18.13;
 - separa gli schemi delle Snapshot di Budget e di Chiusura;
 - definisce in modo deterministico `Previsto`, `Non previsto`, categorie e attributi dei report;
 - elimina la cancellazione fisica ordinaria degli oggetti persistiti;
@@ -2667,9 +2667,31 @@ Non si applica:
 
 Nei primi due casi la decorrenza segue rispettivamente la Data di inizio e la Data di riattivazione approvate. Nel terzo caso la nuova condizione può mantenere il medesimo `Valido dal` futuro della condizione sostituita, purché non produca sovrapposizioni e l'impatto venga mostrato e approvato.
 
-### Data minima richiedibile
+### Registrazione di una variazione già avvenuta
 
-Per un'operazione ordinaria:
+Dalla modifica del Contratto l'utente può aggiungere una condizione economica dopo l'ultima condizione Valida. L'aggiunta richiede la data `Valido al` della precedente; il nuovo `Valido dal` è automaticamente il giorno successivo. Il Contratto conserva la propria scadenza, distinta dalla fine della condizione.
+
+Quando la nuova decorrenza è uguale o precedente alla data locale di registrazione:
+
+- l'operazione registra una variazione reale già avvenuta, distinta dalla correzione dell'importo originario;
+- la decorrenza deve appartenere a un Esercizio Aperto ed essere un InizioCiclo della condizione precedente, successivo al suo primo ciclo;
+- il Contratto deve essere Attivo alla decorrenza indicata;
+- la data indicata viene mantenuta esattamente: se richiede prorata, sovrapposizioni o modifiche di Esercizi Chiusi, l'operazione viene rifiutata;
+- la precedente condizione conserva importo, ciclo, attribuzione e data iniziale, terminando il giorno prima della nuova;
+- la nuova condizione usa i termini e l'eventuale data finale indicati dall'utente;
+- è obbligatorio un motivo; prima della conferma vengono mostrati entrambi gli intervalli e l'impatto per Esercizio;
+- chiusura della condizione precedente, creazione della nuova, audit e ricalcolo degli Esercizi Aperti sono atomici;
+- Budget Approvati, Effettivi e Snapshot di Chiusura restano invariati; le Proposte coinvolte sono marcate Da riallineare.
+
+È consentito terminare una condizione iniziata in un Esercizio Chiuso soltanto se la sua validità e i suoi termini all'interno di ogni Esercizio Chiuso restano identici, e nessuna composizione economica chiusa cambia. Una nuova condizione non può coprire un Esercizio Chiuso.
+
+Esempio: condizione annuale di 15 € dal 01/01/2025, variazione a 30,50 € dal 01/01/2026 registrata nel corso del 2026 Aperto. La precedente termina il 31/12/2025; la nuova parte il 01/01/2026. Il 2025 conserva il vecchio importo, anche se Chiuso.
+
+Questa registrazione è un'operazione sulla realtà viva, non un'azione retroattiva di Proposta. Nell'aggiunta dalla modifica del Contratto, una decorrenza futura resta soggetta alla data minima seguente e al confine di ciclo; una data non ammissibile viene rifiutata senza differimenti impliciti.
+
+### Data minima richiedibile per le modifiche future
+
+Per una modifica ordinaria, esclusa la registrazione già avvenuta descritta sopra:
 
 ```text
 DataMinimaRichiedibile = primo giorno del mese successivo alla conferma
@@ -5290,13 +5312,15 @@ Le condizioni Valide dello stesso Contratto non si sovrappongono.
 
 ## 28.35 Decorrenza delle modifiche contrattuali
 
-Per una modifica ordinaria:
+Per una modifica futura ordinaria:
 
 ```text
 DataEffettivaApplicabile ≥ primo giorno del mese successivo
 ```
 
 e coincide con un InizioCiclo della condizione corrente.
+
+Una variazione già avvenuta può essere registrata alla decorrenza reale soltanto secondo il §18.13: confine di ciclo esatto, Esercizio di decorrenza Aperto e nessuna modifica economica o di validità negli Esercizi Chiusi.
 
 ## 28.36 Nessun differimento silenzioso
 
@@ -5966,7 +5990,7 @@ Questa appendice riepiloga le decisioni che hanno chiuso i principali punti aper
 |---:|---|---|
 | 1 | La Snapshot di Chiusura usa lo stato valido al 31 dicembre dell'Esercizio | §§9.2, 14.1 |
 | 2 | Le operazioni che interessano più Esercizi Aperti sono calcolate, mostrate, bloccate, rivalidate e applicate atomicamente | §10 |
-| 3 | Una modifica economica contrattuale non è applicata prima del mese successivo e, se il ciclo è già iniziato, decorre dal primo confine di ciclo utile; la data effettiva è comunicata e confermata | §18.13 |
+| 3 | Una modifica economica contrattuale futura non è applicata prima del mese successivo e decorre dal primo confine di ciclo utile; una variazione già avvenuta può essere registrata alla decorrenza reale negli Esercizi Aperti, senza prorata né modifiche agli Esercizi Chiusi. La data effettiva è comunicata e confermata | §18.13 |
 | 4 | Per ogni Progetto e passaggio d'anno si sceglie una sola modalità: Nessuna, Riporto oppure Riprogrammazione; Riporto e Riprogrammazione non possono coesistere | §§16.10, 17 |
 | 5 | La Proposta modifica il piano e non corregge o sposta Effettivi | §12.6 |
 | 6 | Un errore storico di imputazione dopo la Chiusura viene annotato e non riclassificato economicamente | §§14.9, 24.10 |

@@ -132,6 +132,7 @@ class EditExpense extends EditRecord
                 ->description('Le Righe persistite conservano la propria identità e non possono essere eliminate. Puoi modificarle, aggiungerne altre o duplicarle; annullamento e ripristino restano disponibili nel dettaglio della Spesa.')
                 ->schema([
                     Repeater::make('lines')
+                        ->label('Righe della Spesa')
                         ->hiddenLabel()
                         ->schema(ExpenseForm::repeaterLineFields(
                             contractActualOnly: $expense->contract_id !== null,

@@ -174,6 +174,7 @@ class ExpenseForm
                 ->description('Il Tipo appartiene alla Riga. Il Totale è l’Importo autoritativo; importo unitario e quantità propongono automaticamente il valore, che resta modificabile.')
                 ->schema([
                     Repeater::make('lines')
+                        ->label('Righe della Spesa')
                         ->hiddenLabel()
                         ->schema(self::repeaterLineFields())
                         ->columns(12)
@@ -246,22 +247,27 @@ class ExpenseForm
     {
         return [
             Placeholder::make('ordinary_project_activity')
+                ->label('Effettivo del Progetto Aperto')
                 ->hiddenLabel()
                 ->content('Il Progetto è Aperto: l’Effettivo è registrato come ordinario.')
                 ->visible(fn (Get $get): bool => self::projectState($get) === ProjectState::Open),
             Placeholder::make('planned_project_activity')
+                ->label('Effettivo del Progetto Pianificato')
                 ->hiddenLabel()
                 ->content('Il Progetto è Pianificato. La conferma apre il Progetto insieme alla registrazione dell’Effettivo ordinario.')
                 ->visible(fn (Get $get): bool => self::projectState($get) === ProjectState::Planned),
             Placeholder::make('ordinary_contract_activity')
+                ->label('Effettivo del Contratto Attivo')
                 ->hiddenLabel()
                 ->content('Il Contratto è Attivo: l’Effettivo è registrato come ordinario.')
                 ->visible(fn (Get $get): bool => self::contractState($get) === ContractState::Active),
             Placeholder::make('planned_contract_activity')
+                ->label('Effettivo del Contratto Pianificato')
                 ->hiddenLabel()
                 ->content('Il Contratto è Pianificato: non è possibile registrare un Effettivo ordinario finché non risulta Attivo.')
                 ->visible(fn (Get $get): bool => self::contractState($get) === ContractState::Planned),
             Placeholder::make('unavailable_project_activity')
+                ->label('Stato del Progetto non disponibile')
                 ->hiddenLabel()
                 ->content('Il Progetto non ha ancora uno stato efficace alla data aziendale.')
                 ->visible(fn (Get $get): bool => $get('container') === 'project' && filled($get('project_id')) && self::projectState($get) === null),

@@ -43,8 +43,17 @@
             @else
                 <div class="mp2-object-empty-state">
                     <x-filament::icon icon="heroicon-o-minus-circle" aria-hidden="true" />
-                    <p>Nessuna condizione economica vigente</p>
+                    <p>Nessuna condizione economica vigente al {{ $overview['today'] }}.</p>
+                    @if ($overview['last_condition_end'] !== null)
+                        <p>L’ultima condizione è terminata il {{ $overview['last_condition_end'] }}.</p>
+                    @endif
                 </div>
+                @if ($overview['is_active'])
+                    <p class="mp2-contract-muted-copy">Il Contratto è Attivo, ma oggi non è coperto da una condizione economica. La fine di una condizione non determina la cessazione del Contratto.</p>
+                    @if ($overview['terms']['automatic_renewal'] === 'Sì')
+                        <p class="mp2-contract-muted-copy">Il rinnovo automatico non prolunga le condizioni con una data finale. Verifica il nuovo accordo nella scheda Condizioni Economiche.</p>
+                    @endif
+                @endif
             @endif
 
             <div class="mp2-contract-terms">
@@ -66,6 +75,10 @@
                         <dd>{{ $overview['terms']['notice'] }}</dd>
                     </div>
                 </dl>
+                @if (filled($overview['notes']))
+                    <h3>Note del Contratto</h3>
+                    <p class="mp2-contract-muted-copy">{{ $overview['notes'] }}</p>
+                @endif
             </div>
         </section>
 
@@ -114,6 +127,10 @@
                         <dd>{{ $overview['selected']['variance'] }}</dd>
                     </div>
                 </dl>
+
+                @if ($overview['condition'] === null && $overview['selected']['composition_count'] > 0)
+                    <p class="mp2-contract-muted-copy">L’Allocato comprende i cicli attribuiti all’intero Esercizio, anche quando la condizione che li ha generati è già terminata. Non indica il canone vigente oggi.</p>
+                @endif
 
                 <div class="mp2-contract-composition">
                     <div class="mp2-contract-subheading">
