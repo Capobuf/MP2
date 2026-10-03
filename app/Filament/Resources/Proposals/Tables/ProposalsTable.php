@@ -17,6 +17,17 @@ class ProposalsTable
             TextColumn::make('referenceBudget.version')->label('Riferimento')->formatStateUsing(fn (mixed $state): string => $state === null ? '—' : 'v'.$state),
             TextColumn::make('status')->label('Stato')->formatStateUsing(fn ($state): string => $state->label())->badge(),
             TextColumn::make('items_count')->label('Elementi')->counts('items'),
+            TextColumn::make('items_to_verify')
+                ->label('Da verificare')
+                ->state(function (Proposal $record): string {
+                    $count = $record->items
+                        ->filter(fn ($item): bool => $item->readiness_state->value !== 'aligned')
+                        ->count();
+
+                    return $count === 0 ? '—' : $count.' '.($count === 1 ? 'elemento' : 'elementi');
+                })
+                ->badge()
+                ->color(fn (string $state): string => $state === '—' ? 'gray' : 'warning'),
             TextColumn::make('planned_allocation')->label('Allocato Pianificato')->state(fn (Proposal $record): string => $record->plannedAllocation())->money('EUR', locale: 'it'),
             TextColumn::make('creator.name')->label('Autore'),
             TextColumn::make('updated_at')->label('Aggiornata')->dateTime('d/m/Y H:i')->sortable(),

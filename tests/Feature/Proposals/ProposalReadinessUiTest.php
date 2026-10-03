@@ -66,5 +66,8 @@ it('shows all canonical readiness labels, impacts and S7 resolution controls', f
         ->assertSee('Da Prendere in Visione')
         ->assertSee('Da Riallineare')
         ->assertSee('Incoerente')
-        ->assertSee('Esercizi Interessati');
+        ->assertSee('Esercizi Interessati')
+        ->filterTable('needs_verification')
+        ->assertCanSeeTableRecords($proposal->items()->where('readiness_state', '!=', 'aligned')->get())
+        ->assertCanNotSeeTableRecords($proposal->items()->where('readiness_state', 'aligned')->get());
 });

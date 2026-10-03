@@ -79,6 +79,12 @@ class Exercise extends Model
         return $this->hasMany(Proposal::class);
     }
 
+    /** @return HasOne<Proposal, $this> */
+    public function currentDraft(): HasOne
+    {
+        return $this->hasOne(Proposal::class)->where('status', 'draft');
+    }
+
     /** @return HasMany<BudgetSnapshot, $this> */
     public function budgets(): HasMany
     {

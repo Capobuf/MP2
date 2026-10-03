@@ -12,7 +12,9 @@
 
     @if ($item['readiness_reasons'] !== [])
         <div class="mp2-proposal-item-messages" role="alert">
-            @foreach ($item['readiness_reasons'] as $reason)<p>{{ $reason }}</p>@endforeach
+            @foreach ($item['readiness_reasons'] as $reason)
+                <p>{{ $reason['message'] }} <small>{{ $reason['code'] }}</small></p>
+            @endforeach
         </div>
     @endif
 

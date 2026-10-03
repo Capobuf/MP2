@@ -25,7 +25,7 @@ class ProposalResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = null;
 
-    protected static ?string $navigationLabel = 'Proposte';
+    protected static ?string $navigationLabel = 'Proposte e revisioni';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Pianificazione';
 

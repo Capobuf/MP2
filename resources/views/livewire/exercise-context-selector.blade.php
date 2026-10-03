@@ -37,13 +37,13 @@
             </div>
         @endif
 
-        @if ($exerciseId)
+        @if ($exerciseId && $showBudgetSelector)
             <x-filament::dropdown placement="bottom-start" width="xs">
                 <x-slot name="trigger">
-                    <button type="button" class="mp2-context-control mp2-context-budget" aria-label="Seleziona Budget">
+                    <button type="button" class="mp2-context-control mp2-context-budget" aria-label="Seleziona Budget di confronto">
                         <x-filament::icon icon="heroicon-m-banknotes" class="mp2-context-icon" />
                         <span class="mp2-context-copy">
-                            <span class="mp2-context-label">Budget</span>
+                            <span class="mp2-context-label">Budget di confronto</span>
                             <span class="mp2-context-value">
                                 @if ($selectedBudget = $budgets->firstWhere('id', $budgetId))
                                     v{{ $selectedBudget->version }} · {{ $selectedBudget->purpose->label() }}
@@ -64,7 +64,7 @@
                         :icon="$budgetId === null ? 'heroicon-m-check' : null"
                         :color="$budgetId === null ? 'primary' : 'gray'"
                     >
-                        Nessun Budget selezionato
+                        Nessun Budget di confronto
                     </x-filament::dropdown.list.item>
                     @foreach ($budgets as $budget)
                         <x-filament::dropdown.list.item

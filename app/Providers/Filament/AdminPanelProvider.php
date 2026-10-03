@@ -104,6 +104,8 @@ class AdminPanelProvider extends PanelProvider
             ->navigationGroups([
                 NavigationGroup::make('Pianificazione')
                     ->icon('heroicon-o-calendar-days'),
+                NavigationGroup::make('Dati di base')
+                    ->icon('heroicon-o-circle-stack'),
                 NavigationGroup::make('Impostazioni')
                     ->icon('heroicon-o-cog-6-tooth'),
             ])

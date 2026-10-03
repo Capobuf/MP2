@@ -4,8 +4,10 @@ use App\Filament\Resources\Exercises\ExerciseResource;
 use App\Filament\Resources\Exercises\Pages\CreateExercise;
 use App\Filament\Resources\Exercises\Pages\ListExercises;
 use App\Filament\Resources\Exercises\Pages\ViewExercise;
+use App\Models\BudgetSnapshot;
 use App\Models\Company;
 use App\Models\Exercise;
+use App\Models\Proposal;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -86,4 +88,50 @@ it('creates a distinct exercise after save and create another', function () {
 
     expect(Exercise::query()->orderBy('year')->pluck('year')->all())
         ->toBe([2032, 2033]);
+});
+
+it('orients budget planning from the Exercise without changing the domain workflow', function (): void {
+    $manager = User::factory()->create();
+    $company = Company::factory()->create();
+    grantExerciseResource($manager, $company);
+    grantTestPermissions(['company_id' => $company->id, 'user' => $manager, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
+
+    $toPrepare = Exercise::factory()->for($company)->create(['year' => 2030]);
+    $initialDraftExercise = Exercise::factory()->for($company)->create(['year' => 2031]);
+    $initialDraft = Proposal::factory()->for($company)->for($initialDraftExercise)->create(['created_by_id' => $manager->id]);
+    $approvedExercise = Exercise::factory()->for($company)->create(['year' => 2032]);
+    $approvedProposal = Proposal::factory()->for($company)->for($approvedExercise)->create([
+        'status' => 'approved',
+        'created_by_id' => $manager->id,
+        'approved_by_id' => $manager->id,
+        'approved_at' => now(),
+    ]);
+    $budget = BudgetSnapshot::factory()->for($approvedProposal)->create(['version' => 2, 'approved_by_id' => $manager->id]);
+    $revision = Proposal::factory()->for($company)->for($approvedExercise)->create([
+        'purpose' => 'revision',
+        'reference_budget_id' => $budget->id,
+        'created_by_id' => $manager->id,
+    ]);
+
+    $this->actingAs($manager);
+    Filament::setTenant($company->tenantCompany);
+
+    Livewire::test(ListExercises::class)
+        ->assertTableColumnStateSet('budget_planning', 'Budget da preparare', $toPrepare)
+        ->assertTableColumnStateSet('budget_planning', 'Budget in preparazione', $initialDraftExercise)
+        ->assertTableColumnStateSet('budget_planning', 'Revisione in preparazione · da Budget v2', $approvedExercise);
+
+    Livewire::test(ViewExercise::class, ['record' => $toPrepare->id])
+        ->assertSee('Pianificazione del Budget')
+        ->assertSee('Prepara il Budget iniziale')
+        ->assertActionHasLabel('initializeProposal', 'Prepara Budget');
+
+    Livewire::test(ViewExercise::class, ['record' => $approvedExercise->id])
+        ->assertActionHasLabel('viewProposal', 'Continua preparazione')
+        ->assertActionHasLabel('viewBudget', 'Apri Budget v2')
+        ->assertActionHasLabel('initializeProposal', 'Prepara revisione')
+        ->assertActionDisabled('initializeProposal');
+
+    expect($initialDraft->fresh()->status->value)->toBe('draft')
+        ->and($revision->fresh()->status->value)->toBe('draft');
 });

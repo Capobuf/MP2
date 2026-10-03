@@ -55,7 +55,13 @@
                 </div>
                 <div>
                     <dt>Proposta di Origine</dt>
-                    <dd>{{ $overview['budget']['proposal'] }}</dd>
+                    <dd>
+                        @if ($overview['budget']['proposal_url'] !== null)
+                            <a class="fi-link" href="{{ $overview['budget']['proposal_url'] }}">{{ $overview['budget']['proposal'] }}</a>
+                        @else
+                            {{ $overview['budget']['proposal'] }}
+                        @endif
+                    </dd>
                 </div>
                 <div>
                     <dt>Azienda</dt>
@@ -82,7 +88,7 @@
         <div class="mp2-object-annual-heading mp2-budget-sources-heading">
             <div>
                 <p class="mp2-object-eyebrow">Piano Approvato</p>
-                <h2 id="budget-sources-title">Sorgenti Materializzate</h2>
+                <h2 id="budget-sources-title">Elementi del Budget</h2>
             </div>
             <p>
                 {{ $overview['budget']['source_count'] }}
@@ -120,8 +126,6 @@
                                 @if ($source['supplier'] !== null)
                                     <span aria-hidden="true">·</span> {{ $source['supplier'] }}
                                 @endif
-                                <span aria-hidden="true">·</span>
-                                <code>{{ $source['origin_key'] }}</code>
                             </span>
                         </span>
 
@@ -336,6 +340,7 @@
                                 <div><dt>ProposalItemID</dt><dd><code>{{ $source['proposal_item_id'] }}</code></dd></div>
                                 <div><dt>CopiedFromOriginKey</dt><dd><code>{{ $source['copied_from_origin_key'] ?? '—' }}</code></dd></div>
                                 <div><dt>Versione Schema Dettaglio</dt><dd>{{ $source['detail_version'] }}</dd></div>
+                                <div><dt>Versione Schema Payload</dt><dd>{{ $source['schema_version'] ?? '—' }}</dd></div>
                                 <div><dt>Riferimenti Eventi di Approvazione</dt><dd>{{ $source['event_sequences'] === [] ? '—' : implode(', ', $source['event_sequences']) }}</dd></div>
                             </dl>
                         </details>

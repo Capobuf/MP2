@@ -11,6 +11,7 @@ use App\Models\ExpenseLine;
 use App\Models\Proposal;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\Support\TestPermissions;
@@ -42,7 +43,13 @@ it('creates an initial budget or revision from the list using canonical initiali
 
     $page = Livewire::test(ListProposals::class)
         ->assertActionVisible('initializeProposal')
-        ->callAction('initializeProposal', ['exercise_id' => $exercise->id])
+        ->assertActionHasLabel('initializeProposal', 'Prepara Budget')
+        ->mountAction('initializeProposal')
+        ->assertSchemaComponentExists('exercise_id', checkComponentUsing: fn (Select $component): bool => $component->getOptions()[$exercise->id] === ($withBudget
+            ? $exercise->year.' · Revisione da Budget v'.$budget->version
+            : $exercise->year.' · Budget iniziale'))
+        ->fillForm(['exercise_id' => $exercise->id])
+        ->callMountedAction()
         ->assertHasNoActionErrors();
 
     $proposal = Proposal::query()->where('status', 'draft')->sole();

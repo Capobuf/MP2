@@ -33,7 +33,7 @@ class SupplierResource extends Resource
 
     protected static ?string $navigationLabel = 'Fornitori';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Pianificazione';
+    protected static string|\UnitEnum|null $navigationGroup = 'Dati di base';
 
     protected static ?string $modelLabel = 'fornitore';
 

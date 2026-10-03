@@ -162,6 +162,9 @@ class ViewProposal extends ViewRecord implements HasTable
                         ])->default('all'),
                 ])->query(fn (Builder $query, array $data): Builder => in_array($data['value'] ?? null, ['contract', 'project', 'expense'], true)
                     ? $query->where('source_type', $data['value']) : $query),
+                Filter::make('needs_verification')
+                    ->label('Da verificare')
+                    ->query(fn (Builder $query): Builder => $query->where('readiness_state', '!=', 'aligned')),
             ], layout: FiltersLayout::AboveContent)
             ->deferFilters(false)
             ->filtersFormColumns(1)
@@ -198,8 +201,8 @@ class ViewProposal extends ViewRecord implements HasTable
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('approveBudget')->label(fn (): string => 'Approva e crea Budget v'.$this->nextBudgetVersion())->color('success')->extraAttributes(['class' => 'mp2-object-primary-action'])->requiresConfirmation()->modalHeading(fn (): string => 'Approva '.($this->proposal()->purpose === ProposalPurpose::Revision ? 'Revisione' : 'Proposta').' e crea Budget v'.$this->nextBudgetVersion())->modalDescription(fn (): string => 'La conferma rivalida e applica atomicamente il piano. '.$this->approvalSummary())->modalSubmitActionLabel(fn (): string => 'Approva e crea Budget v'.$this->nextBudgetVersion())->visible(fn (): bool => $this->canApprove())->disabled(fn (): bool => ! $this->approvalReady())->tooltip(fn (): ?string => $this->approvalReady() ? null : 'Risolvere tutti i blocchi di verifica prima dell’approvazione.')->form([
-                Placeholder::make('final_impact')->label('Impatto Finale da Approvare')->content(fn (): string => $this->approvalSummary()), TextInput::make('external_subject')->label('Soggetto Approvante Esterno')->maxLength(255), TextInput::make('external_venue')->label('Sede o Verbale')->maxLength(255), Textarea::make('reason')->label('Motivazione della Revisione')->required(fn (): bool => $this->proposal()->purpose === ProposalPurpose::Revision), AttachmentUpload::make('new_evidence')->label('Nuova Evidenza Privata')->storeFiles(false), Select::make('attachment_ids')->label('Evidenze Già Presenti')->multiple()->options(fn (): array => Attachment::query()->where('company_id', $this->proposal()->company_id)->whereNull('detached_at')->orderBy('original_name')->pluck('original_name', 'id')->all()), Hidden::make('evidence_operation_id')->default(fn (): string => $this->evidenceOperationId), Hidden::make('operation_id')->default(fn (): string => $this->approvalOperationId),
+            Action::make('approveBudget')->label(fn (): string => 'Approva e crea Budget v'.$this->nextBudgetVersion())->color('success')->extraAttributes(['class' => 'mp2-object-primary-action'])->requiresConfirmation()->modalHeading(fn (): string => 'Approva '.($this->proposal()->purpose === ProposalPurpose::Revision ? 'Revisione' : 'Proposta').' e crea Budget v'.$this->nextBudgetVersion())->modalDescription(fn (): View => $this->approvalSummary())->modalSubmitActionLabel(fn (): string => 'Approva e crea Budget v'.$this->nextBudgetVersion())->visible(fn (): bool => $this->canApprove())->disabled(fn (): bool => ! $this->approvalReady())->tooltip(fn (): ?string => $this->approvalReady() ? null : 'Risolvere tutti i blocchi di verifica prima dell’approvazione.')->form([
+                TextInput::make('external_subject')->label('Soggetto Approvante Esterno')->maxLength(255), TextInput::make('external_venue')->label('Sede o Verbale')->maxLength(255), Textarea::make('reason')->label('Motivazione della Revisione')->required(fn (): bool => $this->proposal()->purpose === ProposalPurpose::Revision), AttachmentUpload::make('new_evidence')->label('Nuova Evidenza Privata')->storeFiles(false), Select::make('attachment_ids')->label('Evidenze Già Presenti')->multiple()->options(fn (): array => Attachment::query()->where('company_id', $this->proposal()->company_id)->whereNull('detached_at')->orderBy('original_name')->pluck('original_name', 'id')->all()), Hidden::make('evidence_operation_id')->default(fn (): string => $this->evidenceOperationId), Hidden::make('operation_id')->default(fn (): string => $this->approvalOperationId),
             ])->action(function (array $data): void {
                 $ids = array_map('intval', $data['attachment_ids'] ?? []);
                 $file = $data['new_evidence'] ?? null;
@@ -298,7 +301,7 @@ class ViewProposal extends ViewRecord implements HasTable
     private function sourceActions(): array
     {
         return [
-            Action::make('planExpenseEstimates')->label('Gestisci')->icon('heroicon-m-pencil-square')->modalHeading('Modifica Stime')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Expense && ! $record->isExcludedFromPlan())->authorize(fn (): bool => $this->canPlan())->fillForm(fn (ProposalItem $record): array => ['estimate_lines' => $this->estimateFormLines($record->result['estimate_lines'] ?? []), 'operation_id' => (string) Str::uuid(), 'proposal_revision' => $this->proposal()->revision])->form([
+            Action::make('planExpenseEstimates')->label('Modifica stime')->icon('heroicon-m-pencil-square')->modalHeading('Modifica Stime')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Expense && ! $record->isExcludedFromPlan())->authorize(fn (): bool => $this->canPlan())->fillForm(fn (ProposalItem $record): array => ['estimate_lines' => $this->estimateFormLines($record->result['estimate_lines'] ?? []), 'operation_id' => (string) Str::uuid(), 'proposal_revision' => $this->proposal()->revision])->form([
                 Repeater::make('estimate_lines')->label('Sostituzione Completa Righe Stima')->schema($this->estimateLineSchema())->defaultItems(1)->required(),
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
             ])->action(function (array $data, ProposalItem $record): void {
@@ -306,7 +309,7 @@ class ViewProposal extends ViewRecord implements HasTable
                 app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::SetExpenseEstimates, ['estimate_lines' => $this->normalizeEstimateLines($data['estimate_lines'])], null, $data['operation_id'], (int) $data['proposal_revision']);
                 $this->refreshProposal('Stime Pianificate Aggiornate');
             }),
-            Action::make('planProjectTransition')->label('Gestisci')->icon('heroicon-m-pencil-square')->modalHeading('Pianifica Stato Progetto')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Project)->authorize(fn (): bool => $this->canPlan())->form([
+            Action::make('planProjectTransition')->label('Modifica stato')->icon('heroicon-m-pencil-square')->modalHeading('Pianifica Stato Progetto')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Project)->authorize(fn (): bool => $this->canPlan())->form([
                 Select::make('from_state')->label('Da')->options(['planned' => 'Pianificato', 'open' => 'Aperto', 'closed' => 'Chiuso', 'cancelled' => 'Cancellato'])->required(), Select::make('to_state')->label('A')->options(['planned' => 'Pianificato', 'open' => 'Aperto', 'closed' => 'Chiuso', 'cancelled' => 'Cancellato'])->required(), DateInput::make('effective_date')->label('Data Efficacia')->required(), Textarea::make('reason')->label('Motivazione'), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
             ])->action(function (array $data, ProposalItem $record): void {
                 $item = $record;
@@ -328,8 +331,8 @@ class ViewProposal extends ViewRecord implements HasTable
                     app(PlanContract::class)->execute($this->actor(), $this->proposal(), $item, ProposalActionType::AddContractCondition, ['cycle' => $data['cycle'], 'attribution_mode' => $data['attribution_mode'], 'amount' => Decimal::money($data['amount']), 'valid_from' => $data['valid_from'], 'valid_to' => $data['valid_to'] ?? null, 'reason' => $data['reason'] ?? null], $data['reason'] ?? null, $data['operation_id'], (int) $data['proposal_revision']);
                     $this->refreshProposal('Condizione Contrattuale Pianificata');
                 }),
-            ])->label('Gestisci')->icon('heroicon-m-pencil-square')->link()->dropdownWidth(Width::ExtraSmall),
-            Action::make('acknowledgeSource')->label('Prendi visione')->visible(fn (ProposalItem $record): bool => $this->canAcknowledge($record))->requiresConfirmation()->modalDescription('Conferma la realtà corrente della sorgente. La presa visione non crea una modifica economica e non tocca gli Effettivi; eventuali variazioni di Stima vanno preparate prima con un’azione tipizzata.')->authorize(fn (): bool => $this->canPlan())->form([
+            ])->label('Gestisci contratto')->icon('heroicon-m-pencil-square')->link()->dropdownWidth(Width::ExtraSmall),
+            Action::make('acknowledgeSource')->label('Conferma presa visione')->visible(fn (ProposalItem $record): bool => $this->canAcknowledge($record))->requiresConfirmation()->modalDescription('Conferma la realtà corrente della sorgente. La presa visione non crea una modifica economica e non tocca gli Effettivi; eventuali variazioni di Stima vanno preparate prima con un’azione tipizzata.')->authorize(fn (): bool => $this->canPlan())->form([
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
                 Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
             ])->action(function (array $data, ProposalItem $record): void {
@@ -405,7 +408,7 @@ class ViewProposal extends ViewRecord implements HasTable
                         TextInput::make('reduction_amount')->label('Riduzione')->numeric()->minValue(0.01)->prefix('€')->required(),
                         Select::make('destination_supplier_id')->label('Fornitore Destinazione')->options(fn (): array => ['none' => 'Nessun Fornitore'] + Supplier::query()->where('company_id', $this->proposal()->company_id)->active()->orderBy('legal_name')->pluck('legal_name', 'id')->all())->required(),
                     ])->columns(3)->minItems(1)->visible(fn (Get $get): bool => $get('mode') === 'reprogramming')->required(fn (Get $get): bool => $get('mode') === 'reprogramming'),
-                    Placeholder::make('deferral_formula')->label('Valori e Impatto')->content(fn (Get $get, ProposalItem $record): string => $this->proposalDeferralSummary($get, $record)),
+                    Placeholder::make('deferral_formula')->label('Valori e Impatto')->content(fn (Get $get, ProposalItem $record): View => $this->proposalDeferralSummary($get, $record)),
                     Textarea::make('reason')->label('Motivazione del Rinvio')->required(),
                     Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
                     Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
@@ -642,14 +645,15 @@ class ViewProposal extends ViewRecord implements HasTable
         return $proposal->reference_budget_id === null ? 1 : $proposal->referenceBudget->version + 1;
     }
 
-    private function approvalSummary(): string
+    private function approvalSummary(): View
     {
-        $review = app(ProposalReadiness::class)->assessProposal($this->proposal());
-        $exercises = collect($review['impacts'])->map(fn (array $impact): string => $impact['year'].' '.$impact['allocation_before'].'→'.$impact['allocation_after'].' EUR ('.$impact['allocation_delta'].' EUR), '.count($impact['sources']).' sorgenti')->implode('; ');
-        $warnings = collect($review['impacts'])->flatMap(fn (array $impact): array => $impact['warnings'])->unique()->implode(' ');
-        $blocks = collect($review['blocks'])->pluck('message')->implode(' ');
-
-        return 'Esercizi e sorgenti: '.$exercises.'. '.($warnings === '' ? '' : 'Avvisi: '.$warnings.' ').($blocks === '' ? 'Nessun blocco.' : 'Blocchi: '.$blocks);
+        return view('filament.resources.proposals.components.approval-summary', [
+            'summary' => [
+                'version' => 'v'.$this->nextBudgetVersion(),
+                'impacts' => $this->sourceOverview['impacts'],
+                'blocks' => $this->sourceOverview['verification']['blocks'],
+            ],
+        ]);
     }
 
     /** @return array<int, string> */
@@ -733,11 +737,14 @@ class ViewProposal extends ViewRecord implements HasTable
             ->all();
     }
 
-    private function proposalDeferralSummary(Get $get, ProposalItem $item): string
+    private function proposalDeferralSummary(Get $get, ProposalItem $item): View
     {
         $source = $this->previousExercise();
         if ($source === null) {
-            return 'Nessun Esercizio immediatamente precedente: il rinvio non è configurabile.';
+            return view('filament.resources.proposals.components.deferral-summary', [
+                'summary' => null,
+                'error' => 'Nessun Esercizio immediatamente precedente: il rinvio non è configurabile.',
+            ]);
         }
         $project = $item->project;
         $current = $project->deferrals()->where('source_exercise_id', $source->id)->where('destination_exercise_id', $this->proposal()->exercise_id)->first();
@@ -770,14 +777,29 @@ class ViewProposal extends ViewRecord implements HasTable
         );
         $terminal = in_array($resultingState, [ProjectState::Closed, ProjectState::Cancelled], true);
 
-        return $source->year.' → '.$this->proposal()->exercise->year
-            .' · Allocato origine pre-operazione € '.$availabilityAllocation.' · Effettivo € '.$totals['actual']
-            .' · Residuo € '.$residual.' · Disponibilità Massima € '.$maximum
-            .' · Stime attive riducibili € '.$reducible.' · Riduzioni selezionate € '.$selected
-            .' · Modalità viva '.($current?->mode->label() ?? ProjectDeferralMode::None->label())
-            .($terminal ? ' · Blocco: Progetto terminale al 31 dicembre, è ammessa soltanto Nessuna.' : '')
-            .(Decimal::compare($maximum, '0.00') === 0 ? ' · Riporto e Riprogrammazione non disponibili: massimo pari a zero.' : '')
-            .' Le Stime origine restano invariate con Riporto; Riprogrammazione riduce le righe selezionate e genera nuove identità a destinazione; allocazioni indipendenti e Budget esistenti restano invariati.';
+        $proposedMode = ProjectDeferralMode::tryFrom((string) $get('mode')) ?? ProjectDeferralMode::None;
+        $money = fn (string $amount): string => Number::currency((float) $amount, in: 'EUR', locale: 'it');
+
+        return view('filament.resources.proposals.components.deferral-summary', [
+            'error' => null,
+            'summary' => [
+                'source_year' => $source->year,
+                'destination_year' => $this->proposal()->exercise->year,
+                'allocation' => $money($availabilityAllocation),
+                'actual' => $money($totals['actual']),
+                'residual' => $money($residual),
+                'maximum' => $money($maximum),
+                'reducible' => $money($reducible),
+                'selected' => $money($selected),
+                'live_mode' => $current?->mode->label() ?? ProjectDeferralMode::None->label(),
+                'proposed_mode' => $proposedMode->label(),
+                'reprogramming_balance' => $proposedMode === ProjectDeferralMode::Reprogramming ? $money($selected) : null,
+                'blocks' => array_values(array_filter([
+                    $terminal ? 'Progetto terminale al 31 dicembre: è ammessa soltanto la modalità Nessuna.' : null,
+                    Decimal::compare($maximum, '0.00') === 0 ? 'Riporto e Riprogrammazione non disponibili: la disponibilità massima è zero.' : null,
+                ])),
+            ],
+        ]);
     }
 
     /** @return list<array<string, mixed>> */

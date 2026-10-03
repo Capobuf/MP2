@@ -37,8 +37,10 @@ it('defines the Admin navigation hierarchy without changing routes', function ()
         ->and(ExerciseResource::getNavigationGroup())->toBe('Pianificazione')
         ->and(BudgetResource::getNavigationGroup())->toBe('Pianificazione')
         ->and(ProposalResource::getNavigationGroup())->toBe('Pianificazione')
-        ->and(SupplierResource::getNavigationGroup())->toBe('Pianificazione')
-        ->and(CostCenterResource::getNavigationGroup())->toBe('Pianificazione')
+        ->and(BudgetResource::getNavigationLabel())->toBe('Budget approvati')
+        ->and(ProposalResource::getNavigationLabel())->toBe('Proposte e revisioni')
+        ->and(SupplierResource::getNavigationGroup())->toBe('Dati di base')
+        ->and(CostCenterResource::getNavigationGroup())->toBe('Dati di base')
         ->and(CompanySettings::getNavigationGroup())->toBe('Impostazioni')
         ->and(CompanySettings::getNavigationLabel())->toBe('Azienda')
         ->and(UserResource::getNavigationGroup())->toBe('Impostazioni')
@@ -63,6 +65,7 @@ it('builds the authorized Admin navigation in the requested order', function ():
     $panoramica = $rootItems->first(fn ($item): bool => $item->getLabel() === 'Panoramica');
     $contracts = $rootItems->first(fn ($item): bool => $item->getLabel() === 'Contratti');
     $planning = $navigation->first(fn ($group): bool => $group->getLabel() === 'Pianificazione');
+    $masterData = $navigation->first(fn ($group): bool => $group->getLabel() === 'Dati di base');
     $settings = $navigation->first(fn ($group): bool => $group->getLabel() === 'Impostazioni');
 
     expect($rootItems->map(fn ($item): string => $item->getLabel())->all())
@@ -72,7 +75,9 @@ it('builds the authorized Admin navigation in the requested order', function ():
         ->and(collect($contracts?->getChildItems())->map(fn ($item): string => $item->getLabel())->all())
         ->toBe(['Scadenze'])
         ->and(collect($planning?->getItems())->map(fn ($item): string => $item->getLabel())->all())
-        ->toBe(['Esercizi', 'Budget', 'Proposte', 'Fornitori', 'Centri di Costo'])
+        ->toBe(['Esercizi', 'Budget approvati', 'Proposte e revisioni'])
+        ->and(collect($masterData?->getItems())->map(fn ($item): string => $item->getLabel())->all())
+        ->toBe(['Fornitori', 'Centri di Costo'])
         ->and(collect($settings?->getItems())->map(fn ($item): string => $item->getLabel())->all())
         ->toBe(['Azienda', 'Utenti', 'Backup Dati']);
 });

@@ -21,5 +21,8 @@
     <div class="mp2-proposal-item-readiness">
         <small>Verifica</small>
         <strong data-state="{{ $item['readiness_value'] }}">{{ $item['readiness'] }}</strong>
+        @if ($item['readiness_value'] !== 'aligned' && $item['readiness_reasons'] !== [])
+            <span>{{ $item['readiness_reasons'][0]['message'] }}</span>
+        @endif
     </div>
 </div>

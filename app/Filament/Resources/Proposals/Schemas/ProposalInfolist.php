@@ -89,9 +89,12 @@ class ProposalInfolist
             'proposal' => [
                 'exercise' => $proposal->exercise->year,
                 'purpose' => $proposal->purpose->label(),
+                'purpose_value' => $proposal->purpose->value,
                 'status' => $proposal->status->label(),
                 'status_value' => $proposal->status->value,
                 'reference_budget' => $proposal->referenceBudget === null ? '—' : 'v'.$proposal->referenceBudget->version,
+                'reference_budget_total' => $proposal->referenceBudget === null ? null : self::money($proposal->referenceBudget->total_approved_allocation),
+                'result_budget' => 'v'.($proposal->referenceBudget === null ? 1 : $proposal->referenceBudget->version + 1),
                 'created_by' => $proposal->creator->name,
                 'created_at' => self::dateTime($proposal->created_at, $proposal->company->timezone),
                 'terminal_by' => match ($proposal->status->value) {
@@ -108,10 +111,22 @@ class ProposalInfolist
                 'allocation_delta' => self::signedMoney($mainImpact['allocation_delta'] ?? '0.00'),
                 'allocation_delta_tone' => self::deltaTone($mainImpact['allocation_delta'] ?? '0.00'),
                 'context' => $proposal->purpose->value === 'revision'
-                    ? 'La realtà corrente è la base; il Budget approvato resta un confronto immutabile.'
-                    : 'La realtà corrente è la base della proposta iniziale.',
+                    ? 'Il Budget approvato è il confronto immutabile. La Base della Proposta è la baseline acquisita o riallineata.'
+                    : 'La Base della Proposta viene trasformata nel Budget iniziale proposto.',
             ],
             'verification' => self::verification($proposal, $review),
+            'readiness_counts' => collect($items)
+                ->countBy('readiness_value')
+                ->pipe(fn (Collection $counts): array => collect([
+                    'aligned' => 'Allineati',
+                    'to_review' => 'Da prendere in visione',
+                    'to_realign' => 'Da riallineare',
+                    'inconsistent' => 'Incoerenti',
+                ])->map(fn (string $label, string $state): array => [
+                    'label' => $label,
+                    'count' => (int) $counts->get($state, 0),
+                    'state' => $state,
+                ])->values()->all()),
             'source_counts' => collect($items)
                 ->countBy('type_value')
                 ->mapWithKeys(fn (int $count, string $type): array => [
@@ -153,7 +168,11 @@ class ProposalInfolist
             'readiness' => $item->readiness_state->label(),
             'readiness_value' => $item->readiness_state->value,
             'readiness_reasons' => collect(ProposalPlanData::rows($item->readiness_reasons, 'readiness_reasons'))
-                ->pluck('message')->filter()->values()->all(),
+                ->filter(fn (array $reason): bool => filled($reason['message'] ?? null))
+                ->map(fn (array $reason): array => [
+                    'code' => (string) ($reason['code'] ?? 'unknown'),
+                    'message' => (string) $reason['message'],
+                ])->values()->all(),
             'archive' => $item->read_only_source ? 'Archiviata · sola lettura' : 'Operativa',
             'actual_raw' => $actual,
             'actual' => self::money($actual),

@@ -62,17 +62,26 @@ class ViewExercise extends ViewRecord
                 ->color('danger')
                 ->url(fn (): string => ExerciseResource::getUrl('close', ['record' => $this->exerciseRecord()]))
                 ->visible(fn (): bool => $this->canCloseExercise()),
-            Action::make('viewProposal')->label('Apri Proposta')->url(fn (): string => ProposalResource::getUrl('view', ['record' => Proposal::query()->where('exercise_id', $this->exerciseRecord()->id)->latest('id')->firstOrFail()]))->visible(fn (): bool => Proposal::query()->where('exercise_id', $this->exerciseRecord()->id)->exists()),
-            Action::make('viewBudget')->label('Apri Budget')->url(fn (): string => BudgetResource::getUrl('view', ['record' => BudgetSnapshot::query()->where('exercise_id', $this->exerciseRecord()->id)->latest('version')->firstOrFail()]))->visible(fn (): bool => BudgetSnapshot::query()->where('exercise_id', $this->exerciseRecord()->id)->exists()),
+            Action::make('viewProposal')
+                ->label(fn (): string => $this->currentDraft() === null ? 'Apri ultima Proposta conclusa' : 'Continua preparazione')
+                ->color(fn (): string => $this->currentDraft() === null ? 'gray' : 'primary')
+                ->url(fn (): string => ProposalResource::getUrl('view', [
+                    'record' => $this->currentDraft() ?? $this->latestTerminalProposal(),
+                ]))
+                ->visible(fn (): bool => $this->currentDraft() !== null || $this->latestTerminalProposal() !== null),
+            Action::make('viewBudget')
+                ->label(fn (): string => 'Apri Budget v'.$this->latestBudget()?->version)
+                ->url(fn (): string => BudgetResource::getUrl('view', ['record' => $this->latestBudget()]))
+                ->visible(fn (): bool => $this->latestBudget() !== null),
             Action::make('initializeProposal')
-                ->label(fn (): string => $this->hasBudget() ? 'Crea revisione' : 'Inizializza proposta')
+                ->label(fn (): string => $this->hasBudget() ? 'Prepara revisione' : 'Prepara Budget')
                 ->requiresConfirmation()
-                ->modalHeading(fn (): string => $this->hasBudget() ? 'Crea Revisione di Budget' : 'Inizializza Proposta di Budget')
+                ->modalHeading(fn (): string => $this->hasBudget() ? 'Prepara Revisione di Budget' : 'Prepara Budget')
                 ->modalDescription(fn (): string => $this->hasBudget()
                     ? 'La base è la realtà corrente. L’ultimo Budget resta immutabile e viene mostrato solo come confronto; gli Effettivi restano in sola lettura.'
                     : 'La Proposta resta isolata: gli Effettivi sono mostrati in sola lettura e non vengono modificati.')
-                ->modalSubmitActionLabel(fn (): string => $this->hasBudget() ? 'Crea revisione' : 'Inizializza proposta')
-                ->visible(fn (): bool => $this->canManageProposals() && $this->exerciseRecord()->isOpen())
+                ->modalSubmitActionLabel(fn (): string => $this->hasBudget() ? 'Prepara revisione' : 'Prepara Budget')
+                ->visible(fn (): bool => $this->canManageProposals())
                 ->disabled(fn (): bool => $this->proposalDisabledReason() !== null)
                 ->tooltip(fn (): ?string => $this->proposalDisabledReason())
                 ->form([Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid())])
@@ -331,7 +340,25 @@ class ViewExercise extends ViewRecord
 
     private function hasBudget(): bool
     {
-        return BudgetSnapshot::query()->where('exercise_id', $this->exerciseRecord()->id)->exists();
+        return $this->latestBudget() !== null;
+    }
+
+    private function currentDraft(): ?Proposal
+    {
+        return $this->exerciseRecord()->currentDraft;
+    }
+
+    private function latestBudget(): ?BudgetSnapshot
+    {
+        return $this->exerciseRecord()->latestBudget;
+    }
+
+    private function latestTerminalProposal(): ?Proposal
+    {
+        return $this->exerciseRecord()->proposals()
+            ->whereIn('status', ['approved', 'discarded'])
+            ->latest('id')
+            ->first();
     }
 
     private function canCorrectClosedExercise(): bool

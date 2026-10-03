@@ -45,6 +45,9 @@ it('places add controls in the workspace and shows only actions belonging to the
     $page = Livewire::test(ViewProposal::class, ['record' => $this->proposal->id])
         ->assertSee('Aggiungi')->assertDontSee('Azioni di Piano')
         ->assertCanSeeTableRecords([$this->expenseItem, $this->projectItem, $this->contractItem]);
+    $page->assertActionHasLabel(TestAction::make('planExpenseEstimates')->table($this->expenseItem), 'Modifica stime')
+        ->assertActionHasLabel(TestAction::make('planProjectTransition')->table($this->projectItem), 'Modifica stato')
+        ->assertActionHasLabel(TestAction::make('changeContractEconomics')->table($this->contractItem), 'Modifica Economia');
     foreach (['createPlannedExpense', 'createPlannedProject', 'createPlannedContract', 'copyExpense', 'includeClosedProject', 'includeTerminatedContract'] as $action) {
         $page->assertActionVisible(TestAction::make($action)->table());
     }
@@ -102,6 +105,7 @@ it('acknowledges and realigns directly on their source while retaining mandatory
         ->assertActionVisible(TestAction::make('keepProposal')->table($this->expenseItem))
         ->assertActionHidden(TestAction::make('planExpenseOwner')->table($reviewItem))
         ->assertSee('Nuova fonte da prendere in visione')
+        ->assertSee('new_source')
         ->assertSee('Effettivo (Sola Lettura)');
     $page->mountAction(TestAction::make('acknowledgeSource')->table($reviewItem))->assertSchemaComponentDoesNotExist('item_id')->callMountedAction()->assertHasNoActionErrors();
     $page->mountAction(TestAction::make('keepProposal')->table($this->expenseItem))->assertSchemaComponentDoesNotExist('item_id')

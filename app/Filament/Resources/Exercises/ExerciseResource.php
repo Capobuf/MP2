@@ -76,6 +76,8 @@ class ExerciseResource extends Resource
         return $company instanceof Company
             ? $query->whereBelongsTo($company, 'company')->with([
                 'expenses.lines',
+                'latestBudget',
+                'currentDraft.referenceBudget',
                 'closingSnapshot',
                 'lateCorrections.company',
                 'lateCorrections.expense',

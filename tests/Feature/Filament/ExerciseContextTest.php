@@ -2,7 +2,9 @@
 
 use App\Domain\Expenses\ExerciseStatus;
 use App\Filament\Pages\Dashboard;
+use App\Filament\Resources\Budgets\BudgetResource;
 use App\Filament\Resources\Expenses\ExpenseResource;
+use App\Filament\Resources\Proposals\ProposalResource;
 use App\Filament\Widgets\EconomicSummary;
 use App\Filament\Widgets\SourceEconomicProfileChart;
 use App\Livewire\ExerciseContextSelector;
@@ -11,6 +13,7 @@ use App\Models\Company;
 use App\Models\Exercise;
 use App\Models\Proposal;
 use App\Models\User;
+use App\Support\BudgetContext;
 use App\Support\ExerciseContext;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
@@ -72,6 +75,7 @@ it('renders the Blade and Livewire global context for the current tenant', funct
     Livewire::test(ExerciseContextSelector::class)
         ->assertSet('exerciseId', $exercise->id)
         ->assertSee('2026 · Aperto')
+        ->assertSee('Budget di confronto')
         ->assertSeeHtml('aria-label="Seleziona Esercizio"')
         ->assertDontSee('Gestisci Esercizi')
         ->assertDontSee('Crea Esercizio');
@@ -205,7 +209,7 @@ it('selects and clears the current Budget from the selector', function (): void 
     Filament::setTenant($company->tenantCompany);
 
     Livewire::test(ExerciseContextSelector::class)
-        ->assertSeeHtml('aria-label="Seleziona Budget"')
+        ->assertSeeHtml('aria-label="Seleziona Budget di confronto"')
         ->call('selectBudget', $budget->id)
         ->assertSet('budgetId', $budget->id);
 
@@ -216,4 +220,49 @@ it('selects and clears the current Budget from the selector', function (): void 
         ->assertSet('budgetId', null);
 
     expect(session()->has("mp2.budget_context.{$company->id}.{$exercise->id}"))->toBeFalse();
+});
+
+it('shows the comparison Budget only on the Dashboard and never changes context when opening records', function (): void {
+    $user = User::factory()->create();
+    $company = Company::factory()->create();
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $proposal = Proposal::factory()->for($company)->for($exercise)->create([
+        'status' => 'approved',
+        'created_by_id' => $user->id,
+        'approved_by_id' => $user->id,
+        'approved_at' => now(),
+    ]);
+    $budget = BudgetSnapshot::factory()->for($proposal)->create([
+        'company_id' => $company->id,
+        'exercise_id' => $exercise->id,
+        'approved_by_id' => $user->id,
+    ]);
+    grantTestPermissions([
+        'company_id' => $company->id,
+        'user' => $user,
+        'permissions' => TestPermissions::VIEW,
+    ]);
+    $this->actingAs($user);
+    Filament::setCurrentPanel('admin');
+    Filament::setTenant($company->tenantCompany);
+    app(ExerciseContext::class)->select($company, $exercise->id);
+    app(BudgetContext::class)->select($company, $exercise, $budget->id);
+
+    $this->get(Dashboard::getUrl(tenant: $company->tenantCompany))
+        ->assertOk()
+        ->assertSee('Budget di confronto');
+    $this->get(ExpenseResource::getUrl(tenant: $company->tenantCompany))
+        ->assertOk()
+        ->assertDontSee('Budget di confronto');
+    $this->get(ProposalResource::getUrl('view', ['record' => $proposal], tenant: $company->tenantCompany))
+        ->assertOk()
+        ->assertDontSee('aria-label="Seleziona Esercizio"', escape: false)
+        ->assertDontSee('Budget di confronto');
+    $this->get(BudgetResource::getUrl('view', ['record' => $budget], tenant: $company->tenantCompany))
+        ->assertOk()
+        ->assertDontSee('aria-label="Seleziona Esercizio"', escape: false)
+        ->assertDontSee('Budget di confronto');
+
+    expect(session("mp2.exercise_context.{$company->id}"))->toBe($exercise->id)
+        ->and(session("mp2.budget_context.{$company->id}.{$exercise->id}"))->toBe($budget->id);
 });

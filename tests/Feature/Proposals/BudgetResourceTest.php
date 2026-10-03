@@ -3,6 +3,7 @@
 use App\Filament\Resources\Budgets\BudgetResource;
 use App\Filament\Resources\Budgets\Pages\ListBudgets;
 use App\Filament\Resources\Budgets\Pages\ViewBudget;
+use App\Filament\Resources\Proposals\ProposalResource;
 use App\Models\BudgetEvidence;
 use App\Models\BudgetSnapshot;
 use App\Models\BudgetSourceRow;
@@ -54,6 +55,8 @@ it('lists and views only immutable Budgets belonging to the active tenant', func
     Livewire::test(ListBudgets::class)
         ->assertCanSeeTableRecords([$budget])
         ->assertCanNotSeeTableRecords([$hiddenBudget])
+        ->assertSee('Versioni approvate e immutabili')
+        ->assertActionHidden('prepareBudget')
         ->assertTableActionDoesNotExist('edit', record: $budget)
         ->assertTableActionDoesNotExist('delete', record: $budget);
 
@@ -62,6 +65,8 @@ it('lists and views only immutable Budgets belonging to the active tenant', func
         ->assertSee('Budget Immutabile')
         ->assertSee('Budget '.$exercise->year.' · v1')
         ->assertSee('Versione Approvata')
+        ->assertSee('Elementi del Budget')
+        ->assertDontSee('Sorgenti Materializzate')
         ->assertSee('Sorgente Inclusa')
         ->assertSee('Dettaglio Spesa')
         ->assertSee('Azioni e Motivazioni Approvate')
@@ -69,6 +74,7 @@ it('lists and views only immutable Budgets belonging to the active tenant', func
         ->assertSee($row->label)
         ->assertSee('Direzione')
         ->assertSee('Verbale approvato')
+        ->assertSeeHtml('href="'.ProposalResource::getUrl('view', ['record' => $proposal], tenant: $company->tenantCompany).'"')
         ->assertActionDoesNotExist('edit')
         ->assertActionDoesNotExist('delete')
         ->assertDontSee('Effettivo')

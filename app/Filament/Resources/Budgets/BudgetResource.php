@@ -25,7 +25,7 @@ class BudgetResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = null;
 
-    protected static ?string $navigationLabel = 'Budget';
+    protected static ?string $navigationLabel = 'Budget approvati';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Pianificazione';
 

@@ -25,6 +25,33 @@ class ExerciseInfolist
                 TextEntry::make('expenses_count')->label('Numero Spese')->state(fn (Exercise $record): int => $record->expenses()->count()),
             ])->columns(3),
 
+            Section::make('Pianificazione del Budget')
+                ->description('Il Budget nasce dall’approvazione di una Proposta. Le versioni approvate restano immutabili.')
+                ->schema([
+                    TextEntry::make('latestBudget.version')
+                        ->label('Ultimo Budget approvato')
+                        ->formatStateUsing(fn (mixed $state): string => 'v'.$state)
+                        ->placeholder('Nessuno'),
+                    TextEntry::make('currentDraft.id')
+                        ->label('Bozza attiva')
+                        ->formatStateUsing(fn (mixed $state): string => 'Proposta #'.$state)
+                        ->placeholder('Nessuna'),
+                    TextEntry::make('currentDraft.purpose')
+                        ->label('Tipo di preparazione')
+                        ->formatStateUsing(fn ($state): string => $state->label())
+                        ->placeholder('—'),
+                    TextEntry::make('currentDraft.status')
+                        ->label('Stato della preparazione')
+                        ->formatStateUsing(fn ($state): string => $state->label())
+                        ->placeholder('—')
+                        ->badge(),
+                    TextEntry::make('budget_next_step')
+                        ->label('Prossimo passo')
+                        ->state(fn (Exercise $record): string => self::budgetNextStep($record))
+                        ->columnSpanFull()
+                        ->wrap(),
+                ])->columns(4),
+
             Section::make('Correzioni Tardive')
                 ->description('Ogni correzione aggiunge un Effettivo append-only. La Snapshot di Chiusura resta distinta e invariata.')
                 ->schema([
@@ -92,6 +119,25 @@ class ExerciseInfolist
                         ->columns(4),
                 ]),
         ]);
+    }
+
+    private static function budgetNextStep(Exercise $exercise): string
+    {
+        if (! $exercise->isOpen()) {
+            return $exercise->latestBudget === null
+                ? 'L’Esercizio è Chiuso: non è possibile preparare un Budget.'
+                : 'L’Esercizio è Chiuso: consulta il Budget approvato, senza avviare nuove preparazioni.';
+        }
+
+        if ($exercise->currentDraft !== null) {
+            return $exercise->currentDraft->purpose->value === 'revision'
+                ? 'Continua la Revisione già in preparazione.'
+                : 'Continua il Budget iniziale già in preparazione.';
+        }
+
+        return $exercise->latestBudget === null
+            ? 'Prepara il Budget iniziale per questo Esercizio.'
+            : 'Il Budget corrente è approvato. Prepara una Revisione se il piano deve cambiare.';
     }
 
     private static function facts(mixed $state): string

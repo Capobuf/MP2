@@ -9,6 +9,7 @@ use App\Domain\Projects\ProjectDeferralMode;
 use App\Domain\Projects\ProjectState;
 use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalSourceType;
+use App\Filament\Resources\Proposals\ProposalResource;
 use App\Models\BudgetEvidence;
 use App\Models\BudgetSnapshot;
 use App\Models\BudgetSourceRow;
@@ -31,7 +32,7 @@ class BudgetInfolist
     /** @return array<string, mixed> */
     private static function overview(BudgetSnapshot $budget): array
     {
-        $budget->loadMissing(['company', 'exercise', 'approver', 'proposal', 'previousBudget', 'rows', 'evidence']);
+        $budget->loadMissing(['company.tenantCompany', 'exercise', 'approver', 'proposal', 'previousBudget', 'rows', 'evidence']);
 
         $rows = $budget->rows
             ->sortBy('id')
@@ -75,6 +76,9 @@ class BudgetInfolist
                     ? 'Autore originale non disponibile'
                     : $budget->approver->name,
                 'proposal' => $budget->proposal_id === null ? 'Non disponibile (Budget importato)' : '#'.$budget->proposal_id,
+                'proposal_url' => $budget->proposal !== null && auth()->user()?->can('view', $budget->proposal) === true
+                    ? ProposalResource::getUrl('view', ['record' => $budget->proposal], tenant: $budget->company->tenantCompany)
+                    : null,
                 'total' => self::money($budget->total_approved_allocation),
                 'affected_exercises' => $affectedExercises,
                 'source_count' => count($rows),

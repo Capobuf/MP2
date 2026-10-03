@@ -43,4 +43,24 @@ it('exposes Project planning, Rinvio and independent new allocation controls', f
         ->assertSchemaComponentExists('source_estimate_reductions')
         ->assertSchemaComponentExists('deferral_formula')
         ->assertSchemaComponentExists('reason');
+
+    $summary = view('filament.resources.proposals.components.deferral-summary', [
+        'error' => null,
+        'summary' => [
+            'source_year' => 2026,
+            'destination_year' => 2027,
+            'allocation' => '100,00 €',
+            'actual' => '20,00 €',
+            'residual' => '80,00 €',
+            'maximum' => '80,00 €',
+            'reducible' => '80,00 €',
+            'selected' => '50,00 €',
+            'live_mode' => 'Nessuna',
+            'proposed_mode' => 'Riprogrammazione',
+            'reprogramming_balance' => '50,00 €',
+            'blocks' => [],
+        ],
+    ])->render();
+
+    expect($summary)->toContain('Allocato origine', 'Disponibilità massima', 'Riduzioni selezionate', 'Bilanciamento Riprogrammazione', 'Budget già approvati restano invariati');
 });

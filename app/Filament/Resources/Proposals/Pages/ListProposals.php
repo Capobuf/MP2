@@ -29,10 +29,10 @@ class ListProposals extends ListRecords
 
         return [
             Action::make('initializeProposal')
-                ->label('Nuova proposta')
-                ->modalHeading('Nuova Proposta')
+                ->label('Prepara Budget')
+                ->modalHeading('Prepara Budget o revisione')
                 ->modalDescription('La Proposta parte dalla realtà corrente, con gli Effettivi in sola lettura. Se esiste un Budget approvato, viene creata una Revisione e l’ultimo Budget resta il riferimento di confronto.')
-                ->modalSubmitActionLabel('Crea proposta')
+                ->modalSubmitActionLabel('Prepara')
                 ->visible($actor instanceof User && $company instanceof Company && $actor->can('create', [Proposal::class, $company]))
                 ->schema([
                     Select::make('exercise_id')
@@ -41,8 +41,14 @@ class ListProposals extends ListRecords
                             ->where('company_id', $company?->id)
                             ->open()
                             ->whereDoesntHave('proposals', fn (Builder $query) => $query->where('status', 'draft'))
+                            ->with('latestBudget')
                             ->orderByDesc('year')
-                            ->pluck('year', 'id')
+                            ->get()
+                            ->mapWithKeys(fn (Exercise $exercise): array => [
+                                $exercise->id => $exercise->latestBudget === null
+                                    ? $exercise->year.' · Budget iniziale'
+                                    : $exercise->year.' · Revisione da Budget v'.$exercise->latestBudget->version,
+                            ])
                             ->all())
                         ->helperText('Sono disponibili gli Esercizi Aperti dell’Azienda senza una Proposta in Bozza.')
                         ->required(),

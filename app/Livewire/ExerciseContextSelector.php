@@ -21,6 +21,9 @@ class ExerciseContextSelector extends Component
     #[Locked]
     public string $returnUrl = '';
 
+    #[Locked]
+    public bool $showBudgetSelector = true;
+
     public function mount(): void
     {
         $tenant = Filament::getTenant();
@@ -36,6 +39,9 @@ class ExerciseContextSelector extends Component
             ? app(BudgetContext::class)->current($company, $exercise)?->id
             : null;
         $this->returnUrl = request()->fullUrl();
+        $routeName = request()->route()?->getName();
+        $this->showBudgetSelector = $routeName === null
+            || $routeName === 'filament.admin.pages.dashboard';
     }
 
     public function updatedExerciseId(mixed $exerciseId): void
@@ -97,6 +103,7 @@ class ExerciseContextSelector extends Component
             'budgets' => $currentCompany && $currentExercise
                 ? $currentExercise->budgets()->orderByDesc('version')->get()
                 : collect(),
+            'showBudgetSelector' => $this->showBudgetSelector,
         ]);
     }
 }

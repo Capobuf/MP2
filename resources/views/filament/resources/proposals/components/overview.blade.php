@@ -11,16 +11,26 @@
                 </div>
             </div>
 
-            <div class="mp2-proposal-allocation-flow">
+            <div @class([
+                'mp2-proposal-allocation-flow',
+                'mp2-proposal-allocation-flow-three' => $overview['proposal']['purpose_value'] === 'revision',
+            ])>
+                @if ($overview['proposal']['purpose_value'] === 'revision')
+                    <div>
+                        <span>Budget approvato {{ $overview['proposal']['reference_budget'] }}</span>
+                        <strong>{{ $overview['proposal']['reference_budget_total'] }}</strong>
+                        <small>Confronto immutabile</small>
+                    </div>
+                    <span class="mp2-proposal-flow-arrow" aria-hidden="true"><x-filament::icon icon="heroicon-m-arrow-right" /></span>
+                @endif
                 <div>
-                    <span>Allocato Base</span>
+                    <span>Base della Proposta</span>
                     <strong>{{ $overview['proposal']['allocation_before'] }}</strong>
+                    <small>Baseline acquisita o riallineata</small>
                 </div>
-                <span class="mp2-proposal-flow-arrow" aria-hidden="true">
-                    <x-filament::icon icon="heroicon-m-arrow-right" />
-                </span>
+                <span class="mp2-proposal-flow-arrow" aria-hidden="true"><x-filament::icon icon="heroicon-m-arrow-right" /></span>
                 <div>
-                    <span>Allocato Risultante</span>
+                    <span>Budget proposto {{ $overview['proposal']['result_budget'] }}</span>
                     <strong>{{ $overview['proposal']['allocation_after'] }}</strong>
                 </div>
             </div>
@@ -85,6 +95,15 @@
             </div>
 
             <p class="mp2-proposal-context-copy">{{ $overview['proposal']['context'] }}</p>
+
+            <dl class="mp2-budget-source-counts" aria-label="Riepilogo verifiche degli elementi">
+                @foreach ($overview['readiness_counts'] as $count)
+                    <div>
+                        <dt>{{ $count['label'] }}</dt>
+                        <dd data-state="{{ $count['state'] }}">{{ $count['count'] }}</dd>
+                    </div>
+                @endforeach
+            </dl>
         </section>
     </div>
 
@@ -92,7 +111,7 @@
         <div class="mp2-object-annual-heading mp2-proposal-items-heading">
             <div>
                 <p class="mp2-object-eyebrow">Perimetro del Piano</p>
-                <h2 id="proposal-items-title">Sorgenti Incluse</h2>
+                <h2 id="proposal-items-title">Elementi del Budget</h2>
             </div>
             <p>
                 {{ $overview['proposal']['item_count'] }}

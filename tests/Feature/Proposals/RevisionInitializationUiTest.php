@@ -44,8 +44,10 @@ it('creates a revision from an open exercise and shows live versus budget contex
     Livewire::test(ViewProposal::class, ['record' => $revision->getRouteKey()])
         ->assertSuccessful()
         ->assertSee('Revisione')
-        ->assertSee('Budget di Riferimento')
-        ->assertSee('realtà corrente');
+        ->assertSee('Budget approvato v1')
+        ->assertSee('Base della Proposta')
+        ->assertSee('Budget proposto v2')
+        ->assertSee('baseline acquisita o riallineata');
 });
 
 it('disables revision creation for a closed exercise or occupied draft', function (): void {

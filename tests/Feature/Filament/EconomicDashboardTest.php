@@ -585,7 +585,7 @@ it('renders every chart and handles no Exercise no Budget and no sources', funct
         ->assertSet('exerciseId', $exercise->id)
         ->assertSet('budgetId', $budget->id)
         ->assertSee('Budget v1')
-        ->assertSeeHtml('aria-label="Seleziona Budget"');
+        ->assertSeeHtml('aria-label="Seleziona Budget di confronto"');
 });
 
 it('preserves every Cost Center when the Radar degrades for high cardinality', function (): void {

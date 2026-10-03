@@ -2,6 +2,7 @@
 
 use App\Actions\Proposals\InitializeProposal;
 use App\Filament\Resources\Proposals\Pages\ViewProposal;
+use App\Filament\Resources\Proposals\Schemas\ProposalInfolist;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
 use App\Models\Exercise;
@@ -33,6 +34,15 @@ it('shows next-version approval and required revision reason', function (): void
     Livewire::test(ViewProposal::class, ['record' => $revision->id])
         ->assertActionExists('approveBudget')
         ->mountAction('approveBudget')
-        ->assertSchemaComponentExists('reason')
-        ->assertSee('Budget v2');
+        ->assertSchemaComponentExists('reason');
+
+    $overview = ProposalInfolist::overview($revision);
+    $summary = view('filament.resources.proposals.components.approval-summary', [
+        'summary' => [
+            'version' => 'v2',
+            'impacts' => $overview['impacts'],
+            'blocks' => $overview['verification']['blocks'],
+        ],
+    ])->render();
+    expect($summary)->toContain('Budget v2 da creare', 'Effettivi restano invariati');
 });

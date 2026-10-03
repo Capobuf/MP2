@@ -5001,6 +5001,23 @@ html.fi {
     min-width: 0;
 }
 
+.mp2-proposal-allocation-flow-three {
+    grid-template-columns: minmax(0, 1fr) 26px minmax(0, 1fr) 26px minmax(0, 1fr);
+    gap: 8px;
+}
+
+.mp2-proposal-allocation-flow-three strong {
+    font-size: clamp(1.05rem, 1.5vw, 1.5rem);
+}
+
+.mp2-proposal-allocation-flow small {
+    display: block;
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+    line-height: 0.9rem;
+}
+
 .mp2-proposal-allocation-flow span,
 .mp2-proposal-plan-footer span,
 .mp2-proposal-context-facts dt,
@@ -5175,6 +5192,13 @@ html.fi {
     line-height: 1.125rem;
     font-weight: 620;
     white-space: nowrap;
+}
+
+.mp2-proposal-item-readiness > span {
+    max-width: 28rem;
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+    line-height: 0.95rem;
 }
 
 .mp2-proposal-item-readiness strong[data-state="aligned"] {
@@ -5551,7 +5575,8 @@ html.fi {
 }
 
 @media (max-width: 767px) {
-    .mp2-proposal-allocation-flow {
+    .mp2-proposal-allocation-flow,
+    .mp2-proposal-allocation-flow-three {
         grid-template-columns: minmax(0, 1fr);
         gap: 10px;
     }

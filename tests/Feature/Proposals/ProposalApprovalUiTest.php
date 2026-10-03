@@ -3,6 +3,7 @@
 use App\Actions\Proposals\InitializeProposal;
 use App\Filament\Resources\Budgets\BudgetResource;
 use App\Filament\Resources\Proposals\Pages\ViewProposal;
+use App\Filament\Resources\Proposals\Schemas\ProposalInfolist;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
 use App\Models\Exercise;
@@ -33,7 +34,16 @@ it('approves an aligned proposal with new evidence and redirects to budget', fun
     $component = Livewire::test(ViewProposal::class, ['record' => $proposal->id])
         ->assertActionExists('approveBudget')->assertSee('Allocato Base')->assertSee('Allocato Risultante')->assertSee('Sorgenti Interessate')->assertSee('Budget che Restano Invariati');
     $approvalOperationId = $component->get('approvalOperationId');
-    $component->mountAction('approveBudget')->assertSchemaComponentExists('final_impact');
+    $component->mountAction('approveBudget');
+    $overview = ProposalInfolist::overview($proposal);
+    $summary = view('filament.resources.proposals.components.approval-summary', [
+        'summary' => [
+            'version' => 'v1',
+            'impacts' => $overview['impacts'],
+            'blocks' => $overview['verification']['blocks'],
+        ],
+    ])->render();
+    expect($summary)->toContain('Budget v1 da creare', 'Effettivi restano invariati', 'Verrà applicato', 'Budget già approvati invariati');
     expect($component->get('approvalOperationId'))->toBe($approvalOperationId)->and(Str::isUuid($approvalOperationId))->toBeTrue();
     $component->fillForm(['external_subject' => 'Direzione', 'external_venue' => 'Verbale', 'reason' => 'ok', 'new_evidence' => UploadedFile::fake()->createWithContent('delibera.txt', 'approvata'), 'attachment_ids' => []])->callMountedAction()->assertHasNoActionErrors();
     $budget = BudgetSnapshot::query()->sole();
