@@ -49,6 +49,7 @@ it('shows exactly the three realignment controls and action history for a stale 
     $page->mountAction(TestAction::make('reloadReality')->table($item))
         ->assertMountedActionModalSee($revisionComparison)
         ->assertMountedActionModalSee('Decisioni da ritirare')
+        ->assertMountedActionModalSeeHtml('<div class="mp2-proposal-realignment-summary">')
         ->assertMountedActionModalSee('#1 · Set Expense Estimates')
         ->unmountAction();
     $page->mountAction(TestAction::make('keepProposal')->table($item))
