@@ -87,7 +87,11 @@ it('replays active expense project and contract decisions from fresh whole-sourc
 
 it('selects touching relation decisions and never replays withdrawn decisions', function (): void {
     [$company, $exercise, $actor] = replayFixture();
+    $liveProject = Project::factory()->for($company)->create();
+    $liveContract = Contract::factory()->for($company)->create();
     $proposal = app(InitializeProposal::class)->execute($actor, $company, $exercise, (string) Str::uuid());
+    $liveProjectItem = $proposal->items()->where('project_id', $liveProject->id)->sole();
+    $liveContractItem = $proposal->items()->where('contract_id', $liveContract->id)->sole();
     $project = ProposalItem::factory()->for($proposal)->create(['company_id' => $company->id, 'source_type' => 'project']);
     $contract = ProposalItem::factory()->for($proposal)->create(['company_id' => $company->id, 'source_type' => 'contract']);
     $relation = app(PlanProposalRelation::class)->execute($actor, $proposal, [
@@ -101,6 +105,16 @@ it('selects touching relation decisions and never replays withdrawn decisions', 
         ->and($replay->touchingActions($project->fresh(), $proposal->fresh()->actionHistory)->pluck('id')->all())->toBe([$relation->id])
         ->and($replay->touchingActions($contract, $proposal->fresh()->actionHistory)->pluck('id')->all())->toBe([$relation->id]);
 
+    $originRelation = app(PlanProposalRelation::class)->execute($actor, $proposal->fresh(), [
+        'project_origin_key' => $liveProject->originKey(),
+        'contract_origin_key' => $liveContract->originKey(),
+    ], (string) Str::uuid(), 1)->fresh();
+
+    expect($replay->touchingActions($liveProjectItem, $proposal->fresh()->actionHistory)->pluck('id')->all())->toBe([$originRelation->id])
+        ->and($replay->touchingActions($liveContractItem, $proposal->fresh()->actionHistory)->pluck('id')->all())->toBe([$originRelation->id])
+        ->and($replay->replay($liveProjectItem, ['plan_baseline' => []], [$originRelation], false))->toBe([])
+        ->and($replay->replay($liveContractItem, ['plan_baseline' => []], [$originRelation], false))->toBe([]);
+
     $relation->update([
         'status' => 'withdrawn',
         'withdrawn_by_id' => $actor->id,
@@ -110,4 +124,48 @@ it('selects touching relation decisions and never replays withdrawn decisions', 
     ]);
 
     expect($replay->touchingActions($project->fresh(), $proposal->fresh()->actionHistory)->all())->toBe([]);
+});
+
+it('uses action ownership instead of matching arbitrary payload strings', function (): void {
+    [$company, $exercise, $actor] = replayFixture();
+    $project = Project::factory()->for($company)->create([
+        'initial_state' => 'open',
+        'initial_effective_date' => '2025-01-01',
+    ]);
+    $proposal = app(InitializeProposal::class)->execute($actor, $company, $exercise, (string) Str::uuid());
+    $projectItem = $proposal->items()->where('project_id', $project->id)->sole();
+    $action = app(PlanExpense::class)->create($actor, $proposal, [
+        'description' => (string) $projectItem->proposal_item_id,
+        'notes' => $project->originKey(),
+        'exercise_id' => $exercise->id,
+        'supplier_id' => null,
+        'cost_center_id' => null,
+        'project_id' => null,
+        'project_item_id' => null,
+        'estimate_lines' => [[
+            'proposal_line_id' => (string) Str::uuid(),
+            'line_id' => null,
+            'amount' => '10.00',
+            'note' => null,
+            'annulled' => false,
+        ]],
+    ], null, (string) Str::uuid(), 0);
+    $action = $action->fresh();
+    $expenseItem = $action->item;
+    $replay = app(ProposalActionReplay::class);
+
+    expect($action->proposal_item_id)->toBe($expenseItem->id)
+        ->and((string) $action->proposal_item_id)->not->toBe((string) $expenseItem->proposal_item_id)
+        ->and($replay->touchingActions($projectItem, [$action])->all())->toBe([])
+        ->and($replay->touchingActions($expenseItem, [$action])->pluck('id')->all())->toBe([$action->id]);
+
+    $action->update([
+        'status' => 'withdrawn',
+        'withdrawn_by_id' => $actor->id,
+        'withdrawn_at' => now(),
+        'withdraw_operation_id' => (string) Str::uuid(),
+        'withdraw_reason' => 'Rimossa',
+    ]);
+
+    expect($replay->touchingActions($expenseItem, [$action->fresh()])->all())->toBe([]);
 });
