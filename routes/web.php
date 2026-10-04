@@ -3,6 +3,7 @@
 use App\Http\Controllers\AttachmentDownloadController;
 use App\Http\Controllers\AttachmentPreviewController;
 use App\Http\Controllers\BudgetEvidenceDownloadController;
+use App\Http\Controllers\ProposalPdfController;
 use App\Http\Controllers\ReportPdfController;
 use Illuminate\Support\Facades\Route;
 
@@ -29,3 +30,13 @@ Route::get('/reports/pdf/preview', ReportPdfController::class)
 Route::get('/reports/pdf/download', ReportPdfController::class)
     ->middleware('auth')
     ->name('reports.pdf.download');
+
+Route::get('/companies/{tenant}/proposals/{proposal}/pdf/preview', ProposalPdfController::class)
+    ->middleware('auth')
+    ->scopeBindings()
+    ->name('proposals.pdf.preview');
+
+Route::get('/companies/{tenant}/proposals/{proposal}/pdf/download', ProposalPdfController::class)
+    ->middleware('auth')
+    ->scopeBindings()
+    ->name('proposals.pdf.download');

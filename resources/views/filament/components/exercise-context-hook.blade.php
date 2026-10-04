@@ -3,6 +3,7 @@
     @unless (request()->routeIs(
         'filament.admin.resources.exercises.view',
         'filament.admin.resources.proposals.view',
+        'filament.admin.resources.proposals.pdf',
         'filament.admin.resources.budgets.view',
     ))
         <livewire:exercise-context-selector />
