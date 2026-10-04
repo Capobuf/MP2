@@ -11,6 +11,12 @@
     };
 @endphp
 
+@if ($comparisonCategory !== null)
+    <p>Categoria visualizzata: {{ \App\Domain\Reporting\ComparisonCategory::from($comparisonCategory)->label() }}.
+        <a href="{{ $this->reportUrl(['comparisonCategory' => null]) }}">Mostra tutte le categorie</a>
+    </p>
+@endif
+
 @if ($report['comparisons'] !== [])
     <section class="mp2-report-table-section" aria-labelledby="report-comparisons-title">
         <div class="mp2-report-section-heading">
@@ -32,11 +38,11 @@
                         <th scope="col">Etichette Secondarie</th>
                     </tr>
                 </thead>
-                <tbody>
-                    @foreach ($report['comparisons'] as $row)
+                @foreach ($report['comparisons'] as $row)
+                    <tbody x-data="{ expanded: false }" class="mp2-report-row-group">
                         <tr>
                             <th scope="row">
-                                {{ $row['label'] }}
+                                <button type="button" class="mp2-report-drilldown-trigger" x-on:click="expanded = ! expanded" x-bind:aria-expanded="expanded">{{ $row['label'] }}<x-filament::icon icon="heroicon-m-chevron-down" x-bind:class="{ 'is-expanded': expanded }" /></button>
                                 <small>
                                     {{ $this->sourceTypeLabel($row['source_type']) }}
                                     @if ($row['cost_center']) · {{ $row['cost_center'] }} @endif
@@ -64,9 +70,25 @@
                                 @endif
                             </td>
                         </tr>
-                    @endforeach
-                </tbody>
+                        <tr class="mp2-report-detail-row" x-show="expanded" x-cloak>
+                            <td colspan="7">
+                                @foreach (['initial_source' => $initialHeading, 'final_source' => $finalHeading] as $key => $heading)
+                                    <h4>{{ $heading }}</h4>
+                                    @if ($row[$key] !== null)
+                                        @include('filament.pages.reporting.drilldown', ['source' => $row[$key]])
+                                    @else
+                                        <p>Sorgente assente in questo riferimento.</p>
+                                    @endif
+                                @endforeach
+                            </td>
+                        </tr>
+                    </tbody>
+                @endforeach
             </table>
         </div>
     </section>
+@endif
+
+@if ($comparisonCategory !== null && $report['comparisons'] === [])
+    <p>Nessuna sorgente nella categoria selezionata.</p>
 @endif

@@ -10,12 +10,12 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
-function chartDefinitionSource(int $id, string $allocation, string $actual, string $state = 'active'): ReportSource
+function chartDefinitionSource(int $id, string $allocation, string $actual, string $state = 'active', string $type = 'contract'): ReportSource
 {
     return new ReportSource(
-        sourceType: 'contract',
+        sourceType: $type,
         originId: $id,
-        originKey: 'contract:'.$id,
+        originKey: $type.':'.$id,
         copiedFromOriginKey: null,
         label: 'Contratto '.$id,
         summary: null,
@@ -107,15 +107,22 @@ it('keeps PDF sorting and limits as presentation over the shared definitions', f
 
 it('defines both transfer datasets once for UI and PDF consumers', function (): void {
     $rows = [
-        ['label' => 'Progetto A', 'provisional_carryover' => '20.00', 'reprogrammed_amount' => '5.00'],
-        ['label' => 'Progetto B', 'consolidated_carryover' => '10.00', 'reprogrammed_amount' => '15.00'],
+        ['origin_key' => 'project:1', 'label' => 'Progetto A', 'provisional_carryover' => '20.00', 'reprogrammed_amount' => '5.00'],
+        ['origin_key' => 'project:2', 'label' => 'Progetto B', 'consolidated_carryover' => '10.00', 'reprogrammed_amount' => '15.00'],
     ];
-    $result = chartDefinitionResult('carryovers', [], [['title' => 'Riporti', 'rows' => $rows]]);
+    $result = chartDefinitionResult('carryovers', [chartDefinitionSource(1, '20.00', '0.00', 'open', 'project'), chartDefinitionSource(2, '10.00', '0.00', 'open', 'project')], [['title' => 'Riporti', 'rows' => $rows]]);
     $definitions = app(ReportChartDefinitions::class);
     $semantic = $definitions->definitions($result)[0];
     $pdf = (new ReportPdfComposer($definitions))->chartDefinitions($result)[0];
     $charts = new ReflectionMethod(Reports::class, 'charts');
-    $ui = $charts->invoke(app(Reports::class), $result)[0];
+    $page = new class extends Reports
+    {
+        public function reportUrl(array $overrides = []): string
+        {
+            return '/reports?'.http_build_query($overrides);
+        }
+    };
+    $ui = $charts->invoke($page, $result)[0];
 
     expect(chartSemantics($ui))->toBe(chartSemantics($pdf))
         ->and(chartSemantics($ui))->toBe(chartSemantics($semantic))

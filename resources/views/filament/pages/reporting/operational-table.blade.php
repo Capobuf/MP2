@@ -17,7 +17,7 @@
             @foreach ($report['sources'] as $source)
                 <tbody x-data="{ expanded: false }" class="mp2-report-row-group">
                     <tr>
-                        <th scope="row">{{ $source['label'] }}<small>{{ $this->sourceTypeLabel($source['source_type']) }}@if ($source['cost_center']) · {{ $source['cost_center'] }}@endif</small></th>
+                        <th scope="row">@if ($source['url'] !== null)<a href="{{ $source['url'] }}">{{ $source['label'] }}</a>@else{{ $source['label'] }}@endif<small>{{ $this->sourceTypeLabel($source['source_type']) }}@if ($source['cost_center']) · {{ $source['cost_center'] }}@endif</small></th>
                         <td class="mp2-report-number">{{ $money($source['allocation']) }}</td>
                         <td class="mp2-report-number">{{ $money($source['actual']) }}</td>
                         <td class="mp2-report-number">{{ $money($source['operational_variance']) }}</td>

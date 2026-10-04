@@ -2,6 +2,7 @@
 
 use App\Domain\Company\AuditEventType;
 use App\Filament\Pages\Reports;
+use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Models\AuditEvent;
 use App\Models\BudgetSnapshot;
 use App\Models\BudgetSourceRow;
@@ -10,6 +11,7 @@ use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\ContractLifecycleFact;
 use App\Models\ContractRenewalConfiguration;
+use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
@@ -359,7 +361,8 @@ it('renders canonical classification and structured detail without raw json or f
         ->assertSee('Modificato')
         ->assertDontSee('Senza Effettivi')
         ->assertSee('Variazione non sufficientemente spiegata')
-        ->assertDontSee('Riga leggibile')
+        ->assertSee('Riga leggibile')
+        ->assertSeeHtml('class="mp2-report-detail-row"')
         ->assertDontSee('Sorgenti Economiche dell’Esercizio')
         ->assertDontSeeHtml('<pre>');
 
@@ -532,3 +535,92 @@ it('denies the report page without visualizza', function (): void {
 
     expect(Reports::canAccess())->toBeFalse();
 });
+
+it('opens the unclassified drilldown with the same annual references and current resource URLs', function (): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $expense = Expense::factory()->forExercise($exercise)->create(['description' => 'Spesa senza classificazione']);
+    ExpenseLine::factory()->for($expense)->create(['amount' => '100.00']);
+    $center = CostCenter::factory()->for($company)->create();
+    $classified = Expense::factory()->forExercise($exercise)->create(['direct_cost_center_id' => $center->id, 'description' => 'Spesa classificata']);
+    ExpenseLine::factory()->for($classified)->create(['amount' => '20.00']);
+    $budget = reportingUiBudget($company, $exercise, $expense);
+    reportingUiContext($company, $viewer);
+
+    $parameters = ['exerciseId' => $exercise->id, 'kind' => 'annual_executive', 'budgetId' => $budget->id, 'actualReference' => 'current', 'auto' => 1];
+    $page = Livewire::withQueryParams($parameters)->test(Reports::class)->assertHasNoErrors();
+    $url = $page->instance()->reportUrl(['costCenterId' => 'unclassified']);
+    parse_str(parse_url($url, PHP_URL_QUERY), $query);
+    expect($query)->toMatchArray([...$parameters, 'costCenterId' => 'unclassified']);
+    $page->assertSeeHtml('href="'.e($url).'"');
+    $chart = collect($page->get('report.charts'))->firstWhere('id', 'annual-cost-centers');
+    expect($chart['data']['drilldownUrls'])->toContain($url);
+
+    Livewire::withQueryParams($query)->test(Reports::class)
+        ->assertHasNoErrors()
+        ->assertSee('Centro di Costo: Non classificato')
+        ->assertSet('report.sources', fn (array $sources): bool => count($sources) === 1 && $sources[0]['origin_id'] === $expense->id)
+        ->assertSet('report.sources.0.url', ExpenseResource::getUrl('view', ['record' => $expense->id], tenant: $company))
+        ->assertSet('definition.initial_reference.budget_snapshot_id', $budget->id)
+        ->assertSet('definition.final_reference.type', 'current')
+        ->assertSee('Spesa senza classificazione')
+        ->assertDontSee('Spesa classificata');
+});
+
+it('filters comparison categories only after comparison and keeps both historical details', function (): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $expense = Expense::factory()->forExercise($exercise)->create();
+    $initial = reportingUiBudget($company, $exercise, $expense, '100.00');
+    $final = reportingUiBudget($company, $exercise, $expense, '115.00', 2);
+    $unchanged = Expense::factory()->forExercise($exercise)->create();
+    foreach ([$initial, $final] as $budget) {
+        BudgetSourceRow::factory()->for($budget, 'budget')->create([
+            'origin_id' => $unchanged->id, 'origin_key' => $unchanged->originKey(), 'label' => 'Sorgente invariata',
+        ]);
+    }
+    reportingUiContext($company, $viewer);
+    $parameters = ['exerciseId' => $exercise->id, 'kind' => 'budget_versions', 'budgetId' => $initial->id, 'secondBudgetId' => $final->id, 'auto' => 1];
+    $page = Livewire::withQueryParams($parameters)->test(Reports::class)->assertHasNoErrors();
+    $totals = $page->get('report.comparison_totals');
+    $counts = $page->get('report.category_counts');
+    expect($counts['modified'])->toBe(1)->and($counts['unchanged'])->toBe(1);
+    $url = $page->instance()->reportUrl(['comparisonCategory' => 'modified']);
+    parse_str(parse_url($url, PHP_URL_QUERY), $query);
+    expect($query)->toMatchArray([...$parameters, 'comparisonCategory' => 'modified']);
+    $filtered = Livewire::withQueryParams($query)->test(Reports::class)
+        ->assertHasNoErrors()
+        ->assertSet('report.category_counts', $counts)
+        ->assertSet('report.comparison_totals', $totals)
+        ->assertSet('report.comparisons', fn (array $rows): bool => count($rows) === 1 && $rows[0]['origin_id'] === $expense->id)
+        ->assertSet('report.comparisons.0.initial_source.allocation', '100.00')
+        ->assertSet('report.comparisons.0.final_source.allocation', '115.00')
+        ->assertSet('report.comparisons.0.initial_source.url', null)
+        ->assertSet('report.comparisons.0.final_source.url', null)
+        ->assertSee('Categoria visualizzata: Modificato')
+        ->assertSee('Mostra tutte le categorie')
+        ->assertDontSee('Sorgente invariata');
+    expect($filtered->get('definition.filters'))->not->toHaveKey('comparison_category');
+    $filtered->call('clearFilters')->assertSet('comparisonCategory', null)
+        ->assertSet('report.comparisons', fn (array $rows): bool => count($rows) === 2)
+        ->set('comparisonCategory', 'invalid')->assertHasErrors(['comparisonCategory'])->assertSet('report', null);
+});
+
+it('preserves exercise comparison and contract interval contexts through drilldown URLs', function (string $kind): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $secondExercise = Exercise::factory()->for($company)->create(['year' => 2027]);
+    reportingUiContext($company, $viewer);
+    $parameters = ['exerciseId' => $exercise->id, 'kind' => $kind, 'auto' => 1];
+    $parameters += $kind === 'exercises'
+        ? ['comparisonExerciseId' => $secondExercise->id, 'exerciseMeasure' => 'current']
+        : ['dateFrom' => '2026-01-01', 'dateTo' => '2026-12-31'];
+    $page = Livewire::withQueryParams($parameters)->test(Reports::class)->assertHasNoErrors();
+    parse_str(parse_url($page->instance()->reportUrl(['costCenterId' => 'unclassified']), PHP_URL_QUERY), $query);
+    expect($query)->toMatchArray([...$parameters, 'costCenterId' => 'unclassified']);
+    Livewire::withQueryParams($query)->test(Reports::class)->assertHasNoErrors()
+        ->assertSet('definition', [...$page->get('definition'), 'filters' => ['cost_center_id' => 'unclassified']]);
+})->with(['exercises', 'contracts']);

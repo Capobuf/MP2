@@ -119,6 +119,17 @@ class ReportChart extends ChartWidget
             {
                 responsive: true,
                 maintainAspectRatio: false,
+                onHover: (event, elements, chart) => {
+                    const hit = elements[0];
+                    const url = hit ? (chart.data.drilldownUrls?.[hit.index] ?? chart.data.datasets?.[hit.datasetIndex]?.data?.[hit.index]?.url) : null;
+                    if (event.native?.target) event.native.target.style.cursor = url ? 'pointer' : 'default';
+                },
+                onClick: (event, elements, chart) => {
+                    const hit = elements[0];
+                    if (! hit) return;
+                    const url = chart.data.drilldownUrls?.[hit.index] ?? chart.data.datasets?.[hit.datasetIndex]?.data?.[hit.index]?.url;
+                    if (url) window.location.assign(url);
+                },
                 animation: window.matchMedia('(prefers-reduced-motion: reduce)').matches
                     ? false
                     : { duration: 650, easing: 'easeOutQuart' },

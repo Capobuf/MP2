@@ -132,6 +132,7 @@ class AllocationComparisonScatterChart extends EconomicChartWidget
                 'key' => $center['key'],
                 'label' => $center['label'],
                 'allocation' => $center['direct_allocation'],
+                'url' => $center['url'],
             ], $dashboard['cost_centers']),
             default => throw new \LogicException('Unknown allocation grouping.'),
         };
@@ -154,6 +155,7 @@ class AllocationComparisonScatterChart extends EconomicChartWidget
             'labels' => array_column($rows, 'label'),
             'total' => $total,
             'otherCount' => $otherCount,
+            'drilldownUrls' => array_map(fn (array $row): ?string => $row['url'] ?? null, $rows),
             'datasets' => [[
                 'label' => 'Allocato Corrente',
                 'data' => array_map('floatval', array_column($rows, 'allocation')),
@@ -171,6 +173,14 @@ class AllocationComparisonScatterChart extends EconomicChartWidget
             return $this->options(<<<'JS'
                 {
                     cutout: '68%',
+                    onHover: (event, elements, chart) => {
+                        const url = elements.length ? chart.data.drilldownUrls?.[elements[0].index] : null;
+                        if (event.native?.target) event.native.target.style.cursor = url ? 'pointer' : 'default';
+                    },
+                    onClick: (event, elements, chart) => {
+                        const url = elements.length ? chart.data.drilldownUrls?.[elements[0].index] : null;
+                        if (url) window.location.assign(url);
+                    },
                     plugins: {
                         legend: {
                             position: 'bottom',
