@@ -37,11 +37,13 @@ use App\Models\PlatformLifecycleEvent;
 use App\Models\Project;
 use App\Models\Supplier;
 use App\Models\User;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\LegacyBusinessBackup;
 
 uses(RefreshDatabase::class);
 
@@ -193,6 +195,28 @@ it('replaces an Archived Tenant atomically and preserves identity journal and gl
     }
 });
 
+it('rejects a replace when the target disappears between lookup and lock', function (): void {
+    $company = Company::factory()->create();
+    $actor = User::factory()->platformAdmin()->create();
+    $artifact = app(ExportBusinessBackup::class)->execute($company, $actor, false, false);
+    try {
+        $package = app(BusinessBackupBundle::class)->validate($artifact['path'], 'zip');
+        $removeTarget = true;
+        DB::listen(function (QueryExecuted $query) use (&$removeTarget, $company): void {
+            if ($removeTarget && str_starts_with($query->sql, 'select * from `tenant_companies` where `portable_uuid`')) {
+                $removeTarget = false;
+                DB::table('companies')->where('id', $company->id)->delete();
+            }
+        });
+        expect(fn () => app(ReplaceBusinessBackup::class)->execute($actor, $package, (string) Str::uuid(), $company->id, true, true))
+            ->toThrow(ValidationException::class, 'Il Tenant target è cambiato. Generare una nuova anteprima.');
+        expect($removeTarget)->toBeFalse()
+            ->and(BusinessBackupImport::query()->count())->toBe(0);
+    } finally {
+        @unlink($artifact['path']);
+    }
+});
+
 it('rolls back replacement and staged files when persistence fails', function (): void {
     Storage::fake('local');
     $company = Company::factory()->create();
@@ -291,6 +315,30 @@ it('rejects unsafe or altered ZIP envelopes and technical resource limits before
             ->and(Company::query()->count())->toBe(1);
     } finally {
         @unlink($artifact['path']);
+    }
+});
+
+it('rejects legacy workbook data inside a V3 bundle with a validation error', function (): void {
+    $company = Company::factory()->create();
+    $actor = User::factory()->platformAdmin()->create();
+    $artifact = app(ExportBusinessBackup::class)->execute($company, $actor, false, false);
+    $legacy = app(LegacyBusinessBackup::class)->execute($company, $actor);
+    try {
+        $zip = new ZipArchive;
+        $zip->open($artifact['path']);
+        $manifest = json_decode($zip->getFromName('manifest.json'), true, flags: JSON_THROW_ON_ERROR);
+        $manifest['package_id'] = $legacy['package_id'];
+        $manifest['data']['size'] = filesize($legacy['path']);
+        $manifest['data']['sha256'] = hash_file('sha256', $legacy['path']);
+        $zip->addFile($legacy['path'], 'data.xlsx');
+        $zip->addFromString('manifest.json', json_encode($manifest, JSON_THROW_ON_ERROR));
+        $zip->close();
+        expect(fn () => app(BusinessBackupBundle::class)->validate($artifact['path'], 'zip'))
+            ->toThrow(ValidationException::class, 'Il bundle richiede dati V3.');
+        expect(BusinessBackupImport::query()->count())->toBe(0);
+    } finally {
+        @unlink($artifact['path']);
+        @unlink($legacy['path']);
     }
 });
 

@@ -139,10 +139,10 @@ final class BusinessBackupBundle
                 $inner->close();
             }
             $package = app(BusinessBackupValidator::class)->validate($workbook, true);
+            $this->assert($package['manifest']['format_version'] === '3', 'Il bundle richiede dati V3.');
             foreach (['package_id', 'source_tenant_uuid', 'company_name', 'company_timezone'] as $key) {
                 $this->assert(($manifest[$key] ?? null) === $package['manifest'][$key], "Manifest incoerenti per [$key].");
             }
-            $this->assert($package['manifest']['format_version'] === '3', 'Il bundle richiede dati V3.');
             $this->assertFileInventory($package, $logical, $manifest['included']['files']);
             $package['bundle'] = $manifest;
             $package['bundle_path'] = $path;

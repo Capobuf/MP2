@@ -67,9 +67,9 @@ final class ImportBusinessBackup
                         if ($target === null || $target->company_id !== $expectedTargetCompanyId || ! $irreversibilityConfirmed || ! $destructionConfirmed) {
                             throw ValidationException::withMessages(['backup' => 'Il Tenant target è cambiato oppure manca la doppia conferma. Generare una nuova anteprima.']);
                         }
-                        $targetCompany = Company::query()->lockForUpdate()->findOrFail($target->company_id);
-                        $target = TenantCompany::query()->lockForUpdate()->findOrFail($targetCompany->id);
-                        if ($target->portable_uuid !== $sourceUuid || $target->company_id !== $expectedTargetCompanyId) {
+                        $targetCompany = Company::query()->lockForUpdate()->find($target->company_id);
+                        $target = $targetCompany === null ? null : TenantCompany::query()->lockForUpdate()->find($targetCompany->id);
+                        if ($target === null || $target->portable_uuid !== $sourceUuid || $target->company_id !== $expectedTargetCompanyId) {
                             throw ValidationException::withMessages(['backup' => 'Il Tenant target è cambiato. Generare una nuova anteprima.']);
                         }
                         $destroyOperationId = app(DestroyTenantCompanyData::class)->execute($actor, $targetCompany, $target);
