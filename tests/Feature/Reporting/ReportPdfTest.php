@@ -266,8 +266,8 @@ it('limits the contracts chart to the eight highest allocations without truncati
     preg_match_all('/<text[^>]*>(.*?)<\/text>/s', $svg, $texts);
 
     expect($chart['render_description'])->toBe('Visualizzati 8 di 9 contratti · ordinati per Allocato decrescente.')
-        ->and($portraitChart['description'])->toBe('Visualizzati 5 di 9 contratti · ordinati per Allocato decrescente.')
-        ->and($html)->toContain($chart['description'], 'Contratto 1', 'Contratto 9')
+        ->and($portraitChart['render_description'])->toBe('Visualizzati 5 di 9 contratti · ordinati per Allocato decrescente.')
+        ->and($html)->toContain($chart['render_description'], 'Contratto 1', 'Contratto 9')
         ->and($texts[1])->not->toContain(Number::currency(0, in: 'EUR', locale: 'it'))
         ->and($svg)->not->toContain('width="0"')
         ->and($svg)->toContain('90,00', '20,00')
