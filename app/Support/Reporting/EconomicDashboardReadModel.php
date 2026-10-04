@@ -113,7 +113,17 @@ final class EconomicDashboardReadModel
                 'operational_variance' => (string) $report->totals['current_operational_variance'],
             ],
             'sources' => $sources,
-            'suppliers' => $this->aggregator->suppliers($currentSources),
+            'suppliers' => array_map(fn (array $bucket): array => [
+                ...$bucket,
+                'url' => str_starts_with($bucket['key'], 'supplier:')
+                    ? Reports::getUrl([
+                        'exerciseId' => $exercise->id,
+                        'kind' => ReportKind::Suppliers->value,
+                        'supplierId' => (int) substr($bucket['key'], strlen('supplier:')),
+                        'auto' => 1,
+                    ], tenant: $company)
+                    : null,
+            ], $this->aggregator->suppliers($currentSources)),
             'cost_centers' => $costCenters,
             'comparison_categories' => $categoryCounts,
             'comparison_source_count' => array_sum($categoryCounts),

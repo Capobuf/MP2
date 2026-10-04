@@ -21,7 +21,7 @@
                     @foreach ($section['rows'] as $row)
                         <tbody x-data="{ expanded: false }" class="mp2-report-row-group">
                             <tr>
-                                <th scope="row">{{ $row['label'] }}</th>
+                                <th scope="row">@if ($row['url'] !== null)<a href="{{ $row['url'] }}">{{ $row['label'] }}</a>@else{{ $row['label'] }}@endif</th>
                                 <td class="mp2-report-number">{{ $money($row['allocation']) }}</td>
                                 <td class="mp2-report-number">{{ $money($row['actual']) }}</td>
                                 <td class="mp2-report-number">{{ $money($row['operational_variance']) }}</td>
@@ -55,7 +55,7 @@
                     @foreach ($section['rows'] as $row)
                         <tbody x-data="{ expanded: false }" class="mp2-report-row-group">
                             <tr>
-                                <th scope="row">{{ $row['label'] }}</th>
+                                <th scope="row">@if ($row['url'] !== null)<a href="{{ $row['url'] }}">{{ $row['label'] }}</a>@else{{ $row['label'] }}@endif</th>
                                 <td>{{ $this->stateLabel($row['state']) }}</td>
                                 <td class="mp2-report-number">{{ $money($row['allocation']) }}</td>
                                 <td class="mp2-report-number">{{ $money($row['actual']) }}</td>
@@ -102,7 +102,7 @@
                         @endphp
                         <tbody x-data="{ expanded: false }" class="mp2-report-row-group">
                             <tr>
-                                <th scope="row">{{ $row['label'] }}</th>
+                                <th scope="row">@if ($row['url'] !== null)<a href="{{ $row['url'] }}">{{ $row['label'] }}</a>@else{{ $row['label'] }}@endif</th>
                                 <td>{{ $this->stateLabel($row['state']) }}</td>
                                 <td class="mp2-report-number">{{ $money($row['allocation']) }}</td>
                                 <td class="mp2-report-number">{{ $money($row['actual']) }}</td>
@@ -130,7 +130,7 @@
                     @foreach ($section['rows'] as $row)
                         <tbody x-data="{ expanded: false }" class="mp2-report-row-group">
                             <tr>
-                                <th scope="row">{{ $row['label'] }}@if ($row['decision_reason'])<small>Motivo: {{ $row['decision_reason'] }}</small>@endif</th>
+                                <th scope="row">@if ($row['url'] !== null)<a href="{{ $row['url'] }}">{{ $row['label'] }}</a>@else{{ $row['label'] }}@endif@if ($row['decision_reason'])<small>Motivo: {{ $row['decision_reason'] }}</small>@endif</th>
                                 <td>{{ $row['source_exercise_year'] ?? '—' }} → {{ $row['destination_exercise_year'] ?? '—' }}</td>
                                 <td>{{ $row['mode_label'] }}</td>
                                 <td class="mp2-report-number">{{ $money($row['allocation']) }}</td>

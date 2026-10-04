@@ -18,7 +18,7 @@
                 <tbody>
                     @foreach ($report['cost_centers'] as $row)
                         <tr>
-                            <th scope="row">{{ $row['label'] }}</th>
+                            <th scope="row"><a href="{{ $row['url'] }}">{{ $row['label'] }}</a></th>
                             <td class="mp2-report-number">{{ $money($row['direct_allocation']) }}</td>
                             <td class="mp2-report-number">{{ $money($row['direct_actual']) }}</td>
                             <td class="mp2-report-number">{{ $money($row['branch_allocation']) }}</td>

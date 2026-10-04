@@ -35,7 +35,9 @@
                     @if ($kind === 'annual_executive')
                         @include('filament.pages.reporting.charts')
                         @include('filament.pages.reporting.cost-centers-table')
-                        @if ($report['sources'] !== [])
+                        @if ($comparisonCategory !== null)
+                            @include('filament.pages.reporting.comparisons-table')
+                        @elseif ($report['sources'] !== [])
                             @include('filament.pages.reporting.sources-table', [
                                 'kicker' => 'Riconciliazione',
                                 'title' => 'Sorgenti Economiche dell’Esercizio',
@@ -45,7 +47,7 @@
                         @endif
                     @elseif (in_array($kind, ['budget_actual', 'budget_current_allocation', 'budget_versions', 'exercises'], true))
                         @include('filament.pages.reporting.charts')
-                        @if ($report['comparisons'] !== [])
+                        @if ($report['comparisons'] !== [] || $comparisonCategory !== null)
                             @include('filament.pages.reporting.comparisons-table')
                         @else
                             @include('filament.pages.reporting.empty')

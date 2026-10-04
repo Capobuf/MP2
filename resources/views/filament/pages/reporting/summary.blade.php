@@ -56,7 +56,7 @@
                 <div><dt>Correzioni Tardive Nette</dt><dd>{{ $money($report['totals']['late_corrections_net']) }}</dd></div>
                 <div><dt>Effettivo a Conoscenza Corrente</dt><dd>{{ $money($report['totals']['current_knowledge_actual']) }}</dd></div>
             @endif
-            <div><dt>Non Classificato</dt><dd>{{ $money($report['totals']['unclassified']) }}</dd></div>
+            <div><dt>Non Classificato</dt><dd><a href="{{ $this->reportUrl(['costCenterId' => 'unclassified']) }}">{{ $money($report['totals']['unclassified']) }}</a></dd></div>
             <div><dt>Sorgenti Primarie</dt><dd>{{ $report['totals']['source_count'] }}</dd></div>
             <div><dt>Annotazioni di Errore Storico</dt><dd>{{ $report['totals']['annotation_count'] }}</dd></div>
         </dl>
@@ -132,7 +132,7 @@
                     <h4>Categorie Primarie</h4>
                     <ul>
                         @foreach ($report['category_items'] as $item)
-                            <li><span class="mp2-report-category" data-category="{{ $item['key'] }}">{{ $item['label'] }}</span><strong>{{ $item['count'] }}</strong></li>
+                            <li><a href="{{ $this->reportUrl(['comparisonCategory' => $item['key']]) }}"><span class="mp2-report-category" data-category="{{ $item['key'] }}">{{ $item['label'] }}</span><strong>{{ $item['count'] }}</strong></a></li>
                         @endforeach
                     </ul>
                 </div>

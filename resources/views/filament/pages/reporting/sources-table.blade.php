@@ -29,7 +29,7 @@
             @foreach ($report['sources'] as $source)
                 <tbody x-data="{ expanded: false }" class="mp2-report-row-group">
                     <tr>
-                        <th scope="row">{{ $source['label'] }}</th>
+                        <th scope="row">@if ($source['url'] !== null)<a href="{{ $source['url'] }}">{{ $source['label'] }}</a>@else{{ $source['label'] }}@endif</th>
                         <td>{{ $this->sourceTypeLabel($source['source_type']) }}</td>
                         <td>{{ $source['cost_center'] ?? 'Non classificato' }}</td>
                         <td>{{ $source['supplier'] ?? '—' }}</td>

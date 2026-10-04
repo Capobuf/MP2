@@ -7,12 +7,16 @@ use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Reporting\ActualReference;
 use App\Domain\Reporting\ComparisonCategory;
+use App\Domain\Reporting\ReferenceType;
 use App\Domain\Reporting\ReportDefinition;
 use App\Domain\Reporting\ReportKind;
 use App\Domain\Reporting\ReportResult;
 use App\Domain\Reporting\ReportSource;
 use App\Domain\Reporting\SecondaryLabel;
 use App\Filament\Forms\DateInput;
+use App\Filament\Resources\Contracts\ContractResource;
+use App\Filament\Resources\Expenses\ExpenseResource;
+use App\Filament\Resources\Projects\ProjectResource;
 use App\Models\BudgetSnapshot;
 use App\Models\Company;
 use App\Models\Contract;
@@ -63,17 +67,22 @@ class Reports extends Page
     #[Url]
     public ?int $budgetId = null;
 
+    #[Url]
     public ?int $secondBudgetId = null;
 
     #[Url]
     public ?string $actualReference = null;
 
+    #[Url]
     public ?int $comparisonExerciseId = null;
 
+    #[Url]
     public ?string $exerciseMeasure = null;
 
+    #[Url]
     public ?string $dateFrom = null;
 
+    #[Url]
     public ?string $dateTo = null;
 
     #[Url]
@@ -93,6 +102,9 @@ class Reports extends Page
 
     #[Url]
     public bool $auto = false;
+
+    #[Url]
+    public ?string $comparisonCategory = null;
 
     public bool $filtersOpen = false;
 
@@ -282,7 +294,7 @@ class Reports extends Page
 
     public function clearFilters(bool $refresh = true): void
     {
-        $this->reset('costCenterId', 'projectId', 'contractId', 'expenseId', 'supplierId', 'dateFrom', 'dateTo');
+        $this->reset('costCenterId', 'projectId', 'contractId', 'expenseId', 'supplierId', 'dateFrom', 'dateTo', 'comparisonCategory');
         $this->resetErrorBag();
 
         if ($refresh && $this->isReportConfigurationComplete()) {
@@ -399,6 +411,10 @@ class Reports extends Page
                 .' – '.str($this->dateTo)->before(' ')->toString();
         }
 
+        if ($this->comparisonCategory !== null && ($category = ComparisonCategory::tryFrom($this->comparisonCategory)) !== null) {
+            $labels[] = 'Categoria visualizzata: '.$category->label();
+        }
+
         return $labels;
     }
 
@@ -417,6 +433,9 @@ class Reports extends Page
         $this->resetErrorBag();
 
         try {
+            if ($this->comparisonCategory !== null && ComparisonCategory::tryFrom($this->comparisonCategory) === null) {
+                throw ValidationException::withMessages(['comparisonCategory' => 'Categoria di confronto non valida.']);
+            }
             $definition = ReportDefinition::fromArray($this->definitionInput());
             /** @var User $user */
             $user = auth()->user();
@@ -627,10 +646,11 @@ class Reports extends Page
             'operational_variance' => Decimal::subtract($item->actual, $item->allocation),
             'has_actuals' => $item->hasActuals, 'carryover' => $item->carryover,
             'residual' => $item->residual, 'saving' => $item->saving, 'unused' => $item->unused,
+            'url' => $this->sourceUrl($item, $result),
             'detail' => $item->detail, 'corrections' => $item->corrections, 'annotations' => $item->annotations,
         ];
         $sources = array_map($source, $result->sources);
-        $comparisons = array_map(function (array $row) use ($hideActualSemantics, $hiddenActualLabels): array {
+        $comparisons = array_map(function (array $row) use ($hideActualSemantics, $hiddenActualLabels, $source): array {
             /** @var ReportSource|null $displaySource */
             $displaySource = $row['final_source'] ?? $row['initial_source'] ?? null;
             $dimensions = $hideActualSemantics
@@ -643,6 +663,9 @@ class Reports extends Page
             return [
                 'origin_key' => $row['origin_key'], 'label' => $row['label'],
                 'source_type' => $displaySource?->sourceType,
+                'origin_id' => $displaySource?->originId,
+                'initial_source' => $row['initial_source'] === null ? null : $source($row['initial_source']),
+                'final_source' => $row['final_source'] === null ? null : $source($row['final_source']),
                 'cost_center' => $displaySource?->costCenterLabel,
                 'supplier' => $displaySource?->supplierLabel,
                 'state' => $displaySource?->state,
@@ -654,9 +677,18 @@ class Reports extends Page
                 'insufficiently_explained' => $row['insufficiently_explained'],
             ];
         }, $result->comparisons);
+        if ($this->comparisonCategory !== null) {
+            $comparisons = array_values(array_filter($comparisons, fn (array $row): bool => $row['category_key'] === $this->comparisonCategory));
+        }
+        $sourcesByKey = collect($result->sources)->keyBy(fn (ReportSource $item): string => $item->originKey);
         $sections = array_map(fn (array $section): array => [
             'title' => $section['title'],
-            'rows' => array_map(fn (mixed $row): array => $row instanceof ReportSource ? $source($row) : $row, $section['rows']),
+            'rows' => array_map(fn (mixed $row): array => $row instanceof ReportSource ? $source($row) : [
+                ...$row,
+                'url' => isset($row['key'])
+                    ? $this->supplierUrl($row['key'])
+                    : $this->sourceUrl($sourcesByKey[$row['origin_key']], $result),
+            ], $section['rows']),
         ], $result->sections);
         $comparisonTotals = $this->comparisonTotals($result->comparisons);
 
@@ -664,7 +696,9 @@ class Reports extends Page
             'header' => $result->header,
             'totals' => $result->totals,
             'sources' => $sources,
-            'cost_centers' => $result->costCenters,
+            'cost_centers' => array_map(fn (array $row): array => [
+                ...$row, 'url' => $this->reportUrl(['costCenterId' => $row['cost_center_id'] ?? 'unclassified']),
+            ], $result->costCenters),
             'comparisons' => $comparisons,
             'category_counts' => $result->categoryCounts,
             'label_counts' => $result->labelCounts,
@@ -690,7 +724,66 @@ class Reports extends Page
     /** @return array<int, array<string, mixed>> */
     private function charts(ReportResult $result): array
     {
-        return app(ReportChartDefinitions::class)->definitions($result);
+        $charts = app(ReportChartDefinitions::class)->definitions($result);
+        $sourcesByKey = collect($result->sources)->keyBy(fn (ReportSource $source): string => $source->originKey);
+        foreach ($charts as &$chart) {
+            $chart['data']['drilldownUrls'] = match ($chart['id']) {
+                'annual-cost-centers' => array_map(fn (array $row): string => $this->reportUrl(['costCenterId' => $row['cost_center_id'] ?? 'unclassified']), $result->costCenters),
+                'comparison-categories' => array_map(fn (ComparisonCategory $category): string => $this->reportUrl(['comparisonCategory' => $category->value]), ComparisonCategory::cases()),
+                'operational-variance' => array_map(fn (ReportSource $source): ?string => $this->sourceUrl($source, $result), $result->sources),
+                'contract-values', 'project-values' => array_values(array_map(
+                    fn (ReportSource $source): ?string => $this->sourceUrl($source, $result),
+                    array_filter($result->sources, fn (ReportSource $source): bool => $source->sourceType === ($chart['id'] === 'contract-values' ? 'contract' : 'project')),
+                )),
+                'supplier-values' => array_map(fn (array $row): ?string => $this->supplierUrl($row['key']), $result->sections[0]['rows']),
+                'carryover-values' => array_map(fn (array $row): string => $this->reportUrl(['projectId' => $sourcesByKey[$row['origin_key']]->originId]), $result->sections[0]['rows']),
+                default => [],
+            };
+        }
+        unset($chart);
+
+        return $charts;
+    }
+
+    /** @param array<string, int|string|bool|null> $overrides */
+    public function reportUrl(array $overrides = []): string
+    {
+        $parameters = [];
+        foreach ($this->configurationProperties() as $property) {
+            $parameters[$property] = $this->{$property};
+        }
+
+        return static::getUrl(array_filter(
+            [...$parameters, 'auto' => 1, ...$overrides],
+            fn (mixed $value): bool => $value !== null && $value !== '',
+        ), tenant: $this->company());
+    }
+
+    private function sourceUrl(ReportSource $source, ReportResult $result): ?string
+    {
+        if ($result->definition->kind->isComparison()
+            || ($result->definition->finalReference !== null && $result->definition->finalReference->type !== ReferenceType::Current)) {
+            return null;
+        }
+
+        $resource = match ($source->sourceType) {
+            'expense' => ExpenseResource::class,
+            'project' => ProjectResource::class,
+            'contract' => ContractResource::class,
+            default => throw new \UnexpectedValueException('Tipo di sorgente economica non supportato.'),
+        };
+        if (! auth()->user()?->can('View:'.ucfirst($source->sourceType))) {
+            return null;
+        }
+
+        return $resource::getUrl('view', ['record' => $source->originId], tenant: $this->company());
+    }
+
+    private function supplierUrl(string $key): ?string
+    {
+        return str_starts_with($key, 'supplier:')
+            ? $this->reportUrl(['supplierId' => (int) substr($key, strlen('supplier:'))])
+            : null;
     }
 
     /** @return array<int, string> */
@@ -699,12 +792,15 @@ class Reports extends Page
         return [
             'exerciseId', 'kind', 'budgetId', 'secondBudgetId', 'actualReference',
             'comparisonExerciseId', 'exerciseMeasure', 'dateFrom', 'dateTo',
-            'costCenterId', 'projectId', 'contractId', 'expenseId', 'supplierId',
+            'costCenterId', 'projectId', 'contractId', 'expenseId', 'supplierId', 'comparisonCategory',
         ];
     }
 
     private function preserveCompatibleContext(ReportKind $kind): void
     {
+        if (! $kind->isComparison() && $kind !== ReportKind::AnnualExecutive) {
+            $this->comparisonCategory = null;
+        }
         if (! in_array($kind, [
             ReportKind::AnnualExecutive,
             ReportKind::BudgetActual,

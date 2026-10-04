@@ -336,6 +336,11 @@ it('switches distribution groupings without duplicating expenses or received car
                 'Senza Fornitore' => 25.0,
                 'Riporto senza Fornitore' => 20.0,
             ]);
+            $urls = array_combine($data['labels'], $data['drilldownUrls']);
+            expect($urls['Fornitore condiviso'])->toContain('supplierId='.$supplier->id)
+                ->and($urls['Fornitore condiviso'])->toContain('exerciseId='.$fixture['exercise']->id)
+                ->and($urls['Senza Fornitore'])->toBeNull()
+                ->and($urls['Riporto senza Fornitore'])->toBeNull();
         }
     }
     $component->set('filter', 'unknown')->assertStatus(422);
@@ -358,6 +363,10 @@ it('uses direct cost center allocations without counting ancestor branches twice
         'Non classificato' => 200.0,
         'Operations / Licenze' => 100.0,
     ])->and($data['total'])->toBe('600.00');
+    $urls = array_combine($data['labels'], $data['drilldownUrls']);
+    expect($urls['Operations'])->toContain('costCenterId='.$fixture['costCenter']->id)
+        ->and($urls['Operations / Licenze'])->toContain('costCenterId='.$child->id)
+        ->and($urls['Non classificato'])->toContain('costCenterId=unclassified');
 });
 
 it('groups small allocation shares into Others while preserving the total and omitting zeros', function (): void {
@@ -376,7 +385,10 @@ it('groups small allocation shares into Others while preserving the total and om
     $data = chartData(AllocationComparisonScatterChart::class, 'supplier');
     expect($data['labels'])->toBe(['Fornitore 8', 'Fornitore 7', 'Fornitore 6', 'Fornitore 5', 'Fornitore 4', 'Fornitore 3', 'Altri (2)'])
         ->and($data['datasets'][0]['data'])->toBe([80.0, 70.0, 60.0, 50.0, 40.0, 30.0, 30.0])
-        ->and($data['total'])->toBe('360.00');
+        ->and($data['total'])->toBe('360.00')
+        ->and($data['drilldownUrls'])->toHaveCount(7)
+        ->and($data['drilldownUrls'][0])->toContain('supplierId=')
+        ->and($data['drilldownUrls'][6])->toBeNull();
 });
 
 it('shows an empty distribution when sources exist but have no allocation', function (): void {
