@@ -3,6 +3,7 @@
 use App\Domain\Expenses\ExerciseStatus;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\Budgets\BudgetResource;
+use App\Filament\Resources\Exercises\ExerciseResource;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Resources\Proposals\ProposalResource;
 use App\Filament\Widgets\EconomicSummary;
@@ -225,16 +226,28 @@ it('selects and clears the current Budget from the selector', function (): void 
 it('shows the comparison Budget only on the Dashboard and never changes context when opening records', function (): void {
     $user = User::factory()->create();
     $company = Company::factory()->create();
-    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
-    $proposal = Proposal::factory()->for($company)->for($exercise)->create([
+    $selectedExercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $selectedProposal = Proposal::factory()->for($company)->for($selectedExercise)->create([
         'status' => 'approved',
         'created_by_id' => $user->id,
         'approved_by_id' => $user->id,
         'approved_at' => now(),
     ]);
-    $budget = BudgetSnapshot::factory()->for($proposal)->create([
+    $selectedBudget = BudgetSnapshot::factory()->for($selectedProposal)->create([
         'company_id' => $company->id,
-        'exercise_id' => $exercise->id,
+        'exercise_id' => $selectedExercise->id,
+        'approved_by_id' => $user->id,
+    ]);
+    $historicalExercise = Exercise::factory()->for($company)->create(['year' => 2025]);
+    $historicalProposal = Proposal::factory()->for($company)->for($historicalExercise)->create([
+        'status' => 'approved',
+        'created_by_id' => $user->id,
+        'approved_by_id' => $user->id,
+        'approved_at' => now(),
+    ]);
+    $historicalBudget = BudgetSnapshot::factory()->for($historicalProposal)->create([
+        'company_id' => $company->id,
+        'exercise_id' => $historicalExercise->id,
         'approved_by_id' => $user->id,
     ]);
     grantTestPermissions([
@@ -245,8 +258,8 @@ it('shows the comparison Budget only on the Dashboard and never changes context 
     $this->actingAs($user);
     Filament::setCurrentPanel('admin');
     Filament::setTenant($company->tenantCompany);
-    app(ExerciseContext::class)->select($company, $exercise->id);
-    app(BudgetContext::class)->select($company, $exercise, $budget->id);
+    app(ExerciseContext::class)->select($company, $selectedExercise->id);
+    app(BudgetContext::class)->select($company, $selectedExercise, $selectedBudget->id);
 
     $this->get(Dashboard::getUrl(tenant: $company->tenantCompany))
         ->assertOk()
@@ -254,15 +267,20 @@ it('shows the comparison Budget only on the Dashboard and never changes context 
     $this->get(ExpenseResource::getUrl(tenant: $company->tenantCompany))
         ->assertOk()
         ->assertDontSee('Budget di confronto');
-    $this->get(ProposalResource::getUrl('view', ['record' => $proposal], tenant: $company->tenantCompany))
+    $this->get(ExerciseResource::getUrl('view', ['record' => $historicalExercise], tenant: $company->tenantCompany))
         ->assertOk()
         ->assertDontSee('aria-label="Seleziona Esercizio"', escape: false)
         ->assertDontSee('Budget di confronto');
-    $this->get(BudgetResource::getUrl('view', ['record' => $budget], tenant: $company->tenantCompany))
+    $this->get(ProposalResource::getUrl('view', ['record' => $historicalProposal], tenant: $company->tenantCompany))
+        ->assertOk()
+        ->assertDontSee('aria-label="Seleziona Esercizio"', escape: false)
+        ->assertDontSee('Budget di confronto');
+    $this->get(BudgetResource::getUrl('view', ['record' => $historicalBudget], tenant: $company->tenantCompany))
         ->assertOk()
         ->assertDontSee('aria-label="Seleziona Esercizio"', escape: false)
         ->assertDontSee('Budget di confronto');
 
-    expect(session("mp2.exercise_context.{$company->id}"))->toBe($exercise->id)
-        ->and(session("mp2.budget_context.{$company->id}.{$exercise->id}"))->toBe($budget->id);
+    expect(session("mp2.exercise_context.{$company->id}"))->toBe($selectedExercise->id)
+        ->and(session("mp2.budget_context.{$company->id}.{$selectedExercise->id}"))->toBe($selectedBudget->id)
+        ->and(session()->has("mp2.budget_context.{$company->id}.{$historicalExercise->id}"))->toBeFalse();
 });
