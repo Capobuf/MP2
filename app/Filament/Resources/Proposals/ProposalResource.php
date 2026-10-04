@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Proposals;
 
+use App\Filament\Resources\Proposals\Pages\CustomizeProposalPdf;
 use App\Filament\Resources\Proposals\Pages\ListProposals;
 use App\Filament\Resources\Proposals\Pages\ViewProposal;
 use App\Filament\Resources\Proposals\Schemas\ProposalInfolist;
@@ -85,6 +86,10 @@ class ProposalResource extends Resource
 
     public static function getPages(): array
     {
-        return ['index' => ListProposals::route('/'), 'view' => ViewProposal::route('/{record}')];
+        return [
+            'index' => ListProposals::route('/'),
+            'pdf' => CustomizeProposalPdf::route('/{record}/pdf'),
+            'view' => ViewProposal::route('/{record}'),
+        ];
     }
 }

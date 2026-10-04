@@ -18,11 +18,6 @@ final class ReportPdfRenderer
     /** @param array<string, mixed> $configuration */
     public function render(ReportResult $result, Company $company, array $configuration = []): string
     {
-        $status = $this->runtime->status();
-        if (! $status['available'] || $status['binary'] === null) {
-            throw new ReportPdfException($status['reason'] ?? 'unavailable', $status['message']);
-        }
-
         $document = $this->composer->compose($result, $company, $configuration);
         $view = match ($result->definition->kind) {
             ReportKind::Contracts => 'reports.contracts',
@@ -32,6 +27,16 @@ final class ReportPdfRenderer
         $html = view($view, [
             'document' => $document,
         ])->render();
+
+        return $this->renderHtml($html);
+    }
+
+    public function renderHtml(string $html): string
+    {
+        $status = $this->runtime->status();
+        if (! $status['available'] || $status['binary'] === null) {
+            throw new ReportPdfException($status['reason'] ?? 'unavailable', $status['message']);
+        }
 
         try {
             $process = Process::timeout((int) config('reporting.timeout'))
