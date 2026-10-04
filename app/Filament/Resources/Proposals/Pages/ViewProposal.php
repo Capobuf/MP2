@@ -366,14 +366,14 @@ class ViewProposal extends ViewRecord implements HasTable
                 $this->refreshProposal('Sorgente Presa in Visione');
             }),
             ActionGroup::make([
-                Action::make('reloadReality')->label('Ricarica Realtà')->visible(fn (ProposalItem $record): bool => $this->canRealign($record))->requiresConfirmation()->modalDescription('Tutte le decisioni che toccano la sorgente saranno ritirate. La realtà corrente sostituirà integralmente piano base e risultato.')->authorize(fn (): bool => $this->canPlan())->form([
+                Action::make('reloadReality')->label('Ricarica Realtà')->visible(fn (ProposalItem $record): bool => $this->canRealign($record))->requiresConfirmation()->modalDescription(fn (ProposalItem $record): View => $this->realignmentSummary($record, ProposalRealignmentChoice::Reload))->authorize(fn (): bool => $this->canPlan())->form([
                     Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
                     Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
                 ])->action(function (array $data, ProposalItem $record): void {
                     app(RealignProposalItem::class)->execute($this->actor(), $this->proposal(), $record, ProposalRealignmentChoice::Reload, null, [], $data['operation_id'], (int) $data['proposal_revision']);
                     $this->refreshProposal('Realtà Ricaricata per l’Intera Sorgente');
                 }),
-                Action::make('keepProposal')->label('Mantieni Proposta')->visible(fn (ProposalItem $record): bool => $this->canRealign($record))->requiresConfirmation()->modalDescription('La realtà corrente diventa il nuovo piano base e tutte le decisioni attive della sorgente vengono rivalidate e riapplicate.')->authorize(fn (): bool => $this->canPlan())->form([
+                Action::make('keepProposal')->label('Mantieni Proposta')->visible(fn (ProposalItem $record): bool => $this->canRealign($record))->requiresConfirmation()->modalDescription(fn (ProposalItem $record): View => $this->realignmentSummary($record, ProposalRealignmentChoice::Keep))->authorize(fn (): bool => $this->canPlan())->form([
                     Textarea::make('reason')->label('Motivazione')->required(),
                     Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
                     Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision),
@@ -381,7 +381,7 @@ class ViewProposal extends ViewRecord implements HasTable
                     app(RealignProposalItem::class)->execute($this->actor(), $this->proposal(), $record, ProposalRealignmentChoice::Keep, $data['reason'], [], $data['operation_id'], (int) $data['proposal_revision']);
                     $this->refreshProposal('Decisioni Riapplicate alla Realtà Corrente');
                 }),
-                Action::make('manualRealignment')->label('Rivedi Manualmente')->visible(fn (ProposalItem $record): bool => $this->canRealign($record))->requiresConfirmation()->modalDescription('Selezionare le decisioni da mantenere. Le altre saranno ritirate senza riscriverne lo storico.')->authorize(fn (): bool => $this->canPlan())->form([
+                Action::make('manualRealignment')->label('Rivedi Manualmente')->visible(fn (ProposalItem $record): bool => $this->canRealign($record))->requiresConfirmation()->modalDescription(fn (ProposalItem $record): View => $this->realignmentSummary($record, ProposalRealignmentChoice::Manual))->authorize(fn (): bool => $this->canPlan())->form([
                     CheckboxList::make('retained_action_ids')->label('Decisioni da Mantenere')->options(fn (ProposalItem $record): array => app(ProposalActionReplay::class)->touchingActions($record, $this->proposal()->actions()->get())->mapWithKeys(fn ($action): array => [$action->id => '#'.$action->sequence.' · '.$action->action_type->label()])->all()),
                     Textarea::make('reason')->label('Nota di Revisione'),
                     Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
@@ -677,6 +677,34 @@ class ViewProposal extends ViewRecord implements HasTable
                 'version' => 'v'.$this->nextBudgetVersion(),
                 'impacts' => $this->sourceOverview['impacts'],
                 'blocks' => $this->sourceOverview['verification']['blocks'],
+            ],
+        ]);
+    }
+
+    private function realignmentSummary(ProposalItem $item, ProposalRealignmentChoice $choice): View
+    {
+        $source = match ($item->source_type) {
+            ProposalSourceType::Expense => $item->expense,
+            ProposalSourceType::Project => $item->project,
+            ProposalSourceType::Contract => $item->contract,
+        };
+        if ($source === null) {
+            throw new \UnexpectedValueException('A live source is required to describe realignment.');
+        }
+
+        $actions = app(ProposalActionReplay::class)
+            ->touchingActions($item, $this->proposal()->actions()->get())
+            ->map(fn ($action): array => [
+                'sequence' => $action->sequence,
+                'label' => $action->action_type->label(),
+            ])->all();
+
+        return view('filament.resources.proposals.components.realignment-summary', [
+            'summary' => [
+                'baseline_revision' => $item->baseline_revision,
+                'current_revision' => (int) $source->revision,
+                'choice' => $choice->value,
+                'actions' => $actions,
             ],
         ]);
     }
