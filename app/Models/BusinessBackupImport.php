@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['package_id', 'format_version', 'company_id', 'imported_by_id', 'completed_at'])]
+#[Fillable(['import_operation_id', 'source_tenant_uuid', 'target_tenant_uuid', 'operation', 'package_id', 'format_version', 'company_id', 'imported_by_id', 'completed_at'])]
 class BusinessBackupImport extends Model
 {
     /** @return BelongsTo<Company, $this> */

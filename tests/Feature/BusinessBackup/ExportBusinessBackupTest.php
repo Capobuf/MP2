@@ -2,10 +2,12 @@
 
 use App\Actions\BusinessBackup\ExportBusinessBackup;
 use App\BusinessBackup\V1\BusinessBackupContract;
+use App\BusinessBackup\V1\BusinessBackupValidator;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
@@ -30,15 +32,22 @@ it('exports the exact current workbook only for a viewer of an active Tenant', f
     $artifact = app(ExportBusinessBackup::class)->execute($company, $viewer);
     try {
         expect($artifact['filename'])->toBe(sprintf(
-            'MP2-azienda-backup-%s-%s.xlsx',
+            'MP2-azienda-backup-%s-%s.zip',
             now($company->timezone)->format('Y-m-d'),
             $artifact['package_id'],
         ))
             ->and(is_file($artifact['path']))->toBeTrue();
 
-        $workbook = IOFactory::load($artifact['path']);
+        $zip = new ZipArchive;
+        $zip->open($artifact['path']);
+        $dataPath = tempnam(sys_get_temp_dir(), 'mp2-data-');
+        file_put_contents($dataPath, $zip->getFromName('data.xlsx'));
+        $zip->close();
+        expect(fn () => app(BusinessBackupValidator::class)->validate($dataPath))->toThrow(ValidationException::class, 'bundle ZIP completo');
+        $workbook = IOFactory::load($dataPath);
+        unlink($dataPath);
         expect($workbook->getSheetNames())->toBe([
-            ...BusinessBackupContract::VISIBLE_SHEETS,
+            ...BusinessBackupContract::visibleSheetsForVersion('3'),
             BusinessBackupContract::MANIFEST,
             ...BusinessBackupContract::machineSheets(),
         ]);

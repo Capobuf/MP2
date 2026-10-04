@@ -2,6 +2,7 @@
 
 namespace App\BusinessBackup\V1;
 
+use App\Domain\Proposals\ProposalActionType;
 use App\Models\Company;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -18,21 +19,28 @@ final class BusinessBackupCollector
      *   visible: array<string, array{columns: list<string>, rows: list<list<string>>}>
      * }
      */
-    public function collect(Company $company, ?string $packageId = null, ?CarbonImmutable $exportedAt = null): array
+    public function collect(Company $company, ?string $packageId = null, ?CarbonImmutable $exportedAt = null, string $version = BusinessBackupContract::FORMAT_VERSION): array
     {
         $packageId ??= (string) Str::uuid();
         $exportedAt ??= CarbonImmutable::now('UTC');
         $companyId = (int) $company->getKey();
+        $company = Company::query()->with('tenantCompany')->findOrFail($companyId);
 
-        $data = $this->read($companyId);
+        $data = $this->read($companyId, $version);
         $refs = $this->references($data);
         $machine = $this->machineSheets($company, $data, $refs);
 
-        foreach (BusinessBackupContract::SCHEMAS as $sheet => $columns) {
+        if ($version === '3') {
+            $machine = $this->addProposals($machine, $data, $refs);
+        }
+        foreach (BusinessBackupContract::schemasForVersion($version) as $sheet => $columns) {
             $machine[$sheet] ??= ['columns' => $columns, 'rows' => []];
         }
 
         return [
+            'format_version' => $version,
+            'source_tenant_uuid' => $company->tenantCompany->portable_uuid,
+            'file_sources' => $this->fileSources($company, $data, $refs),
             'package_id' => $packageId,
             'exported_at' => $exportedAt->toIso8601String(),
             'company' => ['name' => $company->name, 'timezone' => $company->timezone],
@@ -42,7 +50,7 @@ final class BusinessBackupCollector
     }
 
     /** @return array<string, list<object>> */
-    private function read(int $companyId): array
+    private function read(int $companyId, string $version): array
     {
         $companyTables = [
             'suppliers', 'cost_centers', 'exercises', 'projects', 'project_transitions',
@@ -52,10 +60,13 @@ final class BusinessBackupCollector
             'budget_source_rows', 'budget_evidence', 'closing_snapshots', 'closing_source_rows',
             'late_corrections', 'historical_error_annotations', 'attachments',
         ];
+        if ($version === '3') {
+            $companyTables = [...$companyTables, 'proposals', 'proposal_items', 'proposal_actions'];
+        }
         $data = [];
         foreach ($companyTables as $table) {
             $query = DB::table($table)->where('company_id', $companyId)->orderBy('id');
-            if ($table === 'attachments') {
+            if ($table === 'attachments' && $version !== '3') {
                 $query->whereNull('proposal_id');
             }
             $data[$table] = $query->get()->all();
@@ -89,8 +100,9 @@ final class BusinessBackupCollector
             'project_deferral' => 'project_deferrals', 'budget' => 'budget_snapshots', 'budget_row' => 'budget_source_rows',
             'budget_evidence' => 'budget_evidence', 'closing' => 'closing_snapshots', 'closing_row' => 'closing_source_rows',
             'late_correction' => 'late_corrections', 'annotation' => 'historical_error_annotations', 'attachment' => 'attachments',
+            'proposal' => 'proposals', 'proposal_item' => 'proposal_items', 'proposal_action' => 'proposal_actions',
         ] as $type => $table) {
-            $refs->register($type, array_map(fn (object $row): int => (int) $row->id, $data[$table]));
+            $refs->register($type, array_map(fn (object $row): int => (int) $row->id, $data[$table] ?? []));
         }
 
         return $refs;
@@ -278,13 +290,104 @@ final class BusinessBackupCollector
             'Allegati' => ['columns' => ['Proprietario', 'Nome', 'Media type', 'Byte', 'SHA-256', 'Stato'], 'rows' => array_map(fn (array $x): array => [$x[1], $x[3], $x[4], $x[5], $x[6], $x[7]], $machine['_MP2_attachments']['rows'])],
         ];
 
+        if (isset($machine['_MP2_proposals'])) {
+            $years = array_column($machine['_MP2_exercises']['rows'], 1, 0);
+            $budgets = [];
+            foreach ($machine['_MP2_budgets']['rows'] as $budget) {
+                if ($budget[8] !== '') {
+                    $budgets[$budget[8]] = $years[$budget[1]].' · v'.$budget[2];
+                }
+            }
+            $views['Proposte'] = ['columns' => ['Esercizio', 'Scopo', 'Stato', 'Data creazione', 'Data terminale', 'Budget collegato'], 'rows' => array_map(fn (array $row): array => [
+                $years[$row[1]], $row[3] === 'initial_budget' ? 'Budget iniziale' : 'Revisione',
+                ['draft' => 'Bozza', 'approved' => 'Approvata', 'discarded' => 'Scartata'][$row[4]],
+                $row[5], $row[7] ?: $row[8], $budgets[$row[0]] ?? '',
+            ], $machine['_MP2_proposals']['rows'])];
+        }
+
         return $views;
+    }
+
+    /** @param array<string, array{columns: list<string>, rows: list<list<string>>}> $machine
+     * @param  array<string, list<object>>  $data
+     * @return array<string, array{columns: list<string>, rows: list<list<string>>}>
+     */
+    private function addProposals(array $machine, array $data, PortableReferences $refs): array
+    {
+        $codec = new ProposalPortableCodec;
+        $itemRefs = [];
+        foreach ($data['proposal_items'] as $item) {
+            $itemRefs[$item->proposal_item_id] = $refs->get('proposal_item', $item->id);
+        }
+        $resolve = fn (string $type, mixed $id): string => match ($type) {
+            'origin' => $refs->origin('', (string) $id),
+            'proposal_item_uuid' => $itemRefs[$id] ?? throw new \UnexpectedValueException('Unknown Proposal item identity.'),
+            default => $refs->get($type, $id),
+        };
+        $schemas = BusinessBackupContract::schemasForVersion('3');
+        $machine['_MP2_proposals'] = ['columns' => $schemas['_MP2_proposals'], 'rows' => array_map(fn (object $x): array => [
+            $refs->get('proposal', $x->id), $refs->get('exercise', $x->exercise_id), $refs->get('budget', $x->reference_budget_id),
+            $x->purpose, $x->status, $this->timestamp($x->created_at), $this->timestamp($x->updated_at),
+            $this->timestamp($x->approved_at), $this->timestamp($x->discarded_at), $this->str($x->discard_reason),
+        ], $data['proposals'])];
+        $machine['_MP2_proposal_items'] = ['columns' => $schemas['_MP2_proposal_items'], 'rows' => array_map(fn (object $x): array => [
+            $refs->get('proposal_item', $x->id), $refs->get('proposal', $x->proposal_id), $x->source_type,
+            $refs->get($x->source_type, $x->{$x->source_type.'_id'}), $refs->origin('', $x->copied_from_origin_key),
+            PortablePayload::json($codec->encode($this->decode($x->baseline, []), $resolve, null, $x->source_type)),
+            PortablePayload::json($codec->encode($this->decode($x->result, []), $resolve, null, $x->source_type)),
+            $x->readiness_state, PortablePayload::json($this->decode($x->readiness_reasons, [])), $this->bool($x->read_only_source), $this->timestamp($x->last_aligned_at),
+        ], $data['proposal_items'])];
+        $machine['_MP2_proposal_actions'] = ['columns' => $schemas['_MP2_proposal_actions'], 'rows' => array_map(fn (object $x): array => [
+            $refs->get('proposal_action', $x->id), $refs->get('proposal', $x->proposal_id), $refs->get('proposal_item', $x->proposal_item_id),
+            (string) $x->sequence, $x->action_type, (string) $x->payload_version,
+            PortablePayload::json($codec->encodeAction(ProposalActionType::from($x->action_type), $this->decode($x->payload, []), $resolve)),
+            $this->str($x->reason), $x->status, $this->timestamp($x->created_at), $this->timestamp($x->withdrawn_at), $this->str($x->withdraw_reason),
+        ], $data['proposal_actions'])];
+        foreach ($data['budget_snapshots'] as $i => $budget) {
+            $machine['_MP2_budgets']['rows'][$i][] = $refs->get('proposal', $budget->proposal_id);
+        }
+        foreach ($data['budget_source_rows'] as $i => $row) {
+            $machine['_MP2_budget_rows']['rows'][$i][] = $row->proposal_item_id === null ? '' : ($itemRefs[$row->proposal_item_id] ?? '');
+        }
+        foreach ($data['attachments'] as $i => $attachment) {
+            $machine['_MP2_attachments']['rows'][$i] = [...$machine['_MP2_attachments']['rows'][$i], $this->timestamp($attachment->created_at), $this->timestamp($attachment->detached_at)];
+        }
+        foreach ($data['budget_evidence'] as $i => $evidence) {
+            $machine['_MP2_budget_evidence']['rows'][$i][] = $this->bool($evidence->storage_path !== null || $evidence->attachment_id !== null);
+        }
+        foreach (['_MP2_budgets', '_MP2_budget_rows', '_MP2_attachments', '_MP2_budget_evidence'] as $name) {
+            $machine[$name]['columns'] = $schemas[$name];
+        }
+
+        return $machine;
+    }
+
+    /** @param array<string, list<object>> $data
+     * @return list<array<string, mixed>>
+     */
+    private function fileSources(Company $company, array $data, PortableReferences $refs): array
+    {
+        $files = [];
+        if ($company->logo_path !== null) {
+            $files[] = ['kind' => 'logo', 'ref' => 'COM-0000000001', 'disk' => $company->logo_disk, 'path' => $company->logo_path, 'media_type' => $company->logo_media_type, 'size' => null, 'sha256' => null];
+        }
+        foreach (['attachments' => 'attachment', 'budget_evidence' => 'budget_evidence'] as $table => $type) {
+            foreach ($data[$table] as $x) {
+                if ($table === 'budget_evidence' && ($x->attachment_id !== null || $x->storage_path === null)) {
+                    continue;
+                }
+                $files[] = ['kind' => $table === 'attachments' ? 'attachment' : 'budget_evidence', 'ref' => $refs->get($type, $x->id), 'disk' => $x->storage_disk, 'path' => $x->storage_path, 'media_type' => $x->media_type, 'size' => (int) $x->size_bytes, 'sha256' => $x->sha256];
+            }
+        }
+
+        return $files;
     }
 
     /** @return array{0: string, 1: string} */
     private function attachmentOwner(object $attachment, PortableReferences $r): array
     {
         return match (true) {
+            $attachment->proposal_id !== null => ['proposal', $r->get('proposal', $attachment->proposal_id)],
             $attachment->contract_id !== null => ['contract', $r->get('contract', $attachment->contract_id)],
             $attachment->expense_id !== null => ['expense', $r->get('expense', $attachment->expense_id)],
             $attachment->expense_line_id !== null => ['expense_line', $r->get('expense_line', $attachment->expense_line_id)],

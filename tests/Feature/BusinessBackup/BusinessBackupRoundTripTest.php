@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\BusinessBackup\ExportBusinessBackup;
 use App\Actions\BusinessBackup\ImportBusinessBackup;
 use App\BusinessBackup\V1\BusinessBackupValidator;
 use App\Models\BudgetSnapshot;
@@ -16,6 +15,7 @@ use App\Models\Supplier;
 use App\Models\SupplierContact;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\LegacyBusinessBackup;
 use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
@@ -86,7 +86,7 @@ it('round trips a representative portable business graph and retries idempotentl
         ],
     ]);
 
-    $artifact = app(ExportBusinessBackup::class)->execute($company, $actor);
+    $artifact = app(LegacyBusinessBackup::class)->execute($company, $actor);
 
     try {
         $package = app(BusinessBackupValidator::class)->validate($artifact['path']);

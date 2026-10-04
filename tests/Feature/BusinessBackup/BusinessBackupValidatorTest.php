@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\BusinessBackup\ExportBusinessBackup;
 use App\Actions\BusinessBackup\ImportBusinessBackup;
 use App\BusinessBackup\V1\BusinessBackupContract;
 use App\BusinessBackup\V1\BusinessBackupValidator;
@@ -22,6 +21,7 @@ use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use Tests\Support\LegacyBusinessBackup;
 use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
@@ -90,7 +90,7 @@ it('rejects corrupt future orphan duplicate and non-canonical workbooks before w
         'approved_allocation' => '10.00',
         'detail' => [],
     ]);
-    $artifact = app(ExportBusinessBackup::class)->execute($company, $actor);
+    $artifact = app(LegacyBusinessBackup::class)->execute($company, $actor);
     $initialCompanies = Company::query()->count();
 
     try {
@@ -196,7 +196,7 @@ it('accepts a previous V1 workbook without hierarchy and restores every cost cen
     $admin = User::factory()->platformAdmin()->create();
     grantTestPermissions(['company_id' => $company->id, 'user' => $admin, 'permissions' => TestPermissions::VIEW]);
     CostCenter::factory()->for($company)->count(2)->create();
-    $artifact = app(ExportBusinessBackup::class)->execute($company, $admin);
+    $artifact = app(LegacyBusinessBackup::class)->execute($company, $admin);
     $legacyPath = storage_path('framework/testing/business-backup-v1.xlsx');
 
     try {

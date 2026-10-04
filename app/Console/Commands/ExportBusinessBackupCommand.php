@@ -13,7 +13,7 @@ final class ExportBusinessBackupCommand extends Command
 {
     protected $signature = 'business-backup:export {company : ID Azienda} {--drive : Salva sul disk Google Drive configurato} {--output= : Directory locale di destinazione}';
 
-    protected $description = 'Esporta il Business Data Backup XLSX di un Tenant operativo';
+    protected $description = 'Esporta il Business Data Backup ZIP di un Tenant operativo';
 
     public function handle(ExportBusinessBackup $export): int
     {

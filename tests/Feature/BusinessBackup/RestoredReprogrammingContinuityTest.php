@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\BusinessBackup\ExportBusinessBackup;
 use App\Actions\BusinessBackup\ImportBusinessBackup;
 use App\Actions\Operations\ChangeProjectDeferral;
 use App\Actions\Proposals\ApplyProjectDeferral;
@@ -14,6 +13,7 @@ use App\Models\ProjectDeferral;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\LegacyBusinessBackup;
 use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
@@ -44,7 +44,7 @@ it('reverses an imported active Reprogramming with rebuilt local effect metadata
         ]],
     ], (string) Str::uuid());
 
-    $artifact = app(ExportBusinessBackup::class)->execute($company, $actor);
+    $artifact = app(LegacyBusinessBackup::class)->execute($company, $actor);
     try {
         $restored = app(ImportBusinessBackup::class)->execute($actor, app(BusinessBackupValidator::class)->validate($artifact['path']));
     } finally {

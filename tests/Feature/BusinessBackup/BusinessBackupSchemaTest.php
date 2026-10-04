@@ -23,3 +23,29 @@ it('allows only the historical actor and Budget proposal columns required by res
     expect(Schema::hasTable('business_backup_imports'))->toBeTrue()
         ->and(Schema::hasColumns('business_backup_imports', ['package_id', 'format_version', 'company_id', 'imported_by_id', 'completed_at']))->toBeTrue();
 });
+
+it('classifies every tenant-owned table as portable data or a deliberate exclusion', function (): void {
+    $included = [
+        'companies', 'tenant_companies', 'suppliers', 'supplier_contacts', 'cost_centers', 'exercises',
+        'projects', 'project_transitions', 'project_exercise_classifications', 'contracts',
+        'contract_renewal_configurations', 'contract_lifecycle_facts', 'contract_conditions',
+        'contract_exercise_classifications', 'project_contract_links', 'expenses', 'expense_lines',
+        'project_deferrals', 'budget_snapshots', 'budget_source_rows', 'budget_evidence',
+        'closing_snapshots', 'closing_source_rows', 'late_corrections', 'historical_error_annotations',
+        'attachments', 'proposals', 'proposal_items', 'proposal_actions',
+    ];
+    $excluded = ['users', 'company_capabilities', 'audit_events', 'business_backup_imports', 'platform_lifecycle_events', 'pending_file_deletions'];
+    $tables = Schema::getTableListing(schemaQualified: false);
+    $owned = ['companies', 'tenant_companies'];
+    do {
+        $previous = $owned;
+        foreach ($tables as $table) {
+            if (Schema::hasColumn($table, 'company_id') || collect(Schema::getForeignKeys($table))->contains(fn (array $key): bool => in_array($key['foreign_table'], array_diff($owned, $excluded), true))) {
+                $owned[] = $table;
+            }
+        }
+        $owned = array_values(array_unique($owned));
+    } while ($owned !== $previous);
+
+    expect(array_diff($owned, $included, $excluded))->toBe([]);
+});

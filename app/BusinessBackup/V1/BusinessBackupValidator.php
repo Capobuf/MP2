@@ -5,6 +5,7 @@ namespace App\BusinessBackup\V1;
 use App\BusinessBackup\BackupPreview;
 use App\Models\Company;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
@@ -19,7 +20,7 @@ final class BusinessBackupValidator
      *   machine: array<string, array{columns: list<string>, rows: list<list<string>>}>,
      *   preview: BackupPreview
      * } */
-    public function validate(string $path): array
+    public function validate(string $path, bool $bundle = false): array
     {
         try {
             $reader = IOFactory::createReaderForFile($path);
@@ -30,14 +31,6 @@ final class BusinessBackupValidator
         }
 
         try {
-            $expectedSheets = [...BusinessBackupContract::VISIBLE_SHEETS, BusinessBackupContract::MANIFEST, ...BusinessBackupContract::machineSheets()];
-            $this->assert($workbook->getSheetNames() === $expectedSheets, 'L’elenco o l’ordine dei fogli non coincide con un formato MP2 supportato.');
-
-            $visible = [];
-            foreach (BusinessBackupContract::VISIBLE_SHEETS as $name) {
-                $visible[$name] = $this->readUnknownSchema($workbook->getSheetByName($name), false);
-            }
-
             $manifestData = $this->readExact($workbook->getSheetByName(BusinessBackupContract::MANIFEST), ['key', 'value'], true);
             $manifest = [];
             foreach ($manifestData['rows'] as $row) {
@@ -45,8 +38,16 @@ final class BusinessBackupValidator
                 $manifest[$row[0]] = $row[1];
             }
             $version = $manifest['format_version'] ?? '';
-            $this->assert(in_array($version, [BusinessBackupContract::LEGACY_FORMAT_VERSION, BusinessBackupContract::FORMAT_VERSION], true), 'Versione backup non supportata.');
+            $this->assert(in_array($version, BusinessBackupContract::SUPPORTED_VERSIONS, true), 'Versione backup non supportata.');
+            $this->assert($version !== '3' || $bundle, 'Il formato V3 richiede il bundle ZIP completo.');
             $schemas = BusinessBackupContract::schemasForVersion($version);
+            $visibleNames = BusinessBackupContract::visibleSheetsForVersion($version);
+            $expectedSheets = [...$visibleNames, BusinessBackupContract::MANIFEST, ...array_keys($schemas)];
+            $this->assert($workbook->getSheetNames() === $expectedSheets, 'L’elenco o l’ordine dei fogli non coincide con un formato MP2 supportato.');
+            $visible = [];
+            foreach ($visibleNames as $name) {
+                $visible[$name] = $this->readUnknownSchema($workbook->getSheetByName($name), false);
+            }
             $this->assertManifest($manifest, $workbook->getProperties(), $schemas);
 
             $stored = [];
@@ -69,7 +70,16 @@ final class BusinessBackupValidator
             }
 
             $this->assertStructure($machine);
+            if ($version === '3') {
+                app(ProposalPackageRules::class)->validate($machine);
+            }
             $this->assertCompanyIdentity($manifest, $machine['_MP2_company']['rows'][0]);
+            if ($version === '3') {
+                foreach ($machine['_MP2_attachments']['rows'] as $row) {
+                    $this->assert($this->validTimestamp($row[8]), 'Data upload Attachment non valida.');
+                    $this->assert(($row[7] === 'active' && $row[9] === '') || ($row[7] === 'detached' && $this->validTimestamp($row[9])), 'Stato temporale Attachment incoerente.');
+                }
+            }
             $preview = $this->preview($manifest, $machine);
 
             return ['manifest' => $manifest, 'machine' => $machine, 'preview' => $preview];
@@ -85,6 +95,10 @@ final class BusinessBackupValidator
     private function assertManifest(array $manifest, Properties $properties, array $schemas): void
     {
         $required = ['format_version', 'package_id', 'exported_at', 'application_revision', 'company_ref', 'company_name', 'company_timezone', 'currency', 'vat_basis', 'machine_sheet_count'];
+        if ($manifest['format_version'] === '3') {
+            $required[] = 'source_tenant_uuid';
+            $this->assert(Str::isUuid($manifest['source_tenant_uuid'] ?? ''), 'Identità Tenant non valida.');
+        }
         foreach ($required as $key) {
             $this->assert(array_key_exists($key, $manifest), "Chiave manifest mancante [$key].");
         }
@@ -99,7 +113,7 @@ final class BusinessBackupValidator
             $expectedKeys[] = 'row_count:'.$sheet;
             $expectedKeys[] = 'sha256:'.$sheet;
         }
-        foreach (BusinessBackupContract::VISIBLE_SHEETS as $sheet) {
+        foreach (BusinessBackupContract::visibleSheetsForVersion($manifest['format_version']) as $sheet) {
             $expectedKeys[] = 'view_sha256:'.$sheet;
         }
         $this->assert(array_keys($manifest) === $expectedKeys, 'Il manifest contiene chiavi mancanti, aggiuntive o fuori ordine.');
@@ -254,6 +268,9 @@ final class BusinessBackupValidator
         $this->assertCostCenterHierarchy($m['_MP2_cost_centers']['rows']);
 
         foreach (BusinessBackupContract::ENUMS as $key => $allowed) {
+            if ($key === '_MP2_attachments.owner_type' && isset($m['_MP2_proposals'])) {
+                $allowed[] = 'proposal';
+            }
             [$sheet, $column] = explode('.', $key, 2);
             $index = array_search($column, $m[$sheet]['columns'], true);
             foreach ($m[$sheet]['rows'] as $row) {
@@ -653,7 +670,7 @@ final class BusinessBackupValidator
         $attachmentCount = count($m['_MP2_attachments']['rows']);
         $nameCollision = Company::query()->where('name', $manifest['company_name'])->exists();
         $warnings = [];
-        if ($attachmentCount > 0) {
+        if ($attachmentCount > 0 && $manifest['format_version'] !== '3') {
             $warnings[] = "{$attachmentCount} allegati non saranno ripristinati. Il backup ne conserva l’inventario, ma il formato V{$manifest['format_version']} non contiene i file originali.";
         }
         if ($nameCollision) {
@@ -680,7 +697,7 @@ final class BusinessBackupValidator
                 'expense' => 'EXP', 'project' => 'PRJ', 'contract' => 'CTR', default => 'INVALID',
             },
             '_MP2_attachments' => match ($row[1]) {
-                'expense' => 'EXP', 'expense_line' => 'LIN', 'contract' => 'CTR', 'historical_error_annotation' => 'ANN', default => 'INVALID',
+                'expense' => 'EXP', 'expense_line' => 'LIN', 'contract' => 'CTR', 'historical_error_annotation' => 'ANN', 'proposal' => 'PRO', default => 'INVALID',
             },
             default => 'INVALID',
         };

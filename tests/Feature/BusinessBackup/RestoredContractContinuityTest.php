@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\BusinessBackup\ExportBusinessBackup;
 use App\Actions\BusinessBackup\ImportBusinessBackup;
 use App\Actions\Operations\RecalculateContractEstimates;
 use App\BusinessBackup\V1\BusinessBackupValidator;
@@ -14,6 +13,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\LegacyBusinessBackup;
 use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
@@ -39,7 +39,7 @@ it('recalculates an imported Contract estimate without duplicating or double cou
     app(RecalculateContractEstimates::class)->execute($actor, $contract, [$exercise], (string) Str::uuid());
     $sourceAllocation = Expense::query()->where('contract_id', $contract->id)->where('origin', 'system')->sole()->allocation();
 
-    $artifact = app(ExportBusinessBackup::class)->execute($company, $actor);
+    $artifact = app(LegacyBusinessBackup::class)->execute($company, $actor);
     try {
         $restored = app(ImportBusinessBackup::class)->execute($actor, app(BusinessBackupValidator::class)->validate($artifact['path']));
     } finally {

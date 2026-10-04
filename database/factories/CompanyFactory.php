@@ -7,6 +7,7 @@ use App\Domain\Company\TenantCompanyStatus;
 use App\Models\Company;
 use App\Models\TenantCompany;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 /** @extends Factory<Company> */
 class CompanyFactory extends Factory
@@ -17,6 +18,7 @@ class CompanyFactory extends Factory
             TenantCompany::query()->create([
                 'company_id' => $company->getKey(),
                 'status' => TenantCompanyStatus::Active,
+                'portable_uuid' => (string) Str::uuid(),
             ]);
         });
     }

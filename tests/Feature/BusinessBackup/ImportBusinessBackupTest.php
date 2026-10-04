@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\BusinessBackup\ExportBusinessBackup;
 use App\Actions\BusinessBackup\ImportBusinessBackup;
 use App\BusinessBackup\V1\BusinessBackupValidator;
 use App\Models\Attachment;
@@ -13,6 +12,7 @@ use App\Models\SupplierContact;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\LegacyBusinessBackup;
 use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
@@ -29,7 +29,7 @@ it('rolls back any persistence failure and restores only destination-local acces
     Attachment::factory()->forContract($contract)->create(['uploaded_by_id' => $sourceMember->id]);
     Proposal::factory()->for($company)->for($importer, 'creator')->create();
 
-    $artifact = app(ExportBusinessBackup::class)->execute($company, $importer);
+    $artifact = app(LegacyBusinessBackup::class)->execute($company, $importer);
     try {
         $validated = app(BusinessBackupValidator::class)->validate($artifact['path']);
     } finally {

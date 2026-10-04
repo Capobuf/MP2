@@ -4,21 +4,24 @@
 
 **Created**: 2026-08-30
 
-**Status**: Complete
+**Status**: Implementata — Backup Cliente Portabile V3 (Issue #33)
 
-**Input**: Business Data Backup versionato di una singola Azienda in un file XLSX leggibile e ripristinabile come nuova Azienda semanticamente equivalente.
+**Input**: Backup Cliente Portabile di una singola Azienda, in un bundle ZIP V3 con workbook consultabile, Proposte e binari opzionali; importazione, copia o sostituzione esplicita per identità Tenant. V1/V2 XLSX restano legacy immutabili.
 
-> **Current format (2026-09-10):** exports use `format_version=2`. V2 is the V1
-> contract plus portable cost-center parent references and versioned Snapshot
-> lineage. Import continues to accept the immutable V1 contract, interpreting all
-> V1 cost centers as roots. See `contracts/workbook-v2.md` and
-> `contracts/restore-v2.md` for the delta.
+> **Formato corrente (Issue #33, 2026-10-04):** Backup Cliente Portabile ZIP,
+> `bundle_version=1`, `data_format_version=3`, con `manifest.json`, `data.xlsx`
+> e binari opzionali. V3 estende lo stesso motore BusinessBackup con tutte le
+> Proposte e una UUID stabile del Tenant. V1/V2 XLSX restano contratti legacy
+> immutabili (schema, manifest, enum, ordine e fogli visibili), importabili soltanto
+> come nuova Azienda; le loro esclusioni originali non cambiano.
+> Le decisioni consolidate e i criteri V3 sono definiti dalla
+> [Issue #33](https://github.com/Capobuf/MP2/issues/33).
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Scaricare un backup aziendale leggibile (Priority: P1)
 
-Come utente autorizzato alla lettura completa di un Tenant operativo, posso scaricare un singolo file XLSX che conserva il patrimonio informativo dell'Azienda e che resta comprensibile senza MP2.
+Come utente autorizzato alla lettura completa di un Tenant operativo, posso scaricare un singolo ZIP contenente un workbook consultabile che conserva il patrimonio informativo dell'Azienda e che resta comprensibile senza MP2.
 
 **Why this priority**: l'artefatto leggibile e completo è il valore primario della feature e il prerequisito del restore.
 
@@ -26,10 +29,10 @@ Come utente autorizzato alla lettura completa di un Tenant operativo, posso scar
 
 **Acceptance Scenarios**:
 
-1. **Given** un Tenant attivo e un utente con `visualizza`, **When** richiede il backup, **Then** riceve `MP2-<Azienda>-<data>.xlsx` completo, integro e generato da uno stato coerente dell'Azienda.
+1. **Given** un Tenant attivo e un utente con `visualizza`, **When** richiede il backup, **Then** riceve `MP2-<Azienda>-<data>-<package_id>.zip` completo, integro e generato da uno stato coerente dell'Azienda.
 2. **Given** dati testuali che iniziano con caratteri interpretabili come formule, **When** il file viene aperto, **Then** i testi restano dati e nessuna formula proveniente dal dominio viene eseguita.
 3. **Given** testo o contenuto materializzato oltre il limite di una cella, **When** il backup viene generato, **Then** nessun contenuto viene troncato e il valore completo resta ricomponibile.
-4. **Given** allegati aziendali, **When** il backup viene generato, **Then** il file contiene il loro inventario leggibile ma non i binari né riferimenti allo storage locale.
+4. **Given** allegati aziendali, **When** il backup viene generato, **Then** il workbook contiene il loro inventario leggibile; il ZIP include i binari soltanto se selezionati e non espone riferimenti allo storage locale.
 5. **Given** un utente privo di accesso o un Tenant archiviato, **When** tenta l'export, **Then** l'operazione viene rifiutata senza esporre dati.
 
 ---
@@ -52,7 +55,7 @@ Come Platform Admin posso caricare un backup MP2, verificarne formato, versione,
 
 ### User Story 3 - Ripristinare come nuova Azienda (Priority: P1)
 
-Come Platform Admin posso confermare il restore di un package valido per creare un nuovo Tenant attivo e una nuova Azienda economicamente e operativamente equivalente, senza importare utenti, permessi, audit o Proposte sorgente.
+Come Platform Admin posso confermare il restore di un package valido per creare un nuovo Tenant attivo e una nuova Azienda economicamente e operativamente equivalente, senza importare utenti, accessi o Timeline/Audit sorgente.
 
 **Why this priority**: completa la garanzia di portabilità semantica del backup.
 
@@ -60,16 +63,16 @@ Come Platform Admin posso confermare il restore di un package valido per creare 
 
 **Acceptance Scenarios**:
 
-1. **Given** un package V1 o V2 valido e confermato, **When** il restore termina, **Then** esiste un solo nuovo Tenant attivo con nuova Azienda, riferimenti locali ricostruiti e normali capability iniziali assegnate soltanto al Platform Admin importatore.
+1. **Given** un package V1 o V2 valido e confermato, **When** il restore termina, **Then** esiste un solo nuovo Tenant attivo con nuova Azienda e riferimenti locali ricostruiti, senza utenti o accessi sorgente; l'importatore conserva il proprio ruolo globale di Super Admin.
 2. **Given** un errore in qualunque fase di persistenza o verifica finale, **When** il restore fallisce, **Then** non resta visibile alcuna Azienda parziale.
-3. **Given** lo stesso `package_id` già importato con successo, **When** il restore viene ritentato, **Then** viene restituito il risultato esistente e non nasce una seconda Azienda.
+3. **Given** lo stesso `import_operation_id` già completato con successo, **When** il restore viene ritentato, **Then** viene restituito il risultato esistente e non nasce una seconda Azienda; se eliminato, viene segnalata l’operazione già completata.
 4. **Given** un'Azienda esistente con la stessa denominazione, **When** il restore viene confermato, **Then** viene creata comunque una nuova identità dopo il warning, senza merge o matching.
 
 ---
 
 ### User Story 4 - Continuare a operare dopo il restore (Priority: P1)
 
-Come utente della nuova istanza posso continuare i normali processi MP2 dai dati ripristinati senza duplicare Stime contrattuali, perdere la reversibilità della Riprogrammazione o dipendere da Proposte e utenti sorgente.
+Come utente della nuova istanza posso continuare i normali processi MP2 dai dati ripristinati senza duplicare Stime contrattuali, perdere la reversibilità della Riprogrammazione o dipendere dagli utenti sorgente; le Proposte V3 conservano riferimenti locali.
 
 **Why this priority**: la sola leggibilità storica non soddisfa l'equivalenza operativa richiesta.
 
@@ -86,7 +89,7 @@ Come utente della nuova istanza posso continuare i normali processi MP2 dai dati
 
 ### User Story 5 - Salvare lo stesso backup su Drive o da comando (Priority: P2)
 
-Come utente autorizzato posso salvare sul disco Google Drive configurato lo stesso XLSX prodotto dal motore; come operatore posso invocare lo stesso servizio da comando e scheduler senza definire in questa feature una cadenza o retention automatica.
+Come utente autorizzato posso salvare sul disco Google Drive configurato lo stesso ZIP V3 prodotto dal motore; come operatore posso invocare lo stesso servizio da comando e scheduler senza definire in questa feature una cadenza o retention automatica.
 
 **Why this priority**: offre una destinazione remota e rende il motore automatizzabile senza introdurre sincronizzazione.
 
@@ -94,7 +97,7 @@ Come utente autorizzato posso salvare sul disco Google Drive configurato lo stes
 
 **Acceptance Scenarios**:
 
-1. **Given** un disk Drive configurato, **When** l'utente salva il backup, **Then** viene scritto lo stesso XLSX completo senza conversione in Google Sheet.
+1. **Given** un disk Drive configurato, **When** l'utente salva il backup, **Then** viene scritto lo stesso ZIP V3 completo senza conversione in Google Sheet.
 2. **Given** un disk Drive non configurato, **When** viene mostrata la pagina Backup dati, **Then** l'azione Drive non è disponibile e il download locale resta utilizzabile.
 3. **Given** un Tenant archiviato, **When** comando o scheduler tentano il backup, **Then** il dominio non viene letto né modificato.
 
@@ -117,9 +120,9 @@ Come utente autorizzato posso salvare sul disco Google Drive configurato lo stes
 
 - **FR-BDB-001**: Il Business Data Backup MUST rappresentare una sola Azienda e garantire equivalenza semantica dei dati aziendali, non uguaglianza tecnica dell'istanza.
 - **FR-BDB-002**: Il backup MUST includere ogni informazione che modifica valori economici o il loro calcolo, classificazione, interpretazione temporale o comportamento futuro, oltre alle anagrafiche e agli storici materializzati necessari.
-- **FR-BDB-003**: Il backup MUST escludere utenti, credenziali, MFA, sessioni, capability sorgente, Audit, Proposte e relative entità, dati tecnici di queue/cache, `PendingFileDeletion`, percorsi storage, ID locali, revision token tecnici, operation UUID e timestamp ordinari senza significato di dominio.
+- **FR-BDB-003**: Il backup MUST escludere utenti, credenziali, MFA, sessioni, accessi, Timeline/Audit, dati tecnici di queue/cache e PendingFileDeletion. ID locali, revision token e operation UUID MUST essere rimappati o ricostruiti, mai usati come identità portabili. V1/V2 escludono anche Proposte e binari; V3 include tutte le Proposte.
 - **FR-BDB-004**: Date e timestamp di dominio MUST essere preservati; le date MUST restare date e i timestamp MUST usare una rappresentazione ISO 8601 non ambigua.
-- **FR-BDB-005**: L'export corrente MUST produrre un solo file `MP2-<Azienda>-<data>.xlsx` con `format_version=2`; ZIP, JSON, CSV e dump database MUST NOT essere formati canonici alternativi. Il contratto V1 resta immutabile e supportato in import.
+- **FR-BDB-005**: L’export corrente MUST produrre un unico `MP2-<Azienda>-<data>-<package_id>.zip` con bundle_version=1 e data_format_version=3. V3 XLSX isolato MUST essere rifiutato. V1/V2 XLSX restano importabili direttamente e i contratti legacy sono immutabili.
 - **FR-BDB-006**: Il workbook MUST contenere manifest diagnostico con package UUID, export time, versione applicativa se disponibile, Azienda, timezone, EUR netto IVA, conteggi e checksum SHA-256 del contenuto canonico dei fogli macchina.
 - **FR-BDB-007**: Il workbook MUST contenere fogli visibili Informazioni, Riepilogo per Esercizio, Budget, Spese, Progetti, Contratti, Fornitori, Centri di Costo, Chiusure, Correzioni/Annotazioni e inventario allegati.
 - **FR-BDB-008**: Le viste visibili MUST mostrare valori materializzati e spiegare che il file è consultabile, che l'analisi va svolta su una copia e che modificare il backup invalida il restore garantito.
@@ -134,36 +137,36 @@ Come utente autorizzato posso salvare sul disco Google Drive configurato lo stes
 - **FR-BDB-017**: Contratti MUST preservare dati descrittivi, Fornitore, date, rinnovo e storico configurazioni, condizioni, ciclo, attribuzione, lifecycle, annullamenti, classificazioni, Spese e comportamento economico futuro senza riesecuzione retroattiva.
 - **FR-BDB-018**: Le Spese di sistema dei Contratti MUST essere esportate e ripristinate una sola volta; il restore MUST NOT rigenerarle e il successivo ricalcolo MUST aggiornarle senza duplicati.
 - **FR-BDB-019**: Le relazioni `Collegato a` MUST preservare Progetto, Contratto, Nota e Archivio senza acquisire significato economico.
-- **FR-BDB-020**: Il backup MUST includere Budget approvati e MUST escludere Proposal, ProposalItem e ProposalAction.
-- **FR-BDB-021**: Ogni Budget MUST preservare Esercizio, versione, purpose, approvazione, predecessore, totale, righe e dettaglio business materializzato richiesto da reporting e drill-down, senza `proposal_id`, ProposalItem UUID, audit o operation UUID canonici.
+- **FR-BDB-020**: V3 MUST includere Proposal Draft, Approved e Discarded, relativi Item e Action active/withdrawn, usando riferimenti portabili espliciti. Le terminali restano immutabili; le Draft ricostruiscono baseline, piano e readiness locali senza Audit storico. V1/V2 mantengono l’esclusione originaria delle Proposte.
+- **FR-BDB-021**: Ogni Budget MUST preservare i dati storici materializzati. V3 MUST mantenere Proposal ↔ Budget e BudgetRow → ProposalItem; il nuovo UUID dell’item MUST coincidere nella colonna e nel detail.identity. Budget legacy senza Proposal sono validi; gli identificatori tecnici sorgente non sono identità portabili.
 - **FR-BDB-022**: Il dettaglio Budget di ogni versione MUST essere un contratto portabile esplicito e MUST NOT serializzare ciecamente il payload tecnico corrente; in V2 le lineage gerarchiche materializzate MUST usare riferimenti portabili.
 - **FR-BDB-023**: Un Budget importato MUST poter esistere senza Proposal locale e diventare predecessore di una nuova Revisione locale.
 - **FR-BDB-024**: La Snapshot di Chiusura MUST essere ripristinata come fotografia originale materializzata, inclusi riferimenti Budget portabili, valori, righe, warning, impostazioni e decisione N+1; MUST NOT essere ricalcolata dalla realtà viva.
 - **FR-BDB-025**: Correzioni tardive e Annotazioni di errore storico MUST essere preservate anche a impatto zero, mantenendo distinzione fra Chiusura e Conoscenza Corrente e remappando soltanto riferimenti esplicitamente portabili.
-- **FR-BDB-026**: Gli allegati binari MUST NOT essere ripristinati; il workbook MUST inventariarne proprietario, nome, media type, dimensione, SHA-256 e stato, escludendo disk, path, uploader e detacher.
-- **FR-BDB-026A**: Il logo aziendale, dato binario di presentazione, MUST NOT essere incluso né ripristinato dal formato V1; l'interfaccia MUST dichiarare che va riconfigurato dopo il restore.
+- **FR-BDB-026**: V3 MUST inventariare anche Attachment Proposal, uploaded_at e detached_at. Con file inclusi MUST verificare ogni binario per size e SHA-256 e materializzarlo su path locale univoco, senza autori inventati. Con file esclusi (sempre V1/V2) MUST NOT creare Attachment senza file; BudgetEvidence resta metadata-only. Evidenze collegate a un Attachment riusano il suo nuovo file.
+- **FR-BDB-026A**: V3 MUST offrire Includi Logo e Includi Allegati ed Evidenze originali come due opzioni indipendenti, entrambe attive per default. Impostazioni e timezone MUST essere sempre incluse. Logo escluso significa nessun logo nel restore; V1/V2 restano senza logo.
 - **FR-BDB-027**: Le informazioni business di BudgetEvidence non legate al file MUST essere preservate quando applicabili, senza creare Attachment fittizi.
 - **FR-BDB-028**: Le FK autore dei record importabili MAY essere assenti soltanto per fatti importati; le normali operazioni locali MUST continuare a valorizzare l'autore e la UI MUST rappresentarne neutralmente l'assenza.
 - **FR-BDB-029**: Soltanto un Platform Admin MUST poter validare, vedere l'anteprima e confermare l'import.
-- **FR-BDB-030**: Ogni versione supportata MUST importare esclusivamente come nuova Azienda e nuovo Tenant attivo; merge, import in Azienda esistente, upsert, sync, deduplicazione e conflict resolver MUST NOT esistere.
-- **FR-BDB-031**: Il Platform Admin importatore MUST ricevere le normali capability iniziali della nuova Azienda; nessun altro utente o capability sorgente MUST essere importato o assegnato.
-- **FR-BDB-032**: La collisione di denominazione MUST produrre un warning ma MUST NOT dedurre identità né impedire la nuova Azienda.
-- **FR-BDB-033**: Validazione completa, preview e conferma MUST precedere una singola transazione che crea Azienda, importa dipendenze, ricostruisce riferimenti e Snapshot, verifica il risultato e crea Tenant/capability.
+- **FR-BDB-030**: Restore, Copy e Replace MUST essere solo super_admin e creare un Tenant Attivo. V1/V2 restano new-company-only. V3 senza collisione conserva la UUID sorgente; con collisione UUID richiede scelta esplicita Copy (UUID nuova) o Replace (distruzione canonica e ricreazione con UUID conservata nella stessa transazione). Non sono ammessi merge, sync o purge/reinsert nello stesso Tenant.
+- **FR-BDB-031**: Il Platform Admin importatore MUST conservare il proprio ruolo globale di Super Admin, senza essere rappresentato come capacità per Azienda (§31.16 canonica). Utenti, accessi e capability sorgente MUST NOT essere importati o assegnati.
+- **FR-BDB-032**: L’omonimia MUST essere solo un warning. Il target V3 MUST essere identificato esclusivamente dalla portable_uuid del Tenant, ricontrollata con ordine di lock Company → Tenant. Replace MUST ricontrollare anche expected_target_company_id e rifiutare un target sostituito dopo la preview.
+- **FR-BDB-033**: Validazione completa, preview e conferma MUST precedere una singola transazione che crea Azienda e Tenant, importa dipendenze, ricostruisce riferimenti e Snapshot e verifica il risultato; Replace include nella stessa transazione la distruzione canonica del target.
 - **FR-BDB-034**: Qualunque errore di import MUST produrre rollback completo; foreign key checks MUST NOT essere disabilitati globalmente e le normali Actions riferite a oggi MUST NOT essere usate per riprodurre lo storico.
-- **FR-BDB-035**: Ogni package MUST avere `package_id` UUID univoco; un retry dopo successo MUST restituire la precedente Azienda e non duplicarla.
+- **FR-BDB-035**: package_id MUST identificare la provenienza e import_operation_id la singola conferma. Retry/doppio submit della stessa operation MUST restituire la receipt senza mutazioni ripetute; un nuovo operation ID sullo stesso package consente una nuova operazione intenzionale. Il journal MUST sopravvivere alla distruzione del risultato con company_id null; una receipt senza risultato segnala operazione già completata. La UI MUST conservare l’operation ID sui retry.
 - **FR-BDB-036**: I checksum MUST coprire una serializzazione canonica deterministica dei fogli macchina e l'import MUST ricalcolarli e confrontarli prima di ogni write; V1 MUST NOT implementare firme o PKI.
 - **FR-BDB-037**: Importi, quantità e unitari nei fogli macchina MUST essere stringhe decimali canoniche validate per sintassi e scala prima della conversione.
 - **FR-BDB-038**: Tutti i testi MUST essere scritti con tipo esplicito e non essere interpretati come formule; i fogli macchina MUST NOT contenere formule.
 - **FR-BDB-039**: Testi e JSON oltre il limite XLSX MUST usare chunk ordinati sotto il limite con margine di sicurezza e MUST essere ricomposti byte-per-byte in UTF-8 senza troncamento.
 - **FR-BDB-040**: L'export MUST leggere uno stato coerente dell'Azienda, generare un artefatto temporaneo completo e pubblicarlo soltanto dopo successo.
 - **FR-BDB-041**: L'import MUST rifiutare prima delle scritture formato/versione/manifest/fogli invalidi, checksum errati, riferimenti duplicati/orfani/cross-company, parent di Centro inesistenti, cicli gerarchici, enum o decimal invalidi, lineage Budget incoerente, Chiusure e correzioni incoerenti, relazioni incompatibili, duplicate Stime di sistema, Riprogrammazioni incomplete e totali non riconciliati.
-- **FR-BDB-042**: L'equivalenza round-trip MUST confrontare l'intero patrimonio incluso e tutti i report canonici S11, ammettendo differenze soltanto per utenti, audit, Proposte, binari allegati, ID e altri dati tecnici esclusi.
+- **FR-BDB-042**: Il round-trip MUST preservare i dati e report canonici inclusi. Le differenze ammesse sono identità tecniche locali, utenti/accessi e Timeline/Audit; logo e binari esclusi dalle opzioni sono esclusioni esplicite. Le Proposte sono incluse in V3 e restano escluse in V1/V2.
 - **FR-BDB-043**: Il Tenant operativo MUST offrire `Backup dati` con download e, solo quando configurata, scrittura Drive riutilizzando l'autorizzazione `visualizza` senza nuova capability.
-- **FR-BDB-044**: Il pannello piattaforma MUST offrire `Importa Azienda da backup` soltanto ai Platform Admin e mostrare prima della conferma manifest, Esercizi, conteggi, totali, allegati non ripristinabili, collisione nome e warning.
-- **FR-BDB-045**: Google Drive MUST essere soltanto una destinazione immutabile dello stesso XLSX; nessuna conversione Sheet, lettura di modifiche, sincronizzazione, retention o cancellazione automatica è ammessa.
+- **FR-BDB-044**: Platform MUST accettare XLSX legacy e ZIP V3, validare completamente prima delle write e mostrare versioni, UUID, conteggi Proposal per stato, file/logo inclusi, dimensioni, omonimie, target Active/Archived ed esclusioni. Alla conferma MUST confrontare SHA-256 dell’intero upload e rivalidare. Replace MUST riusare il wizard Irreversibilità / Distruzione Definitiva e comunicare perdita di utenti/accessi, Timeline/Audit e file/logo esclusi.
+- **FR-BDB-045**: Drive MUST salvare byte-per-byte lo stesso ZIP V3 generato dal builder, con le stesse due opzioni del download. Nessuna conversione Sheet, sync o nuova retention è ammessa.
 - **FR-BDB-046**: Il motore di export MUST essere riutilizzabile da UI, comando e scheduler, senza introdurre frequenza, orario o retention non definiti.
 - **FR-BDB-047**: La release e il wizard shared-hosting MUST dichiarare e verificare tutte le estensioni PHP realmente richieste dal formato XLSX e dal disk Drive configurabile.
-- **FR-BDB-048**: Il Business Data Backup MUST restare distinto dal PDF reporting, dal disaster recovery tecnico, da template Excel modificabili e da futuri bundle con file.
+- **FR-BDB-048**: Il Backup Cliente Portabile estende BusinessBackup e MUST restare distinto da disaster recovery, dump SQL, sync e template modificabili. ZIP MUST usare ZipArchive e stream/file temporanei, con limiti tecnici configurabili e rifiuto di traversal, duplicati, entry inattese, cifrate/speciali, size/hash errati e decompressione oltre limite.
 - **FR-BDB-049**: V2 MUST rappresentare il padre con `parent_cost_center_ref`, mai con un ID database, e MUST consentire che la riga del padre segua quella del figlio.
 - **FR-BDB-050**: Il restore V2 MUST creare tutti i Centri prima di applicare i parent e MUST validare riferimenti mancanti e cicli prima della prima write.
 - **FR-BDB-051**: Il restore V1 MUST conservare il contratto V1 invariato e interpretare ogni Centro privo del campo gerarchico come radice.
@@ -171,12 +174,12 @@ Come utente autorizzato posso salvare sul disco Google Drive configurato lo stes
 
 ### Key Entities *(include if feature involves data)*
 
-- **Business Backup Package**: singolo workbook versionato relativo a un'Azienda, identificato da package UUID, manifest, conteggi e checksum.
+- **Business Backup Package**: bundle ZIP V3 con workbook e binari opzionali, oppure singolo workbook legacy V1/V2, versionato relativo a un'Azienda, identificato da package UUID, manifest, conteggi e checksum.
 - **Portable Reference**: identità deterministica interna al package che sostituisce ogni ID database sorgente nelle relazioni portabili.
-- **Machine Sheet Contract**: insieme stabile e versionato di fogli, colonne, enum e regole di serializzazione usato simmetricamente da export e restore; V1 è immutabile e V2 ne definisce un delta esplicito.
+- **Machine Sheet Contract**: insieme stabile e versionato di fogli, colonne, enum e regole di serializzazione usato simmetricamente da export e restore; V1/V2 sono legacy immutabili e V3 ne definisce un delta esplicito.
 - **Long Payload Chunk**: porzione ordinata di un testo o JSON canonico troppo lungo per una cella XLSX.
-- **Backup Import Journal**: risultato tecnico univoco per `package_id`, necessario esclusivamente a rendere idempotente la creazione della nuova Azienda.
-- **Attachment Inventory Entry**: descrizione non ripristinabile di un allegato aziendale senza coordinate storage o autore.
+- **Backup Import Journal**: receipt tecnica univoca per `import_operation_id`, con package di provenienza, UUID sorgente/destinazione e operazione create/copy/replace; sopravvive alla distruzione del risultato.
+- **Attachment Inventory Entry**: descrizione portabile di un allegato aziendale senza coordinate storage o autore; materializzato in V3 soltanto con il relativo binario verificato.
 - **Imported Historical Fact**: fatto business valido il cui autore originale non è disponibile nella nuova istanza.
 
 ## Success Criteria *(mandatory)*
@@ -186,17 +189,17 @@ Come utente autorizzato posso salvare sul disco Google Drive configurato lo stes
 - **SC-001**: Il 100% dei dataset obbligatori completa il round-trip con zero differenze semantiche nel patrimonio incluso.
 - **SC-002**: Il 100% dei report canonici S11 generati prima e dopo il round-trip coincide per totali, sorgenti, categorie, dimensioni, etichette, stati, classificazioni, rinvii, correzioni e annotazioni.
 - **SC-003**: Il 100% dei workbook corrotti o incoerenti nei casi obbligatori viene rifiutato prima della prima scrittura persistente.
-- **SC-004**: Ogni errore iniettato durante l'import lascia zero nuovi record aziendali visibili e il retry dello stesso package riuscito lascia esattamente una Azienda.
-- **SC-005**: Dopo il restore, inversione Riprogrammazione, ricalcolo Contratto e Revisione vN+1 producono lo stesso risultato economico dei flussi locali equivalenti e zero duplicati.
+- **SC-004**: Ogni failure di persistenza MUST lasciare zero nuovo grafo/file staged e preservare integralmente il vecchio target Replace. Lo stesso import_operation_id MUST produrre una sola mutazione, inclusi i binari.
+- **SC-005**: Dopo il restore, Riprogrammazione, ricalcolo Contratto, Revisione e readiness/modifica/riallineamento/approvazione delle Draft MUST funzionare con riferimenti e precondizioni locali, senza duplicati.
 - **SC-006**: Il 100% dei testi lunghi e dei valori UTF-8 di prova viene ricostruito identicamente e il 100% dei testi formula-like resta testo.
 - **SC-007**: Un utente autorizzato può produrre e scaricare il backup di un'Azienda rappresentativa senza selezionare tabelle o opzioni di mapping; un Platform Admin può completarne l'anteprima senza scritture.
-- **SC-008**: Il file scritto su Drive è byte-identico all'artefatto generato dal motore e resta XLSX.
-- **SC-009**: Nessun test di restore crea utenti, capability sorgente, Audit, Proposal o Attachment fittizi.
+- **SC-008**: Drive e CLI MUST riusare l’artefatto ZIP V3; Drive salva byte identici e CLI non richiede un utente fittizio.
+- **SC-009**: Nessun restore crea utenti, accessi o Audit sorgente, account fittizi o Attachment senza file. Proposte e Attachment inclusi in V3 hanno autori storici null e UI neutra.
 - **SC-010**: Il quality gate completo e la verifica shared-hosting restano verdi con le estensioni runtime aggiornate.
 
 ## Assumptions
 
-- Il formato V1 resta definito dal contratto esplicito originale; V2 è l'estensione corrente e mantiene un percorso di import esplicito per V1.
+- I contratti V1/V2 restano legacy immutabili; V3 è il formato corrente del bundle.
 - La versione applicativa diagnostica usa la revisione resa disponibile dal packaging corrente; la sua assenza non rende invalido il package.
 - L'Azienda sorgente è sempre raggiungibile tramite un Tenant attivo; il backup non amplia l'accesso ai Tenant archiviati.
 - Il disk Drive è configurato esternamente secondo il normale filesystem Laravel; questa feature non aggiunge una UI per credenziali o OAuth.
@@ -207,5 +210,5 @@ Come utente autorizzato posso salvare sul disco Google Drive configurato lo stes
 
 - Canonical §§4-26, 30-32: dati economici, storico, immutabilità, autorizzazione, Tenant e rimozione di `Sostituisce`.
 - Slice 002-014: modello persistente e comportamento implementato di Azienda, anagrafiche, Esercizi/Spese, Progetti, Contratti, Budget/Revisioni, rinvii, Chiusura, correzioni, reporting, Tenant e release shared-hosting.
-- Category B/C: la portabilità usa le primitive e gli storici esistenti senza aggiungere nuove regole economiche; l'inventario allegati è informativo.
-- Nessuna lacuna Category E è stata individuata: le sole nuove persistenze sono il journal tecnico di import e la nullabilità controllata degli autori storici importabili.
+- Category B/C: la portabilità usa le primitive e gli storici esistenti senza aggiungere nuove regole economiche; l’inventario allegati è materializzato solo con file inclusi in V3.
+- Nessuna lacuna Category E è stata individuata: le persistenze tecniche includono UUID Tenant, journal di import e nullabilità controllata degli autori storici importabili.

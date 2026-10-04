@@ -1,6 +1,6 @@
 <?php
 
-use App\BusinessBackup\V1\BusinessBackupValidator;
+use App\BusinessBackup\BusinessBackupBundle;
 use App\Models\Company;
 use App\Models\CostCenter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,7 +19,7 @@ it('exports an active Company from the scheduler-ready command and rejects an ar
             ->expectsOutputToContain('Backup creato:');
         $files = File::files($directory);
         expect($files)->toHaveCount(1)
-            ->and($files[0]->getFilename())->toMatch('/^MP2-comando-backup-\d{4}-\d{2}-\d{2}-[0-9a-f-]{36}\.xlsx$/');
+            ->and($files[0]->getFilename())->toMatch('/^MP2-comando-backup-\d{4}-\d{2}-\d{2}-[0-9a-f-]{36}\.zip$/');
 
         $company->tenantCompany()->update(['status' => 'archived']);
         $this->artisan('business-backup:export', ['company' => $company->id, '--output' => $directory])
@@ -61,7 +61,7 @@ it('keeps distinct readable files for Companies with the same filesystem-safe na
 
         $centers = [];
         foreach ($files as $file) {
-            $package = app(BusinessBackupValidator::class)->validate($file->getPathname());
+            $package = app(BusinessBackupBundle::class)->validate($file->getPathname(), 'zip');
             expect($file->getFilename())->toContain($package['manifest']['package_id']);
             $centers[] = $package['machine']['_MP2_cost_centers']['rows'][0][1];
         }

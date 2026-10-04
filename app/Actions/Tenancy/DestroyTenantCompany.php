@@ -5,12 +5,10 @@ namespace App\Actions\Tenancy;
 use App\Domain\Company\TenantCompanyStatus;
 use App\Models\Company;
 use App\Models\PendingFileDeletion;
-use App\Models\PlatformLifecycleEvent;
 use App\Models\TenantCompany;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class DestroyTenantCompany
@@ -54,72 +52,7 @@ class DestroyTenantCompany
                 ]);
             }
 
-            $operationId = (string) Str::uuid();
-            $files = $this->exclusiveFiles($company->getKey());
-            $now = now();
-            $linkedUsers = User::query()
-                ->where('company_id', $company->getKey())
-                ->lockForUpdate()
-                ->get();
-            $tenantUsers = $linkedUsers
-                ->reject(fn (User $user): bool => $user->hasRole('super_admin'));
-            $tenantUserIds = $tenantUsers->modelKeys();
-            $tenantUserEmails = $tenantUsers->pluck('email')->all();
-
-            if ($files !== []) {
-                DB::table('pending_file_deletions')->upsert(
-                    array_map(fn (array $file): array => [
-                        'operation_id' => $operationId,
-                        'storage_disk' => $file['storage_disk'],
-                        'storage_path' => $file['storage_path'],
-                        'attempts' => 0,
-                        'last_attempted_at' => null,
-                        'last_error' => null,
-                        'created_at' => $now,
-                        'updated_at' => $now,
-                    ], $files),
-                    ['storage_disk', 'storage_path'],
-                    ['operation_id', 'updated_at'],
-                );
-            }
-
-            if ($linkedUsers->isNotEmpty()) {
-                User::query()
-                    ->whereKey($linkedUsers->modelKeys())
-                    ->update(['company_id' => null]);
-            }
-
-            $deleted = DB::table('companies')->where('id', $company->getKey())->delete();
-            if ($deleted !== 1) {
-                throw new \RuntimeException('The locked Company could not be deleted.');
-            }
-
-            if ($tenantUserIds !== []) {
-                DB::table('model_has_roles')
-                    ->where('model_type', User::class)
-                    ->whereIn('model_id', $tenantUserIds)
-                    ->delete();
-                DB::table('model_has_permissions')
-                    ->where('model_type', User::class)
-                    ->whereIn('model_id', $tenantUserIds)
-                    ->delete();
-                DB::table('sessions')->whereIn('user_id', $tenantUserIds)->delete();
-                DB::table('password_reset_tokens')->whereIn('email', $tenantUserEmails)->delete();
-
-                $deletedUsers = DB::table('users')->whereIn('id', $tenantUserIds)->delete();
-                if ($deletedUsers !== count($tenantUserIds)) {
-                    throw new \RuntimeException('Not all Tenant users could be deleted.');
-                }
-            }
-
-            PlatformLifecycleEvent::query()->create([
-                'operation_id' => $operationId, 'operation' => 'destroy',
-                'actor_id' => $actor->id, 'actor_name' => $actor->name,
-                'tenant_id' => $lockedTenant->getKey(), 'occurred_at' => now('UTC'),
-                'outcome' => 'data_deleted', 'file_count' => count($files),
-            ]);
-
-            return $operationId;
+            return app(DestroyTenantCompanyData::class)->execute($actor, $company, $lockedTenant);
         });
 
         $cleanup = $this->deletePendingTenantFiles->execute($operationId);
@@ -131,68 +64,5 @@ class DestroyTenantCompany
             filesCompleted: $cleanup['completed'],
             filesPending: $pending,
         );
-    }
-
-    /** @return list<array{storage_disk: string, storage_path: string}> */
-    private function exclusiveFiles(int $companyId): array
-    {
-        $attachments = DB::table('attachments')
-            ->where('company_id', $companyId)
-            ->whereNotNull('storage_disk')
-            ->whereNotNull('storage_path')
-            ->get(['storage_disk', 'storage_path']);
-        $evidence = DB::table('budget_evidence')
-            ->where('company_id', $companyId)
-            ->whereNotNull('storage_disk')
-            ->whereNotNull('storage_path')
-            ->get(['storage_disk', 'storage_path']);
-        $logo = DB::table('companies')
-            ->where('id', $companyId)
-            ->whereNotNull('logo_disk')
-            ->whereNotNull('logo_path')
-            ->get(['logo_disk as storage_disk', 'logo_path as storage_path']);
-
-        return $attachments->concat($evidence)->concat($logo)
-            ->map(fn (object $file): array => [
-                'storage_disk' => $this->requiredFileValue($file->storage_disk),
-                'storage_path' => $this->requiredFileValue($file->storage_path),
-            ])
-            ->unique(fn (array $file): string => $file['storage_disk']."\0".$file['storage_path'])
-            ->reject(fn (array $file): bool => $this->isReferencedByAnotherCompany($companyId, $file))
-            ->values()
-            ->all();
-    }
-
-    /** @param array{storage_disk: string, storage_path: string} $file */
-    private function isReferencedByAnotherCompany(int $companyId, array $file): bool
-    {
-        foreach (['attachments', 'budget_evidence'] as $table) {
-            if (DB::table($table)
-                ->where('company_id', '<>', $companyId)
-                ->where('storage_disk', $file['storage_disk'])
-                ->where('storage_path', $file['storage_path'])
-                ->exists()) {
-                return true;
-            }
-        }
-
-        if (DB::table('companies')
-            ->where('id', '<>', $companyId)
-            ->where('logo_disk', $file['storage_disk'])
-            ->where('logo_path', $file['storage_path'])
-            ->exists()) {
-            return true;
-        }
-
-        return false;
-    }
-
-    private function requiredFileValue(mixed $value): string
-    {
-        if (! is_string($value) || trim($value) === '') {
-            throw new \UnexpectedValueException('Invalid persisted file reference.');
-        }
-
-        return $value;
     }
 }

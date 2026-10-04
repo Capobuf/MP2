@@ -23,6 +23,8 @@ final class BusinessBackupWorkbook implements Export, WithEvents, WithMultipleSh
     private array $checksums;
 
     /** @param array{
+     *   format_version?: string,
+     *   source_tenant_uuid?: string,
      *   package_id: string,
      *   exported_at: string,
      *   company: array{name: string, timezone: string},
@@ -41,13 +43,13 @@ final class BusinessBackupWorkbook implements Export, WithEvents, WithMultipleSh
     public function sheets(): array
     {
         $sheets = [];
-        foreach (BusinessBackupContract::VISIBLE_SHEETS as $name) {
+        foreach (BusinessBackupContract::visibleSheetsForVersion($this->version()) as $name) {
             $view = $this->package['visible'][$name];
             $sheets[] = new BusinessBackupSheet($name, $view['columns'], $view['rows'], false);
         }
 
         $sheets[] = new BusinessBackupSheet(BusinessBackupContract::MANIFEST, ['key', 'value'], $this->manifestRows(), true);
-        foreach (BusinessBackupContract::SCHEMAS as $name => $columns) {
+        foreach (BusinessBackupContract::schemasForVersion($this->version()) as $name => $columns) {
             $sheets[] = new BusinessBackupSheet($name, $columns, $this->machine[$name]['rows'], true);
         }
 
@@ -62,18 +64,23 @@ final class BusinessBackupWorkbook implements Export, WithEvents, WithMultipleSh
                 $properties = $event->writer->getDelegate()->getProperties();
                 $properties->setCreator('MP2');
                 $properties->setTitle('MP2 Business Data Backup');
-                $properties->setSubject('Portable business backup format v'.BusinessBackupContract::FORMAT_VERSION);
-                $properties->setCustomProperty('mp2_format_version', BusinessBackupContract::FORMAT_VERSION);
+                $properties->setSubject('Portable business backup format v'.$this->version());
+                $properties->setCustomProperty('mp2_format_version', $this->version());
                 $properties->setCustomProperty('mp2_package_id', $this->package['package_id']);
             },
         ];
+    }
+
+    private function version(): string
+    {
+        return $this->package['format_version'] ?? '2';
     }
 
     /** @return list<list<string>> */
     private function manifestRows(): array
     {
         $rows = [
-            ['format_version', BusinessBackupContract::FORMAT_VERSION],
+            ['format_version', $this->version()],
             ['package_id', $this->package['package_id']],
             ['exported_at', $this->package['exported_at']],
             ['application_revision', (string) config('app.revision', '')],
@@ -82,13 +89,16 @@ final class BusinessBackupWorkbook implements Export, WithEvents, WithMultipleSh
             ['company_timezone', $this->package['company']['timezone']],
             ['currency', 'EUR'],
             ['vat_basis', 'net'],
-            ['machine_sheet_count', (string) count(BusinessBackupContract::SCHEMAS)],
+            ['machine_sheet_count', (string) count(BusinessBackupContract::schemasForVersion($this->version()))],
         ];
-        foreach (BusinessBackupContract::SCHEMAS as $sheet => $_columns) {
+        if ($this->version() === '3') {
+            $rows[] = ['source_tenant_uuid', $this->package['source_tenant_uuid']];
+        }
+        foreach (BusinessBackupContract::schemasForVersion($this->version()) as $sheet => $_columns) {
             $rows[] = ['row_count:'.$sheet, (string) count($this->machine[$sheet]['rows'])];
             $rows[] = ['sha256:'.$sheet, $this->checksums[$sheet]];
         }
-        foreach (BusinessBackupContract::VISIBLE_SHEETS as $sheet) {
+        foreach (BusinessBackupContract::visibleSheetsForVersion($this->version()) as $sheet) {
             $view = $this->package['visible'][$sheet];
             $rows[] = ['view_sha256:'.$sheet, PortablePayload::checksum($view['columns'], $view['rows'])];
         }

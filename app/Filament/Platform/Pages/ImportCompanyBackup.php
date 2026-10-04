@@ -3,13 +3,16 @@
 namespace App\Filament\Platform\Pages;
 
 use App\Actions\BusinessBackup\ImportBusinessBackup;
+use App\Actions\BusinessBackup\ReplaceBusinessBackup;
 use App\BusinessBackup\BackupPreview;
-use App\BusinessBackup\V1\BusinessBackupValidator;
+use App\BusinessBackup\BusinessBackupBundle;
 use App\Filament\Platform\Resources\TenantCompanies\TenantCompanyResource;
+use App\Models\TenantCompany;
 use App\Models\User;
 use BackedEnum;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\FileUpload;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\RepeatableEntry\TableColumn;
@@ -21,10 +24,15 @@ use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
+use Livewire\Features\SupportFileUploads\FileUploadConfiguration;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Throwable;
 
 /** @property-read Schema $form */
@@ -42,9 +50,20 @@ final class ImportCompanyBackup extends Page
     public ?array $data = [];
 
     /** @var array<string, mixed>|null */
+    #[Locked]
     public ?array $previewData = null;
 
+    #[Locked]
     public ?string $validatedPackageId = null;
+
+    #[Locked]
+    public ?string $validatedHash = null;
+
+    #[Locked]
+    public ?string $importOperationId = null;
+
+    #[Locked]
+    public string $importChoice = 'create';
 
     public function mount(): void
     {
@@ -63,14 +82,15 @@ final class ImportCompanyBackup extends Page
     {
         return $schema->statePath('data')->components([
             FileUpload::make('backup')
-                ->label('Workbook MP2 (.xlsx)')
+                ->label('Backup MP2 (.zip) o XLSX legacy')
                 ->disk('local')
                 ->directory('business-backup-uploads')
-                ->acceptedFileTypes(['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'])
+                ->acceptedFileTypes(['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/zip', 'application/x-zip-compressed'])
+                ->getUploadedFileNameForStorageUsing(fn (TemporaryUploadedFile $file): string => Str::uuid().'.'.$file->getClientOriginalExtension())
                 ->required()
                 ->validationMessages([
-                    'required' => 'Caricare un workbook XLSX.',
-                    'mimetypes' => 'Il file deve essere un workbook XLSX.',
+                    'required' => 'Caricare un backup ZIP o XLSX legacy.',
+                    'mimetypes' => 'Il file deve essere un backup ZIP o XLSX legacy.',
                 ])
                 ->live()
                 ->afterStateUpdated(function (): void {
@@ -88,7 +108,7 @@ final class ImportCompanyBackup extends Page
                     Action::make('validate')->label('Valida e Mostra Anteprima')->action('validateBackup'),
                 ])]),
             Section::make('Anteprima del Ripristino')
-                ->description('Il backup è valido e può essere ripristinato come una nuova Azienda.')
+                ->description('Dati validati. Utenti, accessi e Timeline/Audit non vengono ricreati.')
                 ->visible(fn (): bool => $this->previewData !== null)
                 ->schema([
                     TextEntry::make('preview_company_name')
@@ -102,6 +122,24 @@ final class ImportCompanyBackup extends Page
                         TextEntry::make('backup_format')->label('Formato')->state(fn (): string => 'MP2 Business Data Backup · V'.$this->previewInt('format_version')),
                         TextEntry::make('backup_timezone')->label('Fuso Orario')->state(fn (): string => $this->previewString('company_timezone')),
                     ])->columns(['sm' => 2, 'lg' => 4]),
+                    Section::make('Identità e File')->schema([
+                        TextEntry::make('source_uuid')->label('Tenant UUID sorgente')->state(fn (): string => $this->previewString('source_tenant_uuid', 'Non presente nel formato legacy')),
+                        TextEntry::make('target')->label('Tenant con la stessa identità')->state(fn (): string => $this->previewString('target_label', 'Nessuno')),
+                        TextEntry::make('files')->label('File originali')->state(fn (): string => $this->previewBool('files_included') ? 'Inclusi' : 'Esclusi'),
+                        TextEntry::make('logo')->label('Logo')->state(fn (): string => $this->previewBool('logo_included') ? 'Incluso se presente' : 'Escluso'),
+                        TextEntry::make('file_count')->label('Numero binari')->state(fn (): int => $this->previewInt('file_count')),
+                        TextEntry::make('file_bytes')->label('Byte binari')->state(fn (): int => $this->previewInt('file_bytes')),
+                        TextEntry::make('total_bytes')->label('Byte totali dichiarati')->state(fn (): int => $this->previewInt('total_bytes')),
+                        TextEntry::make('package_size')->label('Byte package')->state(fn (): int => $this->previewInt('package_size')),
+                        TextEntry::make('upload_limit')->label('Limite tecnico upload web')->state(fn (): string => $this->uploadLimits()),
+                        TextEntry::make('bundle_version')->label('Versione bundle')->state(fn (): string => $this->previewString('bundle_version', 'XLSX legacy')),
+                    ])->columns(2),
+                    Section::make('Proposte')->schema([
+                        TextEntry::make('draft_count')->label('Bozza')->state(fn (): int => $this->previewInt('draft_count')),
+                        TextEntry::make('approved_count')->label('Approvata')->state(fn (): int => $this->previewInt('approved_count')),
+                        TextEntry::make('discarded_count')->label('Scartata')->state(fn (): int => $this->previewInt('discarded_count')),
+                    ])->columns(3),
+                    Callout::make('Utenti, accessi e Timeline/Audit non sono portabili e non verranno ricreati.')->warning(),
                     Section::make('Esercizi')->schema([
                         RepeatableEntry::make('preview_exercises')
                             ->label('Esercizi Inclusi')
@@ -140,14 +178,18 @@ final class ImportCompanyBackup extends Page
                     ])->columns(2),
                     Callout::make(fn (): string => $this->attachmentWarning())
                         ->warning()
-                        ->visible(fn (): bool => $this->previewInt('attachment_count') > 0),
+                        ->visible(fn (): bool => $this->previewInt('attachment_count') > 0 && ! $this->previewBool('files_included')),
                     Callout::make(fn (): string => 'Esiste già un’Azienda denominata “'.$this->previewString('company_name').'”.')
-                        ->description('Il ripristino creerà una nuova Azienda indipendente. L’Azienda esistente non verrà modificata né unita ai dati importati.')
+                        ->description(fn (): string => $this->previewInt('target_company_id') > 0
+                            ? 'La stessa UUID è già presente: scegli se creare una copia indipendente o sostituire completamente il Tenant indicato.'
+                            : 'Il ripristino creerà una nuova Azienda indipendente. L’Azienda esistente non verrà modificata né unita ai dati importati.')
                         ->warning()
                         ->visible(fn (): bool => $this->previewBool('name_collision')),
                     Actions::make([
                         Action::make('confirmImport')
-                            ->label('Ripristina come Nuova Azienda')
+                            ->label('Importa')
+                            ->mountUsing(fn (?Schema $schema) => $this->prepareImportChoice('create', $schema))
+                            ->visible(fn (): bool => $this->previewInt('target_company_id') === 0)
                             ->color('success')
                             ->requiresConfirmation()
                             ->modalHeading(fn (): string => 'Ripristinare “'.$this->previewString('company_name').'” come nuova Azienda?')
@@ -156,6 +198,35 @@ final class ImportCompanyBackup extends Page
                             ->action(function (): void {
                                 $this->confirmImport();
                             }),
+                        Action::make('copy')
+                            ->label('Crea come Nuova Copia')
+                            ->mountUsing(fn (?Schema $schema) => $this->prepareImportChoice('copy', $schema))
+                            ->visible(fn (): bool => $this->previewInt('target_company_id') > 0)
+                            ->requiresConfirmation()
+                            ->modalDescription('La copia avrà una nuova identità Tenant. Il target esistente resterà integro. Utenti, accessi e Timeline/Audit non verranno ricreati.')
+                            ->action(fn () => $this->confirmImport('copy')),
+                        Action::make('replace')
+                            ->label('Sostituisci Completamente')
+                            ->mountUsing(fn (?Schema $schema) => $this->prepareImportChoice('replace', $schema))
+                            ->color('danger')
+                            ->visible(fn (): bool => $this->previewInt('target_company_id') > 0)
+                            ->modalHeading(fn (): string => 'Sostituisci '.$this->previewString('target_label'))
+                            ->modalDescription(fn (): string => $this->replaceDescription())
+                            ->modalSubmitActionLabel('Sostituisci Completamente')
+                            ->steps([
+                                Step::make('Irreversibilità')->schema([
+                                    Checkbox::make('irreversibility_confirmed')
+                                        ->label('Confermo la cancellazione irreversibile di dati, file, utenti, accessi e Timeline/Audit del target; utenti/accessi e Timeline/Audit non saranno ricreati')
+                                        ->accepted()->required(),
+                                ]),
+                                Step::make('Distruzione Definitiva')->schema([
+                                    Callout::make(fn (): string => $this->replaceDescription())->danger(),
+                                    Checkbox::make('destruction_confirmed')
+                                        ->label(fn (): string => 'Confermo la distruzione definitiva e sostituzione di '.$this->previewString('target_label').' · UUID '.$this->previewString('source_tenant_uuid'))
+                                        ->accepted()->required(),
+                                ]),
+                            ])
+                            ->action(fn (array $data) => $this->confirmImport('replace', ($data['irreversibility_confirmed'] ?? false) === true, ($data['destruction_confirmed'] ?? false) === true)),
                     ]),
                 ]),
         ]);
@@ -168,7 +239,7 @@ final class ImportCompanyBackup extends Page
         try {
             $state = $this->form->getState();
             $path = $this->uploadedPath($this->normalizeUploadedRelativePath($state['backup'] ?? null));
-            $validated = app(BusinessBackupValidator::class)->validate($path);
+            $validated = app(BusinessBackupBundle::class)->validate($path, strtolower(pathinfo($path, PATHINFO_EXTENSION)));
         } catch (ValidationException $exception) {
             $this->addValidationError($exception);
 
@@ -176,10 +247,13 @@ final class ImportCompanyBackup extends Page
         }
         $this->previewData = $this->serializePreview($validated['preview']);
         $this->validatedPackageId = $validated['manifest']['package_id'];
+        $this->validatedHash = $validated['upload_sha256'];
+        $this->importOperationId = (string) Str::uuid();
+        $this->previewData += $this->portablePreview($validated);
         Notification::make()->success()->title('Backup Valido')->body('Nessun dato è stato ancora scritto.')->send();
     }
 
-    public function confirmImport(): void
+    public function confirmImport(string $choice = 'create', bool $irreversibilityConfirmed = false, bool $destructionConfirmed = false): void
     {
         abort_unless(self::canAccess(), 403);
         $expectedPackageId = $this->validatedPackageId;
@@ -192,14 +266,20 @@ final class ImportCompanyBackup extends Page
         try {
             $relativePath = $this->uploadedRelativePath();
             $path = $this->uploadedPath($relativePath);
-            $validated = app(BusinessBackupValidator::class)->validate($path);
+            if (! hash_equals($this->validatedHash ?? '', hash_file('sha256', $path))) {
+                $this->invalidateValidatedBackup();
+                $this->addError('data.backup', 'Il file caricato è cambiato dopo la validazione. Validalo nuovamente prima di procedere.');
+
+                return;
+            }
+            $validated = app(BusinessBackupBundle::class)->validate($path, strtolower(pathinfo($path, PATHINFO_EXTENSION)));
         } catch (ValidationException $exception) {
             $this->addValidationError($exception);
 
             return;
         }
 
-        if ($validated['manifest']['package_id'] !== $expectedPackageId) {
+        if ($validated['manifest']['package_id'] !== $expectedPackageId || ! hash_equals($this->validatedHash ?? '', $validated['upload_sha256'])) {
             $this->invalidateValidatedBackup();
             $this->addError('data.backup', 'Il file caricato è cambiato dopo la validazione. Validalo nuovamente prima di procedere.');
 
@@ -207,13 +287,24 @@ final class ImportCompanyBackup extends Page
         }
 
         try {
-            $company = app(ImportBusinessBackup::class)->execute($this->actor(), $validated);
+            if ($this->importChoice !== $choice) {
+                throw ValidationException::withMessages(['backup' => 'Aprire la conferma della scelta desiderata prima di procedere.']);
+            }
+            if ($choice === 'replace') {
+                $company = app(ReplaceBusinessBackup::class)->execute($this->actor(), $validated, $this->importOperationId, $this->previewInt('target_company_id'), $irreversibilityConfirmed, $destructionConfirmed);
+            } else {
+                $company = app(ImportBusinessBackup::class)->execute($this->actor(), $validated, $this->importOperationId, $choice);
+            }
+        } catch (ValidationException $exception) {
+            $this->addValidationError($exception);
+
+            return;
         } catch (Throwable $exception) {
             report($exception);
             Notification::make()
                 ->danger()
                 ->title('Ripristino Non Riuscito')
-                ->body('Non è stata creata alcuna Azienda. Puoi riprovare oppure consultare i log applicativi.')
+                ->body('La mutazione non è stata completata. Il Tenant target resta integro. Puoi riprovare oppure consultare i log applicativi.')
                 ->send();
 
             return;
@@ -223,7 +314,11 @@ final class ImportCompanyBackup extends Page
         $this->form->fill();
         $this->invalidateValidatedBackup();
 
-        Notification::make()->success()->title('Azienda Ripristinata')->body($company->name)->send();
+        if (($company->getAttribute('backup_cleanup_pending') ?? 0) > 0) {
+            Notification::make()->warning()->title('Ripristino Completato; Pulizia File in Attesa')->body('Il nuovo Tenant è valido. File precedenti ancora da rimuovere: '.$company->getAttribute('backup_cleanup_pending').'.')->send();
+        } else {
+            Notification::make()->success()->title('Azienda Ripristinata')->body($company->name)->send();
+        }
         $this->redirect(TenantCompanyResource::getUrl('index', panel: 'platform'));
     }
 
@@ -231,7 +326,7 @@ final class ImportCompanyBackup extends Page
     {
         $relative ??= $this->uploadedRelativePath();
         if (! Storage::disk('local')->exists($relative)) {
-            throw ValidationException::withMessages(['data.backup' => 'Caricare un workbook XLSX.']);
+            throw ValidationException::withMessages(['data.backup' => 'Caricare un backup ZIP o XLSX legacy.']);
         }
 
         return Storage::disk('local')->path($relative);
@@ -248,11 +343,11 @@ final class ImportCompanyBackup extends Page
             return $uploads;
         }
         if (! is_array($uploads) || count($uploads) !== 1) {
-            throw ValidationException::withMessages(['data.backup' => 'Caricare un solo workbook XLSX.']);
+            throw ValidationException::withMessages(['data.backup' => 'Caricare un solo backup ZIP o XLSX legacy.']);
         }
         $relative = array_values($uploads)[0];
         if (! is_string($relative) || $relative === '') {
-            throw ValidationException::withMessages(['data.backup' => 'Caricare un workbook XLSX.']);
+            throw ValidationException::withMessages(['data.backup' => 'Caricare un backup ZIP o XLSX legacy.']);
         }
 
         return $relative;
@@ -276,6 +371,9 @@ final class ImportCompanyBackup extends Page
     {
         $this->previewData = null;
         $this->validatedPackageId = null;
+        $this->validatedHash = null;
+        $this->importOperationId = null;
+        $this->importChoice = 'create';
     }
 
     private function addValidationError(ValidationException $exception): void
@@ -328,9 +426,8 @@ final class ImportCompanyBackup extends Page
     private function attachmentWarning(): string
     {
         $count = $this->previewInt('attachment_count');
-        $format = $this->previewInt('format_version');
 
-        return "{$count} allegati non saranno ripristinati. Il backup ne conserva l’inventario, ma il formato V{$format} non contiene i file originali.";
+        return "{$count} allegati non saranno ripristinati. Il backup ne conserva l’inventario; i file originali sono esclusi.";
     }
 
     private function confirmationDescription(): string
@@ -339,11 +436,71 @@ final class ImportCompanyBackup extends Page
         if ($this->previewBool('name_collision')) {
             $description .= ' Esiste già un’Azienda con questa denominazione. Verrà comunque creata una nuova identità.';
         }
-        if ($this->previewInt('attachment_count') > 0) {
-            $description .= ' I file allegati originali non fanno parte del backup V'.$this->previewInt('format_version').' e non verranno ripristinati.';
+        if ($this->previewInt('attachment_count') > 0 && ! $this->previewBool('files_included')) {
+            $description .= ' I file allegati originali sono esclusi e non verranno ripristinati.';
         }
 
         return $description;
+    }
+
+    /** @param array<string, mixed> $package
+     * @return array<string, mixed>
+     */
+    private function portablePreview(array $package): array
+    {
+        $uuid = $package['manifest']['source_tenant_uuid'] ?? null;
+        $target = $uuid === null ? null : TenantCompany::query()->with('company')->where('portable_uuid', $uuid)->first();
+        $files = $package['bundle']['files'] ?? [];
+        $proposals = $package['machine']['_MP2_proposals']['rows'] ?? [];
+
+        return [
+            'source_tenant_uuid' => $uuid,
+            'target_company_id' => $target === null ? 0 : $target->company_id,
+            'target_label' => $target === null ? 'Nessuno' : $target->company->name.' · '.($target->status()->value === 'active' ? 'Attivo' : 'Archiviato'),
+            'files_included' => $package['bundle']['included']['files'] ?? false,
+            'logo_included' => $package['bundle']['included']['logo'] ?? false,
+            'file_count' => count($files), 'file_bytes' => array_sum(array_column($files, 'size')),
+            'total_bytes' => $package['declared_total_bytes'] ?? 0,
+            'package_size' => $package['package_size'] ?? 0,
+            'bundle_version' => isset($package['bundle']) ? (string) $package['bundle']['bundle_version'] : 'XLSX legacy',
+            'draft_count' => count(array_filter($proposals, fn (array $row): bool => $row[4] === 'draft')),
+            'approved_count' => count(array_filter($proposals, fn (array $row): bool => $row[4] === 'approved')),
+            'discarded_count' => count(array_filter($proposals, fn (array $row): bool => $row[4] === 'discarded')),
+        ];
+    }
+
+    private function replaceDescription(): string
+    {
+        $description = 'Il target sarà distrutto e ricreato Attivo con la stessa UUID. Dati e file, utenti interni, accessi e Timeline/Audit del target saranno eliminati. Utenti/accessi e Timeline/Audit non saranno ricreati. I Super Admin sopravvivono.';
+        if (! $this->previewBool('files_included')) {
+            $description .= ' I vecchi Allegati ed Evidenze saranno persi e non ricreati: il package esclude i file.';
+        }
+        if (! $this->previewBool('logo_included')) {
+            $description .= ' Il vecchio logo sarà perso e non ricreato.';
+        }
+
+        return $description;
+    }
+
+    private function prepareImportChoice(string $choice, ?Schema $schema): void
+    {
+        if ($this->importChoice !== $choice) {
+            $this->importChoice = $choice;
+            $this->importOperationId = (string) Str::uuid();
+        }
+        $schema?->fill();
+    }
+
+    private function uploadLimits(): string
+    {
+        $limits = ['PHP upload_max_filesize: '.ini_get('upload_max_filesize'), 'post_max_size: '.ini_get('post_max_size')];
+        foreach (FileUploadConfiguration::rules() as $rule) {
+            if (is_string($rule) && str_starts_with($rule, 'max:')) {
+                $limits[] = 'Upload applicativo: '.substr($rule, 4).' KiB';
+            }
+        }
+
+        return implode(' · ', $limits);
     }
 
     private function actor(): User

@@ -3,7 +3,7 @@
 use App\Actions\BusinessBackup\ExportBusinessBackup;
 use App\Actions\BusinessBackup\ImportBusinessBackup;
 use App\Actions\Reporting\BuildReport;
-use App\BusinessBackup\V1\BusinessBackupValidator;
+use App\BusinessBackup\BusinessBackupBundle;
 use App\Domain\LateCorrections\HistoricalErrorKind;
 use App\Domain\Reporting\ReportDefinition;
 use App\Domain\Reporting\ReportResult;
@@ -27,6 +27,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\LegacyBusinessBackup;
 use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
@@ -138,7 +139,7 @@ function backupReportDifferences(mixed $before, mixed $after, string $path = '')
     return array_slice($differences, 0, 20);
 }
 
-it('keeps all ten canonical S11 report families semantically equivalent after restore', function (): void {
+it('keeps all ten canonical S11 report families semantically equivalent after restore', function (bool $legacy): void {
     CarbonImmutable::setTestNow('2026-08-30 10:00:00 Europe/Rome');
     $company = Company::factory()->create(['name' => 'Reporting Portabile', 'timezone' => 'Europe/Rome']);
     $actor = User::factory()->platformAdmin()->create();
@@ -237,9 +238,11 @@ it('keeps all ten canonical S11 report families semantically equivalent after re
         $before[$definition['kind']] = semanticBackupReport($report);
     }
 
-    $artifact = app(ExportBusinessBackup::class)->execute($company, $actor);
+    Proposal::query()->where('company_id', $company->id)->where('status', 'approved')->update(['approved_at' => now()]);
+    $artifact = $legacy ? app(LegacyBusinessBackup::class)->execute($company, $actor) : app(ExportBusinessBackup::class)->execute($company, $actor, false, false);
     try {
-        $restored = app(ImportBusinessBackup::class)->execute($actor, app(BusinessBackupValidator::class)->validate($artifact['path']));
+        $package = app(BusinessBackupBundle::class)->validate($artifact['path'], $legacy ? 'xlsx' : 'zip');
+        $restored = app(ImportBusinessBackup::class)->execute($actor, $package, (string) Str::uuid(), $legacy ? 'create' : 'copy');
     } finally {
         @unlink($artifact['path']);
     }
@@ -259,4 +262,4 @@ it('keeps all ten canonical S11 report families semantically equivalent after re
     }
     expect(array_keys($after))->toBe(['annual_executive', 'budget_actual', 'budget_current_allocation', 'operational_variance', 'budget_versions', 'exercises', 'carryovers', 'contracts', 'projects', 'suppliers'])
         ->and($differences)->toBe([]);
-});
+})->with(['legacy V2' => true, 'portable V3' => false]);

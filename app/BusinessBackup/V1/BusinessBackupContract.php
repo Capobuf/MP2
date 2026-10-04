@@ -4,7 +4,9 @@ namespace App\BusinessBackup\V1;
 
 final class BusinessBackupContract
 {
-    public const FORMAT_VERSION = '2';
+    public const FORMAT_VERSION = '3';
+
+    public const SUPPORTED_VERSIONS = ['1', '2', '3'];
 
     public const LEGACY_FORMAT_VERSION = '1';
 
@@ -51,6 +53,7 @@ final class BusinessBackupContract
         'project_deferral' => 'DEF', 'budget' => 'BUD', 'budget_row' => 'BUR', 'budget_evidence' => 'BEV',
         'closing' => 'CLS', 'closing_row' => 'CLR', 'late_correction' => 'LCR', 'annotation' => 'ANN',
         'attachment' => 'ATT', 'payload' => 'PAY',
+        'proposal' => 'PRO', 'proposal_item' => 'PIT', 'proposal_action' => 'PAC',
     ];
 
     /** @var array<string, string> */
@@ -66,7 +69,9 @@ final class BusinessBackupContract
         '_MP2_budget_rows' => 'budget_row', '_MP2_budget_evidence' => 'budget_evidence',
         '_MP2_closings' => 'closing', '_MP2_closing_rows' => 'closing_row',
         '_MP2_late_corrections' => 'late_correction', '_MP2_error_annotations' => 'annotation',
-        '_MP2_attachments' => 'attachment', self::LONG_PAYLOADS => 'payload',
+        '_MP2_attachments' => 'attachment',
+        '_MP2_proposals' => 'proposal', '_MP2_proposal_items' => 'proposal_item', '_MP2_proposal_actions' => 'proposal_action',
+        self::LONG_PAYLOADS => 'payload',
     ];
 
     /** @var list<string> */
@@ -123,23 +128,38 @@ final class BusinessBackupContract
     ];
 
     /** @return list<string> */
-    public static function machineSheets(): array
+    public static function machineSheets(string $version = self::FORMAT_VERSION): array
     {
-        return array_keys(self::SCHEMAS);
+        return array_keys(self::schemasForVersion($version));
+    }
+
+    /** @return list<string> */
+    public static function visibleSheetsForVersion(string $version): array
+    {
+        return $version === '3' ? [...self::VISIBLE_SHEETS, 'Proposte'] : self::VISIBLE_SHEETS;
     }
 
     /** @return array<string, list<string>> */
     public static function schemasForVersion(string $version): array
     {
-        if ($version === self::FORMAT_VERSION) {
-            return self::SCHEMAS;
-        }
-        if ($version !== self::LEGACY_FORMAT_VERSION) {
+        if (! in_array($version, self::SUPPORTED_VERSIONS, true)) {
             throw new \InvalidArgumentException("Unsupported business backup version [$version].");
         }
-
         $schemas = self::SCHEMAS;
-        $schemas['_MP2_cost_centers'] = ['cost_center_ref', 'name', 'archived_at'];
+        if ($version === '1') {
+            $schemas['_MP2_cost_centers'] = ['cost_center_ref', 'name', 'archived_at'];
+        }
+        if ($version === '3') {
+            $schemas['_MP2_budgets'][] = 'proposal_ref';
+            $schemas['_MP2_budget_rows'][] = 'proposal_item_ref';
+            $schemas['_MP2_budget_evidence'][] = 'has_original_file';
+            $schemas['_MP2_attachments'] = [...$schemas['_MP2_attachments'], 'uploaded_at', 'detached_at'];
+            unset($schemas[self::LONG_PAYLOADS]);
+            $schemas['_MP2_proposals'] = ['proposal_ref', 'exercise_ref', 'reference_budget_ref', 'purpose', 'status', 'created_at', 'updated_at', 'approved_at', 'discarded_at', 'discard_reason'];
+            $schemas['_MP2_proposal_items'] = ['proposal_item_ref', 'proposal_ref', 'source_type', 'source_ref', 'copied_from_source_ref', 'baseline_json', 'result_json', 'readiness_state', 'readiness_reasons_json', 'read_only_source', 'last_aligned_at'];
+            $schemas['_MP2_proposal_actions'] = ['action_ref', 'proposal_ref', 'proposal_item_ref', 'sequence', 'action_type', 'payload_version', 'payload_json', 'reason', 'status', 'created_at', 'withdrawn_at', 'withdraw_reason'];
+            $schemas[self::LONG_PAYLOADS] = self::SCHEMAS[self::LONG_PAYLOADS];
+        }
 
         return $schemas;
     }
