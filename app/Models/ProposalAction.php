@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property-read User|null $creator
  * @property int $company_id
  * @property int $proposal_id
  * @property ProposalActionType $action_type

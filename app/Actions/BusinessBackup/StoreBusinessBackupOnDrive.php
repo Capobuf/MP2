@@ -20,13 +20,13 @@ final class StoreBusinessBackupOnDrive
             && (filled($disk['refreshToken'] ?? null) || filled($disk['accessToken'] ?? null));
     }
 
-    public function execute(Company $company, User $actor): string
+    public function execute(Company $company, User $actor, bool $includeLogo = true, bool $includeFiles = true): string
     {
         if (! self::configured()) {
             throw new \RuntimeException('Google Drive non è configurato.');
         }
 
-        return $this->store($this->export->execute($company, $actor));
+        return $this->store($this->export->execute($company, $actor, $includeLogo, $includeFiles));
     }
 
     /** @param array{path: string, filename: string, package_id: string} $artifact */

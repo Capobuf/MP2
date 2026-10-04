@@ -9,8 +9,9 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
-#[Fillable(['company_id', 'status'])]
+#[Fillable(['company_id', 'status', 'portable_uuid'])]
 class TenantCompany extends Model implements HasCurrentTenantLabel, HasName
 {
     protected $primaryKey = 'company_id';
@@ -18,6 +19,13 @@ class TenantCompany extends Model implements HasCurrentTenantLabel, HasName
     public $incrementing = false;
 
     protected $keyType = 'int';
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $tenant): void {
+            $tenant->portable_uuid ??= (string) Str::uuid();
+        });
+    }
 
     /** @return BelongsTo<Company, $this> */
     public function company(): BelongsTo

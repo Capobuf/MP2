@@ -10,7 +10,7 @@ use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
-it('writes the exact generated XLSX bytes to the configured Drive disk', function (): void {
+it('writes the exact generated ZIP bytes to the configured Drive disk', function (): void {
     Storage::fake('google');
     config()->set('filesystems.disks.google', [
         'driver' => 'google', 'clientId' => 'client', 'clientSecret' => 'secret', 'refreshToken' => 'refresh',
@@ -25,7 +25,7 @@ it('writes the exact generated XLSX bytes to the configured Drive disk', functio
 
     Storage::disk('google')->assertExists($filename);
     expect(hash('sha256', (string) Storage::disk('google')->get($filename)))->toBe($expectedHash)
-        ->and($filename)->toEndWith('.xlsx')
+        ->and($filename)->toEndWith('.zip')
         ->and($filename)->toContain($artifact['package_id'])
         ->and(is_file($artifact['path']))->toBeFalse();
 });

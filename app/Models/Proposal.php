@@ -14,6 +14,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
+ * @property-read User|null $creator
+ * @property-read User|null $approver
+ * @property-read User|null $discarder
  * @property ProposalPurpose $purpose
  * @property ProposalStatus $status
  * @property int $company_id

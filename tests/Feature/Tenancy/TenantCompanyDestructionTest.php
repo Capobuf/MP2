@@ -269,6 +269,9 @@ function createTenantDestructionGraph(
     string $sharedPath,
 ): void {
     BusinessBackupImport::query()->create([
+        'import_operation_id' => (string) Str::uuid(),
+        'target_tenant_uuid' => $company->tenantCompany->portable_uuid,
+        'operation' => 'create',
         'package_id' => (string) Str::uuid(),
         'format_version' => 1,
         'company_id' => $company->id,

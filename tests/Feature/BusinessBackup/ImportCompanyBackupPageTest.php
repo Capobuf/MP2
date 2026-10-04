@@ -16,13 +16,16 @@ use App\Models\Exercise;
 use App\Models\Proposal;
 use App\Models\Supplier;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Tests\Support\LegacyBusinessBackup;
 use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
@@ -34,13 +37,87 @@ beforeEach(function (): void {
 
 function storeBusinessBackupPageUpload(Company $company, User $actor, string $filename): string
 {
-    $artifact = app(ExportBusinessBackup::class)->execute($company, $actor);
+    $artifact = app(LegacyBusinessBackup::class)->execute($company, $actor);
     $upload = 'business-backup-uploads/'.$filename;
     Storage::disk('local')->put($upload, (string) file_get_contents($artifact['path']));
     @unlink($artifact['path']);
 
     return $upload;
 }
+
+it('previews UUID collision choices and retains the operation on retries while rejecting a changed upload', function (): void {
+    Storage::fake('local');
+    $source = Company::factory()->create(['name' => 'Identità portabile']);
+    $admin = User::factory()->platformAdmin()->create();
+    $artifact = app(ExportBusinessBackup::class)->execute($source, $admin, false, false);
+    $upload = 'business-backup-uploads/current.zip';
+    Storage::disk('local')->put($upload, file_get_contents($artifact['path']));
+    @unlink($artifact['path']);
+    $source->tenantCompany()->update(['status' => 'archived']);
+    $this->actingAs($admin);
+    $page = Livewire::test(ImportCompanyBackup::class)
+        ->set('data.backup', [$upload])->call('validateBackup')->assertHasNoErrors()
+        ->assertSet('previewData.target_company_id', $source->id)
+        ->assertSee('Archiviato')->assertSee('Crea come Nuova Copia')->assertSee('Sostituisci Completamente')
+        ->assertSee('Timeline/Audit');
+    $previewOperation = $page->get('importOperationId');
+    $page->mountAction(TestAction::make('replace')->schemaComponent(schema: 'content'))->assertSet('importChoice', 'replace');
+    $replaceOperation = $page->get('importOperationId');
+    $page->call('confirmImport', 'replace', false, false)->assertHasErrors('data.backup');
+    expect($replaceOperation)->not->toBe($previewOperation);
+    expect($page->get('importOperationId'))->toBe($replaceOperation);
+    $page->call('confirmImport', 'replace', false, false)->assertHasErrors('data.backup');
+    expect($page->get('importOperationId'))->toBe($replaceOperation)
+        ->and(BusinessBackupImport::query()->count())->toBe(0);
+    Storage::disk('local')->append($upload, 'changed');
+    $page->call('confirmImport', 'replace', true, true)->assertHasErrors('data.backup')
+        ->assertSet('validatedPackageId', null)->assertSet('importOperationId', null);
+    expect(Company::query()->count())->toBe(1)
+        ->and($source->fresh())->not->toBeNull()
+        ->and(BusinessBackupImport::query()->count())->toBe(0);
+});
+
+it('reserves one operation before the copy confirmation and changes it only for a different choice', function (): void {
+    Storage::fake('local');
+    $source = Company::factory()->create();
+    $admin = User::factory()->platformAdmin()->create();
+    $artifact = app(ExportBusinessBackup::class)->execute($source, $admin, false, false);
+    $upload = 'business-backup-uploads/copy-confirmation.zip';
+    Storage::disk('local')->put($upload, file_get_contents($artifact['path']));
+    @unlink($artifact['path']);
+    $this->actingAs($admin);
+    $page = Livewire::test(ImportCompanyBackup::class)
+        ->set('data.backup', [$upload])->call('validateBackup')->assertHasNoErrors()
+        ->mountAction(TestAction::make('copy')->schemaComponent(schema: 'content'))->assertSet('importChoice', 'copy');
+    $copyOperation = $page->get('importOperationId');
+    $page->unmountAction()->mountAction(TestAction::make('copy')->schemaComponent(schema: 'content'));
+    expect($page->get('importOperationId'))->toBe($copyOperation)
+        ->and(BusinessBackupImport::query()->count())->toBe(0);
+    $page->unmountAction()->mountAction(TestAction::make('replace')->schemaComponent(schema: 'content'))->assertSet('importChoice', 'replace');
+    expect($page->get('importOperationId'))->not->toBe($copyOperation);
+});
+
+it('imports a V3 identity without matching an existing namesake', function (): void {
+    Storage::fake('local');
+    $source = Company::factory()->create(['name' => 'Omonimia senza identità']);
+    $namesake = Company::factory()->create(['name' => $source->name]);
+    $admin = User::factory()->platformAdmin()->create();
+    $artifact = app(ExportBusinessBackup::class)->execute($source, $admin, false, false);
+    $uuid = $source->tenantCompany->portable_uuid;
+    $upload = 'business-backup-uploads/new.zip';
+    Storage::disk('local')->put($upload, file_get_contents($artifact['path']));
+    @unlink($artifact['path']);
+    DB::table('companies')->where('id', $source->id)->delete();
+    $this->actingAs($admin);
+    Livewire::test(ImportCompanyBackup::class)
+        ->set('data.backup', [$upload])->call('validateBackup')->assertHasNoErrors()
+        ->assertSet('previewData.name_collision', true)->assertSet('previewData.target_company_id', 0)
+        ->assertDontSee('Sostituisci Completamente')->call('confirmImport')->assertHasNoErrors();
+    $restored = Company::query()->whereKeyNot($namesake->id)->sole();
+    expect($restored->tenantCompany->portable_uuid)->toBe($uuid)
+        ->and($namesake->fresh())->not->toBeNull()
+        ->and(Storage::disk('local')->exists($upload))->toBeFalse();
+});
 
 it('allows only a Platform Admin to validate and preview without writes', function (): void {
     Storage::fake('local');
@@ -94,7 +171,7 @@ it('allows only a Platform Admin to validate and preview without writes', functi
         ->assertSee(['Fornitori', 'Progetti', 'Contratti', 'Spese', 'Budget', 'Chiusure'])
         ->assertSee('Totale degli Snapshot Budget Inclusi')
         ->assertSee('Effettivi delle Chiusure Incluse')
-        ->assertSee('Ripristina come Nuova Azienda')
+        ->assertSee('Importa')
         ->assertDontSee('2025 (open)')
         ->assertDontSee('timezone Europe/Rome')
         ->assertDontSee('allegati non saranno ripristinati')
@@ -141,10 +218,10 @@ it('restores a validated upload through the page', function (): void {
         ->set('data.backup', [$upload])
         ->call('validateBackup')
         ->assertSet('previewData.company_name', 'Ripristino Pagina')
-        ->assertSee('1 allegati non saranno ripristinati. Il backup ne conserva l’inventario, ma il formato V2 non contiene i file originali.')
+        ->assertSee('1 allegati non saranno ripristinati. Il backup ne conserva l’inventario; i file originali sono esclusi.')
         ->assertSee('Esiste già un’Azienda denominata “Ripristino Pagina”.')
         ->assertSee('L’Azienda esistente non verrà modificata né unita ai dati importati.')
-        ->assertSee('Ripristina come Nuova Azienda')
+        ->assertSee('Importa')
         ->assertSeeHtml('wire:click="mountAction(\'confirmImport\'')
         ->call('confirmImport')
         ->assertHasNoErrors()

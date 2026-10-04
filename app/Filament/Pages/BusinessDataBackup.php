@@ -33,6 +33,10 @@ final class BusinessDataBackup extends Page
 
     protected static ?int $navigationSort = 30;
 
+    public bool $includeLogo = true;
+
+    public bool $includeFiles = true;
+
     public function mount(): void
     {
         abort_unless(self::canAccess(), 403);
@@ -49,10 +53,10 @@ final class BusinessDataBackup extends Page
                 ->url(ImportCompanyBackup::getUrl(panel: 'platform'))
                 ->visible(fn (): bool => $this->actor()->hasRole('super_admin')),
             Action::make('download')
-                ->label('Scarica XLSX')
+                ->label('Scarica Backup')
                 ->icon(Heroicon::OutlinedArrowDownTray)
                 ->action(function (): BinaryFileResponse {
-                    $artifact = app(ExportBusinessBackup::class)->execute($this->company(), $this->actor());
+                    $artifact = app(ExportBusinessBackup::class)->execute($this->company(), $this->actor(), $this->includeLogo, $this->includeFiles);
 
                     return response()->download($artifact['path'], $artifact['filename'])->deleteFileAfterSend(true);
                 }),
@@ -62,7 +66,7 @@ final class BusinessDataBackup extends Page
                 ->visible(StoreBusinessBackupOnDrive::configured())
                 ->requiresConfirmation()
                 ->action(function (): void {
-                    $filename = app(StoreBusinessBackupOnDrive::class)->execute($this->company(), $this->actor());
+                    $filename = app(StoreBusinessBackupOnDrive::class)->execute($this->company(), $this->actor(), $this->includeLogo, $this->includeFiles);
                     Notification::make()->success()->title('Backup Salvato su Drive')->body($filename)->send();
                 }),
         ];

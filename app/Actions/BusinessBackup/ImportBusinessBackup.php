@@ -2,15 +2,20 @@
 
 namespace App\Actions\BusinessBackup;
 
+use App\Actions\Tenancy\DeletePendingTenantFiles;
+use App\Actions\Tenancy\DestroyTenantCompanyData;
 use App\BusinessBackup\V1\BusinessBackupContract;
 use App\Domain\Company\TenantCompanyStatus;
 use App\Models\BusinessBackupImport;
 use App\Models\Company;
+use App\Models\PendingFileDeletion;
+use App\Models\TenantCompany;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 final class ImportBusinessBackup
 {
@@ -19,24 +24,59 @@ final class ImportBusinessBackup
      *   machine: array<string, array{columns: list<string>, rows: list<list<string>>}>
      * } $package
      */
-    public function execute(User $actor, array $package): Company
+    public function execute(User $actor, array $package, ?string $importOperationId = null, string $operation = 'create', ?int $expectedTargetCompanyId = null, bool $irreversibilityConfirmed = false, bool $destructionConfirmed = false): Company
     {
         if (! $actor->hasRole('super_admin')) {
             throw new AuthorizationException('Solo un Platform Admin può importare un backup.');
         }
         $packageId = $package['manifest']['package_id'];
-        $completed = BusinessBackupImport::query()->where('package_id', $packageId)->with('company.tenantCompany')->first();
+        $v3 = $package['manifest']['format_version'] === '3';
+        if ($v3 && $importOperationId === null) {
+            throw ValidationException::withMessages(['backup' => 'Identificativo operazione di import obbligatorio.']);
+        }
+        $importOperationId ??= $packageId;
+        if (! Str::isUuid($importOperationId) || ! in_array($operation, ['create', 'copy', 'replace'], true)) {
+            throw ValidationException::withMessages(['backup' => 'Operazione di import non valida.']);
+        }
+        if (! $v3 && $operation !== 'create') {
+            throw ValidationException::withMessages(['backup' => 'I backup legacy possono solo creare una nuova Azienda.']);
+        }
+        $sourceUuid = $v3 ? $package['manifest']['source_tenant_uuid'] : null;
+        $targetUuid = $operation === 'copy' || ! $v3 ? (string) Str::uuid() : $sourceUuid;
+        $completed = BusinessBackupImport::query()->where('import_operation_id', $importOperationId)->with('company.tenantCompany')->first();
         if ($completed !== null) {
-            return $completed->company;
+            return $this->completedCompany($completed, $packageId);
         }
 
+        $filePreparer = app(PrepareBackupFiles::class);
+        $files = $filePreparer->execute($package);
+        $destroyOperationId = null;
+        $committed = false;
+        $created = false;
+        $proposals = new RestoreBackupProposals;
         try {
-            return DB::transaction(function () use ($actor, $package, $packageId): Company {
-                $completed = BusinessBackupImport::query()->where('package_id', $packageId)->lockForUpdate()->first();
+            $company = DB::transaction(function () use ($actor, $package, $packageId, $importOperationId, $operation, $expectedTargetCompanyId, $irreversibilityConfirmed, $destructionConfirmed, $sourceUuid, $targetUuid, $v3, $files, $proposals, &$destroyOperationId, &$created): Company {
+                $completed = BusinessBackupImport::query()->where('import_operation_id', $importOperationId)->lockForUpdate()->first();
                 if ($completed !== null) {
-                    return $completed->company()->with('tenantCompany')->firstOrFail();
+                    return $this->completedCompany($completed, $packageId);
                 }
 
+                if ($v3 && $operation !== 'copy') {
+                    $target = TenantCompany::query()->where('portable_uuid', $sourceUuid)->first();
+                    if ($operation === 'replace') {
+                        if ($target === null || $target->company_id !== $expectedTargetCompanyId || ! $irreversibilityConfirmed || ! $destructionConfirmed) {
+                            throw ValidationException::withMessages(['backup' => 'Il Tenant target è cambiato oppure manca la doppia conferma. Generare una nuova anteprima.']);
+                        }
+                        $targetCompany = Company::query()->lockForUpdate()->find($target->company_id);
+                        $target = $targetCompany === null ? null : TenantCompany::query()->lockForUpdate()->find($targetCompany->id);
+                        if ($target === null || $target->portable_uuid !== $sourceUuid || $target->company_id !== $expectedTargetCompanyId) {
+                            throw ValidationException::withMessages(['backup' => 'Il Tenant target è cambiato. Generare una nuova anteprima.']);
+                        }
+                        $destroyOperationId = app(DestroyTenantCompanyData::class)->execute($actor, $targetCompany, $target);
+                    } elseif ($target !== null) {
+                        throw ValidationException::withMessages(['backup' => 'Identità Tenant già presente. Generare una nuova anteprima e scegliere Copia o Sostituisci.']);
+                    }
+                }
                 $now = now('UTC');
                 $companyRow = $this->rows($package, '_MP2_company')[0];
                 $companyId = DB::table('companies')->insertGetId([
@@ -45,8 +85,7 @@ final class ImportBusinessBackup
                     'unclassified_closing_policy' => $companyRow['unclassified_closing_policy'],
                     'created_at' => $now, 'updated_at' => $now,
                 ]);
-                DB::table('tenant_companies')->insert(['company_id' => $companyId, 'status' => TenantCompanyStatus::Active->value, 'created_at' => $now, 'updated_at' => $now]);
-                /** @var array<string, array<string, int>> $ids */
+                DB::table('tenant_companies')->insert(['company_id' => $companyId, 'status' => TenantCompanyStatus::Active->value, 'portable_uuid' => $targetUuid, 'created_at' => $now, 'updated_at' => $now]);
                 $ids = [];
                 $ids['company']['COM-0000000001'] = $companyId;
                 $this->insertBasic($package, '_MP2_suppliers', 'supplier', 'suppliers', $ids, $companyId, $now, fn (array $x): array => [
@@ -166,11 +205,15 @@ final class ImportBusinessBackup
                         : null,
                 ]);
 
+                if ($v3) {
+                    $proposals->headersAndItems($package, $ids, $companyId);
+                }
+
                 $budgetRows = collect($this->rows($package, '_MP2_budgets'))->sortBy(fn (array $x): int => (int) $x['version'])->values()->all();
                 foreach ($budgetRows as $x) {
                     $id = DB::table('budget_snapshots')->insertGetId([
                         'company_id' => $companyId, 'exercise_id' => $this->id($ids, 'exercise', $x['exercise_ref']),
-                        'proposal_id' => null, 'version' => (int) $x['version'], 'purpose' => $x['purpose'],
+                        'proposal_id' => $this->optionalId($ids, 'proposal', $x['proposal_ref'] ?? ''), 'version' => (int) $x['version'], 'purpose' => $x['purpose'],
                         'approved_at' => $x['approved_at'], 'approved_by_id' => null,
                         'previous_budget_id' => $this->optionalId($ids, 'budget', $x['previous_budget_ref']),
                         'total_approved_allocation' => $x['total'],
@@ -179,8 +222,11 @@ final class ImportBusinessBackup
                     ]);
                     $ids['budget'][$x['budget_ref']] = $id;
                 }
+                if ($v3) {
+                    $proposals->actionsAndReferences($package, $ids, $companyId);
+                }
                 foreach ($this->rows($package, '_MP2_budget_rows') as $x) {
-                    $proposalItemId = (string) Str::uuid();
+                    $proposalItemId = ($x['proposal_item_ref'] ?? '') === '' ? (string) Str::uuid() : $ids['proposal_item_uuid'][$x['proposal_item_ref']];
                     $detail = $this->hydrateJson(json_decode($x['detail_json'], true, flags: JSON_THROW_ON_ERROR), $ids);
                     if (is_array($detail)) {
                         if (isset($detail['identity']) && is_array($detail['identity'])) {
@@ -203,13 +249,6 @@ final class ImportBusinessBackup
                     ]);
                     $ids['budget_row'][$x['budget_row_ref']] = $id;
                 }
-                $this->insertBasic($package, '_MP2_budget_evidence', 'budget_evidence', 'budget_evidence', $ids, $companyId, $now, fn (array $x): array => [
-                    'company_id' => $companyId, 'budget_snapshot_id' => $this->id($ids, 'budget', $x['budget_ref']),
-                    'external_subject' => $this->null($x['external_subject']), 'external_venue' => $this->null($x['external_venue']),
-                    'reason' => $this->null($x['reason']), 'attachment_id' => null, 'storage_disk' => null, 'storage_path' => null,
-                    'original_name' => $this->null($x['original_name']), 'media_type' => $this->null($x['media_type']),
-                    'size_bytes' => $this->nullableInt($x['size']), 'sha256' => $this->null($x['sha256']),
-                ]);
 
                 foreach ($this->rows($package, '_MP2_closings') as $x) {
                     $id = DB::table('closing_snapshots')->insertGetId([
@@ -255,27 +294,120 @@ final class ImportBusinessBackup
                     'created_at' => $x['recorded_at'],
                 ], false);
                 $this->insertAnnotations($package, $ids, $companyId);
+                $this->insertAttachments($package, $ids, $companyId, $files);
+                $this->insertBasic($package, '_MP2_budget_evidence', 'budget_evidence', 'budget_evidence', $ids, $companyId, $now, fn (array $x): array => [
+                    'company_id' => $companyId, 'budget_snapshot_id' => $this->id($ids, 'budget', $x['budget_ref']),
+                    'external_subject' => $this->null($x['external_subject']), 'external_venue' => $this->null($x['external_venue']),
+                    'reason' => $this->null($x['reason']),
+                    ...$this->evidenceFile($x, $ids, $files),
+                    'original_name' => $this->null($x['original_name']), 'media_type' => $this->null($x['media_type']),
+                    'size_bytes' => $this->nullableInt($x['size']), 'sha256' => $this->null($x['sha256']),
+                ]);
+                if (isset($files['logo:COM-0000000001'])) {
+                    $logo = $files['logo:COM-0000000001'];
+                    DB::table('companies')->where('id', $companyId)->update(['logo_disk' => $logo['disk'], 'logo_path' => $logo['path'], 'logo_media_type' => $logo['media_type']]);
+                }
+                if ($v3) {
+                    $proposals->rebuildDrafts($companyId);
+                }
 
                 $this->verifyCounts($package, $companyId);
                 DB::table('business_backup_imports')->insert([
                     'package_id' => $packageId, 'format_version' => (int) $package['manifest']['format_version'], 'company_id' => $companyId,
+                    'import_operation_id' => $importOperationId, 'operation' => $operation, 'target_tenant_uuid' => $targetUuid, 'source_tenant_uuid' => $sourceUuid,
                     'imported_by_id' => $actor->id, 'completed_at' => $now, 'created_at' => $now, 'updated_at' => $now,
                 ]);
 
-                return Company::query()->with('tenantCompany')->findOrFail($companyId);
+                $created = true;
+
+                $result = Company::query()->with('tenantCompany')->findOrFail($companyId);
+                if ($destroyOperationId !== null) {
+                    $result->setAttribute('backup_cleanup_pending', PendingFileDeletion::query()->where('operation_id', $destroyOperationId)->count());
+                }
+
+                return $result;
             }, 1);
+            $committed = $created;
         } catch (QueryException $exception) {
-            $completed = BusinessBackupImport::query()->where('package_id', $packageId)->with('company.tenantCompany')->first();
+            $committed = false;
+            $completed = BusinessBackupImport::query()->where('import_operation_id', $importOperationId)->with('company.tenantCompany')->first();
             if ($completed !== null) {
-                return $completed->company;
+                return $this->completedCompany($completed, $packageId);
             }
 
+            if ($v3 && str_contains($exception->getMessage(), 'tenant_companies_portable_uuid_unique')) {
+                throw ValidationException::withMessages(['backup' => 'L’identità Tenant è cambiata durante l’import. Generare una nuova anteprima.']);
+            }
             throw $exception;
+        } finally {
+            if (! $committed) {
+                $filePreparer->cleanup($files);
+            }
         }
+        if ($destroyOperationId !== null) {
+            DB::afterCommit(function () use ($destroyOperationId, $company): void {
+                try {
+                    app(DeletePendingTenantFiles::class)->execute($destroyOperationId);
+                    $company->setAttribute('backup_cleanup_pending', PendingFileDeletion::query()->where('operation_id', $destroyOperationId)->count());
+                } catch (\Throwable $exception) {
+                    report($exception);
+                }
+            });
+        }
+
+        return $company;
+    }
+
+    private function completedCompany(BusinessBackupImport $receipt, string $packageId): Company
+    {
+        if ($receipt->package_id !== $packageId) {
+            throw ValidationException::withMessages(['backup' => 'Identificativo operazione già usato per un altro package.']);
+        }
+        $company = $receipt->company()->with('tenantCompany')->first();
+        if ($company === null) {
+            throw ValidationException::withMessages(['backup' => 'Operazione già completata; il Tenant risultante è stato successivamente eliminato.']);
+        }
+
+        return $company;
     }
 
     /** @param array<string, mixed> $package
-     * @param  array<string, array<string, int>>  $ids
+     * @param  array<string, array<string, int|string>>  $ids
+     * @param  array<string, array{disk: string, path: string, media_type: ?string}>  $files
+     */
+    private function insertAttachments(array $package, array &$ids, int $companyId, array $files): void
+    {
+        foreach ($this->rows($package, '_MP2_attachments') as $row) {
+            $file = $files['attachment:'.$row['attachment_ref']] ?? null;
+            if ($file === null) {
+                continue;
+            }
+            $ownerType = $row['owner_type'] === 'historical_error_annotation' ? 'annotation' : $row['owner_type'];
+            $ids['attachment'][$row['attachment_ref']] = DB::table('attachments')->insertGetId([
+                'company_id' => $companyId, $row['owner_type'].'_id' => $this->id($ids, $ownerType, $row['owner_ref']),
+                'storage_disk' => $file['disk'], 'storage_path' => $file['path'],
+                'original_name' => $row['original_name'], 'media_type' => $row['media_type'] ?: null,
+                'size_bytes' => (int) $row['size'], 'sha256' => $row['sha256'], 'uploaded_by_id' => null,
+                'detached_at' => $row['detached_at'] ?: null, 'detached_by_id' => null,
+                'created_at' => $row['uploaded_at'], 'updated_at' => $row['detached_at'] ?: $row['uploaded_at'],
+            ]);
+        }
+    }
+
+    /** @param array<string, string> $row
+     * @param  array<string, array<string, int|string>>  $ids
+     * @param  array<string, array{disk: string, path: string, media_type: ?string}>  $files
+     * @return array<string, mixed>
+     */
+    private function evidenceFile(array $row, array $ids, array $files): array
+    {
+        $file = $row['attachment_ref'] === '' ? ($files['budget_evidence:'.$row['evidence_ref']] ?? null) : ($files['attachment:'.$row['attachment_ref']] ?? null);
+
+        return ['attachment_id' => $file !== null && $row['attachment_ref'] !== '' ? $ids['attachment'][$row['attachment_ref']] : null, 'storage_disk' => $file['disk'] ?? null, 'storage_path' => $file['path'] ?? null];
+    }
+
+    /** @param array<string, mixed> $package
+     * @param  array<string, array<string, int|string>>  $ids
      */
     private function insertAnnotations(array $package, array &$ids, int $companyId): void
     {
@@ -305,7 +437,7 @@ final class ImportBusinessBackup
     }
 
     /** @param array<string, mixed> $package
-     * @param  array<string, array<string, int>>  $ids
+     * @param  array<string, array<string, int|string>>  $ids
      * @param  callable(array<string, string>): array<string, mixed>  $attributes
      */
     private function insertBasic(array $package, string $sheet, string $type, string $table, array &$ids, int $companyId, mixed $now, callable $attributes, bool $timestamps = true): void
@@ -331,7 +463,7 @@ final class ImportBusinessBackup
     }
 
     /** @param array<string, mixed> $effects
-     * @param  array<string, array<string, int>>  $ids
+     * @param  array<string, array<string, int|string>>  $ids
      * @param  array<string, string>  $deferral
      * @return array<string, mixed>
      */
@@ -394,7 +526,7 @@ final class ImportBusinessBackup
         return $value;
     }
 
-    /** @param array<string, array<string, int>> $ids */
+    /** @param array<string, array<string, int|string>> $ids */
     private function hydrateJson(mixed $value, array $ids, ?string $parent = null): mixed
     {
         if (! is_array($value)) {
@@ -457,6 +589,7 @@ final class ImportBusinessBackup
             '_MP2_project_deferrals' => 'project_deferrals', '_MP2_budgets' => 'budget_snapshots',
             '_MP2_closings' => 'closing_snapshots', '_MP2_late_corrections' => 'late_corrections',
             '_MP2_error_annotations' => 'historical_error_annotations',
+            ...(isset($package['machine']['_MP2_proposals']) ? ['_MP2_proposals' => 'proposals', '_MP2_proposal_items' => 'proposal_items', '_MP2_proposal_actions' => 'proposal_actions'] : []),
         ] as $sheet => $table) {
             if (DB::table($table)->where('company_id', $companyId)->count() !== count($package['machine'][$sheet]['rows'])) {
                 throw new \RuntimeException("Verifica finale fallita per [$table].");
@@ -464,19 +597,24 @@ final class ImportBusinessBackup
         }
     }
 
-    /** @param array<string, array<string, int>> $ids */
+    /** @param array<string, array<string, int|string>> $ids */
     private function id(array $ids, string $type, string $ref): int
     {
-        return $ids[$type][$ref] ?? throw new \UnexpectedValueException("Riferimento non risolto [$type:$ref].");
+        $id = $ids[$type][$ref] ?? null;
+        if (! is_int($id)) {
+            throw new \UnexpectedValueException("Riferimento non risolto [$type:$ref].");
+        }
+
+        return $id;
     }
 
-    /** @param array<string, array<string, int>> $ids */
+    /** @param array<string, array<string, int|string>> $ids */
     private function optionalId(array $ids, string $type, string $ref): ?int
     {
         return $ref === '' ? null : $this->id($ids, $type, $ref);
     }
 
-    /** @param array<string, array<string, int>> $ids */
+    /** @param array<string, array<string, int|string>> $ids */
     private function origin(array $ids, string $ref, ?string $sourceType = null): string
     {
         $types = $sourceType === null ? ['expense', 'project', 'contract', 'supplier', 'cost_center', 'exercise', 'closing'] : [$this->sourceType($sourceType)];
@@ -491,7 +629,7 @@ final class ImportBusinessBackup
         throw new \UnexpectedValueException("Riferimento senza OriginKey [$ref].");
     }
 
-    /** @param array<string, array<string, int>> $ids */
+    /** @param array<string, array<string, int|string>> $ids */
     private function optionalOrigin(array $ids, string $ref): ?string
     {
         return $ref === '' ? null : $this->origin($ids, $ref);

@@ -34,7 +34,7 @@ class ContractAttachmentsRelationManager extends RelationManager
                 TextColumn::make('original_name')->label('File'),
                 TextColumn::make('size_bytes')->label('Dimensione')->numeric(),
                 TextColumn::make('sha256')->label('SHA-256')->copyable()->limit(16),
-                TextColumn::make('uploader.name')->label('Caricato da'),
+                TextColumn::make('uploader.name')->label('Caricato da')->placeholder('Autore storico non disponibile'),
                 TextColumn::make('created_at')->label('Caricato il')->dateTime('d/m/Y H:i'),
             ])->recordActions([
                 Action::make('preview')->label('Visualizza')->icon('heroicon-m-eye')
