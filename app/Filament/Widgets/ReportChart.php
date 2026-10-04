@@ -26,7 +26,8 @@ class ReportChart extends ChartWidget
 
     public function chartSurfaceClass(): string
     {
-        return 'mp2-economic-chart mp2-report-chart';
+        return 'mp2-economic-chart mp2-report-chart'
+            .(in_array($this->variant, ['grouped-horizontal', 'variance-horizontal'], true) ? ' mp2-report-chart-wide' : '');
     }
 
     public function getHeading(): string
@@ -69,6 +70,13 @@ class ReportChart extends ChartWidget
                 plugins: {
                     legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 16 } },
                     tooltip: { padding: 12, callbacks: { label: (context) => `${context.label}: ${context.parsed} sorgenti` } },
+                },
+                JS,
+            'contract-state-doughnut' => <<<'JS'
+                cutout: '68%',
+                plugins: {
+                    legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 16 } },
+                    tooltip: { padding: 12, callbacks: { label: (context) => `${context.label}: ${context.parsed} contratti` } },
                 },
                 JS,
             'grouped-horizontal' => <<<'JS'
