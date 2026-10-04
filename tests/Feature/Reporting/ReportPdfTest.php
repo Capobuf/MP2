@@ -265,7 +265,7 @@ it('limits the contracts chart to the eight highest allocations without truncati
     $portraitSvg = base64_decode(explode(',', collect($portraitDocument['charts'])->firstWhere('id', 'contract-values')['image'], 2)[1], true);
     preg_match_all('/<text[^>]*>(.*?)<\/text>/s', $svg, $texts);
 
-    expect($chart['description'])->toBe('Visualizzati 8 di 9 contratti · ordinati per Allocato decrescente.')
+    expect($chart['render_description'])->toBe('Visualizzati 8 di 9 contratti · ordinati per Allocato decrescente.')
         ->and($portraitChart['description'])->toBe('Visualizzati 5 di 9 contratti · ordinati per Allocato decrescente.')
         ->and($html)->toContain($chart['description'], 'Contratto 1', 'Contratto 9')
         ->and($texts[1])->not->toContain(Number::currency(0, in: 'EUR', locale: 'it'))
@@ -992,7 +992,7 @@ it('limits dense charts by the declared measure while retaining complete tables'
     $total = $kind === 'suppliers' ? 13 : 12;
     $xpath = pdfDocumentXPath(view('reports.pdf', compact('document'))->render());
     expect($definition['data']['labels'])->toHaveCount($limit)
-        ->and($definition['description'])->toContain('Visualizzati '.$limit.' di '.$total, 'decrescente')
+        ->and($definition['render_description'])->toContain('Visualizzati '.$limit.' di '.$total, 'decrescente')
         ->and($xpath->query('//table[@data-block="'.$block.'"]/tbody/tr')->length)->toBe($total);
     $values = $definition['data']['datasets'][0]['data'];
     $rank = $kind === 'operational_variance' ? array_map('abs', $values) : $values;

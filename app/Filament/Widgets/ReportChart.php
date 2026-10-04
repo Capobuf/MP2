@@ -71,6 +71,13 @@ class ReportChart extends ChartWidget
                     tooltip: { padding: 12, callbacks: { label: (context) => `${context.label}: ${context.parsed} sorgenti` } },
                 },
                 JS,
+            'contract-state-doughnut' => <<<'JS'
+                cutout: '68%',
+                plugins: {
+                    legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 16 } },
+                    tooltip: { padding: 12, callbacks: { label: (context) => `${context.label}: ${context.parsed} contratti` } },
+                },
+                JS,
             'grouped-horizontal' => <<<'JS'
                 indexAxis: 'y',
                 interaction: { mode: 'index', intersect: false },
