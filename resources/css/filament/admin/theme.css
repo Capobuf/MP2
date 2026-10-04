@@ -3541,6 +3541,7 @@ html.fi {
     margin-top: 16px;
 }
 
+.mp2-report-chart-grid > .mp2-report-chart-wide,
 .mp2-report-chart-grid > .fi-wi-widget:last-child:nth-child(odd) {
     grid-column: 1 / -1;
 }

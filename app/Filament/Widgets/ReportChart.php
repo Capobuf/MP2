@@ -26,7 +26,8 @@ class ReportChart extends ChartWidget
 
     public function chartSurfaceClass(): string
     {
-        return 'mp2-economic-chart mp2-report-chart';
+        return 'mp2-economic-chart mp2-report-chart'
+            .(in_array($this->variant, ['grouped-horizontal', 'variance-horizontal'], true) ? ' mp2-report-chart-wide' : '');
     }
 
     public function getHeading(): string
