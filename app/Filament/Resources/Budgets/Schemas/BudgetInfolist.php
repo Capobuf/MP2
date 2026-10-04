@@ -8,6 +8,7 @@ use App\Domain\Contracts\ContractState;
 use App\Domain\Projects\ProjectDeferralMode;
 use App\Domain\Projects\ProjectState;
 use App\Domain\Proposals\ProposalActionType;
+use App\Domain\Proposals\ProposalPlanData;
 use App\Domain\Proposals\ProposalSourceType;
 use App\Filament\Resources\Proposals\ProposalResource;
 use App\Models\BudgetEvidence;
@@ -158,6 +159,7 @@ class BudgetInfolist
                 'system' => 'Sistema',
                 default => '—',
             },
+            'exercise_year' => $detail['exercise_year'] ?? null,
             'owner' => $owner['label'] ?? '—',
             'state' => self::stateLabel(ProposalSourceType::Expense, $detail['state'] ?? null),
             'lines' => collect($lines)->map(fn (mixed $line): array => self::estimateLine(is_array($line) ? $line : []))->all(),
@@ -199,6 +201,9 @@ class BudgetInfolist
         $conditions = is_array($detail['conditions'] ?? null) ? $detail['conditions'] : [];
 
         return [
+            'system_estimates' => isset($detail['system_estimate_total']) ? self::money($detail['system_estimate_total']) : null,
+            'manual_estimates' => isset($detail['manual_estimate_total']) ? self::money($detail['manual_estimate_total']) : null,
+            'expenses' => collect(ProposalPlanData::rows($detail['expenses'] ?? [], 'expenses'))->map(fn (array $expense): array => ['description' => $expense['description'], 'origin' => $expense['origin'] === 'system' ? 'Sistema' : 'Manuale', 'total' => self::money($expense['approved_estimate_total']), 'lines' => collect(ProposalPlanData::rows($expense['active_estimate_lines'], 'active_estimate_lines'))->map(fn (array $line): array => self::estimateLine($line))->all()])->all(),
             'start_date' => self::date($detail['contractual_start_date'] ?? null),
             'expiry_date' => self::date($detail['next_expiry_date'] ?? null),
             'automatic_renewal' => ($detail['automatic_renewal'] ?? false) ? 'Sì' : 'No',

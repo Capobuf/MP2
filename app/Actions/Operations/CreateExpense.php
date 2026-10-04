@@ -3,6 +3,7 @@
 namespace App\Actions\Operations;
 
 use App\Domain\Company\AuditEventType;
+use App\Domain\Contracts\ContractEconomicUse;
 use App\Domain\Contracts\ContractExpenseActivity;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseAuditSnapshot;
@@ -40,6 +41,7 @@ class CreateExpense
             'project_id' => $input['project_id'] ?? null,
             'contract_id' => $input['contract_id'] ?? null,
             'actual_kind' => $input['actual_kind'] ?? null,
+            'residual_estimate' => $input['residual_estimate'] ?? false,
             'activity_note' => $input['activity_note'] ?? null,
             'open_project' => $input['open_project'] ?? false,
             'overspend_note' => $input['overspend_note'] ?? null,
@@ -48,7 +50,7 @@ class CreateExpense
             'notes' => $this->nullableTrim($input['notes'] ?? null),
             'operation_id' => $operationId,
         ];
-        /** @var array{exercise_id: int, supplier_id: ?int, direct_cost_center_id: ?int, project_id: ?int, contract_id: ?int, actual_kind: ?string, activity_note: ?string, open_project: bool, overspend_note: ?string, change_reason: ?string, description: string, notes: ?string, lines: array<int, array<string, mixed>>, operation_id: string} $validated */
+        /** @var array{exercise_id: int, supplier_id: ?int, direct_cost_center_id: ?int, project_id: ?int, contract_id: ?int, actual_kind: ?string, residual_estimate: bool, activity_note: ?string, open_project: bool, overspend_note: ?string, change_reason: ?string, description: string, notes: ?string, lines: array<int, array<string, mixed>>, operation_id: string} $validated */
         $validated = Validator::make($normalized, [
             'exercise_id' => ['required', 'integer'],
             'supplier_id' => ['nullable', 'integer'],
@@ -56,6 +58,7 @@ class CreateExpense
             'project_id' => ['nullable', 'integer'],
             'contract_id' => ['nullable', 'integer'],
             'actual_kind' => ['nullable', 'string'],
+            'residual_estimate' => ['boolean'],
             'activity_note' => ['nullable', 'string'],
             'open_project' => ['boolean'],
             'overspend_note' => ['nullable', 'string'],
@@ -178,6 +181,7 @@ class CreateExpense
                 ProjectExpenseActivity::assertOverspendNote($lockedCompany, $projectContext, $varianceBefore, $varianceAfter);
                 $project->increment('revision', $openingTransition === null ? 1 : 2);
             }
+            ContractEconomicUse::recordIfProven($contract);
             $contract?->increment('revision');
             $exercise->increment('revision');
             $expense->refresh();
@@ -197,8 +201,9 @@ class CreateExpense
             }
             if ($contract !== null) {
                 $newValue['contract_activity'] = [
-                    'actual_kind' => $contractContext['actual_kind']->value,
+                    'actual_kind' => $contractContext['actual_kind']?->value,
                     'activity_note' => $contractContext['activity_note'],
+                    'residual_estimate' => $contractContext['residual_estimate'],
                     'cycle_matching' => null,
                 ];
             }

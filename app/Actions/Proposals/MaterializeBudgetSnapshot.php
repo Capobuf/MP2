@@ -141,6 +141,10 @@ final class MaterializeBudgetSnapshot
 
         foreach ($payload['rows'] as $row) {
             $budget->rows()->create($row);
+            if ($row['source_type'] === 'contract') {
+                Contract::query()->where('company_id', $row['company_id'])->whereKey($row['origin_id'])
+                    ->update(['economic_use_recorded' => true]);
+            }
         }
         self::checkpoint($checkpoint, 'after_budget_rows');
         $budget->evidence()->create(['company_id' => $proposal->company_id, 'external_subject' => $evidence['external_subject'] ?? null, 'external_venue' => $evidence['external_venue'] ?? null, 'reason' => $evidence['reason'] ?? null]);
@@ -170,7 +174,7 @@ final class MaterializeBudgetSnapshot
             ProposalActionType::ReverseExpense => AuditEventType::ExpenseReversed,
             ProposalActionType::RestoreExpense => AuditEventType::ExpenseRestored,
             ProposalActionType::CreateProject => AuditEventType::ProjectCreated,
-            ProposalActionType::PlanProjectChildExpenses => AuditEventType::ExpenseLineUpdated,
+            ProposalActionType::PlanProjectChildExpenses, ProposalActionType::PlanContractChildExpenses => AuditEventType::ExpenseLineUpdated,
             ProposalActionType::SetProjectCostCenter => AuditEventType::ProjectClassificationChanged,
             ProposalActionType::PlanProjectTransition => AuditEventType::ProjectTransitionPlanned,
             ProposalActionType::PlanProjectDeferral => AuditEventType::ProjectDeferralChanged,

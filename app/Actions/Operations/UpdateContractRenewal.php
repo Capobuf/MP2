@@ -133,11 +133,15 @@ class UpdateContractRenewal
             $after = ContractAnnualAllocation::forYear($contract->conditions, $exercise->year, fn (string $date) => ContractStateTimeline::stateAtDate(
                 $contract->contractualStartDate()->toDateString(), $contract->lifecycleFacts, $date, $projected,
             ));
+            $persisted = $contract->annualTotals()[$exercise->id]['allocation'] ?? '0.00';
+            $projectedTotal = Decimal::add($after->amount, $contract->manualEstimateTotal($exercise->id));
             $impacts[$exercise->id] = [
                 'year' => $exercise->year,
-                'allocation_before' => $before->amount,
-                'allocation_after' => $after->amount,
-                'allocation_delta' => Decimal::subtract($after->amount, $before->amount),
+                'allocation_before' => $persisted,
+                'allocation_after' => $projectedTotal,
+                'recurring_before' => $before->amount,
+                'recurring_after' => $after->amount,
+                'allocation_delta' => Decimal::subtract($projectedTotal, $persisted),
             ];
         }
 

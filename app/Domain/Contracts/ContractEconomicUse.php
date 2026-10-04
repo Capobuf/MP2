@@ -14,6 +14,9 @@ final class ContractEconomicUse
 {
     public static function exists(Contract $contract): bool
     {
+        if ($contract->economic_use_recorded) {
+            return true;
+        }
         if (BudgetSourceRow::query()->where('company_id', $contract->company_id)->where('source_type', 'contract')->where('origin_id', $contract->id)->exists()
             || ClosingSourceRow::query()->where('company_id', $contract->company_id)->where('source_type', 'contract')->where('origin_id', $contract->id)->exists()) {
             return true;
@@ -32,12 +35,19 @@ final class ContractEconomicUse
             ->where('expenses.contract_id', $contract->id)
             ->where(function ($query): void {
                 $query->where(function ($query): void {
-                    $query->where('expenses.origin', 'system')
-                        ->whereNull('expense_lines.annulled_at')
+                    $query->whereNull('expense_lines.annulled_at')
+                        ->whereNull('expenses.reversed_at')
                         ->where('expense_lines.type', ExpenseLineType::Estimate->value)
                         ->where('expense_lines.amount', '!=', '0.00');
                 })->orWhere('expense_lines.type', ExpenseLineType::Actual->value);
             })
             ->exists();
+    }
+
+    public static function recordIfProven(?Contract $contract): void
+    {
+        if ($contract !== null && ! $contract->economic_use_recorded && self::exists($contract)) {
+            $contract->forceFill(['economic_use_recorded' => true])->save();
+        }
     }
 }

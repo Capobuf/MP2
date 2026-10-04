@@ -2,8 +2,11 @@
 
 namespace App\Actions\Operations;
 
+use App\Actions\Proposals\MarkProposalItemsToRealign;
 use App\Domain\Company\AuditEventType;
 use App\Domain\Contracts\ContractAttributionMode;
+use App\Domain\Contracts\ContractClosedHistoryGuard;
+use App\Domain\Contracts\ContractConditionRules;
 use App\Domain\Contracts\ContractCycleType;
 use App\Domain\Contracts\ContractState;
 use App\Models\AuditEvent;
@@ -35,12 +38,13 @@ class ReactivateContract
         ], [
             'start_date' => ['required', 'date_format:Y-m-d'], 'next_expiry_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
             'reason' => ['required', 'string'], 'expected_revision' => ['required', 'integer', 'min:0'], 'operation_id' => ['required', 'uuid'],
-            'condition' => ['required', 'array'], 'condition.amount' => ['required', 'decimal:0,2', 'min:0'],
-            'condition.cycle' => ['required', Rule::enum(ContractCycleType::class)],
-            'condition.attribution_mode' => ['required', Rule::enum(ContractAttributionMode::class)],
-            'condition.valid_from' => ['required', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+            'condition' => ['present', 'array'], 'condition.amount' => [Rule::requiredIf($condition !== []), 'decimal:0,2', 'min:0'],
+            'condition.cycle' => [Rule::requiredIf($condition !== []), Rule::enum(ContractCycleType::class)],
+            'condition.attribution_mode' => [Rule::requiredIf($condition !== []), Rule::enum(ContractAttributionMode::class)],
+            'condition.valid_from' => [Rule::requiredIf($condition !== []), 'date_format:Y-m-d', 'after_or_equal:start_date'],
             'condition.valid_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:condition.valid_from'],
         ])->validate();
+        $data['condition'] ??= [];
 
         return DB::transaction(function () use ($actor, $contract, $data): ContractLifecycleFact {
             $company = Company::query()->lockForUpdate()->findOrFail($contract->company_id);
@@ -49,7 +53,8 @@ class ReactivateContract
             Gate::forUser($actor)->authorize('update', $locked);
             $existing = AuditEvent::query()->where('operation_id', $data['operation_id'])->where('event_sequence', 0)->first();
             if ($existing !== null) {
-                if ($existing->eventType() !== AuditEventType::ContractReactivated || $existing->subject_type !== ContractLifecycleFact::class) {
+                if ($existing->eventType() !== AuditEventType::ContractReactivated || $existing->subject_type !== ContractLifecycleFact::class || $existing->company_id !== $company->id
+                    || $existing->reference_type !== Contract::class || $existing->reference_id !== $locked->id) {
                     throw ValidationException::withMessages(['operation_id' => 'Identificativo operazione già utilizzato.']);
                 }
 
@@ -63,24 +68,35 @@ class ReactivateContract
                 throw ValidationException::withMessages(['contract' => 'La riattivazione richiede un Contratto Cessato o Annullato.']);
             }
 
+            ContractClosedHistoryGuard::assertEventDateIsMutable($locked, $data['start_date']);
+            if ($data['condition'] !== []) {
+                ContractConditionRules::assertMayPersist($locked, $data['condition']['valid_from'], $data['condition']['valid_to'] ?? null, $locked->conditions);
+            }
             $fact = ContractLifecycleFact::query()->create([
                 'company_id' => $company->id, 'contract_id' => $locked->id, 'type' => 'reactivation',
                 'declared_contractual_date' => $data['start_date'], 'state_change_date' => $data['start_date'],
                 'reason' => $data['reason'], 'created_by_id' => $actor->id,
             ]);
-            $condition = ContractCondition::query()->create([
-                'company_id' => $company->id, 'contract_id' => $locked->id,
-                'amount' => $data['condition']['amount'], 'cycle' => $data['condition']['cycle'],
-                'attribution_mode' => $data['condition']['attribution_mode'], 'valid_from' => $data['condition']['valid_from'],
-                'valid_to' => $data['condition']['valid_to'] ?? null, 'reason' => $data['reason'], 'created_by_id' => $actor->id,
-            ]);
+            $condition = null;
+            if ($data['condition'] !== []) {
+                $condition = ContractCondition::query()->create([
+                    'company_id' => $company->id, 'contract_id' => $locked->id,
+                    'amount' => $data['condition']['amount'], 'cycle' => $data['condition']['cycle'],
+                    'attribution_mode' => $data['condition']['attribution_mode'], 'valid_from' => $data['condition']['valid_from'],
+                    'valid_to' => $data['condition']['valid_to'] ?? null, 'reason' => $data['reason'], 'created_by_id' => $actor->id,
+                ]);
+            }
             $locked->update(['next_expiry_date' => $data['next_expiry_date'], 'renewal_anchor_date' => $data['next_expiry_date'], 'revision' => $locked->revision + 1]);
             $exerciseIds = $exercises->pluck('id')->all();
             $sequence = 0;
             $this->event($actor, $fact, $locked, $data['operation_id'], $sequence++, AuditEventType::ContractReactivated, $exerciseIds, $data['start_date'], $data['reason']);
-            $this->event($actor, $fact, $locked, $data['operation_id'], $sequence++, AuditEventType::ContractConditionCreated, $exerciseIds, $data['condition']['valid_from'], $data['reason'], ['condition_id' => $condition->id]);
+            if ($condition !== null) {
+                $this->event($actor, $fact, $locked, $data['operation_id'], $sequence++, AuditEventType::ContractConditionCreated, $exerciseIds, $data['condition']['valid_from'], $data['reason'], ['condition_id' => $condition->id]);
+            }
             $locked->unsetRelation('conditions')->unsetRelation('lifecycleFacts');
             $this->recalculate->recalculateWithinTransaction($actor, $locked, $exercises, $data['operation_id'], $sequence);
+
+            app(MarkProposalItemsToRealign::class)->execute($company->id, contractIds: [$locked->id]);
 
             return $fact->refresh();
         });

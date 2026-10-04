@@ -36,7 +36,7 @@ final class ReportAggregator
     {
         $buckets = [];
         foreach ($sources as $source) {
-            $expenses = $source->sourceType === 'expense'
+            $expenses = in_array($source->sourceType, ['expense', 'contract'], true)
                 ? [[
                     'supplier_id' => $source->supplierId,
                     'supplier_label' => $source->supplierLabel,
@@ -44,7 +44,19 @@ final class ReportAggregator
                     'actual' => $source->actual,
                     'source' => $source->label,
                 ]]
-                : ($source->detail['expenses'] ?? []);
+                : $source->expenseComponents();
+
+            if ($source->sourceType === 'project') {
+                foreach ($source->corrections as $correction) {
+                    $expenses[] = [
+                        'supplier_id' => $correction['supplier_context']['id'] ?? null,
+                        'supplier_label' => $correction['supplier_context']['label'] ?? null,
+                        'source' => $correction['source_label'],
+                        'allocation' => '0.00',
+                        'actual' => $correction['amount'],
+                    ];
+                }
+            }
 
             foreach ($expenses as $expense) {
                 $supplierId = $source->sourceType === 'contract'

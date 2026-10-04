@@ -16,6 +16,8 @@
             <dt>Totale Allocato</dt>
             <dd>{{ $detail['allocation'] }}</dd>
         </div>
+        <div><dt>Stime di sistema</dt><dd>{{ $detail['system_allocation'] }}</dd></div>
+        <div><dt>Stime manuali</dt><dd>{{ $detail['manual_allocation'] }}</dd></div>
     </dl>
 
     @if ($detail['composition'] !== [])
@@ -43,3 +45,7 @@
         <p class="mp2-contract-muted-copy">Nessun ciclo attribuito a questo Esercizio.</p>
     @endif
 </div>
+
+@foreach ($detail['manual_expenses'] as $expense)
+    <p>{{ $expense['description'] }} · {{ $expense['allocation'] }}</p>
+@endforeach

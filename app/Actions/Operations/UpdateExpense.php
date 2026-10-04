@@ -4,6 +4,7 @@ namespace App\Actions\Operations;
 
 use App\Domain\Company\AuditEventType;
 use App\Domain\Contracts\ContractActualKind;
+use App\Domain\Contracts\ContractEconomicUse;
 use App\Domain\Contracts\ContractExpenseActivity;
 use App\Domain\Expenses\ExpenseAuditSnapshot;
 use App\Domain\Expenses\ExpenseImpactPlan;
@@ -63,6 +64,7 @@ class UpdateExpense
             overspendNote: $normalized['overspend_note'],
             sourceContract: $sourceContract,
             targetContract: $targetContract,
+            residualEstimate: $normalized['residual_estimate'],
             supplierReplacementAcknowledged: $normalized['supplier_replacement_acknowledged'],
         );
     }
@@ -146,6 +148,7 @@ class UpdateExpense
                 'project_id' => $preview->targetProjectId,
                 'contract_id' => $preview->targetContractId,
                 'actual_kind' => $preview->actualKind,
+                'residual_estimate' => $preview->residualEstimate,
                 'activity_note' => $preview->activityNote,
                 'open_project' => $preview->openProject,
                 'overspend_note' => $preview->overspendNote,
@@ -169,6 +172,7 @@ class UpdateExpense
                 sourceContract: $sourceContract,
                 targetContract: $targetContract,
                 supplierReplacementAcknowledged: $preview->supplierReplacementAcknowledged,
+                residualEstimate: $preview->residualEstimate,
             );
             if (! hash_equals($preview->fingerprint(), $current->fingerprint())) {
                 throw ValidationException::withMessages(['preview' => 'L’impatto è cambiato: calcolare una nuova anteprima.']);
@@ -190,6 +194,7 @@ class UpdateExpense
             foreach ($preview->projectImpacts as $impact) {
                 ProjectExpenseActivity::assertOverspendNote($company, $overspendContext, (string) $impact['variance_before'], (string) $impact['variance_after']);
             }
+            ContractEconomicUse::recordIfProven($sourceContract);
             $lockedExpense->fill([
                 'exercise_id' => $preview->targetExerciseId,
                 'project_id' => $preview->targetProjectId,
@@ -206,6 +211,7 @@ class UpdateExpense
                 $affectedProject->increment('revision', $openingTransition !== null && $affectedProject->is($targetProject) ? 2 : 1);
             }
             foreach ($contracts as $affectedContract) {
+                ContractEconomicUse::recordIfProven($affectedContract);
                 $affectedContract->increment('revision');
             }
             foreach ($exerciseIds as $exerciseId) {
@@ -233,12 +239,14 @@ class UpdateExpense
                 'contract_impacts' => $preview->contractImpacts,
                 'supplier_replacement_acknowledged' => $preview->supplierReplacementAcknowledged,
                 'actual_kind' => $preview->actualKind,
+                'residual_estimate' => $preview->residualEstimate,
                 'activity_note' => $preview->activityNote,
                 'opening_transition' => $openingTransition === null ? null : ProjectAuditSnapshot::transition($openingTransition),
                 'overspend_note' => $preview->overspendNote,
                 'contract_activity' => $contractContext === null ? null : [
-                    'actual_kind' => $contractContext['actual_kind']->value,
+                    'actual_kind' => $contractContext['actual_kind']?->value,
                     'activity_note' => $contractContext['activity_note'],
+                    'residual_estimate' => $contractContext['residual_estimate'],
                     'cycle_matching' => null,
                 ],
             ];
@@ -348,11 +356,11 @@ class UpdateExpense
     }
 
     /** @param array<string, mixed> $input
-     * @return array{exercise_id: int, supplier_id: ?int, direct_cost_center_id: ?int, reason: ?string, project_id: ?int, contract_id: ?int, actual_kind: ?string, activity_note: ?string, open_project: bool, overspend_note: ?string, direct_cost_center_supplied: bool, supplier_replacement_acknowledged: bool}
+     * @return array{exercise_id: int, supplier_id: ?int, direct_cost_center_id: ?int, reason: ?string, project_id: ?int, contract_id: ?int, actual_kind: ?string, residual_estimate: bool, activity_note: ?string, open_project: bool, overspend_note: ?string, direct_cost_center_supplied: bool, supplier_replacement_acknowledged: bool}
      */
     private function normalizeClassification(Expense $expense, array $input): array
     {
-        /** @var array{exercise_id: int, supplier_id: ?int, direct_cost_center_id: ?int, reason: ?string, project_id: ?int, contract_id: ?int, actual_kind: ?string, activity_note: ?string, open_project: bool, overspend_note: ?string, direct_cost_center_supplied: bool, supplier_replacement_acknowledged: bool} $validated */
+        /** @var array{exercise_id: int, supplier_id: ?int, direct_cost_center_id: ?int, reason: ?string, project_id: ?int, contract_id: ?int, actual_kind: ?string, residual_estimate: bool, activity_note: ?string, open_project: bool, overspend_note: ?string, direct_cost_center_supplied: bool, supplier_replacement_acknowledged: bool} $validated */
         $validated = Validator::make([
             'exercise_id' => $input['exercise_id'] ?? $expense->exercise_id,
             'supplier_id' => array_key_exists('supplier_id', $input) ? $input['supplier_id'] : $expense->supplier_id,
@@ -361,6 +369,7 @@ class UpdateExpense
             'project_id' => array_key_exists('project_id', $input) ? $input['project_id'] : $expense->project_id,
             'contract_id' => array_key_exists('contract_id', $input) ? $input['contract_id'] : $expense->contract_id,
             'actual_kind' => $input['actual_kind'] ?? null,
+            'residual_estimate' => $input['residual_estimate'] ?? false,
             'activity_note' => $this->nullableTrim($input['activity_note'] ?? null),
             'open_project' => filter_var($input['open_project'] ?? false, FILTER_VALIDATE_BOOL),
             'overspend_note' => $this->nullableTrim($input['overspend_note'] ?? null),
@@ -374,6 +383,7 @@ class UpdateExpense
             'project_id' => ['nullable', 'integer'],
             'contract_id' => ['nullable', 'integer'],
             'actual_kind' => ['nullable', 'string'],
+            'residual_estimate' => ['boolean'],
             'activity_note' => ['nullable', 'string'],
             'open_project' => ['boolean'],
             'overspend_note' => ['nullable', 'string'],
@@ -389,8 +399,8 @@ class UpdateExpense
     }
 
     /**
-     * @param  array{exercise_id: int, supplier_id: ?int, direct_cost_center_id: ?int, reason: ?string, project_id: ?int, contract_id: ?int, actual_kind: ?string, activity_note: ?string, open_project: bool, overspend_note: ?string, direct_cost_center_supplied: bool, supplier_replacement_acknowledged: bool}  $input
-     * @return array{project: array{actual_kind: ?ProjectActualKind, activity_note: ?string, open_project: bool, overspend_note: ?string, today: string}|null, contract: array{actual_kind: ContractActualKind, activity_note: ?string, today: string}|null}
+     * @param  array{exercise_id: int, supplier_id: ?int, direct_cost_center_id: ?int, reason: ?string, project_id: ?int, contract_id: ?int, actual_kind: ?string, residual_estimate: bool, activity_note: ?string, open_project: bool, overspend_note: ?string, direct_cost_center_supplied: bool, supplier_replacement_acknowledged: bool}  $input
+     * @return array{project: array{actual_kind: ?ProjectActualKind, activity_note: ?string, open_project: bool, overspend_note: ?string, today: string}|null, contract: array{actual_kind: ?ContractActualKind, activity_note: ?string, residual_estimate: bool, today: string}|null}
      */
     private function validateExercisesAndReferences(
         Expense $expense,
@@ -476,8 +486,6 @@ class UpdateExpense
             if ($expense->supplier_id !== $targetContract->supplier_id && ! $input['supplier_replacement_acknowledged']) {
                 throw ValidationException::withMessages(['supplier_replacement_acknowledged' => 'Confermare la sostituzione del Fornitore diretto con quello del Contratto.']);
             }
-            $allLines = $expense->lines()->orderBy('id')->get()->map(fn ($line): array => ['type' => $line->lineType()]);
-            ContractExpenseActivity::assertActualOnly($allLines);
             $activeLines = $expense->lines()->active()->orderBy('id')->get()->map(fn ($line): array => ['type' => $line->lineType()]);
             $contractContext = ContractExpenseActivity::validate($targetContract, $target, $expense->company, $activeLines, $input);
         }

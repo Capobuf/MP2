@@ -303,6 +303,10 @@ final class CloseExercise
                 ]);
                 foreach ($payload['rows'] as $row) {
                     $snapshot->rows()->create($row);
+                    if ($row['source_type'] === 'contract') {
+                        Contract::query()->where('company_id', $row['company_id'])->whereKey($row['origin_id'])
+                            ->update(['economic_use_recorded' => true]);
+                    }
                 }
 
                 $lockedExercise->update(['status' => ExerciseStatus::Closed]);

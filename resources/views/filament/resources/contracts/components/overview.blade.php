@@ -48,7 +48,9 @@
                         <p>L’ultima condizione è terminata il {{ $overview['last_condition_end'] }}.</p>
                     @endif
                 </div>
-                @if ($overview['is_active'])
+                @if (! $overview['has_conditions'])
+                    <p class="mp2-contract-muted-copy">Nessun canone ricorrente definito. Le Stime e gli Effettivi manuali sono consultabili nelle Spese e nelle situazioni annuali.</p>
+                @elseif ($overview['is_active'])
                     <p class="mp2-contract-muted-copy">Il Contratto è Attivo, ma oggi non è coperto da una condizione economica. La fine di una condizione non determina la cessazione del Contratto.</p>
                     @if ($overview['terms']['automatic_renewal'] === 'Sì')
                         <p class="mp2-contract-muted-copy">Il rinnovo automatico non prolunga le condizioni con una data finale. Verifica il nuovo accordo nella scheda Condizioni Economiche.</p>
@@ -132,10 +134,12 @@
                     <p class="mp2-contract-muted-copy">L’Allocato comprende i cicli attribuiti all’intero Esercizio, anche quando la condizione che li ha generati è già terminata. Non indica il canone vigente oggi.</p>
                 @endif
 
+                <p>{{ $overview['selected']['reference_label'] }}</p>
+                <p>Stime di sistema: {{ $overview['selected']['system_allocation'] }} · Stime manuali: {{ $overview['selected']['manual_allocation'] }}</p>
                 <div class="mp2-contract-composition">
                     <div class="mp2-contract-subheading">
                         <h3>Composizione dell’Allocato</h3>
-                        <span>{{ $overview['selected']['composition_count'] }} {{ $overview['selected']['composition_count'] === 1 ? 'Ciclo Compone' : 'Cicli Compongono' }} l’Allocato</span>
+                        <span>{{ $overview['selected']['composition_count'] }} {{ $overview['selected']['composition_count'] === 1 ? 'Ciclo Compone' : 'Cicli Compongono' }} la previsione ricorrente</span>
                     </div>
                     @if ($overview['selected']['composition'] !== [])
                         <dl class="mp2-contract-composition-summary">
@@ -195,7 +199,7 @@
                 <p class="mp2-object-eyebrow">Andamento Pluriennale</p>
                 <h2 id="contract-annual-title">Situazioni Annuali</h2>
             </div>
-            <p>Valori calcolati alla data di riferimento canonica di ciascun Esercizio.</p>
+            <p>Anni aperti: valori correnti. Anni chiusi: Snapshot di Chiusura e rettifiche.</p>
         </div>
 
         <div class="mp2-object-annual-table-wrap" tabindex="0" role="region" aria-label="Situazioni Annuali del Contratto">
@@ -209,7 +213,7 @@
                         <th scope="col" class="mp2-object-number">Allocato</th>
                         <th scope="col" class="mp2-object-number">Effettivo</th>
                         <th scope="col" class="mp2-object-number">Scostamento</th>
-                        <th scope="col" class="mp2-object-table-action"><span class="fi-sr-only">Azioni</span></th>
+                        <th scope="col" class="mp2-object-table-action" style="position: relative;"><span class="fi-sr-only">Azioni</span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -221,14 +225,14 @@
                                     <small>Esercizio Selezionato</small>
                                 @endif
                             </th>
-                            <td>{{ $row['reference_date'] }}</td>
+                            <td>{{ $row['reference_date'] }}<br><small>{{ $row['reference_label'] }}</small></td>
                             <td><span class="mp2-object-table-state">{{ $row['state'] }}</span></td>
                             <td>{{ $row['cost_center'] }}</td>
                             <td class="mp2-object-number">{{ $row['allocation'] }}</td>
                             <td class="mp2-object-number">{{ $row['actual'] }}</td>
                             <td class="mp2-object-number">{{ $row['variance'] }}</td>
                             <td class="mp2-object-table-action">
-                                @if ($row['composition'] !== [])
+                                @if ($row['composition'] !== [] || $row['manual_expenses'] !== [])
                                     {{ ($this->allocationDetailAction)(['year' => $row['year']]) }}
                                 @endif
                             </td>

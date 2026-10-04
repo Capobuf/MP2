@@ -5,6 +5,7 @@ use App\Domain\LateCorrections\HistoricalErrorKind;
 use App\Domain\Reporting\ReportDefinition;
 use App\Models\ClosingSourceRow;
 use App\Models\Company;
+use App\Models\Contract;
 use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
@@ -88,4 +89,33 @@ it('keeps closing values immutable and composes current knowledge from separate 
         ->and($result->comparisons[0]['initial_source']->costCenterLabel)->toBe('IT / Software')
         ->and($result->comparisons[0]['final_source']->costCenterLabel)->toBe('IT / Software')
         ->and($snapshot->refresh()->total_closing_actual)->toBe('100.00');
+});
+
+it('unions an absent historical contract with offsetting late corrections without inventing its closing state', function (): void {
+    $company = Company::factory()->create();
+    $viewer = s11ReportingViewer($company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2025]);
+    $contract = Contract::factory()->for($company)->create(['contractual_start_date' => '2024-01-01']);
+    $expense = Expense::factory()->forExercise($exercise)->create(['contract_id' => $contract->id, 'supplier_id' => $contract->supplier_id]);
+    $snapshot = closeExerciseFixture($exercise, $viewer);
+    expect($snapshot->rows()->where('origin_key', $contract->originKey())->exists())->toBeFalse();
+    foreach (['100.00', '-100.00'] as $amount) {
+        $line = ExpenseLine::factory()->for($expense)->actual()->create(['amount' => $amount, 'note' => 'Rettifica']);
+        LateCorrection::query()->create([
+            'company_id' => $company->id, 'exercise_id' => $exercise->id, 'closing_snapshot_id' => $snapshot->id,
+            'expense_id' => $expense->id, 'expense_line_id' => $line->id, 'recorded_by_id' => $viewer->id,
+            'operation_id' => (string) Str::uuid(), 'reason' => 'Rettifica', 'belongs_to_closed_exercise' => true,
+            'source_type' => 'contract', 'source_origin_id' => $contract->id, 'source_origin_key' => $contract->originKey(),
+            'source_label' => 'Accordo storico', 'owner_context' => ['container' => 'contract', 'contract_id' => $contract->id],
+            'supplier_context' => ['id' => $contract->supplier_id, 'label' => 'Fornitore storico'],
+        ]);
+    }
+    $report = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray([
+        'company_id' => $company->id, 'exercise_id' => $exercise->id, 'kind' => 'annual_executive', 'actual_reference' => 'current_knowledge',
+        'final_reference' => ['type' => 'current_knowledge', 'exercise_id' => $exercise->id],
+    ]));
+    $source = collect($report->sources)->sole('originKey', $contract->originKey());
+    expect($source->allocation)->toBe('0.00')->and($source->actual)->toBe('0.00')->and($source->hasActuals)->toBeTrue()
+        ->and($source->state)->toBeNull()->and($source->corrections)->toHaveCount(2)->and($source->detail['absent_at_closing'])->toBeTrue()
+        ->and($snapshot->fresh()->rows()->count())->toBe(0);
 });

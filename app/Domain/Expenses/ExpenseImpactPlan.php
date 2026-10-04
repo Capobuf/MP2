@@ -45,6 +45,7 @@ final readonly class ExpenseImpactPlan
         public bool $openProject,
         public ?string $overspendNote,
         public bool $supplierReplacementAcknowledged,
+        public bool $residualEstimate = false,
     ) {}
 
     public static function build(
@@ -63,6 +64,7 @@ final readonly class ExpenseImpactPlan
         ?Contract $sourceContract = null,
         ?Contract $targetContract = null,
         bool $supplierReplacementAcknowledged = false,
+        bool $residualEstimate = false,
     ): self {
         $allocation = $expense->allocation();
         $actual = $expense->actual();
@@ -151,6 +153,7 @@ final readonly class ExpenseImpactPlan
             openProject: $openProject,
             overspendNote: $overspendNote,
             supplierReplacementAcknowledged: $supplierReplacementAcknowledged,
+            residualEstimate: $residualEstimate,
         );
     }
 
@@ -266,6 +269,7 @@ final readonly class ExpenseImpactPlan
             'target_cost_center_id' => $this->targetCostCenterId,
             'line_ids' => $this->lineIds,
             'actual_kind' => $this->actualKind,
+            'residual_estimate' => $this->residualEstimate,
             'activity_note' => $this->activityNote,
             'open_project' => $this->openProject,
             'overspend_note' => $this->overspendNote,

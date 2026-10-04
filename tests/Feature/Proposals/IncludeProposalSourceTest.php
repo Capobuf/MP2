@@ -16,6 +16,7 @@ use App\Models\Exercise;
 use App\Models\Project;
 use App\Models\ProjectTransition;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -23,7 +24,10 @@ use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
 
+afterEach(fn () => CarbonImmutable::setTestNow());
+
 it('manually includes eligible closed Projects and cessated Contracts and permits their reopening plans', function (): void {
+    CarbonImmutable::setTestNow('2026-01-15');
     $company = Company::factory()->create();
     $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $actor = User::factory()->create();

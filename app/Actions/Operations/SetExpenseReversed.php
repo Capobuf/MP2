@@ -3,6 +3,7 @@
 namespace App\Actions\Operations;
 
 use App\Domain\Company\AuditEventType;
+use App\Domain\Contracts\ContractEconomicUse;
 use App\Domain\Contracts\ContractExpenseActivity;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseAuditSnapshot;
@@ -82,6 +83,7 @@ class SetExpenseReversed
                 ]);
             }
 
+            ContractEconomicUse::recordIfProven($contract);
             $allocationBefore = $lockedExpense->allocation();
             $actualBefore = $lockedExpense->actual();
             $projectContext = null;
@@ -128,6 +130,7 @@ class SetExpenseReversed
                 ProjectExpenseActivity::assertOverspendNote($company, $overspendContext, $varianceBefore, $varianceAfter);
                 $project->increment('revision', $openingTransition === null ? 1 : 2);
             }
+            ContractEconomicUse::recordIfProven($contract);
             $contract?->increment('revision');
             $exercise->increment('revision');
 
@@ -145,8 +148,9 @@ class SetExpenseReversed
             }
             if ($contractContext !== null) {
                 $newValue['contract_activity'] = [
-                    'actual_kind' => $contractContext['actual_kind']->value,
+                    'actual_kind' => $contractContext['actual_kind']?->value,
                     'activity_note' => $contractContext['activity_note'],
+                    'residual_estimate' => $contractContext['residual_estimate'],
                     'cycle_matching' => null,
                 ];
             }

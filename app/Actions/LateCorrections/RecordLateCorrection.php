@@ -3,6 +3,7 @@
 namespace App\Actions\LateCorrections;
 
 use App\Domain\Company\AuditEventType;
+use App\Domain\Contracts\ContractEconomicUse;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Domain\Expenses\ManualExpenseLine;
@@ -188,6 +189,7 @@ final class RecordLateCorrection
                 'amount_warning_acknowledged' => true,
             ], $company, $lockedExercise));
 
+            ContractEconomicUse::recordIfProven($expense->contract);
             $expense->increment('revision');
             if ($source instanceof Project || $source instanceof Contract) {
                 $source->increment('revision');

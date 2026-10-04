@@ -8,6 +8,8 @@ use App\Models\ContractCondition;
 use App\Models\ContractExerciseClassification;
 use App\Models\ContractLifecycleFact;
 use App\Models\Exercise;
+use App\Models\Expense;
+use App\Models\ExpenseLine;
 use App\Models\Supplier;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -29,6 +31,8 @@ it('shows exact annual composition without generated estimate mutation controls'
     ContractLifecycleFact::factory()->forContract($contract)->create();
     ContractCondition::factory()->forContract($contract)->create(['amount' => '12.34', 'valid_from' => '2026-01-01', 'valid_to' => '2026-02-01']);
     ContractExerciseClassification::factory()->forContractAndExercise($contract, $exercise)->create();
+    $system = Expense::factory()->forExercise($exercise)->create(['contract_id' => $contract->id, 'origin' => 'system', 'supplier_id' => $supplier->id]);
+    ExpenseLine::factory()->for($system)->create(['type' => 'estimate', 'amount' => '24.68']);
     $this->actingAs($viewer);
     Filament::setTenant(($company)->tenantCompany);
 

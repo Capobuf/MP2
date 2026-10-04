@@ -80,11 +80,13 @@ final readonly class ContractRenewalSchedule
     /** @param iterable<array<string, mixed>|object> $conditions */
     public static function hasRenewalWithoutCondition(iterable $conditions, string $expiryDate): bool
     {
+        $hasConditions = false;
         $dayAfter = CarbonImmutable::parse($expiryDate)->addDay()->startOfDay();
         foreach ($conditions as $condition) {
             if (self::value($condition, 'annulled_at') !== null) {
                 continue;
             }
+            $hasConditions = true;
             $validFrom = CarbonImmutable::parse((string) self::value($condition, 'valid_from'))->startOfDay();
             $validToValue = self::value($condition, 'valid_to');
             $validTo = $validToValue === null ? null : CarbonImmutable::parse((string) $validToValue)->startOfDay();
@@ -93,7 +95,7 @@ final readonly class ContractRenewalSchedule
             }
         }
 
-        return true;
+        return $hasConditions;
     }
 
     /** @param array<string, mixed>|object $value */

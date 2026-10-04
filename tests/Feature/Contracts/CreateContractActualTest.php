@@ -125,13 +125,14 @@ it('accepts a declared terminal Actual for a Cancelled Contract', function () {
         ->and($contract->refresh()->stateAtDate('2026-08-21')->value)->toBe('cancelled');
 });
 
-it('rejects Contract Estimates and terminal Actuals without an explicit declaration and note', function () {
+it('accepts manual Estimates and rejects terminal Actuals without an explicit declaration and note', function () {
     ['actor' => $actor, 'company' => $company, 'exercise' => $exercise, 'contract' => $contract] = contractActualFixture();
 
-    expect(fn () => app(CreateExpense::class)->execute($actor, $company, [
+    $manual = app(CreateExpense::class)->execute($actor, $company, [
         'exercise_id' => $exercise->id, 'contract_id' => $contract->id, 'description' => 'Stima manuale',
         'lines' => [['type' => 'estimate', 'amount' => '10.00']],
-    ], (string) Str::uuid()))->toThrow(ValidationException::class);
+    ], (string) Str::uuid());
+    expect($manual->allocation())->toBe('10.00');
 
     ContractLifecycleFact::factory()->forContract($contract)->create([
         'type' => 'cessation', 'declared_contractual_date' => '2026-08-01', 'state_change_date' => '2026-08-01', 'reason' => 'Fine rapporto',
@@ -140,7 +141,7 @@ it('rejects Contract Estimates and terminal Actuals without an explicit declarat
         'exercise_id' => $exercise->id, 'contract_id' => $contract->id, 'description' => 'Tardiva non dichiarata',
         'lines' => [['type' => 'actual', 'amount' => '10.00']],
     ], (string) Str::uuid()))->toThrow(ValidationException::class)
-        ->and(Expense::query()->count())->toBe(0);
+        ->and(Expense::query()->count())->toBe(1);
 });
 
 it('continues with its historically assigned archived Supplier and applies Contract rules to added Lines', function () {
@@ -151,11 +152,8 @@ it('continues with its historically assigned archived Supplier and applies Contr
         'lines' => [['type' => 'actual', 'amount' => '1.00']],
     ], (string) Str::uuid());
 
-    expect($expense->supplier_id)->toBe($supplier->id)
-        ->and(fn () => app(CreateExpenseLine::class)->execute($actor, $expense, [
-            'type' => 'estimate', 'amount' => '1.00',
-        ], (string) Str::uuid()))->toThrow(ValidationException::class)
-        ->and($expense->lines()->count())->toBe(1);
+    app(CreateExpenseLine::class)->execute($actor, $expense, ['type' => 'estimate', 'amount' => '1.00'], (string) Str::uuid());
+    expect($expense->supplier_id)->toBe($supplier->id)->and($expense->lines()->count())->toBe(2)->and($expense->fresh()->allocation())->toBe('1.00');
 });
 
 it('revalidates Contract state and declarations when updating or restoring an Actual Line', function () {

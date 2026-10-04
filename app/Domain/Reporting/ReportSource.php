@@ -40,4 +40,36 @@ final readonly class ReportSource
     {
         return $this->actual !== '0.00' || $this->hasActuals ? $this->actual : $this->allocation;
     }
+
+    /** @return list<array<string, mixed>> */
+    public function expenseComponents(): array
+    {
+        $budgetExpenses = $this->detail[$this->sourceType]['expenses'] ?? null;
+        $expenses = $budgetExpenses ?? ($this->detail['expenses'] ?? []);
+
+        return array_values(array_map(function (array $expense) use ($budgetExpenses): array {
+            if ($budgetExpenses !== null) {
+                return [
+                    'id' => $expense['expense_id'],
+                    'source' => $expense['description'],
+                    'supplier_id' => $expense['supplier']['id'] ?? null,
+                    'supplier_label' => $expense['supplier']['label'] ?? null,
+                    'allocation' => $expense['approved_estimate_total'],
+                    'actual' => '0.00',
+                ];
+            }
+            if (array_key_exists('final_estimate_total', $expense)) {
+                return [
+                    'id' => $expense['expense_id'],
+                    'source' => $expense['description'],
+                    'supplier_id' => $expense['supplier']['id'] ?? null,
+                    'supplier_label' => $expense['supplier']['label'] ?? null,
+                    'allocation' => $expense['final_estimate_total'],
+                    'actual' => $expense['closing_actual_total'],
+                ];
+            }
+
+            return $expense;
+        }, $expenses));
+    }
 }

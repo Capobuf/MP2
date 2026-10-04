@@ -473,7 +473,7 @@ Importo oggi pianificato nella realtà operativa.
 
 - Spesa autonoma: somma delle Stime;
 - Progetto: Riporto ricevuto più Stime delle Spese del Progetto;
-- Contratto: Stima annuale generata dalle condizioni economiche.
+- Contratto: Stime ricorrenti materializzate più Stime manuali aggiuntive dell’Esercizio.
 
 ## 6.6 Allocato Approvato
 
@@ -603,9 +603,9 @@ Azienda
         │   └── Riporti
         ├── Contratti
         │   ├── Scadenze e rinnovi
-        │   ├── Condizioni economiche
+        │   ├── Condizioni economiche facoltative
         │   ├── Spesa Stima annuale di sistema
-        │   └── Spese Effettive manuali
+        │   └── Spese manuali con Stime, Effettivi o entrambi
         ├── classificazioni annuali
         └── Timeline
 ```
@@ -729,7 +729,7 @@ Una sorgente è inclusa automaticamente nella Proposta dell'Esercizio quando ric
 
 - è Pianificato o Attivo in almeno un giorno dell'Esercizio;
 - una condizione produce una Stima nell'Esercizio;
-- possiede Effettivi nell'Esercizio;
+- possiede Stime manuali o Effettivi nell'Esercizio;
 - possiede una scadenza, cessazione, riattivazione o rinnovo efficace nell'Esercizio;
 - era presente in una versione di Budget dell'Esercizio.
 
@@ -784,7 +784,7 @@ Una sorgente viene materializzata in una vista o confronto della Situazione Corr
 | Spesa Stornata | No | Sola lettura se storica | Se già approvata o esplicitamente inclusa | Secondo §7.6.5 | Solo ripristino |
 | Sorgente Archiviata con valori o storia nell'anno | Sì | Sola lettura, salvo azione esplicita di ripristino | Se approvata | Sì | Ripristino esplicito prima di nuove attività |
 | Progetto Chiuso/Cancellato | Valori esistenti sì | Se valori, Budget o transizioni | Se approvato | Secondo §7.6.5 | Riapertura esplicita |
-| Contratto Cessato/Annullato | Valori esistenti sì | Se valori, Budget o eventi | Se approvato | Secondo §7.6.5 | Riattivazione esplicita |
+| Contratto Cessato/Annullato | Valori esistenti sì | Se valori, Budget o eventi | Se approvato | Secondo §7.6.5 | Riattivazione per nuovi canoni; costi residui espliciti secondo §15.4 e §18.19 |
 
 ## 7.8 Stati ortogonali
 
@@ -873,10 +873,14 @@ Poiché Allocato Corrente non è negativo, la disponibilità massima riportabile
 ## 8.5 Contratto
 
 ```text
-AllocatoCorrenteContratto = Stima annuale generata dalle condizioni economiche
+AllocatoCorrenteContratto = Stime system materializzate + Stime manuali dell’Esercizio
 EffettivoContratto = somma Effettivi delle Spese manuali associate
 ScostamentoOperativoContratto = EffettivoContratto - AllocatoCorrenteContratto
 ```
+
+La proiezione del Contratto è ricorrenza ipotetica più Stime manuali risultanti dello stesso anno. Il motore ricorrente restituisce soltanto la ricorrenza: una lettura usa le Stime persistite, non ricalcola o ripara il dato. Non si sommano ricorrenza calcolata e system materializzata. Spese Stornate e Righe annullate sono escluse; +100 e −100 di Effettivi mantengono `HaEffettivi=true`.
+
+Esempio: system 1.200, manuali 300, Effettivi 900 → Allocato 1.500 e scostamento −600. Accordo Sophos 22/02/2025–22/02/2028 senza canoni: 18 × 145,63 = 2.621,34 di Stima manuale nel solo 2025 Aperto; nessuna copia nel 2026. La validità fino al 2028 non distribuisce la previsione e la Stima non attesta pagamento. Se il 2025 è Chiuso, non si inserisce una Stima retroattiva: soltanto eventuali Effettivi omessi seguono le tardive.
 
 ## 8.6 Totali di Esercizio
 
@@ -1353,15 +1357,20 @@ Se il Progetto possiede Effettivi nell'Esercizio, un cambio di Centro di Costo r
 
 La Proposta **MUST** supportare:
 
-- creare un nuovo Contratto Pianificato;
+- creare un nuovo Contratto Pianificato, anche senza condizioni;
 - ripristinare dall'Archivio un Contratto Cessato o Annullato come parte di una futura riattivazione;
 - continuare il Contratto;
-- aggiungere una condizione economica futura;
+- aggiungere una condizione economica futura, anche la prima;
+- pianificare Stime manuali aggiuntive nelle Spese contrattuali secondo il §15.4;
 - modificare importo, ciclo o modalità di attribuzione secondo il §18;
 - pianificare cessazione o riattivazione;
 - modificare rinnovo, prossima scadenza, durata del rinnovo e preavviso;
 - modificare il Centro di Costo dell'Esercizio soltanto se il Contratto non possiede Effettivi nell'Esercizio;
 - modificare relazioni informative.
+
+Le Stime delle manuali già vive si pianificano nel solo elemento Contratto; la system è contesto in sola lettura. Una nuova figlia ha un solo elemento Spesa, riferito al Contratto vivo o al suo elemento della stessa Proposta, senza duplicare un piano modificabile nel padre. Identità delle Righe e metadati si preservano; gli Effettivi sono contesto non modificabile. Origine mancante nelle vecchie Bozze richiede riallineamento esplicito, non viene interpretata come manuale.
+
+Le decisioni fuori dall’anno principale conservano identità e tracciabilità nel Budget principale con contributo annuale zero, senza approvare altri Budget. I dettagli annuali spiegano ricorrenze e manuali senza Effettivi; padre e figlie non vengono sommati due volte. Una dipendenza dal padre non trasferisce al padre la proprietà della decisione della figlia.
 
 La Proposta **MUST NOT** modificare il Fornitore di un Contratto già economicamente utilizzato.
 
@@ -1440,7 +1449,7 @@ Una Proposta è `Incoerente` soltanto nei seguenti casi:
 - modalità Riporto e Riprogrammazione entrambe selezionate per lo stesso Progetto e passaggio d'anno;
 - azione che modificherebbe o sposterebbe Effettivi;
 - Spesa associata contemporaneamente a Progetto e Contratto;
-- Stima manuale proposta dentro un Contratto;
+- modifica manuale proposta sulla Spesa di sistema di un Contratto;
 - condizione contrattuale invalida o non applicabile;
 - transizioni di stato incompatibili;
 - azione su Esercizio Chiuso;
@@ -1624,11 +1633,11 @@ Il sistema mostra almeno:
 - elementi Non classificati quando la policy è Avviso;
 - Progetti Pianificati ma mai Aperti;
 - differenze fra Riporto provvisorio approvato in `N+1` e massimo consolidabile;
-- Contratti Attivi o Pianificati nell'Esercizio senza alcuna condizione economica Valida applicabile nell'Esercizio;
-- rinnovi contrattuali che mantengono il Contratto Attivo ma non lasciano alcuna condizione economica Valida dopo la scadenza;
+- lacune nella copertura delle condizioni ricorrenti già previste, valutate sugli intervalli e non sull’importo attribuito nell’anno;
+- rinnovi contrattuali che interrompono la copertura delle condizioni ricorrenti esistenti;
 - sorgenti con Annotazioni di errore storico.
 
-Gli avvisi **MUST NOT** dedurre fatture, rate o cause mancanti.
+L’assenza intenzionale di condizioni è ammessa e non costituisce errore o avviso di copertura. Gli avvisi **MUST NOT** dedurre fatture, rate o cause mancanti.
 
 Non esiste un avviso separato `Progetto dormiente`.
 
@@ -1821,11 +1830,13 @@ Una Spesa di sistema mai esistita non viene creata soltanto per rappresentare ze
 ### Spesa manuale
 
 - associata al Contratto;
-- contiene esclusivamente Effettivi;
-- eredita il Fornitore del Contratto;
-- non contiene Stime manuali.
+- contiene Stime aggiuntive non ricorrenti, Effettivi o entrambi;
+- eredita il Fornitore del Contratto e il Centro di Costo della sua classificazione annuale;
+- appartiene a un Esercizio esplicito: costi in anni diversi richiedono Spese distinte.
 
-Un costo pianificato non rappresentabile dal motore contrattuale viene modellato come Spesa autonoma o di Progetto distinta.
+La Stima manuale si aggiunge ai canoni: non corregge una Condizione e non viene consumata da un Effettivo. L’origine manuale descrive la registrazione, anche di un normale canone, non il significato commerciale del costo.
+
+Sole Stime richiedono un Esercizio Aperto della stessa Azienda e un Contratto Pianificato o Attivo non Archiviato, senza richiedere Attivo oggi. Nuove Stime o ripristini in Cessato/Annullato richiedono dichiarazione esplicita di costo residuo e Nota, senza riattivazione. Gli Effettivi rispettano separatamente il §18.19 e il divieto di anni futuri; una richiesta mista soddisfa entrambe le famiglie di regole o fallisce integralmente. Annullare una Stima esistente non richiede una dichiarazione di nuovo Effettivo terminale; il ripristino rivalida i dati che tornano efficaci. Archiviato e Chiuso non ammettono nuova attività ordinaria.
 
 ## 15.5 Fornitore
 
@@ -1869,10 +1880,10 @@ Se la Spesa contiene Effettivi, il cambio Esercizio è una riclassificazione int
 Per una Spesa manuale sono ammesse, in Esercizi Aperti:
 
 - autonoma → Progetto;
-- autonoma → Contratto, solo senza Stime;
+- autonoma → Contratto;
 - Progetto → autonoma;
 - Progetto → altro Progetto;
-- Progetto → Contratto, solo senza Stime;
+- Progetto → Contratto;
 - Contratto → autonoma;
 - Contratto → Progetto;
 - Contratto → altro Contratto.
@@ -1883,8 +1894,8 @@ Per una Spesa priva di Effettivi:
 
 - un Progetto di destinazione deve essere Pianificato o Aperto nell'Esercizio;
 - se il Progetto è Chiuso o Cancellato, deve essere riaperto nella stessa operazione prima di ricevere nuova pianificazione;
-- una Spesa con Stime non può entrare in un Contratto;
-- l'associazione a un Contratto di una Spesa priva di Stime non crea automaticamente Effettivi o Stime.
+- un Contratto di destinazione deve rispettare le regole per le Stime del §15.4;
+- l’associazione non crea né converte automaticamente Righe; anche le Righe inattive mantengono identità e dati.
 
 ## 15.9 Spostamento di una Spesa con Effettivi
 
@@ -1896,7 +1907,7 @@ Precondizioni:
 - anteprima dei valori rimossi e aggiunti ai contenitori;
 - Nota obbligatoria;
 - contenitore di destinazione che soddisfa esattamente le regole di stato e tipo elencate sotto;
-- nessuna Stima manuale in ingresso a un Contratto;
+- le Stime in ingresso a un Contratto rispettano separatamente il §15.4;
 - aggiornamento atomico di contenitori, classificazione ereditata e report.
 
 Destinazione Progetto:
@@ -1907,7 +1918,7 @@ Destinazione Progetto:
 
 Destinazione Contratto:
 
-- se Attivo, lo spostamento è ammesso per soli Effettivi;
+- se Attivo, lo spostamento è ammesso rispettando i vincoli distinti di Stime ed Effettivi;
 - se Cessato o Annullato, è ammesso soltanto per addebiti tardivi, costi di cessazione, rimborsi o correzioni, con Nota;
 - se Pianificato, Effettivi ordinari non sono ammessi.
 
@@ -2319,7 +2330,8 @@ Il Contratto è un contenitore logico di Spese con:
 
 - ciclo di vita contrattuale;
 - scadenze informative;
-- condizioni economiche ricorrenti che generano Stime annuali.
+- zero o più condizioni economiche ricorrenti non sovrapposte che generano Stime annuali;
+- Spese manuali con Stime aggiuntive non ricorrenti, Effettivi o entrambi.
 
 Non è un motore di fatturazione.
 
@@ -2344,7 +2356,7 @@ Ogni Contratto contiene almeno:
 - Archivio;
 - Timeline.
 
-Un nuovo Contratto **MUST** avere almeno una condizione Valida. Il `Valido dal` della prima condizione **MUST NOT** precedere la Data di inizio contrattuale.
+Un nuovo Contratto può non avere condizioni, senza condizioni artificiali a zero. Il `Valido dal` della prima condizione è autonomo e **MUST NOT** precedere la Data di inizio contrattuale o della riattivazione pertinente. Durata dell’accordo e previsioni di costo restano distinte.
 
 Quando la prossima scadenza è definita:
 
@@ -2534,6 +2546,7 @@ La cessazione:
 - impedisce l'avvio di nuovi cicli dopo tale data;
 - non applica prorata;
 - non rimuove un ciclo già iniziato;
+- non azzera le Stime manuali;
 - ricalcola atomicamente gli Esercizi Aperti interessati;
 - non ricalcola Esercizi Chiusi.
 
@@ -2546,23 +2559,22 @@ La riattivazione:
 - richiede una nuova data di inizio;
 - crea un nuovo evento di attivazione;
 - richiede una nuova prossima scadenza quando applicabile;
-- richiede almeno una nuova condizione economica Valida;
+- può includere una nuova condizione economica Valida, integralmente validata quando presente;
 - non riapre né estende automaticamente condizioni precedenti;
-- lascia l'intervallo di cessazione privo di Stime.
+- non copia o ripristina Spese o Stime manuali;
+- lascia l’intervallo di cessazione privo di nuove ricorrenze, preservando i costi manuali esistenti.
 
 ## 18.9 Annullamento prima dell'attivazione
 
-Un Contratto Pianificato mai entrato in vigore può essere Annullato se tutti gli Esercizi economicamente interessati sono Aperti.
+Un Contratto Pianificato mai entrato in vigore può essere Annullato con motivo e conferma unica. Un Contratto già Attivo segue la cessazione del §18.7.
 
-L'annullamento:
+L’annullamento azzera le ricorrenze negli Esercizi Aperti e annulla le condizioni future. Nella stessa conferma l’utente può mantenere tutte le Stime manuali modificabili, annullarle tutte oppure selezionare le singole Righe da annullare. Nessuna scelta distruttiva è preselezionata; senza Stime modificabili non si richiede una scelta economica.
 
-- richiede motivo;
-- annulla le condizioni future;
-- porta l'Allocato Corrente a zero negli Esercizi Aperti;
-- non modifica Budget Approvati;
-- non riattiva condizioni precedenti.
+La preview, senza scritture, mostra per Esercizio e Spesa importi mantenuti e annullati. Sono selezionabili soltanto Righe Stima manuali attive, in Spese non Stornate e anni Aperti, per cui l’utente possiede il permesso di modifica. Effettivi, allegati, Spese e storia non vengono eliminati; i dati non modificabili restano consultabili con spiegazione. Le Stime mantenute non richiedono una nuova Nota individuale.
 
-Se un Esercizio interessato è Chiuso, il dato storico resta e viene annotato.
+La conferma è legata alle revisioni, agli stati e all’insieme concreto delle Righe mostrate. Qualsiasi variazione pertinente richiede una nuova anteprima. Stato, selezioni economiche, audit, revisioni e ricalcolo system vengono applicati insieme oppure nulla; un retry della stessa operazione non riapplica le mutazioni. Un utente autorizzato soltanto al Contratto può mantenere i costi, senza acquisire il permesso di annullare Righe.
+
+Budget approvati e anni Chiusi restano immutati. Un impatto sulla composizione economica chiusa impedisce l’operazione; il dato storico resta e viene annotato. Nessuna manuale viene azzerata implicitamente, né ripristinata automaticamente da successive operazioni sul ciclo di vita. Questa decisione non introduce annullamenti contrattuali nelle Proposte.
 
 ## 18.10 Condizioni economiche
 
@@ -2624,10 +2636,12 @@ richiede una nuova condizione.
 
 Il Fornitore può essere cambiato soltanto prima del primo utilizzo economico, definito come il primo dei seguenti eventi:
 
-- generazione di una Stima viva diversa da zero;
-- esistenza di almeno una Riga Effettivo Attiva;
+- registrazione di una Stima positiva system o manuale;
+- registrazione di almeno una Riga Effettivo, anche zero;
 - inclusione del Contratto in un Budget Approvato;
 - inclusione in una Snapshot di Chiusura.
+
+Il primo uso è un fatto permanente, conservato nella stessa transazione anche dopo azzeramento, annullamento, spostamento, Archivio o riattivazione. Budget e Chiusura lo determinano anche a zero. Il fatto non equivale a `HaEffettivi`: un Effettivo zero blocca il Fornitore senza rendere vero H. Le prove pregresse derivano soltanto da dati, Snapshot e audit disponibili, senza inventare date o storia legacy.
 
 Dopo il primo utilizzo economico, una nuova controparte richiede un nuovo Contratto. Una ridenominazione dello stesso soggetto avviene sull'anagrafica del Fornitore.
 
@@ -2661,11 +2675,19 @@ Questa sezione si applica alla modifica di una condizione esistente.
 
 Non si applica:
 
-- alla prima condizione di un nuovo Contratto;
+- alla prima condizione, anche aggiunta dopo la creazione del Contratto;
 - alla prima condizione di una riattivazione;
 - alla sostituzione di una condizione futura il cui primo ciclo non è ancora iniziato.
 
-Nei primi due casi la decorrenza segue rispettivamente la Data di inizio e la Data di riattivazione approvate. Nel terzo caso la nuova condizione può mantenere il medesimo `Valido dal` futuro della condizione sostituita, purché non produca sovrapposizioni e l'impatto venga mostrato e approvato.
+Nei primi due casi la decorrenza reale dichiarata può essere successiva alla Data di inizio o alla Data di riattivazione approvata, senza rinvio automatico al mese successivo e senza un precedente confine di ciclo inesistente. Nel terzo caso la nuova condizione può mantenere il medesimo `Valido dal` futuro della condizione sostituita, purché non produca sovrapposizioni e l'impatto venga mostrato e approvato.
+
+### Registrazione del primo canone (D2)
+
+La prima condizione usa la decorrenza reale dichiarata, non chiude una precedente e non richiede la scelta fra correzione e cambiamento di una tariffa inesistente. L’assenza di una condizione applicabile oggi non significa assenza di una precedente.
+
+Una prima decorrenza già trascorsa è ammessa nel perimetro Aperto, con motivo e anteprima per Esercizio; nessuna validità, composizione o valore Chiuso può cambiare. Una decorrenza futura mantiene la data richiesta, anche nello stesso mese. Si valida il ciclo di vita alla decorrenza, compresa l’attivazione futura di un Contratto Pianificato. Effettivi e Budget approvati restano invariati; si aggiornano le ricorrenze degli anni Aperti e si invalidano le Proposte pertinenti.
+
+Esempio: accordo dal 01/01/2026, primo mensile di 100 dal 01/07/2026 registrato il 04/10/2026, attribuzione a inizio ciclo e anno Aperto: ricorrenza 600. Il primo canone futuro dal 10/10/2026 mantiene il 10/10, non il 01/11. In Proposta si usa l’aggiunta della prima condizione futura, rivalidata all’approvazione: questa eccezione viva non autorizza retroattività nelle Proposte.
 
 ### Registrazione di una variazione già avvenuta
 
@@ -2895,13 +2917,12 @@ Non sono rappresentati nativamente:
 - prorata;
 - consumi variabili;
 - minimo garantito più eccedenze;
-- setup o una tantum dentro il Contratto;
 - soglie e scaglioni;
 - indicizzazioni automatiche;
 - termini di pagamento come 30 o 60 giorni fine mese;
 - fatture e rate.
 
-Le componenti pianificate non rappresentabili vengono gestite come Spese autonome o di Progetto.
+I costi aggiuntivi non ricorrenti, inclusi setup e una tantum, possono essere pianificati nelle Spese manuali del Contratto. Il motore non li calcola né li replica al rinnovo o al passaggio d’anno.
 
 ---
 
@@ -5133,7 +5154,7 @@ AllocatoProgetto = RiportoRicevuto + somma StimeAnno
 ## 28.9 Allocato del Contratto
 
 ```text
-AllocatoContratto = StimaAnnualeGenerata
+AllocatoContratto = StimaSystemMaterializzata + StimeManualiAnno
 ```
 
 ## 28.10 Scostamento Operativo
@@ -5312,7 +5333,7 @@ Le condizioni Valide dello stesso Contratto non si sovrappongono.
 
 ## 28.35 Decorrenza delle modifiche contrattuali
 
-Per una modifica futura ordinaria:
+Per una modifica futura ordinaria di una condizione esistente (prima condizione esclusa secondo §18.13):
 
 ```text
 DataEffettivaApplicabile ≥ primo giorno del mese successivo
@@ -5320,7 +5341,7 @@ DataEffettivaApplicabile ≥ primo giorno del mese successivo
 
 e coincide con un InizioCiclo della condizione corrente.
 
-Una variazione già avvenuta può essere registrata alla decorrenza reale soltanto secondo il §18.13: confine di ciclo esatto, Esercizio di decorrenza Aperto e nessuna modifica economica o di validità negli Esercizi Chiusi.
+Il primo canone conserva la decorrenza reale autonoma secondo D2 (§18.13), senza precedente fittizia. Una variazione di tariffa già avvenuta può essere registrata alla decorrenza reale soltanto secondo il §18.13: confine di ciclo esatto, Esercizio di decorrenza Aperto e nessuna modifica economica o di validità negli Esercizi Chiusi.
 
 ## 28.36 Nessun differimento silenzioso
 
@@ -5346,7 +5367,7 @@ Una Spesa già materializzata può restare a zero; una nuova Spesa non viene cre
 
 ## 28.41 Spese manuali di Contratto
 
-Contengono soltanto Effettivi.
+Contengono Stime aggiuntive non ricorrenti, Effettivi o entrambi nell’Esercizio esplicito. Il ricalcolo modifica soltanto la system; nessuna manuale viene copiata al rinnovo, alla riattivazione o al passaggio d’anno.
 
 ## 28.42 Classificazione annuale
 
@@ -5515,7 +5536,7 @@ Questa sezione è un indice di tracciabilità. Le regole normative sono esclusiv
 | FR-045 | Errori post-Chiusura annotati e corretti solo negli anni Aperti | §14.9 |
 | FR-046 | Struttura della Spesa | §15.1 |
 | FR-047 | Correlazione manuale della Spesa autonoma | §§15.2, 25.3 |
-| FR-048 | Spese manuali di Contratto con soli Effettivi | §15.4 |
+| FR-048 | Spese manuali di Contratto con Stime ed Effettivi | §15.4 |
 | FR-049 | Unica Stima annuale di sistema del Contratto | §§15.4, 18.18 |
 | FR-050 | Cambio Esercizio della Spesa | §15.7 |
 | FR-051 | Cambio contenitore | §15.8 |
@@ -5769,7 +5790,7 @@ Ogni blocco o differimento deve spiegare il motivo.
 Esempi:
 
 - una Spesa non può appartenere a Progetto e Contratto perché produrrebbe imputazione ambigua;
-- una Stima manuale non può essere inserita in un Contratto perché le Stime contrattuali derivano dalle condizioni;
+- una Spesa di sistema non può essere modificata manualmente perché materializza le condizioni ricorrenti;
 - una Proposta non può spostare una Spesa con Effettivi perché modificherebbe la realtà;
 - una modifica contrattuale è differita al confine di ciclo per evitare prorata e sovrapposizioni;
 - una Chiusura fuori ordine è vietata perché il Riporto dipende dall'anno precedente;
@@ -5854,9 +5875,7 @@ Senza entità e identificativi strutturati non sono supportati:
 
 ### Contratti non esprimibili
 
-Componenti variabili, setup, consumo, soglie, scaglioni e conguagli restano sorgenti separate.
-
-Il report del Contratto non rappresenta necessariamente il costo complessivo dell'accordo commerciale.
+Il motore non calcola consumi, soglie, scaglioni e conguagli. I costi aggiuntivi previsti e gli Effettivi possono essere registrati nelle Spese manuali del Contratto; nessun importo viene dedotto automaticamente dai termini commerciali.
 
 ### Scadenze senza promemoria
 
@@ -6257,7 +6276,7 @@ L'utente decide se una Stima e un Effettivo appartengono alla stessa Spesa auton
 
 ### Contratti non rappresentabili dal motore
 
-Un accordo con setup, consumo, conguaglio, indicizzazione o prorata richiede sorgenti esterne al Contratto. Il report del Contratto non coincide necessariamente con il costo commerciale complessivo.
+Setup e altri costi aggiuntivi possono essere registrati manualmente nel Contratto. Consumo, conguaglio, indicizzazione e prorata non vengono calcolati automaticamente dal motore ricorrente.
 
 ### Errori storici di imputazione
 

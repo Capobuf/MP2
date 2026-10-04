@@ -48,7 +48,7 @@ final class SaveContractEdits
      */
     public function changes(array $original, array $data): array
     {
-        $changes = ['details' => [], 'conditions' => [], 'classifications' => [], 'renewal' => []];
+        $changes = ['details' => [], 'conditions' => [], 'classifications' => [], 'renewal' => [], 'first_condition' => null];
         foreach (['title', 'notes', 'supplier_id'] as $field) {
             $value = $field === 'supplier_id' ? (int) $data[$field] : (trim((string) ($data[$field] ?? '')) === '' ? null : trim((string) $data[$field]));
             if ($value !== $original[$field]) {
@@ -76,8 +76,10 @@ final class SaveContractEdits
                 $changes['conditions'][$before['id']] = $terms;
             }
         }
-        if ($newConditions->isNotEmpty()) {
-            if ($last === null || $changes['conditions'] !== []) {
+        if ($newConditions->isNotEmpty() && $last === null) {
+            $changes['first_condition'] = $newConditions->sole();
+        } elseif ($newConditions->isNotEmpty()) {
+            if ($changes['conditions'] !== []) {
                 throw ValidationException::withMessages(['conditions' => 'Aggiungi una condizione alla volta, mantenendo gli importi e le frequenze delle condizioni precedenti.']);
             }
             $end = $conditions->get($last['id'])['valid_to'] ?? null;
@@ -122,10 +124,10 @@ final class SaveContractEdits
                 $changes['renewal'][$field] = $value;
             }
         }
-        if (array_key_exists('supplier_id', $changes['details']) && ($changes['conditions'] !== [] || $changes['renewal'] !== [])) {
+        if (array_key_exists('supplier_id', $changes['details']) && ($changes['first_condition'] !== null || $changes['conditions'] !== [] || $changes['renewal'] !== [])) {
             throw ValidationException::withMessages(['supplier_id' => 'Salva prima il cambio di Fornitore, poi le modifiche economiche o contrattuali: queste possono determinare il primo utilizzo economico.']);
         }
-        if (count($changes['conditions']) + (int) ($changes['classifications'] !== []) + (int) ($changes['renewal'] !== []) > 1) {
+        if ((int) ($changes['first_condition'] !== null) + count($changes['conditions']) + (int) ($changes['classifications'] !== []) + (int) ($changes['renewal'] !== []) > 1) {
             throw ValidationException::withMessages(['conditions' => 'Salva separatamente ogni condizione economica, la modifica dei termini contrattuali e le classificazioni annuali. Le classificazioni di più Esercizi possono essere confermate insieme, dopo averne rivisto l’impatto. Titolo, note e allegati possono essere salvati insieme.']);
         }
 
@@ -160,7 +162,11 @@ final class SaveContractEdits
         }
         $reason = trim((string) ($decisions['reason'] ?? '')) ?: null;
         $review = ['kind' => 'details', 'input' => [], 'plan' => [], 'reason' => $reason];
-        if ($changes['conditions'] !== []) {
+        if ($changes['first_condition'] !== null) {
+            $input = $changes['first_condition'] + ['reason' => $reason];
+            $review = ['kind' => 'first_condition', 'input' => $input,
+                'plan' => app(CreateContractCondition::class)->preview($actor, $contract, $input), 'reason' => $reason];
+        } elseif ($changes['conditions'] !== []) {
             $id = array_key_first($changes['conditions']);
             $condition = $contract->conditions()->active()->findOrFail($id);
             $input = $changes['conditions'][$id] + $decisions + ['reason' => $reason];
@@ -243,7 +249,7 @@ final class SaveContractEdits
                     throw ValidationException::withMessages(['title' => 'Il Contratto è cambiato mentre lo modificavi. Ricarica la pagina prima di salvare.']);
                 }
                 $changes = $this->changes($original, $data);
-                $hasImpact = $changes['conditions'] !== [] || $changes['classifications'] !== [] || $changes['renewal'] !== [];
+                $hasImpact = $changes['first_condition'] !== null || $changes['conditions'] !== [] || $changes['classifications'] !== [] || $changes['renewal'] !== [];
                 if ($review !== null && ! $hasImpact) {
                     throw ValidationException::withMessages(['conditions' => 'Le modifiche sono cambiate dopo l’anteprima. Annulla la conferma e rivedi le modifiche.']);
                 }
@@ -265,6 +271,8 @@ final class SaveContractEdits
                         } else {
                             $action->execute($actor, $locked, $condition, $review['input'], $plan->fingerprint(), $id);
                         }
+                    } elseif ($review['kind'] === 'first_condition') {
+                        app(CreateContractCondition::class)->execute($actor, $locked, $review['input'], $id, ContractImpactFingerprint::make($review['plan']));
                     } elseif ($review['kind'] === 'classification') {
                         $action = app(UpdateContractClassification::class);
                         foreach ($review['plan'] as $classification) {
@@ -284,7 +292,7 @@ final class SaveContractEdits
                         'reason' => $review['reason'] ?? $data['reason'] ?? null,
                     ], Uuid::uuid5($operationId, 'details')->toString());
                 }
-                if ($changes['conditions'] !== [] || $changes['classifications'] !== [] || array_key_exists('supplier_id', $changes['details'])) {
+                if ($changes['first_condition'] !== null || $changes['conditions'] !== [] || $changes['classifications'] !== [] || array_key_exists('supplier_id', $changes['details'])) {
                     app(MarkProposalItemsToRealign::class)->execute($locked->company_id, contractIds: [$locked->id]);
                 }
                 foreach (array_values($data['attachments'] ?? []) as $index => $file) {

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Proposals;
 
+use App\Domain\Contracts\ContractEconomicUse;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Models\Contract;
 use App\Models\Exercise;
@@ -26,16 +27,20 @@ final class ApplyExpensePlan
         if ($project !== null && ! $project instanceof Project) {
             throw ValidationException::withMessages(['project_item_id' => 'Riferimento Progetto non risolto.']);
         }
-        $contract = isset($result['contract_id']) ? Contract::query()->where('company_id', $item->company_id)->find($result['contract_id']) : null;
+        $contract = isset($result['contract_item_id']) ? ($identities[$result['contract_item_id']] ?? null) : (isset($result['contract_id']) ? Contract::query()->where('company_id', $item->company_id)->find($result['contract_id']) : null);
+        if ((isset($result['contract_item_id']) || isset($result['contract_id'])) && ! $contract instanceof Contract) {
+            throw ValidationException::withMessages(['contract_id' => 'Riferimento Contratto non risolto.']);
+        }
+        ContractEconomicUse::recordIfProven($contract);
         $expense = $item->expense;
         $reversedAt = array_key_exists('reversed', $result)
             ? ($result['reversed'] ? now() : null)
             : $expense?->reversed_at;
-        $attributes = ['company_id' => $item->company_id, 'exercise_id' => $exercise->id, 'project_id' => $project?->id, 'contract_id' => $contract?->id, 'origin' => 'manual', 'copied_from_origin_key' => $item->copied_from_origin_key, 'supplier_id' => $result['supplier_id'] ?? ($contract?->supplier_id), 'direct_cost_center_id' => ($project || $contract) ? null : ($result['cost_center_id'] ?? $result['direct_cost_center_id'] ?? null), 'description' => $result['description'] ?? 'Spesa pianificata', 'notes' => $result['notes'] ?? null, 'reversed_at' => $reversedAt];
+        $attributes = ['company_id' => $item->company_id, 'exercise_id' => $exercise->id, 'project_id' => $project?->id, 'contract_id' => $contract?->id, 'origin' => 'manual', 'copied_from_origin_key' => $item->copied_from_origin_key, 'supplier_id' => $contract->supplier_id ?? ($result['supplier_id'] ?? null), 'direct_cost_center_id' => ($project || $contract) ? null : ($result['cost_center_id'] ?? $result['direct_cost_center_id'] ?? null), 'description' => $result['description'] ?? 'Spesa pianificata', 'notes' => $result['notes'] ?? null, 'reversed_at' => $reversedAt];
         if ($expense === null) {
             $expense = Expense::query()->create($attributes);
         } else {
-            if ($expense->hasActuals() && ($expense->exercise_id !== $attributes['exercise_id'] || $expense->project_id !== $attributes['project_id'] || $expense->supplier_id !== $attributes['supplier_id'] || $expense->direct_cost_center_id !== $attributes['direct_cost_center_id'] || $attributes['reversed_at'] !== null)) {
+            if ($expense->hasActuals() && ($expense->exercise_id !== $attributes['exercise_id'] || $expense->project_id !== $attributes['project_id'] || $expense->contract_id !== $attributes['contract_id'] || $expense->supplier_id !== $attributes['supplier_id'] || $expense->direct_cost_center_id !== $attributes['direct_cost_center_id'] || $attributes['reversed_at'] !== null)) {
                 throw ValidationException::withMessages(['expense' => 'Una Spesa con Effettivi non può essere spostata, riclassificata o stornata.']);
             } $expense->update($attributes);
         }
@@ -46,19 +51,26 @@ final class ApplyExpensePlan
             if ($existing === null && $lineId !== null) {
                 throw ValidationException::withMessages(['estimate_lines' => 'Riga Stima non appartenente alla Spesa.']);
             }
+            $values = [];
+            foreach (['amount', 'quantity', 'unit_amount', 'unit_of_measure', 'note'] as $key) {
+                $values[$key] = $line[$key] ?? $existing?->{$key};
+                if (array_key_exists($key, $line)) {
+                    $values[$key] = $line[$key];
+                }
+            }
             $annulled = array_key_exists('annulled', $line)
                 ? (bool) $line['annulled']
                 : filled($line['annulled_at'] ?? null);
             if ($existing === null) {
                 if ($annulled) {
                     continue;
-                } $existing = $expense->lines()->create(['type' => ExpenseLineType::Estimate, 'amount' => $line['amount'], 'note' => $line['note'] ?? null]);
+                } $existing = $expense->lines()->create(['type' => ExpenseLineType::Estimate, ...$values]);
             } else {
                 $annulledAt = array_key_exists('annulled', $line)
                     ? ($annulled ? ($existing->annulled_at ?? now()) : null)
                     : $existing->annulled_at;
-                $existing->fill(['amount' => $line['amount'], 'note' => $line['note'] ?? null, 'annulled_at' => $annulledAt]);
-                if ($project !== null && $existing->isDirty()) {
+                $existing->fill([...$values, 'annulled_at' => $annulledAt]);
+                if (($project !== null || $contract !== null) && $existing->isDirty()) {
                     $existing->revision++;
                 }
                 $existing->save();
@@ -69,7 +81,7 @@ final class ApplyExpensePlan
             $omitted = $expense->lines()->where('type', ExpenseLineType::Estimate->value)->whereNotIn('id', $plannedIds)->whereNull('annulled_at')->get();
             foreach ($omitted as $line) {
                 $line->annulled_at = now();
-                if ($project !== null) {
+                if ($project !== null || $contract !== null) {
                     $line->revision++;
                 }
                 $line->save();
@@ -78,6 +90,7 @@ final class ApplyExpensePlan
         $expense->increment('revision');
         $exercise->increment('revision');
         $project?->increment('revision');
+        ContractEconomicUse::recordIfProven($contract);
         $contract?->increment('revision');
 
         return $expense->refresh();

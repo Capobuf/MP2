@@ -168,7 +168,17 @@ final class BuildReport
             ->with('rows')
             ->findOrFail($reference->budgetSnapshotId);
 
-        return $budget->rows->map(fn (BudgetSourceRow $row): ReportSource => new ReportSource(
+        return $budget->rows->filter(function (BudgetSourceRow $row): bool {
+            if ($row->source_type->value !== 'expense') {
+                return true;
+            }
+            $owner = data_get($row->detail, 'expense.owner.type');
+            if (! in_array($owner, ['standalone', 'project', 'contract'], true)) {
+                throw ValidationException::withMessages(['budget' => 'Dettaglio Budget insufficiente: appartenenza storica della Spesa non disponibile.']);
+            }
+
+            return $owner === 'standalone';
+        })->map(fn (BudgetSourceRow $row): ReportSource => new ReportSource(
             sourceType: $row->source_type->value,
             originId: $row->origin_id,
             originKey: $row->origin_key,
@@ -191,7 +201,7 @@ final class BuildReport
                 $row->detail,
             ),
             detail: $row->detail,
-        ))->all();
+        ))->values()->all();
     }
 
     /** @return array<int, ReportSource> */
@@ -206,14 +216,17 @@ final class BuildReport
             throw ValidationException::withMessages(['reference' => 'La Snapshot di Chiusura richiesta non esiste.']);
         }
 
-        $corrections = $snapshot->lateCorrections->groupBy('source_origin_key');
+        $corrections = $snapshot->lateCorrections->filter(fn (LateCorrection $correction): bool => ! $correction->expenseLine->isAnnulled())->groupBy('source_origin_key');
         $annotations = $snapshot->historicalErrorAnnotations;
 
-        return $snapshot->rows->map(function (ClosingSourceRow $row) use ($currentKnowledge, $corrections, $annotations): ReportSource {
+        $sources = $snapshot->rows->map(function (ClosingSourceRow $row) use ($currentKnowledge, $corrections, $annotations): ReportSource {
             /** @var Collection<int, LateCorrection> $rowCorrections */
             $rowCorrections = $corrections->get($row->origin_key, collect());
             $correctionRows = $rowCorrections->map(fn (LateCorrection $correction): array => [
                 'id' => $correction->id,
+                'expense_id' => $correction->expense_id,
+                'owner_context' => $correction->owner_context,
+                'supplier_context' => $correction->supplier_context,
                 'amount' => (string) $correction->expenseLine->amount,
                 'reason' => $correction->reason,
                 'source_label' => $correction->source_label,
@@ -247,7 +260,9 @@ final class BuildReport
                 state: $row->end_state,
                 allocation: (string) $row->final_allocation,
                 actual: $actual,
-                hasActuals: (bool) $row->has_actuals,
+                hasActuals: (bool) $row->has_actuals || ($currentKnowledge && $rowCorrections->contains(
+                    fn (LateCorrection $correction): bool => Decimal::compare((string) $correction->expenseLine->amount, '0.00') !== 0,
+                )),
                 carryover: (string) ($detail['consolidated_carryover'] ?? '0.00'),
                 receivedCarryover: (string) $row->received_carryover,
                 residual: (string) ($detail['residual'] ?? '0.00'),
@@ -264,6 +279,48 @@ final class BuildReport
                 annotations: $rowAnnotations,
             );
         })->all();
+
+        if ($currentKnowledge) {
+            $historicalKeys = $snapshot->rows->pluck('origin_key');
+            foreach ($corrections as $key => $sourceCorrections) {
+                if ($historicalKeys->contains($key)) {
+                    continue;
+                }
+                /** @var LateCorrection $first */
+                $first = $sourceCorrections->first();
+                $correctionRows = $sourceCorrections->map(fn (LateCorrection $correction): array => [
+                    'id' => $correction->id,
+                    'expense_id' => $correction->expense_id,
+                    'amount' => (string) $correction->expenseLine->amount,
+                    'reason' => $correction->reason,
+                    'source_label' => $correction->source_label,
+                    'owner_context' => $correction->owner_context,
+                    'supplier_context' => $correction->supplier_context,
+                    'created_at' => $correction->created_at->toISOString(),
+                ])->values()->all();
+                $sources[] = new ReportSource(
+                    sourceType: $first->source_type,
+                    originId: $first->source_origin_id,
+                    originKey: $key,
+                    copiedFromOriginKey: null,
+                    label: $first->source_label,
+                    summary: null,
+                    supplierId: $first->source_type === 'project' ? null : ($first->supplier_context['id'] ?? null),
+                    supplierLabel: $first->source_type === 'project' ? null : ($first->supplier_context['label'] ?? null),
+                    costCenterId: $first->owner_context['direct_cost_center_id'] ?? null,
+                    costCenterLabel: $first->owner_context['direct_cost_center_label'] ?? 'Classificazione storica non disponibile',
+                    state: null,
+                    allocation: '0.00',
+                    actual: Decimal::sum($sourceCorrections->map(fn (LateCorrection $correction): string => (string) $correction->expenseLine->amount)),
+                    hasActuals: $sourceCorrections->contains(fn (LateCorrection $correction): bool => Decimal::compare((string) $correction->expenseLine->amount, '0.00') !== 0),
+                    detail: ['absent_at_closing' => true, 'historical_context_notice' => 'Sorgente assente dalla Snapshot: stato e classificazione storica non materializzati.'],
+                    corrections: $correctionRows,
+                    annotations: $this->annotationsForOriginKey($annotations, $key),
+                );
+            }
+        }
+
+        return $sources;
     }
 
     /** @return array<int, ReportSource> */
@@ -827,8 +884,13 @@ final class BuildReport
         return collect($sources)
             ->filter(fn (ReportSource $source): bool => $source->sourceType === 'contract')
             ->map(function (ReportSource $source) use ($definition): array {
-                $deadline = isset($source->detail['deadline'])
-                    ? CarbonImmutable::parse((string) $source->detail['deadline'])
+                $detail = $source->detail['contract'] ?? $source->detail;
+                $detail['expenses'] = $source->expenseComponents();
+                $detail['events'] ??= $detail['lifecycle_events'] ?? $detail['approved_lifecycle'] ?? [];
+                $detail['deadline'] ??= $detail['next_expiry_date'] ?? null;
+                $detail['notice_limit_date'] ??= $detail['cancellation_deadline'] ?? null;
+                $deadline = isset($detail['deadline'])
+                    ? CarbonImmutable::parse((string) $detail['deadline'])
                     : null;
                 $labels = [];
                 if ($deadline === null) {
@@ -847,18 +909,18 @@ final class BuildReport
                     'cost_center' => $source->costCenterLabel ?? 'Non classificato',
 
                     'state' => $source->state,
-                    'state_label' => ContractState::from($source->state)->label(),
+                    'state_label' => $source->state === null ? 'Stato storico non disponibile' : ContractState::from($source->state)->label(),
 
-                    'deadline' => $source->detail['deadline'] ?? null,
-                    'notice_limit_date' => $source->detail['notice_limit_date'] ?? null,
-                    'automatic_renewal' => (bool) ($source->detail['automatic_renewal'] ?? false),
+                    'deadline' => $detail['deadline'],
+                    'notice_limit_date' => $detail['notice_limit_date'],
+                    'automatic_renewal' => (bool) ($detail['automatic_renewal'] ?? false),
 
                     'allocation' => $source->allocation,
                     'actual' => $source->actual,
                     'operational_variance' => Decimal::subtract($source->actual, $source->allocation),
 
                     'labels' => $labels,
-                    'detail' => $source->detail,
+                    'detail' => $detail,
                     'corrections' => $source->corrections,
                     'annotations' => $source->annotations,
                 ];
@@ -881,7 +943,7 @@ final class BuildReport
                     : 'Centro di Costo: '.CostCenterHierarchy::forCompany((int) $company->id)->path((int) $id),
                 'project_id' => 'Progetto: '.Project::query()->where('company_id', $company->id)->findOrFail($id)->title,
                 'contract_id' => 'Contratto: '.Contract::query()->where('company_id', $company->id)->findOrFail($id)->title,
-                'expense_id' => 'Spesa autonoma: '.Expense::query()->where('company_id', $company->id)->findOrFail($id)->description,
+                'expense_id' => 'Spesa: '.Expense::query()->where('company_id', $company->id)->findOrFail($id)->description,
                 'supplier_id' => 'Fornitore: '.Supplier::query()->where('company_id', $company->id)->findOrFail($id)->legal_name,
                 default => null,
             };
@@ -931,10 +993,8 @@ final class BuildReport
                     continue;
                 }
                 $id = $value === 'unclassified' ? null : (int) $value;
-                $expenseDetails = $source->detail['expenses'] ?? [];
-                /** @var array<int, array<string, mixed>> $expenseDetails */
-                $expenseDetails = is_array($expenseDetails) ? $expenseDetails : [];
-                $expenses = collect($expenseDetails);
+                $expenses = collect($source->expenseComponents());
+                $corrections = collect($source->corrections);
                 $matches = match ($key) {
                     'cost_center_id' => $id === null
                         ? $source->costCenterId === null
@@ -944,9 +1004,11 @@ final class BuildReport
                     'project_id' => $source->sourceType === 'project' && $source->originId === $id,
                     'contract_id' => $source->sourceType === 'contract' && $source->originId === $id,
                     'expense_id' => ($source->sourceType === 'expense' && $source->originId === $id)
-                        || $expenses->contains(fn (array $expense): bool => (int) ($expense['id'] ?? 0) === $id),
+                        || $expenses->contains(fn (array $expense): bool => (int) ($expense['id'] ?? 0) === $id)
+                        || $corrections->contains(fn (array $correction): bool => (int) ($correction['expense_id'] ?? 0) === $id),
                     'supplier_id' => $source->supplierId === $id
-                        || $expenses->contains(fn (array $expense): bool => (int) ($expense['supplier_id'] ?? 0) === $id),
+                        || $expenses->contains(fn (array $expense): bool => (int) ($expense['supplier_id'] ?? 0) === $id)
+                        || $corrections->contains(fn (array $correction): bool => (int) data_get($correction, 'supplier_context.id', 0) === $id),
                     default => false,
                 };
                 if (! $matches) {

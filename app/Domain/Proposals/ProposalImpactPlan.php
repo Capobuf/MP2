@@ -237,10 +237,7 @@ final class ProposalImpactPlan
         $contract = $item->contract;
         if ($contract !== null) {
             $contract->loadMissing(['conditions', 'lifecycleFacts', 'renewalConfigurations']);
-            $beforeStateAt = fn (string $date) => ContractStateTimeline::stateAtDate(
-                $contract->contractualStartDate()->toDateString(), $contract->lifecycleFacts, $date, $contract->renewalConfigurations,
-            );
-            $before = ContractAnnualAllocation::forYear($contract->conditions, $exercise->year, $beforeStateAt)->amount;
+            $before = $contract->annualTotals()[$exercise->id]['allocation'] ?? '0.00';
         } else {
             $before = '0.00';
         }
@@ -263,7 +260,10 @@ final class ProposalImpactPlan
             ...$fact, 'id' => 0, 'state_change_date' => $fact['effective_date'], 'annulled_at' => null,
         ]));
         $stateAt = fn (string $date) => ContractStateTimeline::stateAtDate((string) $result['contractual_start_date'], $facts, $date, ProposalPlanData::rows($result['renewal_configurations'] ?? null, 'renewal_configurations'));
-        $after = ContractAnnualAllocation::forYear($conditions, $exercise->year, $stateAt)->amount;
+        $manual = Decimal::sum(collect(ProposalPlanData::rows($result['expense_plan'] ?? null, 'expense_plan'))
+            ->filter(fn (array $expense): bool => ($expense['origin'] ?? null) === 'manual' && (int) $expense['exercise_id'] === $exercise->id)
+            ->map(fn (array $expense): string => self::allocation($expense)));
+        $after = Decimal::add(ContractAnnualAllocation::forYear($conditions, $exercise->year, $stateAt)->amount, $manual);
         $reference = $exercise->year.'-12-31';
         $beforeState = $contract?->stateAtDate($reference)->value;
         $afterState = $stateAt($reference)->value;
@@ -275,6 +275,15 @@ final class ProposalImpactPlan
     private static function explicitExerciseIds(ProposalItem $item): array
     {
         $ids = collect([data_get($item->baseline, 'plan_baseline.exercise_id'), $item->result['exercise_id'] ?? null]);
+        if ($item->source_type === ProposalSourceType::Contract) {
+            foreach ($item->proposal->items as $child) {
+                if ($child->source_type === ProposalSourceType::Expense && ! $child->isExcludedFromPlan()
+                    && (($child->result['contract_item_id'] ?? null) === $item->proposal_item_id
+                        || ($item->contract_id !== null && (int) ($child->result['contract_id'] ?? 0) === $item->contract_id))) {
+                    $ids->push($child->result['exercise_id'] ?? $item->proposal->exercise_id);
+                }
+            }
+        }
         foreach ($item->actions as $action) {
             $ids->push($action->payload['exercise_id'] ?? null);
             $ids->push($action->payload['source_exercise_id'] ?? null);
@@ -291,6 +300,11 @@ final class ProposalImpactPlan
     private static function directExerciseIds(ProposalItem $item): array
     {
         $ids = collect([data_get($item->baseline, 'plan_baseline.exercise_id'), $item->result['exercise_id'] ?? null]);
+        foreach ($item->result['expense_plan'] ?? [] as $expense) {
+            if ($expense['estimate_lines_changed'] ?? false) {
+                $ids->push($expense['exercise_id']);
+            }
+        }
         foreach ($item->actions as $action) {
             $ids->push($action->payload['exercise_id'] ?? $action->payload['target_exercise_id'] ?? null);
             $ids->push($action->payload['source_exercise_id'] ?? null);

@@ -2,9 +2,12 @@
 
 namespace App\Domain\Proposals;
 
+use App\Domain\Contracts\ContractCycleType;
 use App\Domain\Contracts\ContractEconomicChangePlan;
 use App\Domain\Contracts\ContractLifecycleRules;
 use App\Domain\Contracts\ContractState;
+use App\Domain\Contracts\ContractStateTimeline;
+use App\Domain\Expenses\ManualExpenseLine;
 use App\Models\ContractCondition;
 use App\Models\CostCenter;
 use App\Models\Exercise;
@@ -14,11 +17,41 @@ use Illuminate\Validation\ValidationException;
 
 final class ContractPlan
 {
+    /** @param array<string, mixed> $context */
+    public static function assertManualActivity(ProposalItem $item, array $context, Exercise $exercise): void
+    {
+        $result = $item->result;
+        $facts = [...ProposalPlanData::rows($result['lifecycle_facts'] ?? null, 'lifecycle_facts'),
+            ...array_map(fn (array $fact): array => [...$fact, 'state_change_date' => $fact['effective_date'], 'annulled_at' => null], ProposalPlanData::rows($result['planned_lifecycle'] ?? null, 'planned_lifecycle'))];
+        $state = ContractStateTimeline::stateAtDate((string) $result['contractual_start_date'], $facts,
+            now($item->proposal->company->timezone)->toDateString(), $result['renewal_configurations'] ?? []);
+        $reactivates = collect(ProposalPlanData::rows($result['planned_lifecycle'] ?? null, 'planned_lifecycle'))->contains(fn (array $fact): bool => $fact['type'] === 'reactivation' && $fact['effective_date'] <= $exercise->year.'-12-31');
+        if (filled($result['archived_at'] ?? null) && ! $reactivates) {
+            throw ValidationException::withMessages(['contract_id' => 'Ripristinare il Contratto prima della nuova pianificazione.']);
+        }
+        if (in_array($state, [ContractState::Cessated, ContractState::Cancelled], true) && ! $reactivates
+            && (! ($context['residual_estimate'] ?? false) || blank($context['activity_note'] ?? null))) {
+            throw ValidationException::withMessages(['residual_estimate' => 'Dichiarare il costo residuo e la Nota per il Contratto terminale.']);
+        }
+    }
+
     public static function validateForApproval(ProposalItem $item): void
     {
         $result = $item->result;
-        if ($item->contract === null && ($result['planned_conditions'] ?? []) === []) {
-            throw ValidationException::withMessages(['planned_conditions' => 'Un nuovo Contratto richiede almeno una condizione economica applicabile.']);
+        foreach ($result['expense_plan'] ?? [] as $expense) {
+            if (! isset($expense['origin'])) {
+                throw ValidationException::withMessages(['expense_plan' => 'Riallineare la Bozza: l’origine delle Spese non è disponibile nella baseline.']);
+            }
+        }
+        foreach ($result['expense_plan'] ?? [] as $expense) {
+            if (! ($expense['estimate_lines_changed'] ?? false)) {
+                continue;
+            }
+            $exercise = Exercise::query()->where('company_id', $item->company_id)->find($expense['exercise_id']);
+            if ($exercise === null || ! $exercise->isOpen()) {
+                throw ValidationException::withMessages(['exercise_id' => 'La pianificazione richiede un Esercizio Aperto.']);
+            }
+            self::assertManualActivity($item, $expense, $exercise);
         }
         $conditions = collect(self::projectedConditions($result))
             ->filter(fn (array $condition): bool => ! filled($condition['annulled_at'] ?? null))
@@ -42,6 +75,12 @@ final class ContractPlan
             ContractLifecycleRules::validate((string) $result['contractual_start_date'], $facts);
         } catch (\DomainException $exception) {
             throw ValidationException::withMessages(['lifecycle' => $exception->getMessage()]);
+        }
+        foreach ($result['planned_conditions'] ?? [] as $condition) {
+            if ($condition['valid_from'] < now($item->proposal->company->timezone)->toDateString()
+                || ContractStateTimeline::stateAtDate((string) $result['contractual_start_date'], $facts, $condition['valid_from'], $result['renewal_configurations'] ?? []) !== ContractState::Active) {
+                throw ValidationException::withMessages(['valid_from' => 'La decorrenza deve essere corrente o futura, in un periodo Attivo del Contratto.']);
+            }
         }
         if ($item->contract?->isArchived() && collect(ProposalPlanData::rows($result['planned_lifecycle'] ?? null, 'planned_lifecycle'))->doesntContain(fn (array $fact): bool => ($fact['type'] ?? null) === 'reactivation')) {
             throw ValidationException::withMessages(['archived' => 'Il Contratto Archiviato richiede una riattivazione esplicita.']);
@@ -134,7 +173,8 @@ final class ContractPlan
         $result = $item->result;
 
         return match ($type) {
-            ProposalActionType::AddContractCondition => self::condition($result, $payload),
+            ProposalActionType::AddContractCondition => self::condition($item, $result, $payload),
+            ProposalActionType::PlanContractChildExpenses => self::manualExpenses($item, $result, $payload),
             ProposalActionType::ChangeContractEconomics => self::economicChange($result, $payload),
             ProposalActionType::PlanContractLifecycle => self::lifecycle($item, $result, $payload),
             ProposalActionType::SetContractRenewal => self::renewal($item, $result, $payload),
@@ -148,10 +188,61 @@ final class ContractPlan
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
-    private static function condition(array $result, array $payload): array
+    private static function manualExpenses(ProposalItem $item, array $result, array $payload): array
     {
-        if (! in_array($payload['cycle'], ['monthly', 'quarterly', 'semiannual', 'annual'], true) || ! in_array($payload['attribution_mode'], ['cycle_start', 'cycle_end'], true) || ! is_numeric($payload['amount']) || bccomp((string) $payload['amount'], '0', 2) < 0) {
+        $plans = collect(ProposalPlanData::rows($result['expense_plan'] ?? null, 'expense_plan'))->keyBy('expense_id');
+        $updates = collect(ProposalPlanData::rows($payload['existing_expenses'] ?? null, 'existing_expenses'));
+        if ($updates->pluck('expense_id')->duplicates()->isNotEmpty()) {
+            throw ValidationException::withMessages(['existing_expenses' => 'Una Spesa può essere pianificata una sola volta.']);
+        }
+        foreach ($updates as $update) {
+            $expense = $plans->get($update['expense_id']);
+            if ($expense === null || ($expense['origin'] ?? null) !== 'manual'
+                || (int) ($expense['contract_id'] ?? 0) !== (int) $item->contract_id) {
+                throw ValidationException::withMessages(['existing_expenses' => 'La Spesa deve essere una manuale della baseline del Contratto. Riallineare le Bozze precedenti.']);
+            }
+            $exercise = Exercise::query()->where('company_id', $item->company_id)->find($expense['exercise_id']);
+            if ($exercise === null || ! $exercise->isOpen() || filled($expense['reversed_at'] ?? null)) {
+                throw ValidationException::withMessages(['existing_expenses' => 'La Spesa deve essere Attiva in un Esercizio Aperto.']);
+            }
+            self::assertManualActivity($item, $payload, $exercise);
+            $oldLines = collect(ProposalPlanData::rows($expense['estimate_lines'], 'estimate_lines'))->keyBy(fn (array $line): int => (int) ($line['line_id'] ?? $line['id']));
+            $ids = collect(ProposalPlanData::rows($update['estimate_lines'], 'estimate_lines'))->pluck('line_id')->filter();
+            if ($ids->duplicates()->isNotEmpty() || $ids->diff($oldLines->keys())->isNotEmpty()) {
+                throw ValidationException::withMessages(['estimate_lines' => 'Righe duplicate o estranee alla Spesa.']);
+            }
+            $lines = [];
+            foreach ($update['estimate_lines'] as $line) {
+                $before = isset($line['line_id']) ? $oldLines->get($line['line_id']) : [];
+                $merged = array_replace($before, $line);
+                unset($merged['id']);
+                $merged['annulled_at'] = $line['annulled'] ? ($before['annulled_at'] ?? now()->toDateTimeString()) : null;
+                $validated = ManualExpenseLine::validate([...$merged, 'type' => 'estimate'], $item->proposal->company, $exercise, $before === []);
+                unset($validated['type']);
+                $lines[] = [...$merged, ...$validated];
+            }
+            $expense['estimate_lines'] = $lines;
+            $expense['estimate_lines_changed'] = true;
+            $expense['residual_estimate'] = $payload['residual_estimate'] ?? false;
+            $expense['activity_note'] = $payload['activity_note'] ?? null;
+            $plans->put($update['expense_id'], $expense);
+        }
+
+        return [...$result, 'expense_plan' => $plans->values()->all()];
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private static function condition(ProposalItem $item, array $result, array $payload): array
+    {
+        if (ContractCycleType::tryFrom($payload['cycle']) === null || ! in_array($payload['attribution_mode'], ['cycle_start', 'cycle_end'], true) || ! is_numeric($payload['amount']) || bccomp((string) $payload['amount'], '0', 2) < 0) {
             throw ValidationException::withMessages(['condition' => 'Condizione economica non valida.']);
+        }
+        if ($payload['valid_from'] < $result['contractual_start_date'] || $payload['valid_from'] < now($item->proposal->company->timezone)->toDateString()) {
+            throw ValidationException::withMessages(['valid_from' => 'La Proposta non può introdurre una decorrenza precedente all’accordo o già trascorsa.']);
         }
         self::dateOrder((string) $payload['valid_from'], $payload['valid_to'] ?? null, 'valid_to');
         $conditions = self::projectedConditions($result);
@@ -208,9 +299,6 @@ final class ContractPlan
             ContractLifecycleRules::validate((string) $result['contractual_start_date'], $facts);
         } catch (\DomainException $exception) {
             throw ValidationException::withMessages(['effective_date' => $exception->getMessage()]);
-        }
-        if ($payload['type'] === 'reactivation' && collect(self::projectedConditions($result))->doesntContain(fn (array $condition): bool => (string) $condition['valid_from'] >= $payload['effective_date'])) {
-            throw ValidationException::withMessages(['condition' => 'La riattivazione richiede una nuova condizione economica Valida.']);
         }
 
         return [...$result, 'planned_lifecycle' => [...($result['planned_lifecycle'] ?? []), $payload]];

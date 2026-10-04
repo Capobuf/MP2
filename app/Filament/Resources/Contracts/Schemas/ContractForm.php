@@ -84,7 +84,7 @@ class ContractForm
                     Textarea::make('notes')->label('Note')->rows(3)->columnSpanFull(),
                 ])->columns(['default' => 1, 'md' => 2, 'xl' => $editing ? 2 : 3])->columnSpanFull(),
             Section::make('Condizioni Economiche')
-                ->description('Ogni riga definisce un importo ricorrente; non sono calcolati prorata. “Valida fino al” termina solo quella condizione economica: non determina la scadenza del Contratto.')
+                ->description('I canoni sono facoltativi. Puoi aggiungere costi previsti nelle Spese del Contratto. Ogni riga definisce un importo ricorrente; non sono calcolati prorata. “Valida fino al” termina solo quella condizione economica: non determina la scadenza del Contratto.')
                 ->schema([
                     Repeater::make('conditions')
                         ->label('Condizioni Economiche')
@@ -94,7 +94,7 @@ class ContractForm
                             DecimalInput::make('amount')->label('Importo per Ciclo')->minValue(0)->prefix('€')->required(),
                             Select::make('cycle')->label('Frequenza')->options(ContractCycleType::options())->native(false)->required(),
                             Select::make('attribution_mode')->label('Attribuzione')->options(ContractAttributionMode::options())->native(false)->required(),
-                            DateInput::make('valid_from')->label('Valida dal')->required()->readOnly($editing)
+                            DateInput::make('valid_from')->label('Valida dal')->required()->readOnly(fn (Get $get): bool => $editing && (filled($get('id')) || $lastConditionId !== null))
                                 ->afterStateUpdated(function (Get $get, Set $set, mixed $state) use ($editing): void {
                                     if ($editing) {
                                         return;
@@ -132,13 +132,13 @@ class ContractForm
                             self::syncSuggestedContractualStart($get, $set, $state);
                             self::syncSuggestedContractualTerms($get, $set, $state);
                         })
-                        ->defaultItems(1)
-                        ->minItems($editing ? 0 : 1)
-                        ->addable(fn (Get $get): bool => ! $editing || ($lastConditionId !== null && ! self::hasNewCondition($get('conditions'))))
+                        ->defaultItems(0)
+                        ->minItems(0)
+                        ->addable(fn (Get $get): bool => ! $editing || ! self::hasNewCondition($get('conditions')))
                         ->deleteAction(fn (Action $action): Action => $action
                             ->visible(fn (array $arguments, Repeater $component): bool => ! $editing || blank($component->getRawState()[$arguments['item']]['id'] ?? null))
                             ->after(function (Repeater $component) use ($contract, $lastConditionId): void {
-                                if ($contract === null) {
+                                if ($contract === null || $lastConditionId === null) {
                                     return;
                                 }
                                 $rows = $component->getRawState();
@@ -149,7 +149,7 @@ class ContractForm
                                 }
                                 $component->rawState($rows);
                             }))
-                        ->helperText($editing ? 'Aggiungi una condizione e indica quando termina la precedente: la nuova partirà dal giorno successivo. Puoi registrare variazioni già avvenute negli Esercizi Aperti, senza prorata. Salva una nuova condizione alla volta. Per correggere un importo inserito male, modifica la riga esistente.' : null)
+                        ->helperText($editing && $lastConditionId === null ? 'Da quando decorre il canone? Indica la data reale, anche già trascorsa in un Esercizio Aperto.' : ($editing ? 'Aggiungi una condizione e indica quando termina la precedente: la nuova partirà dal giorno successivo. Puoi registrare variazioni già avvenute negli Esercizi Aperti, senza prorata. Salva una nuova condizione alla volta. Per correggere un importo inserito male, modifica la riga esistente.' : null))
                         ->addActionLabel('Aggiungi condizione')
                         ->reorderable(false)
                         ->extraAttributes(['class' => 'mp2-economic-conditions'])
@@ -327,6 +327,9 @@ class ContractForm
 
     private static function syncSuccessorStart(Set $set, mixed $conditions, ?int $lastConditionId, string $rootPath = ''): void
     {
+        if ($lastConditionId === null) {
+            return;
+        }
         $rows = collect(is_array($conditions) ? $conditions : []);
         $previous = $rows->firstWhere('id', $lastConditionId);
         $end = self::dateString($previous['valid_to'] ?? null);
@@ -380,6 +383,9 @@ class ContractForm
             ->filter(fn (mixed $date): bool => self::dateString($date) !== null)
             ->sortBy(fn (mixed $date): string => self::dateString($date) ?? '')
             ->first();
+        if ($suggested === null) {
+            return;
+        }
         $previousSuggestion = $get($rootPath.'suggested_contractual_start_date');
         $currentStart = $get($rootPath.'contractual_start_date');
 
@@ -401,13 +407,16 @@ class ContractForm
             ->sortBy(fn (array $condition): string => self::dateString($condition['valid_from']) ?? '')
             ->last();
 
+        if ($latestCondition === null) {
+            return;
+        }
         $previousExpirySuggestion = $get($rootPath.'suggested_next_expiry_date');
         $previousDurationSuggestion = $get($rootPath.'suggested_renewal_duration_months');
         $durationType = $get($rootPath.'duration_type');
         $durationTypeManuallySelected = (bool) $get($rootPath.'duration_type_manually_selected');
 
-        $validFrom = is_array($latestCondition) ? self::dateString($latestCondition['valid_from'] ?? null) : null;
-        $validTo = is_array($latestCondition) ? self::dateString($latestCondition['valid_to'] ?? null) : null;
+        $validFrom = self::dateString($latestCondition['valid_from'] ?? null);
+        $validTo = self::dateString($latestCondition['valid_to'] ?? null);
 
         if ($validFrom === null || $validTo === null) {
             $expiryWasSuggested = self::dateString($get($rootPath.'next_expiry_date')) === self::dateString($previousExpirySuggestion);

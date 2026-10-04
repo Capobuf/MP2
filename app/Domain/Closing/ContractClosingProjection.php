@@ -132,13 +132,14 @@ final class ContractClosingProjection
                 'conditions' => $conditions,
                 'lifecycle_facts' => $facts,
             ], $exercise->year);
+            $projectedTotal = Decimal::add($allocation['amount'], $contract->manualEstimateTotal($exercise->id));
             $current = $contract->annualTotals()[$exercise->id]['allocation'] ?? '0.00';
             $exerciseImpacts[$exercise->id] = [
                 'exercise_id' => $exercise->id,
                 'year' => $exercise->year,
                 'allocation_before' => Decimal::money((string) $current),
-                'allocation_after' => $allocation['amount'],
-                'allocation_delta' => Decimal::subtract($allocation['amount'], (string) $current),
+                'allocation_after' => $projectedTotal,
+                'allocation_delta' => Decimal::subtract($projectedTotal, (string) $current),
                 'composition' => $allocation['composition'],
                 'state_before' => $stateBefore->value,
                 'state_after' => $stateAfter->value,

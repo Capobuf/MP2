@@ -10,6 +10,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * @property array<string, mixed> $owner_context
+ * @property array<string, mixed>|null $supplier_context
+ */
 #[Fillable([
     'company_id',
     'exercise_id',

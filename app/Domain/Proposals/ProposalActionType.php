@@ -19,6 +19,7 @@ enum ProposalActionType: string
     case PlanProjectTransition = 'plan_project_transition';
     case PlanProjectDeferral = 'plan_project_deferral';
     case CreateProjectAllocation = 'create_project_allocation';
+    case PlanContractChildExpenses = 'plan_contract_child_expenses';
     case CreateContract = 'create_contract';
     case AddContractCondition = 'add_contract_condition';
     case ChangeContractEconomics = 'change_contract_economics';
@@ -45,6 +46,7 @@ enum ProposalActionType: string
             self::PlanProjectTransition => 'Plan Project Transition',
             self::PlanProjectDeferral => 'Rinvio',
             self::CreateProjectAllocation => 'Nuova Allocazione',
+            self::PlanContractChildExpenses => 'Costi aggiuntivi previsti',
             self::CreateContract => 'Create Contract',
             self::AddContractCondition => 'Add Contract Condition',
             self::ChangeContractEconomics => 'Change Contract Economics',

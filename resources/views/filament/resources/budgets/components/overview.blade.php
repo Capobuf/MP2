@@ -183,6 +183,9 @@
                         </dl>
 
                         @if ($source['expense'] !== null)
+                            @if ($source['expense']['exercise_year'] !== null && $source['expense']['exercise_year'] != $overview['budget']['exercise'])
+                                <p>Spesa dell’Esercizio {{ $source['expense']['exercise_year'] }}. Contributo al Budget {{ $overview['budget']['exercise'] }}: {{ $source['allocation'] }}. Le componenti qui mostrate appartengono al Budget selezionato; la decisione resta nelle azioni approvate.</p>
+                            @endif
                             <section class="mp2-budget-source-section" aria-label="Dettaglio Spesa">
                                 <div class="mp2-budget-subheading">
                                     <h3>Dettaglio Spesa</h3>
@@ -244,6 +247,16 @@
                                     <h3>Dettaglio Contratto</h3>
                                     <span>{{ count($source['contract']['conditions']) }} {{ count($source['contract']['conditions']) === 1 ? 'condizione economica' : 'condizioni economiche' }}</span>
                                 </div>
+                                @if ($source['contract']['system_estimates'] !== null)
+                                    <p>Stime di sistema: {{ $source['contract']['system_estimates'] }} · Stime manuali: {{ $source['contract']['manual_estimates'] }}</p>
+                                    @foreach ($source['contract']['expenses'] as $expense)
+                                        <details><summary>{{ $expense['origin'] }} · {{ $expense['description'] }} · {{ $expense['total'] }}</summary>
+                                            @foreach ($expense['lines'] as $line)
+                                                <p>{{ $line['note'] }} · {{ $line['quantity'] }} × {{ $line['unit_amount'] }} · Totale {{ $line['amount'] }}</p>
+                                            @endforeach
+                                        </details>
+                                    @endforeach
+                                @endif
                                 <dl class="mp2-budget-contract-facts">
                                     <div><dt>Data di Inizio</dt><dd>{{ $source['contract']['start_date'] }}</dd></div>
                                     <div><dt>Prossima Scadenza</dt><dd>{{ $source['contract']['expiry_date'] }}</dd></div>

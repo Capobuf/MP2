@@ -200,8 +200,8 @@ it('exposes canonical non-blocking warnings without invoice inference', function
         'allocated_without_actuals',
         'unclassified_source',
         'planned_project_never_opened',
-        'contract_without_applicable_condition',
-    )->and(strtolower($warningText))->not->toContain('fattura')
+    )->and($warningCodes)->not->toContain('contract_without_applicable_condition')
+        ->and(strtolower($warningText))->not->toContain('fattura')
         ->not->toContain('pagamento');
 });
 

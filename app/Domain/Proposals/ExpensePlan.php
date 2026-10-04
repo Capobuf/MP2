@@ -2,6 +2,7 @@
 
 namespace App\Domain\Proposals;
 
+use App\Domain\Expenses\ManualExpenseLine;
 use App\Domain\Projects\ProjectState;
 use App\Domain\Projects\ProjectStateTimeline;
 use App\Models\CostCenter;
@@ -57,6 +58,9 @@ final class ExpensePlan
 
             return [...$item->result, 'excluded' => true];
         }
+        if ($item->expense_id !== null && data_get($item->baseline, 'plan_baseline.contract_id') !== null) {
+            throw ValidationException::withMessages(['item' => 'Pianificare le Stime della Spesa dal Contratto.']);
+        }
         $hasActuals = (bool) data_get($item->baseline, 'actual_context.has_actuals', false);
         if ($hasActuals && in_array($type, [ProposalActionType::SetExpenseOwner, ProposalActionType::SetExpenseSupplier, ProposalActionType::SetExpenseCostCenter, ProposalActionType::ReverseExpense, ProposalActionType::RestoreExpense], true)) {
             throw ValidationException::withMessages(['action_type' => 'La Spesa contiene Effettivi: contenitore, Esercizio, Fornitore, Centro di Costo e Storno non sono modificabili dalla Proposta.']);
@@ -72,6 +76,19 @@ final class ExpensePlan
             default => throw ValidationException::withMessages(['action_type' => 'Azione Spesa non valida per un elemento esistente.']),
         };
 
+        if ($type === ProposalActionType::SetExpenseEstimates) {
+            $old = collect(ProposalPlanData::rows($current['estimate_lines'] ?? null, 'estimate_lines'))->keyBy(fn (array $line): string => (string) ($line['line_id'] ?? $line['id'] ?? $line['proposal_line_id']));
+            $result['estimate_lines'] = collect(ProposalPlanData::rows($payload['estimate_lines'], 'estimate_lines'))->map(function (array $line) use ($old): array {
+                $key = $line['line_id'] ?? $line['proposal_line_id'];
+                if (isset($line['line_id']) && ! $old->has($key)) {
+                    throw ValidationException::withMessages(['estimate_lines' => 'Riga estranea alla Spesa.']);
+                }
+                $merged = [...($old->get($key) ?? []), ...$line];
+                $merged['annulled_at'] = $line['annulled'] ? ($merged['annulled_at'] ?? now()->toDateTimeString()) : null;
+
+                return $merged;
+            })->all();
+        }
         self::validateResult($item->proposal, $item, $result, $type);
 
         return $result;
@@ -114,6 +131,26 @@ final class ExpensePlan
 
         $projectId = filled($result['project_id'] ?? null) ? (int) $result['project_id'] : null;
         $projectItemId = filled($result['project_item_id'] ?? null) ? (string) $result['project_item_id'] : null;
+        $contractId = filled($result['contract_id'] ?? null) ? (int) $result['contract_id'] : null;
+        $contractItemId = filled($result['contract_item_id'] ?? null) ? (string) $result['contract_item_id'] : null;
+        if (count(array_filter([$projectId, $projectItemId, $contractId, $contractItemId])) > 1) {
+            throw ValidationException::withMessages(['contract_id' => 'Indicare un solo contenitore della Spesa.']);
+        }
+        if ($contractId !== null || $contractItemId !== null) {
+            $parent = $contractItemId !== null ? ProposalItemReference::item($proposal, $contractItemId, 'contract')
+                : $proposal->items()->where('source_type', 'contract')->where('contract_id', $contractId)->first();
+            if ($parent === null || $parent->isExcludedFromPlan()) {
+                throw ValidationException::withMessages(['contract_id' => 'Il Contratto deve essere incluso nella stessa Proposta.']);
+            }
+            if (filled($result['supplier_id'] ?? null) || filled($result['cost_center_id'] ?? null)) {
+                throw ValidationException::withMessages(['supplier_id' => 'Fornitore e Centro di Costo sono ereditati dal Contratto.']);
+            }
+            ContractPlan::assertManualActivity($parent, $result, $exercise);
+            foreach ($result['estimate_lines'] ?? [] as $line) {
+                ManualExpenseLine::validate([...$line, 'type' => 'estimate'], $proposal->company, $exercise, ! isset($line['line_id']) && ! isset($line['id']));
+            }
+
+        }
         if ($projectId !== null && $projectItemId !== null) {
             throw ValidationException::withMessages(['project_id' => 'Indicare un solo Progetto di destinazione.']);
         }
@@ -131,6 +168,9 @@ final class ExpensePlan
             }
             $yearStart = $exercise->year.'-01-01';
             $yearEnd = $exercise->year.'-12-31';
+            if ($projectItem?->isExcludedFromPlan()) {
+                throw ValidationException::withMessages(['project_id' => 'Il Progetto è escluso dalla Proposta.']);
+            }
             $acceptsPlan = $projectItem !== null
                 ? self::plannedProjectAcceptsExpense($projectItem->result, $exercise)
                 : in_array($project->stateAtDate($yearStart), [ProjectState::Planned, ProjectState::Open], true)
@@ -144,7 +184,7 @@ final class ExpensePlan
             $sourceExerciseId = (int) data_get($item->baseline, 'plan_baseline.exercise_id', $proposal->exercise_id);
             $sourceProjectId = data_get($item->baseline, 'plan_baseline.project_id');
             $sourceContractId = data_get($item->baseline, 'plan_baseline.contract_id');
-            if ($sourceContractId !== null) {
+            if ($sourceContractId !== null || filled($item->result['contract_id'] ?? null) || filled($item->result['contract_item_id'] ?? null)) {
                 throw ValidationException::withMessages(['item' => 'Il cambio contenitore di una Spesa di Contratto non è rappresentato in S6.']);
             }
             if ($sourceExerciseId !== $exercise->id && ($sourceProjectId !== null || $projectId !== null || $projectItemId !== null)) {

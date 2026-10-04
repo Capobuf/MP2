@@ -52,7 +52,7 @@ class ExpenseLinesRelationManager extends RelationManager
     public function form(Schema $schema): Schema
     {
         return $schema->components([
-            ...ExpenseForm::lineFormSections($this->ownerIsContractExpense()),
+            ...ExpenseForm::lineFormSections(),
             ExpenseForm::containerActivitySection($this->ownerIsProjectExpense(), $this->ownerIsContractExpense()),
             Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
         ]);

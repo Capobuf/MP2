@@ -31,16 +31,16 @@ final class RegisterContractPayment
     public static function make(Contract $contract): Action
     {
         return Action::make('registerContractPayment')
-            ->label('Registra Pagamento')
+            ->label('Registra Effettivo')
             ->icon('heroicon-o-banknotes')
             ->visible(fn (): bool => self::company() !== null
                 && auth()->user()?->can('create', [Expense::class, self::company()]) === true
                 && ! $contract->isArchived())
             ->disabled(fn (): bool => self::disabledReason() !== null)
             ->tooltip(fn (): ?string => self::disabledReason())
-            ->modalHeading('Registra Pagamento')
+            ->modalHeading('Registra Effettivo')
             ->modalDescription(fn (): string => 'Registra un Effettivo del Contratto per l’Esercizio '.self::exercise()?->year.'.')
-            ->modalSubmitActionLabel('Registra Pagamento')
+            ->modalSubmitActionLabel('Registra Effettivo')
             ->schema([
                 Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
                 Hidden::make('container')->default('contract')->dehydrated(false),
@@ -85,7 +85,7 @@ final class RegisterContractPayment
                         ]],
                     ], $data['operation_id']);
                 } catch (ValidationException $exception) {
-                    Notification::make()->danger()->title('Pagamento non registrato')
+                    Notification::make()->danger()->title('Effettivo non registrato')
                         ->body(collect($exception->errors())->flatten()->implode(' '))->send();
 
                     throw ValidationException::withMessages(collect($exception->errors())
@@ -93,7 +93,7 @@ final class RegisterContractPayment
                         ->all());
                 }
 
-                $action->successNotificationTitle('Pagamento registrato')->sendSuccessNotification();
+                $action->successNotificationTitle('Effettivo registrato')->sendSuccessNotification();
                 $action->redirect(ExpenseResource::getUrl('view', ['record' => $expense]));
             });
     }
@@ -115,7 +115,7 @@ final class RegisterContractPayment
     {
         $exercise = self::exercise();
         if ($exercise === null) {
-            return 'Seleziona un Esercizio globale prima di registrare il Pagamento.';
+            return 'Seleziona un Esercizio globale prima di registrare l’Effettivo.';
         }
         if (! $exercise->isOpen()) {
             return 'L’Esercizio globale selezionato è Chiuso.';

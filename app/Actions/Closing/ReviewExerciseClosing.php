@@ -707,10 +707,10 @@ final class ReviewExerciseClosing
         if (! $classified) {
             $this->addClassificationIssue($company, 'contract', $contract->id, $blocks, $warnings);
         }
-        $composition = $impact['composition'] ?? [];
         if ((in_array($stateStart, [ContractState::Planned, ContractState::Active], true)
             || in_array($stateEnd, [ContractState::Planned, ContractState::Active], true))
-            && is_array($composition) && $composition === []) {
+            && $contract->conditions->contains(fn ($condition): bool => ! $condition->isAnnulled())
+            && ! $this->projectionHasConditionInExercise($projection, $yearStart, $yearEnd)) {
             $warnings[] = $this->issue('contract_without_applicable_condition', 'Contratto Attivo o Pianificato senza condizione economica Valida applicabile nell’Esercizio.', 'contract', $contract->id);
         }
         if ((bool) ($projection['renewal_without_condition'] ?? false)) {

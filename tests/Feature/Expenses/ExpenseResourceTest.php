@@ -509,7 +509,7 @@ it('shows unit amounts with two decimals and quantities without trailing zeroes'
         ->assertSet("data.lines.{$lineKey}.unit_amount", '3000.00');
 });
 
-it('allows only Actual lines when creating an Expense for a Contract', function () {
+it('allows manual Estimate lines when creating an Expense for a Contract', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
     grantExpenseResource($manager, $company);
@@ -528,21 +528,21 @@ it('allows only Actual lines when creating an Expense for a Contract', function 
 
     $component
         ->assertFormSet(['container' => 'contract', 'contract_id' => $contract->id])
-        ->assertSet("data.lines.{$lineKey}.type", 'actual')
         ->assertFormFieldExists(
             "lines.{$lineKey}.type",
-            fn (Select $field): bool => $field->getOptions() === ['actual' => 'Effettivo'],
+            fn (Select $field): bool => $field->getOptions() === ['estimate' => 'Stima', 'actual' => 'Effettivo'],
         )
         ->fillForm(['description' => 'Giornata di consulenza'])
+        ->set("data.lines.{$lineKey}.type", 'estimate')
         ->set("data.lines.{$lineKey}.amount", '1200')
         ->call('create')
         ->assertHasNoFormErrors();
 
     expect(Expense::query()->sole()->contract_id)->toBe($contract->id)
-        ->and(ExpenseLine::query()->sole()->lineType()->value)->toBe('actual');
+        ->and(ExpenseLine::query()->sole()->lineType()->value)->toBe('estimate');
 });
 
-it('changes existing line types to Actual when the Expense container becomes a Contract', function () {
+it('preserves existing line types when the Expense container becomes a Contract', function () {
     $manager = User::factory()->create();
     $company = Company::factory()->create();
     grantExpenseResource($manager, $company);
@@ -563,10 +563,10 @@ it('changes existing line types to Actual when the Expense container becomes a C
         ->set("data.lines.{$lineKey}.type", 'estimate')
         ->set('data.container', 'contract')
         ->set('data.contract_id', $contract->id)
-        ->assertSet("data.lines.{$lineKey}.type", 'actual')
+        ->assertSet("data.lines.{$lineKey}.type", 'estimate')
         ->assertFormFieldExists(
             "lines.{$lineKey}.type",
-            fn (Select $field): bool => $field->getOptions() === ['actual' => 'Effettivo'],
+            fn (Select $field): bool => $field->getOptions() === ['estimate' => 'Stima', 'actual' => 'Effettivo'],
         );
 });
 
