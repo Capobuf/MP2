@@ -3,6 +3,7 @@
 namespace App\Actions\Operations;
 
 use App\Domain\Company\AuditEventType;
+use App\Domain\Contracts\ContractEconomicUse;
 use App\Domain\Contracts\ContractExpenseActivity;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseAuditSnapshot;
@@ -93,6 +94,7 @@ class CreateExpenseLine
                 ProjectExpenseActivity::assertOverspendNote($company, $projectContext, $varianceBefore, $varianceAfter);
                 $project->increment('revision', $openingTransition === null ? 1 : 2);
             }
+            ContractEconomicUse::recordIfProven($contract);
             $contract?->increment('revision');
             $lockedExpense->increment('revision');
             $exercise->increment('revision');
@@ -110,8 +112,9 @@ class CreateExpenseLine
             }
             if ($contractContext !== null) {
                 $newValue['contract_activity'] = [
-                    'actual_kind' => $contractContext['actual_kind']->value,
+                    'actual_kind' => $contractContext['actual_kind']?->value,
                     'activity_note' => $contractContext['activity_note'],
+                    'residual_estimate' => $contractContext['residual_estimate'],
                     'cycle_matching' => null,
                 ];
             }

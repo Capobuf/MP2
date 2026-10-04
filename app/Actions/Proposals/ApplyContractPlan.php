@@ -3,6 +3,7 @@
 namespace App\Actions\Proposals;
 
 use App\Domain\Contracts\ContractAnnualAllocation;
+use App\Domain\Contracts\ContractEconomicUse;
 use App\Domain\Contracts\ContractStateTimeline;
 use App\Domain\Expenses\ExpenseLineType;
 use App\Models\Contract;
@@ -63,6 +64,7 @@ final class ApplyContractPlan
                 $contract->update(['archived_at' => null, 'next_expiry_date' => $fact['next_expiry_date'] ?? $contract->next_expiry_date, 'renewal_anchor_date' => $fact['next_expiry_date'] ?? $contract->renewal_anchor_date]);
             }
         }
+        ContractEconomicUse::recordIfProven($contract);
         $contract->load(['conditions', 'lifecycleFacts', 'renewalConfigurations']);
         $exerciseIds = collect([$result['exercise_id'] ?? $item->proposal->exercise_id, $item->proposal->exercise_id]);
         foreach ($result['planned_condition_changes'] ?? [] as $change) {
@@ -89,6 +91,19 @@ final class ApplyContractPlan
             }
             $exercise->increment('revision');
         }
+        foreach ($result['expense_plan'] ?? [] as $plan) {
+            if (! ($plan['estimate_lines_changed'] ?? false)) {
+                continue;
+            }
+            $expense = Expense::query()->where('company_id', $item->company_id)->where('contract_id', $contract->id)
+                ->where('origin', 'manual')->findOrFail($plan['expense_id']);
+            $child = new ProposalItem(['company_id' => $item->company_id, 'expense_id' => $expense->id,
+                'result' => $plan, 'copied_from_origin_key' => $expense->copied_from_origin_key]);
+            $child->setRelation('expense', $expense);
+            $child->setRelation('proposal', $item->proposal);
+            app(ApplyExpensePlan::class)->execute($child, [], $actor);
+        }
+        ContractEconomicUse::recordIfProven($contract);
         $contract->increment('revision');
 
         return $contract->refresh();

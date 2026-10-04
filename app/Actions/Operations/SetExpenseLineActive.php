@@ -3,6 +3,7 @@
 namespace App\Actions\Operations;
 
 use App\Domain\Company\AuditEventType;
+use App\Domain\Contracts\ContractEconomicUse;
 use App\Domain\Contracts\ContractExpenseActivity;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseAuditSnapshot;
@@ -90,6 +91,7 @@ class SetExpenseLineActive
                 ], $company, $exercise, false);
             }
 
+            ContractEconomicUse::recordIfProven($contract);
             $allocationBefore = $expense->allocation();
             $actualBefore = $expense->actual();
             $projectContext = null;
@@ -111,7 +113,7 @@ class SetExpenseLineActive
             }
             $before = ExpenseAuditSnapshot::line($lockedLine);
             $lockedLine->annulled_at = $active ? null : now();
-            if ($project !== null && $lockedLine->lineType() === ExpenseLineType::Estimate) {
+            if (($project !== null || $contract !== null) && $lockedLine->lineType() === ExpenseLineType::Estimate) {
                 $lockedLine->revision++;
             }
             $lockedLine->save();
@@ -127,6 +129,7 @@ class SetExpenseLineActive
                 ProjectExpenseActivity::assertOverspendNote($company, $overspendContext, $varianceBefore, $varianceAfter);
                 $project->increment('revision', $openingTransition === null ? 1 : 2);
             }
+            ContractEconomicUse::recordIfProven($contract);
             $contract?->increment('revision');
             $expense->increment('revision');
             $exercise->increment('revision');
@@ -144,8 +147,9 @@ class SetExpenseLineActive
             }
             if ($contractContext !== null) {
                 $newValue['contract_activity'] = [
-                    'actual_kind' => $contractContext['actual_kind']->value,
+                    'actual_kind' => $contractContext['actual_kind']?->value,
                     'activity_note' => $contractContext['activity_note'],
+                    'residual_estimate' => $contractContext['residual_estimate'],
                     'cycle_matching' => null,
                 ];
             }

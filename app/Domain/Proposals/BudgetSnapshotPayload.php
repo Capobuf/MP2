@@ -51,7 +51,7 @@ final class BudgetSnapshotPayload
                 'payload' => self::budgetActionPayload($action->action_type, $action->payload), 'reason' => $action->reason,
             ])->values()->all();
             $common = [
-                'schema_version' => 2,
+                'schema_version' => 3,
                 'identity' => [
                     'source_type' => $item->source_type->value, 'origin_id' => $live->id, 'origin_key' => $live->originKey(),
                     'proposal_item_id' => $item->proposal_item_id, 'copied_from_origin_key' => $item->copied_from_origin_key,
@@ -82,7 +82,7 @@ final class BudgetSnapshotPayload
                 'approved_allocation' => $allocation,
                 'start_state' => self::state($live, $proposal->exercise->year.'-01-01'),
                 'end_state' => self::state($live, $proposal->exercise->year.'-12-31'),
-                'detail_version' => 2, 'detail' => $detail,
+                'detail_version' => 3, 'detail' => $detail,
             ];
         }
 
@@ -109,12 +109,12 @@ final class BudgetSnapshotPayload
             $item->proposal_item_id => self::liveIdentity($item, $identities),
         ]);
         $classifications = fn ($query) => $query->where('exercise_id', $proposal->exercise_id);
-        $expenses = fn ($query) => $query->where('exercise_id', $proposal->exercise_id)->with(['lines', 'supplier']);
+        $expenses = fn ($query) => $query->where('exercise_id', $proposal->exercise_id)->with(['lines', 'supplier', 'exercise']);
         $links = fn ($query) => $query->active()->with(['project', 'contract'])->orderBy('id');
 
         // Approval may have changed these relations after the identity was resolved.
         (new Collection($sources->filter(fn ($live): bool => $live instanceof Expense)->values()->all()))->load([
-            'lines', 'supplier', 'project.classifications' => $classifications, 'contract.classifications' => $classifications,
+            'lines', 'supplier', 'exercise', 'project.classifications' => $classifications, 'contract.classifications' => $classifications,
         ]);
         (new Collection($sources->filter(fn ($live): bool => $live instanceof Project)->values()->all()))->load([
             'transitions', 'expenses' => $expenses, 'classifications' => $classifications,
@@ -125,6 +125,14 @@ final class BudgetSnapshotPayload
             'supplier', 'conditions', 'lifecycleFacts', 'renewalConfigurations',
             'expenses' => $expenses, 'classifications' => $classifications, 'projectLinks' => $links,
         ]);
+
+        foreach ($sources as $source) {
+            if ($source instanceof Contract) {
+                foreach ($source->expenses as $expense) {
+                    $expense->setRelation('contract', $source)->setRelation('project', null);
+                }
+            }
+        }
 
         return $sources->all();
     }
@@ -137,19 +145,20 @@ final class BudgetSnapshotPayload
             $expense->contract !== null => ['type' => 'contract', 'origin_id' => $expense->contract->id, 'origin_key' => $expense->contract->originKey(), 'label' => $expense->contract->title],
             default => ['type' => 'standalone', 'origin_id' => null, 'origin_key' => null, 'label' => 'Autonoma'],
         };
-        $lines = $expense->lines->filter(fn (ExpenseLine $line): bool => ! $line->isAnnulled() && $line->lineType() === ExpenseLineType::Estimate)->sortBy('id')->map(fn (ExpenseLine $line): array => [
-            'line_id' => $line->id, 'amount' => (string) $line->amount, 'quantity' => $line->quantity,
-            'unit_amount' => $line->unit_amount, 'unit_of_measure' => $line->unit_of_measure, 'note' => $line->note,
-        ])->values()->all();
+        $lines = $expense->lines->filter(fn (ExpenseLine $line): bool => (int) $expense->exercise_id === (int) $proposal->exercise_id
+            && ! $line->isAnnulled() && $line->lineType() === ExpenseLineType::Estimate)->sortBy('id')->map(fn (ExpenseLine $line): array => [
+                'line_id' => $line->id, 'amount' => (string) $line->amount, 'quantity' => $line->quantity,
+                'unit_amount' => $line->unit_amount, 'unit_of_measure' => $line->unit_of_measure, 'note' => $line->note,
+            ])->values()->all();
 
         return [
             'expense_id' => $expense->id, 'description' => $expense->description,
-            'exercise_id' => $expense->exercise_id, 'exercise_year' => $proposal->exercise->year,
+            'exercise_id' => $expense->exercise_id, 'exercise_year' => $expense->exercise->year,
             'origin' => $expense->origin, 'owner' => $owner,
             'supplier' => ['id' => $expense->supplier_id, 'label' => $expense->supplier?->legal_name],
             'cost_center' => ['id' => self::costCenterId($expense, $proposal->exercise_id), 'label' => self::costCenterLabel(self::costCenterId($expense, $proposal->exercise_id), $hierarchy)],
             'state' => $expense->isReversed() ? 'reversed' : 'active',
-            'approved_estimate_total' => $expense->allocation(), 'active_estimate_lines' => $lines,
+            'approved_estimate_total' => self::allocation($expense, $proposal->exercise_id), 'active_estimate_lines' => $lines,
         ];
     }
 
@@ -237,7 +246,12 @@ final class BudgetSnapshotPayload
             'renewal_duration_months' => $contract->renewal_duration_months, 'notice_days' => $contract->notice_days,
             'cancellation_deadline' => $deadline->noticeLimitDate,
             'cost_center' => ['id' => self::costCenterId($contract, $proposal->exercise_id), 'label' => self::costCenterLabel(self::costCenterId($contract, $proposal->exercise_id), $hierarchy)],
-            'approved_estimate_total' => $annual->amount, 'conditions' => $conditions,
+            'approved_estimate_total' => self::allocation($contract, $proposal->exercise_id),
+            'recurring_estimate_total' => $annual->amount,
+            'system_estimate_total' => Decimal::sum($contract->expenses->where('origin', 'system')->map(fn (Expense $expense): string => $expense->allocation())),
+            'manual_estimate_total' => Decimal::sum($contract->expenses->where('origin', 'manual')->map(fn (Expense $expense): string => $expense->allocation())),
+            'expenses' => $contract->expenses->sortBy('id')->map(fn (Expense $expense): array => self::expenseDetail($expense, $proposal, $hierarchy))->values()->all(),
+            'conditions' => $conditions,
             'annual_composition' => $annual->composition, 'approved_lifecycle' => $lifecycle,
         ];
     }
@@ -259,7 +273,7 @@ final class BudgetSnapshotPayload
     private static function allocation(Expense|Project|Contract $live, int $exerciseId): string
     {
         if ($live instanceof Expense) {
-            return $live->allocation();
+            return (int) $live->exercise_id === $exerciseId ? $live->allocation() : '0.00';
         }
         $estimates = Decimal::sum($live->expenses->map(fn (Expense $expense): string => $expense->allocation()));
 

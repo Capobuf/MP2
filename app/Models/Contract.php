@@ -180,6 +180,19 @@ class Contract extends Model
         return $totals;
     }
 
+    public function manualEstimateTotal(int $exerciseId): string
+    {
+        return Decimal::money((string) ExpenseLine::query()
+            ->join('expenses', 'expenses.id', '=', 'expense_lines.expense_id')
+            ->where('expenses.contract_id', $this->id)
+            ->where('expenses.exercise_id', $exerciseId)
+            ->where('expenses.origin', 'manual')
+            ->whereNull('expenses.reversed_at')
+            ->whereNull('expense_lines.annulled_at')
+            ->where('expense_lines.type', ExpenseLineType::Estimate->value)
+            ->sum('expense_lines.amount'));
+    }
+
     public function contractualStartDate(): Carbon
     {
         $date = $this->getAttribute('contractual_start_date');
@@ -242,6 +255,7 @@ class Contract extends Model
             'notice_days' => 'integer',
             'archived_at' => 'datetime',
             'revision' => 'integer',
+            'economic_use_recorded' => 'boolean',
         ];
     }
 }

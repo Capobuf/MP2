@@ -35,7 +35,7 @@ it('creates and plans a contract without any live write', function (): void {
     $supplier = Supplier::factory()->create(['company_id' => $proposal->company_id]);
     grantTestPermissions(['company_id' => $proposal->company_id, 'user' => $user, 'permissions' => TestPermissions::MANAGE_PROPOSALS]);
     $created = app(PlanContract::class)->create($user, $proposal, ['title' => 'Contratto futuro', 'notes' => null, 'supplier_id' => $supplier->id, 'contractual_start_date' => '2026-01-01', 'next_expiry_date' => '2026-12-31', 'automatic_renewal' => false, 'renewal_duration_months' => null, 'notice_days' => 30, 'exercise_id' => $proposal->exercise_id, 'cost_center_id' => null], (string) Str::uuid(), 0);
-    app(PlanContract::class)->execute($user, $proposal->refresh(), $created->item, ProposalActionType::AddContractCondition, ['cycle' => 'annual', 'attribution_mode' => 'cycle_start', 'amount' => '100.00', 'valid_from' => '2026-01-01', 'valid_to' => null, 'reason' => null], null, (string) Str::uuid(), 1);
+    app(PlanContract::class)->execute($user, $proposal->refresh(), $created->item, ProposalActionType::AddContractCondition, ['cycle' => 'annual', 'attribution_mode' => 'cycle_start', 'amount' => '100.00', 'valid_from' => '2026-09-01', 'valid_to' => null, 'reason' => null], null, (string) Str::uuid(), 1);
     expect($created->item->refresh()->contract_id)->toBeNull()->and($created->item->result['planned_conditions'])->toHaveCount(1)->and(Contract::query()->count())->toBe(0);
 });
 

@@ -81,9 +81,9 @@ class EditContract extends EditRecord
         try {
             $data = $this->form->getState();
             $this->changes = app(SaveContractEdits::class)->changes($this->original, $data);
-            if ($this->changes['conditions'] !== [] || $this->changes['classifications'] !== [] || $this->changes['renewal'] !== []) {
+            if (($this->changes['first_condition'] ?? null) !== null || $this->changes['conditions'] !== [] || $this->changes['classifications'] !== [] || $this->changes['renewal'] !== []) {
                 $this->review = null;
-                if ($this->changes['conditions'] !== [] || $this->changes['renewal'] !== []) {
+                if (($this->changes['first_condition'] ?? null) !== null || $this->changes['conditions'] !== [] || $this->changes['renewal'] !== []) {
                     $this->mountAction('interpretChanges');
                 } else {
                     $this->prepareReview(['reason' => $data['reason'] ?? null]);
@@ -104,7 +104,7 @@ class EditContract extends EditRecord
             ->modalHeading($this->isAddingCondition() ? 'Hai aggiunto una condizione economica' : ($this->changes['conditions'] !== [] ? 'Hai modificato le condizioni economiche' : 'Hai modificato i termini contrattuali'))
             ->modalSubmitActionLabel('Rivedi le modifiche')
             ->fillForm(fn (): array => [
-                'requested_date' => now($this->contractRecord()->company->timezone)->addMonthNoOverflow()->startOfMonth()->toDateString(),
+                'requested_date' => ($this->changes['first_condition'] ?? null) !== null ? $this->changes['first_condition']['valid_from'] : now($this->contractRecord()->company->timezone)->addMonthNoOverflow()->startOfMonth()->toDateString(),
                 'effective_from' => now($this->contractRecord()->company->timezone)->toDateString(),
                 'reason' => $this->data['reason'] ?? null,
             ])
@@ -123,7 +123,7 @@ class EditContract extends EditRecord
                     ->helperText('È supportata la configurazione corrente, successiva alle scadenze già elaborate. Le configurazioni con efficacia futura non sono modificabili da questa schermata.')
                     ->required()->visible(fn (): bool => $this->changes['renewal'] !== []),
                 Textarea::make('reason')->label('Motivo della modifica')
-                    ->required(fn (Get $get): bool => $get('meaning') === 'correction' || $this->isAddingCondition() || ($this->changes['renewal'] !== [] && $this->contractRecord()->company->exercises()->open()->whereHas('budgets')->exists()))
+                    ->required(fn (Get $get): bool => $get('meaning') === 'correction' || ($this->isAddingCondition() && (($this->changes['first_condition'] ?? null) === null || $this->changes['first_condition']['valid_from'] <= now($this->contractRecord()->company->timezone)->toDateString())) || ($this->changes['renewal'] !== [] && $this->contractRecord()->company->exercises()->open()->whereHas('budgets')->exists()))
                     ->helperText('Indica il motivo della variazione. Per una decorrenza già trascorsa, descrivi l’accordo già in vigore.'),
             ])
             ->action(function (array $data): void {
@@ -232,7 +232,7 @@ class EditContract extends EditRecord
     {
         $conditions = $this->changes['conditions'] ?? [];
 
-        return (bool) ($conditions[array_key_first($conditions)]['succession'] ?? false);
+        return ($this->changes['first_condition'] ?? null) !== null || (bool) ($conditions[array_key_first($conditions)]['succession'] ?? false);
     }
 
     private function contractRecord(): Contract

@@ -72,16 +72,6 @@ class ExpenseForm
                         } elseif ($state === 'contract') {
                             $set('project_id', null);
                             $set('direct_cost_center_id', null);
-
-                            $lines = array_map(function (mixed $line): mixed {
-                                if (is_array($line)) {
-                                    $line['type'] = ExpenseLineType::Actual->value;
-                                }
-
-                                return $line;
-                            }, (array) $get('lines'));
-
-                            $set('lines', $lines);
                         }
                     })
                     ->required(),
@@ -188,22 +178,18 @@ class ExpenseForm
             Section::make('Informazioni Aggiuntive')
                 ->schema(self::creationActivityFields())
                 ->columns(2)
-                ->visible(fn (Get $get): bool => self::hasInitialActual($get) && self::hasSelectedContainer($get))
+                ->visible(fn (Get $get): bool => self::hasSelectedContainer($get) && (self::hasInitialActual($get) || $get('container') === 'contract'))
                 ->columnSpanFull(),
         ]);
     }
 
     /** @return array<int, mixed> */
-    public static function repeaterLineFields(bool $contractActualOnly = false, bool $preserveIdentity = false): array
+    public static function repeaterLineFields(bool $preserveIdentity = false): array
     {
         $fields = [
             Select::make('type')->label('Tipo')
-                ->options(fn (Get $get): array => $contractActualOnly || $get('../../container') === 'contract'
-                    ? [ExpenseLineType::Actual->value => ExpenseLineType::Actual->label()]
-                    : ExpenseLineType::options())
-                ->default(fn (): ?string => $contractActualOnly || self::initialContainer() === 'contract'
-                    ? ExpenseLineType::Actual->value
-                    : null)
+                ->options(ExpenseLineType::options())
+                ->default(null)
                 ->placeholder('Seleziona')
                 ->required()->native(false)->live()
                 ->columnSpan(['default' => 12, 'md' => 3, 'xl' => 2]),
@@ -271,12 +257,13 @@ class ExpenseForm
                 ->hiddenLabel()
                 ->content('Il Progetto non ha ancora uno stato efficace alla data aziendale.')
                 ->visible(fn (Get $get): bool => $get('container') === 'project' && filled($get('project_id')) && self::projectState($get) === null),
+            Checkbox::make('residual_estimate')->label('Confermo il costo residuo del Contratto')->live()->visible(fn (Get $get): bool => in_array(self::contractState($get), [ContractState::Cessated, ContractState::Cancelled], true)),
             Select::make('actual_kind')
                 ->label('Tipo di Effettivo')
                 ->options(fn (Get $get): array => self::terminalActualOptions($get))
-                ->required(fn (Get $get): bool => self::requiresTerminalDeclaration($get))
-                ->visible(fn (Get $get): bool => self::requiresTerminalDeclaration($get))
-                ->dehydrated(fn (Get $get): bool => self::requiresTerminalDeclaration($get)),
+                ->required(fn (Get $get): bool => self::requiresTerminalDeclaration($get) && (self::hasInitialActual($get) || $get('amount') !== null))
+                ->visible(fn (Get $get): bool => self::requiresTerminalDeclaration($get) && (self::hasInitialActual($get) || $get('amount') !== null))
+                ->dehydrated(fn (Get $get): bool => self::requiresTerminalDeclaration($get) && (self::hasInitialActual($get) || $get('amount') !== null)),
             Checkbox::make('open_project')
                 ->label('Confermo l’apertura del Progetto')
                 ->accepted()
@@ -308,11 +295,11 @@ class ExpenseForm
     }
 
     /** @return array<int, mixed> */
-    public static function lineFormSections(bool $contractActualOnly = false, bool|\Closure $requiresBudgetReason = false): array
+    public static function lineFormSections(bool|\Closure $requiresBudgetReason = false): array
     {
         return [
             Section::make('Valore Economico')->description('Il Totale è l’Importo autoritativo; importo unitario e quantità propongono automaticamente il valore, che resta modificabile.')
-                ->schema(self::economicLineFields($contractActualOnly))->columns(4),
+                ->schema(self::economicLineFields())->columns(4),
             Section::make('Nota e Verifica')->schema(self::lineNoteFields($requiresBudgetReason)),
         ];
     }
@@ -341,6 +328,7 @@ class ExpenseForm
     public static function containerActivityFields(bool $project, bool $contract): array
     {
         return [
+            Checkbox::make('residual_estimate')->label('Confermo il costo residuo del Contratto terminale')->visible($contract),
             Select::make('actual_kind')
                 ->label('Dichiarazione Effettivo')
                 ->options($contract ? ContractActualKind::options() : ProjectActualKind::options())
@@ -350,7 +338,7 @@ class ExpenseForm
                 ->label('Conferma Apertura Atomica se il Progetto è Pianificato')
                 ->visible($project),
             Textarea::make('activity_note')
-                ->label('Nota Attività Tardiva, Rimborso o Correzione')
+                ->label('Nota del Costo Residuo o dell’Effettivo Terminale')
                 ->visible($project || $contract),
             Textarea::make('overspend_note')
                 ->label('Nota di Sovraspesa')
@@ -359,14 +347,12 @@ class ExpenseForm
     }
 
     /** @return array<int, mixed> */
-    private static function economicLineFields(bool $contractActualOnly = false): array
+    private static function economicLineFields(): array
     {
         return [
             Select::make('type')->label('Tipo Riga')
-                ->options(fn (Get $get): array => $contractActualOnly || filled($get('../../contract_id'))
-                    ? [ExpenseLineType::Actual->value => ExpenseLineType::Actual->label()]
-                    : ExpenseLineType::options())
-                ->default($contractActualOnly ? ExpenseLineType::Actual->value : null)
+                ->options(ExpenseLineType::options())
+                ->default(null)
                 ->required()->native(false)->live(),
             Hidden::make('suggested_amount')->dehydrated(false),
             MoneyInput::make('unit_amount', 14)

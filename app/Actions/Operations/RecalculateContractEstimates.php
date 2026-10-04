@@ -4,6 +4,7 @@ namespace App\Actions\Operations;
 
 use App\Domain\Company\AuditEventType;
 use App\Domain\Contracts\ContractAnnualAllocation;
+use App\Domain\Contracts\ContractEconomicUse;
 use App\Domain\Contracts\ContractStateTimeline;
 use App\Domain\Expenses\Decimal;
 use App\Domain\Expenses\ExpenseLineType;
@@ -58,6 +59,7 @@ class RecalculateContractEstimates
         string $operationId,
         int &$sequence,
     ): array {
+        ContractEconomicUse::recordIfProven($contract);
         $contract->load(['conditions', 'lifecycleFacts', 'renewalConfigurations']);
         $impacts = [];
 
@@ -143,6 +145,8 @@ class RecalculateContractEstimates
                 'actual_impact_by_exercise' => [(string) $exercise->id => '0.00'],
             ]);
         }
+
+        ContractEconomicUse::recordIfProven($contract);
 
         return $impacts;
     }

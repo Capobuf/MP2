@@ -32,7 +32,8 @@ use Illuminate\Support\Number;
  *     cost_centers: Collection<int, string>,
  *     projects: Collection<int, string>,
  *     contracts: Collection<int, string>,
- *     proposed_projects: Collection<string, string>
+ *     proposed_projects: Collection<string, string>,
+ *     proposed_contracts: Collection<string, string>
  * }
  */
 class ProposalInfolist
@@ -456,6 +457,7 @@ class ProposalInfolist
                 ->mapWithKeys(fn (Project $project): array => [(int) $project->id => (string) $project->title]),
             'contracts' => Contract::query()->where('company_id', $proposal->company_id)->get(['id', 'title'])
                 ->mapWithKeys(fn (Contract $contract): array => [(int) $contract->id => (string) $contract->title]),
+            'proposed_contracts' => $proposal->items->where('source_type', ProposalSourceType::Contract)->mapWithKeys(fn (ProposalItem $item): array => [$item->proposal_item_id => (string) ($item->result['title'] ?? 'Contratto')]),
             'proposed_projects' => $proposal->items->where('source_type', ProposalSourceType::Project)
                 ->mapWithKeys(fn (ProposalItem $item): array => [$item->proposal_item_id => self::sourceLabel($item->source_type, $item->result, [])]),
         ];
@@ -496,6 +498,9 @@ class ProposalInfolist
         }
         if (filled($result['project_id'] ?? null)) {
             return 'Progetto · '.$maps['projects']->get((int) $result['project_id'], '—');
+        }
+        if (filled($result['contract_item_id'] ?? null)) {
+            return 'Contratto proposto · '.$maps['proposed_contracts']->get((string) $result['contract_item_id'], '—');
         }
         if (filled($result['contract_id'] ?? null)) {
             return 'Contratto · '.$maps['contracts']->get((int) $result['contract_id'], '—');
@@ -579,6 +584,7 @@ class ProposalInfolist
             ProposalActionType::RestoreExpense => 'Ripristino della Spesa',
             ProposalActionType::CreateProject => 'Creazione Progetto',
             ProposalActionType::PlanProjectChildExpenses => 'Pianificazione Spese del Progetto',
+            ProposalActionType::PlanContractChildExpenses => 'Pianificazione Stime Manuali del Contratto',
             ProposalActionType::SetProjectCostCenter => 'Cambio Centro di Costo del Progetto',
             ProposalActionType::PlanProjectTransition => 'Transizione del Progetto',
             ProposalActionType::PlanProjectDeferral => 'Rinvio del Progetto',

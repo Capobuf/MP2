@@ -11,7 +11,7 @@ final class ProposalItemReference
     public static function item(Proposal $proposal, string $proposalItemId, string $sourceType): ProposalItem
     {
         $item = ProposalItem::query()->where('proposal_id', $proposal->id)->where('proposal_item_id', $proposalItemId)->first();
-        if ($item === null || $item->source_type->value !== $sourceType) {
+        if ($item === null || $item->source_type->value !== $sourceType || $item->isExcludedFromPlan()) {
             throw ValidationException::withMessages(['proposal_item_id' => 'Riferimento non compatibile o esterno alla Proposta.']);
         }
 

@@ -8,6 +8,7 @@ use App\Domain\Contracts\ContractAttributionMode;
 use App\Domain\Contracts\ContractCycleType;
 use App\Filament\Forms\DateInput;
 use App\Filament\Forms\DecimalInput;
+use App\Filament\Resources\Contracts\ContractResource;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\User;
@@ -61,7 +62,9 @@ class ContractConditionsRelationManager extends RelationManager
             TextColumn::make('creator.name')->label('Autore')->placeholder('Autore originale non disponibile'),
             TextColumn::make('reason')->label('Motivo')->placeholder('—')->wrap(),
         ])->headerActions([
-            Action::make('createCondition')->label('Nuova Condizione')->visible(fn (): bool => $this->canMutate())
+            Action::make('firstCondition')->label('Aggiungi Primo Canone')->visible(fn (): bool => $this->canMutate() && ! $this->hasConditions())
+                ->url(fn (): string => ContractResource::getUrl('edit', ['record' => $this->getOwnerRecord()])),
+            Action::make('createCondition')->label('Nuova Condizione')->visible(fn (): bool => $this->canMutate() && $this->hasConditions())
                 ->form($this->fields())
                 ->successNotificationTitle('Condizione Creata')
                 ->action(function (array $data, Schema $schema): void {
@@ -111,7 +114,7 @@ class ContractConditionsRelationManager extends RelationManager
                 }),
         ])->defaultSort('valid_from')
             ->emptyStateHeading('Nessuna Condizione')
-            ->emptyStateDescription('Ogni Contratto nasce con una prima condizione valida; verifica i filtri se non è visibile.');
+            ->emptyStateDescription('Il Contratto può avere soltanto costi manuali. Aggiungi un canone quando esiste un accordo ricorrente.');
     }
 
     /** @return array<int, mixed> */
@@ -126,6 +129,13 @@ class ContractConditionsRelationManager extends RelationManager
             Textarea::make('reason')->label('Nota')->nullable(),
             Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
         ];
+    }
+
+    private function hasConditions(): bool
+    {
+        $contract = $this->getOwnerRecord();
+
+        return $contract instanceof Contract && $contract->conditions()->exists();
     }
 
     private function canMutate(): bool

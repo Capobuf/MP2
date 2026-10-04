@@ -44,7 +44,7 @@ it('creates a complete contract through the form and approves its calculated est
     Livewire::test(ViewProposal::class, ['record' => $this->proposal->id])
         ->callAction(TestAction::make('createPlannedContract')->table(), data: [
             'title' => 'Assistenza', 'supplier_id' => $this->supplier->id,
-            'contractual_start_date' => '01/01/2027', 'amount' => '120,50',
+            'add_condition' => true, 'valid_from' => '01/01/2027', 'contractual_start_date' => '01/01/2027', 'amount' => '120,50',
             'cycle' => $cycle, 'attribution_mode' => $attribution,
         ])->assertHasNoActionErrors();
 
@@ -101,7 +101,7 @@ it('requires a first amount and rejects negative amounts without creating a part
     Livewire::test(ViewProposal::class, ['record' => $this->proposal->id])
         ->callAction(TestAction::make('createPlannedContract')->table(), data: [
             'title' => 'Assistenza', 'supplier_id' => $this->supplier->id,
-            'contractual_start_date' => '01/01/2027', 'amount' => $amount,
+            'add_condition' => true, 'valid_from' => '01/01/2027', 'contractual_start_date' => '01/01/2027', 'amount' => $amount,
             'cycle' => 'annual', 'attribution_mode' => 'cycle_start',
         ])->assertHasActionErrors(['amount']);
     expect($this->proposal->items()->count())->toBe(0)->and($this->proposal->fresh()->revision)->toBe(0);
@@ -120,10 +120,10 @@ it('rolls back invalid first conditions and records a complete creation only onc
     expect($retry->id)->toBe($created->id)->and($this->proposal->actions()->count())->toBe(2)->and($created->item->result['planned_conditions'])->toHaveCount(1);
 });
 
-it('shows the precise missing condition message on an incomplete existing draft', function (): void {
+it('allows a contract without recurring conditions and can add the first condition later', function (): void {
     app(PlanContract::class)->create($this->user, $this->proposal, ['title' => 'Incompleto', 'supplier_id' => $this->supplier->id, 'contractual_start_date' => '2027-01-01', 'exercise_id' => $this->proposal->exercise_id], (string) Str::uuid(), 0);
     $review = app(ProposalReadiness::class)->assessProposal($this->proposal->fresh());
-    expect($review['blocks'][0]['message'])->toBe('Un nuovo Contratto richiede almeno una condizione economica applicabile.');
+    expect($review['ready'])->toBeTrue()->and($review['blocks'])->toBe([]);
     $item = $this->proposal->items()->sole();
     Livewire::test(ViewProposal::class, ['record' => $this->proposal->id])
         ->callAction(TestAction::make('addContractCondition')->table($item), data: ['amount' => '0,00', 'cycle' => 'annual', 'attribution_mode' => 'cycle_start', 'valid_from' => '01/01/2027'])
@@ -172,6 +172,7 @@ it('applies the initial expiry and renewal to both the proposal and the approved
             'title' => 'Assistenza', 'supplier_id' => $this->supplier->id,
             'contractual_start_date' => '01/01/2027', 'next_expiry_date' => '30/06/2027',
             'automatic_renewal' => $automatic, 'renewal_duration_months' => $automatic ? 6 : null,
+            'add_condition' => true, 'valid_from' => '01/01/2027',
             'amount' => '100,00', 'cycle' => 'monthly', 'attribution_mode' => 'cycle_start',
         ])->assertHasNoActionErrors();
     $review = app(ProposalReadiness::class)->assessProposal($this->proposal->fresh());

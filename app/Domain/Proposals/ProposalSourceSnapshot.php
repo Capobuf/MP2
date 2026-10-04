@@ -22,6 +22,7 @@ final class ProposalSourceSnapshot
 
         return self::canonical([
             'plan_baseline' => [
+                'origin' => $expense->origin, 'expense_id' => $expense->id, 'revision' => $expense->revision,
                 'origin_key' => $expense->originKey(), 'exercise_id' => $expense->exercise_id,
                 'project_id' => $expense->project_id, 'contract_id' => $expense->contract_id,
                 'supplier_id' => $expense->supplier_id, 'supplier_label' => $expense->supplier?->legal_name,
@@ -69,7 +70,7 @@ final class ProposalSourceSnapshot
     {
         $contract->loadMissing(['supplier', 'conditions', 'lifecycleFacts', 'renewalConfigurations', 'classifications.costCenter', 'expenses.lines', 'projectLinks']);
         $hierarchy ??= CostCenterHierarchy::forCompany((int) $contract->company_id);
-        $expenses = $contract->expenses->where('exercise_id', $exerciseId)->sortBy('id');
+        $expenses = $contract->expenses->sortBy('id');
 
         return self::canonical([
             'plan_baseline' => [
@@ -91,7 +92,7 @@ final class ProposalSourceSnapshot
                 'expense_plan' => $expenses->map(fn (Expense $expense): array => self::expense($expense, $hierarchy)['plan_baseline'])->values()->all(),
                 'project_links' => $contract->projectLinks->map->only(['id', 'project_id', 'archived_at'])->values()->all(),
             ],
-            'actual_context' => ['has_actuals' => $expenses->contains(fn (Expense $expense): bool => $expense->hasActuals()), 'expenses' => $expenses->map(fn (Expense $expense): array => self::expense($expense)['actual_context'])->values()->all()],
+            'actual_context' => ['has_actuals' => $expenses->where('exercise_id', $exerciseId)->contains(fn (Expense $expense): bool => $expense->hasActuals()), 'expenses' => $expenses->where('exercise_id', $exerciseId)->map(fn (Expense $expense): array => self::expense($expense)['actual_context'])->values()->all()],
         ]);
     }
 

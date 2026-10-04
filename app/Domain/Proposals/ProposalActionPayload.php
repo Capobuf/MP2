@@ -10,7 +10,7 @@ final class ProposalActionPayload
     /** @var array<string, list<string>> */
     private const ALLOWED = [
         'exclude_expense' => ['reason'],
-        'create_expense' => ['description', 'notes', 'exercise_id', 'supplier_id', 'cost_center_id', 'project_id', 'project_item_id', 'estimate_lines'],
+        'create_expense' => ['description', 'notes', 'exercise_id', 'supplier_id', 'cost_center_id', 'project_id', 'project_item_id', 'contract_id', 'contract_item_id', 'residual_estimate', 'activity_note', 'estimate_lines'],
         'copy_expense' => ['source_expense_id', 'source_revision', 'source_fingerprint', 'target_exercise_id', 'description', 'notes', 'supplier_id', 'cost_center_id', 'estimate_lines'],
         'set_expense_estimates' => ['estimate_lines'], 'set_expense_owner' => ['exercise_id', 'project_id', 'project_item_id'],
         'set_expense_supplier' => ['supplier_id'], 'set_expense_cost_center' => ['cost_center_id'], 'reverse_expense' => ['reason'], 'restore_expense' => ['reason'],
@@ -19,6 +19,7 @@ final class ProposalActionPayload
         'plan_project_transition' => ['from_state', 'to_state', 'effective_date', 'reason'],
         'plan_project_deferral' => ['source_exercise_id', 'destination_exercise_id', 'mode', 'carryover_amount', 'reprogrammed_amount', 'source_estimate_reductions', 'destination_plans', 'source_context', 'active_reprogramming_operation_id', 'active_reprogramming_fingerprint'],
         'create_project_allocation' => ['description', 'notes', 'exercise_id', 'supplier_id', 'cost_center_id', 'project_id', 'project_item_id', 'estimate_lines'],
+        'plan_contract_child_expenses' => ['existing_expenses', 'residual_estimate', 'activity_note'],
         'create_contract' => ['title', 'notes', 'supplier_id', 'contractual_start_date', 'next_expiry_date', 'automatic_renewal', 'renewal_duration_months', 'notice_days', 'exercise_id', 'cost_center_id'],
         'add_contract_condition' => ['cycle', 'attribution_mode', 'amount', 'valid_from', 'valid_to', 'reason'],
         'change_contract_economics' => ['condition_id', 'amount', 'cycle', 'attribution_mode', 'requested_date', 'confirmed_effective_date', 'minimum_date', 'effective_date', 'delay_reason', 'no_prorata', 'future_replacement', 'exercise_impacts', 'effective_date_confirmed', 'reason'],
@@ -107,7 +108,7 @@ final class ProposalActionPayload
             throw ValidationException::withMessages(['estimate_lines' => 'Le Righe Stima devono essere un elenco.']);
         }
         foreach ($lines as $index => $line) {
-            if (! is_array($line) || array_diff(array_keys($line), ['proposal_line_id', 'line_id', 'amount', 'note', 'annulled']) !== []) {
+            if (! is_array($line) || array_diff(array_keys($line), ['proposal_line_id', 'line_id', 'amount', 'quantity', 'unit_amount', 'unit_of_measure', 'amount_warning_acknowledged', 'note', 'annulled']) !== []) {
                 throw ValidationException::withMessages(["estimate_lines.$index" => 'Forma Riga Stima non valida.']);
             }
             self::require($line, ['proposal_line_id', 'amount', 'annulled']);

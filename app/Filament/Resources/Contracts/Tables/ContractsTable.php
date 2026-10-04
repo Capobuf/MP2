@@ -2,14 +2,16 @@
 
 namespace App\Filament\Resources\Contracts\Tables;
 
-use App\Domain\Contracts\ContractAnnualAllocation;
+use App\Domain\Contracts\ContractState;
 use App\Domain\Contracts\ContractStateTimeline;
 use App\Domain\CostCenters\CostCenterHierarchy;
 use App\Domain\Expenses\Decimal;
 use App\Filament\Resources\Contracts\ContractResource;
+use App\Models\ClosingSnapshot;
 use App\Models\Company;
 use App\Models\Contract;
 use App\Models\Exercise;
+use App\Models\LateCorrection;
 use App\Models\Supplier;
 use App\Models\TenantCompany;
 use App\Support\ExerciseContext;
@@ -152,11 +154,22 @@ class ContractsTable
 
         $today = CarbonImmutable::now($contract->company->timezone)->startOfDay();
         $reference = ContractStateTimeline::referenceDateForExercise($exercise->year, $today);
-        $allocation = ContractAnnualAllocation::forYear(
-            $contract->conditions,
-            $exercise->year,
-            fn (string $date) => $contract->stateAtDate($date),
-        )->amount;
+        if (! $exercise->isOpen()) {
+            $snapshot = ClosingSnapshot::query()->where('company_id', $contract->company_id)->where('exercise_id', $exercise->id)->firstOrFail();
+            $row = $snapshot->rows()->where('origin_key', $contract->originKey())->first();
+            $corrections = $snapshot->lateCorrections()->where('source_origin_key', $contract->originKey())->with('expenseLine')->get()
+                ->filter(fn (LateCorrection $correction): bool => ! $correction->expenseLine->isAnnulled());
+            $allocation = (string) ($row->final_allocation ?? '0.00');
+            $actual = Decimal::add((string) ($row->closing_actual ?? '0.00'), Decimal::sum($corrections->map(fn (LateCorrection $correction): string => (string) $correction->expenseLine->amount)));
+
+            return [
+                'state' => $row === null ? 'Stato storico non disponibile' : ContractState::from($row->end_state)->label(),
+                'reference_date' => 'Conoscenza Corrente · '.$reference->format('d/m/Y'),
+                'cost_center' => $row->cost_center_label ?? 'Classificazione storica non disponibile',
+                'allocation' => $allocation, 'actual' => $actual, 'variance' => Decimal::subtract($actual, $allocation),
+            ];
+        }
+        $allocation = Decimal::sum($contract->expenses->where('exercise_id', $exercise->id)->map->allocation());
         $actual = Decimal::sum($contract->expenses
             ->where('exercise_id', $exercise->id)
             ->where('origin', 'manual')

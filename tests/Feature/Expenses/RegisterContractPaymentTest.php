@@ -58,7 +58,7 @@ it('registers the editable annual Estimate as a separate Actual from the Contrac
         ->fillForm(['description' => 'Pagamento servizi', 'amount' => '1150,50'])
         ->callMountedAction()
         ->assertHasNoActionErrors()
-        ->assertNotified('Pagamento registrato');
+        ->assertNotified('Effettivo registrato');
 
     $expense = Expense::query()->where('origin', 'manual')->sole();
     expect($expense->contract_id)->toBe($this->contract->id)
@@ -135,7 +135,7 @@ it('does not expose payment registration in Expenses', function () {
     Livewire::test(ListExpenses::class)
         ->assertActionVisible('create')
         ->assertActionDoesNotExist('registerContractPayment')
-        ->assertDontSee('Registra Pagamento');
+        ->assertDontSee('Registra Effettivo');
 });
 
 it('rejects a different Contract submitted to the payment form', function () {
@@ -164,7 +164,7 @@ it('requires the Budget reason before creating the payment', function () {
     Livewire::test(ViewContract::class, ['record' => $this->contract->getRouteKey()])->mountAction('registerContractPayment')
         ->fillForm(['contract_id' => $this->contract->id, 'description' => 'Pagamento'])
         ->callMountedAction()->assertHasActionErrors(['change_reason'])
-        ->fillForm(['change_reason' => 'Pagamento registrato dopo approvazione'])
+        ->fillForm(['change_reason' => 'Effettivo registrato dopo approvazione'])
         ->callMountedAction()->assertHasNoActionErrors();
 
     expect(Expense::query()->where('origin', 'manual')->count())->toBe(1);
@@ -205,7 +205,10 @@ it('rejects ordinary Actuals for a planned Contract', function () {
 });
 
 it('disables payment registration for closed or future Exercises', function (int $year, string $status) {
-    $exercise = Exercise::factory()->for($this->company)->create(['year' => $year, 'status' => $status]);
+    $exercise = Exercise::factory()->for($this->company)->create(['year' => $year]);
+    if ($status === 'closed') {
+        closeExerciseFixture($exercise, $this->user);
+    }
     app(ExerciseContext::class)->select($this->company, $exercise->id);
 
     Livewire::test(ViewContract::class, ['record' => $this->contract->getRouteKey()])->assertActionDisabled('registerContractPayment')

@@ -22,7 +22,8 @@ it('builds autonomous plan-only rows and a non-duplicated exercise total', funct
     expect($payload['total'])->toBe('4.00')
         ->and($payload['rows'])->toHaveCount(1)
         ->and($payload['rows'][0]['detail'])->not->toHaveKey('actual_context')
-        ->and($payload['rows'][0]['detail_version'])->toBe(2)
+        ->and($payload['rows'][0]['detail_version'])->toBe(3)
+        ->and($payload['rows'][0]['detail']['schema_version'])->toBe(3)
         ->and($payload['rows'][0]['cost_center_label'])->toBe('IT / Software')
         ->and($payload['rows'][0]['detail']['cost_center_lineage'])->toBe([
             ['cost_center_id' => $parent->id, 'cost_center_label' => 'IT'],

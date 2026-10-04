@@ -335,7 +335,7 @@ final class ClosingSnapshotPayload
             $exercise->year,
             fn (string $date) => $contract->stateAtDate($date),
         );
-        $totals = $contract->annualTotals()[$exercise->id] ?? ['allocation' => $annual->amount, 'actual' => '0.00', 'has_actuals' => false];
+        $totals = $contract->annualTotals()[$exercise->id] ?? ['allocation' => '0.00', 'actual' => '0.00', 'has_actuals' => false];
         $state = $contract->stateAtDate($yearEnd->toDateString());
         $classification = $contract->classifications->firstWhere('exercise_id', $exercise->id);
         $costCenter = $classification === null ? null : $classification->costCenter;
@@ -408,7 +408,7 @@ final class ClosingSnapshotPayload
             'final_allocation' => (string) $totals['allocation'],
             'closing_actual' => (string) $totals['actual'],
             'operational_variance' => Decimal::subtract((string) $totals['actual'], (string) $totals['allocation']),
-            'detail_version' => 2,
+            'detail_version' => 3,
             'detail' => [
                 'contract_id' => $contract->id,
                 'title' => $contract->title,
@@ -427,6 +427,8 @@ final class ClosingSnapshotPayload
                 'renewal_configuration_at_31_december' => $renewalAtClosing,
                 'conditions' => $conditions,
                 'annual_composition' => $annual->composition,
+                'system_estimate_total' => Decimal::sum($contract->expenses->where('exercise_id', $exercise->id)->where('origin', 'system')->map->allocation()),
+                'manual_estimate_total' => Decimal::sum($contract->expenses->where('exercise_id', $exercise->id)->where('origin', 'manual')->map->allocation()),
                 'lifecycle_events' => $lifecycle,
                 'expenses' => $contract->expenses
                     ->where('exercise_id', $exercise->id)

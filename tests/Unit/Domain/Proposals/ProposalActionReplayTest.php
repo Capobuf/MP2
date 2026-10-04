@@ -97,7 +97,9 @@ it('selects touching relation decisions and never replays withdrawn decisions', 
 
     $replay = app(ProposalActionReplay::class);
 
-    expect($replay->touchingActions($project, $proposal->fresh()->actionHistory)->pluck('id')->all())->toBe([$relation->id]);
+    expect($replay->touchingActions($project, $proposal->fresh()->actionHistory)->pluck('id')->all())->toBe([$relation->id])
+        ->and($replay->touchingActions($project->fresh(), $proposal->fresh()->actionHistory)->pluck('id')->all())->toBe([$relation->id])
+        ->and($replay->touchingActions($contract, $proposal->fresh()->actionHistory)->pluck('id')->all())->toBe([$relation->id]);
 
     $relation->update([
         'status' => 'withdrawn',

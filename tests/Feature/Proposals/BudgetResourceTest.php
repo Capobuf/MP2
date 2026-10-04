@@ -27,7 +27,7 @@ it('lists and views only immutable Budgets belonging to the active tenant', func
         'user' => $viewer,
         'permissions' => TestPermissions::VIEW,
     ]);
-    $exercise = Exercise::factory()->for($company)->create();
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
     $proposal = Proposal::factory()->for($company)->for($exercise)->create();
     $budget = BudgetSnapshot::factory()->for($proposal)->create([
         'total_approved_allocation' => '125.50',
@@ -39,6 +39,22 @@ it('lists and views only immutable Budgets belonging to the active tenant', func
         'approved_estimates' => '125.50',
         'approved_allocation' => '125.50',
         'detail' => ['identity' => ['source_type' => 'expense'], 'expense' => ['description' => 'Licenze approvate', 'approved_estimate_total' => '125.50'], 'approved_actions' => [], 'relations' => [], 'approval_event_sequences' => [0, 1]],
+    ]);
+    BudgetSourceRow::factory()->for($budget, 'budget')->create([
+        'company_id' => $company->id,
+        'label' => 'Decisione futura',
+        'approved_estimates' => '0.00',
+        'approved_allocation' => '0.00',
+        'detail' => [
+            'identity' => ['source_type' => 'expense'],
+            'expense' => [
+                'description' => 'Decisione futura', 'exercise_id' => 999, 'exercise_year' => 2027,
+                'approved_estimate_total' => '0.00', 'active_estimate_lines' => [],
+            ],
+            'approved_actions' => [['sequence' => 1, 'type' => 'create_expense', 'payload' => ['amount' => '300.00']]],
+            'relations' => [],
+            'approval_event_sequences' => [2],
+        ],
     ]);
     BudgetEvidence::factory()->for($budget, 'budget')->create([
         'company_id' => $company->id,
@@ -67,8 +83,12 @@ it('lists and views only immutable Budgets belonging to the active tenant', func
         ->assertSee('Versione Approvata')
         ->assertSee('Elementi del Budget')
         ->assertDontSee('Sorgenti Materializzate')
-        ->assertSee('Sorgente Inclusa')
+        ->assertSee('Sorgenti Incluse')
         ->assertSee('Dettaglio Spesa')
+        ->assertSee('Spesa dell’Esercizio 2027.')
+        ->assertSee('Contributo al Budget 2026:')
+        ->assertSee('0,00')
+        ->assertSee('Le componenti qui mostrate appartengono al Budget selezionato; la decisione resta nelle azioni approvate.')
         ->assertSee('Azioni e Motivazioni Approvate')
         ->assertSee('Riferimenti e Tracciabilità Tecnica')
         ->assertSee($row->label)

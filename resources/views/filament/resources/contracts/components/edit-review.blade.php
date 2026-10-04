@@ -42,6 +42,15 @@
                     <p>Impatto {{ $impact['year'] }}: {{ $money($impact['allocation_before']) }} → {{ $money($impact['allocation_after']) }} ({{ $money($impact['allocation_delta']) }})</p>
                 @endforeach
             </section>
+        @elseif ($review['kind'] === 'first_condition')
+            <section class="space-y-2">
+                <h3 class="font-semibold">Primo canone · decorrenza {{ $date($plan['effectiveDate']) }}</h3>
+                <p>{{ $money($plan['newTerms']['amount']) }} · {{ \App\Domain\Contracts\ContractCycleType::from($plan['newTerms']['cycle'])->label() }}</p>
+                @foreach ($plan['exerciseImpacts'] as $impact)
+                    <p>Totale previsto {{ $impact['year'] }}: {{ $money($impact['allocation_before']) }} → {{ $money($impact['allocation_after']) }}</p>
+                @endforeach
+                <p>La decorrenza reale è mantenuta. Effettivi, Budget approvati e anni Chiusi restano invariati.</p>
+            </section>
         @elseif ($review['kind'] === 'classification')
             @foreach ($review['plan'] as $plan)
                 <section class="space-y-2">

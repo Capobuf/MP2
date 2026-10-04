@@ -102,7 +102,7 @@ class ViewContract extends ViewRecord
             ->color('gray')
             ->link()
             ->modalHeading(fn (array $arguments): string => 'Dettaglio Allocato '.((int) ($arguments['year'] ?? 0)))
-            ->modalDescription('Composizione completa dei cicli prodotti dalle condizioni economiche del Contratto.')
+            ->modalDescription('Previsioni ricorrenti e Stime manuali aggiuntive del Contratto nell’Esercizio.')
             ->modalContent(fn (array $arguments): View => view(
                 'filament.resources.contracts.components.allocation-detail',
                 ['detail' => $this->allocationDetail($arguments)],

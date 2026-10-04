@@ -486,6 +486,8 @@ it('renders the canonical current agreement and selected Exercise economics', fu
         'supplier_id' => $contract->supplier_id,
     ]);
     ExpenseLine::factory()->actual()->for($expense)->create(['amount' => '250.00']);
+    $system = Expense::factory()->forExercise($selectedExercise)->for($contract)->create(['origin' => 'system', 'supplier_id' => $contract->supplier_id]);
+    ExpenseLine::factory()->for($system)->create(['amount' => '1200.00']);
 
     $this->actingAs($manager);
     Filament::setTenant(($company)->tenantCompany);
@@ -576,13 +578,16 @@ it('previews a long annual allocation composition and exposes every cycle on dem
         'valid_to' => '2026-12-31',
     ]);
 
+    $system = Expense::factory()->forExercise($exercise)->for($contract)->create(['origin' => 'system', 'supplier_id' => $contract->supplier_id]);
+    ExpenseLine::factory()->for($system)->create(['amount' => '1200.00']);
+
     $this->actingAs($manager);
     Filament::setTenant(($company)->tenantCompany);
     app(ExerciseContext::class)->select($company, $exercise->id);
 
     $component = Livewire::test(ViewContract::class, ['record' => $contract->getRouteKey()])
         ->assertSuccessful()
-        ->assertSee('12 Cicli Compongono l’Allocato')
+        ->assertSee('12 Cicli Compongono la previsione ricorrente')
         ->assertSee('Primo Ciclo Incluso')
         ->assertSee('Ultimo Ciclo Incluso')
         ->assertSee('Vedi Tutti i 12 Cicli')
@@ -626,7 +631,7 @@ it('shows the complete allocation list without a fade when no cycles are hidden'
 
     Livewire::test(ViewContract::class, ['record' => $contract->getRouteKey()])
         ->assertSuccessful()
-        ->assertSee('4 Cicli Compongono l’Allocato')
+        ->assertSee('4 Cicli Compongono la previsione ricorrente')
         ->assertDontSee('Vedi Tutti i 4 Cicli')
         ->assertDontSeeHtml('mp2-list-preview-has-more');
 });

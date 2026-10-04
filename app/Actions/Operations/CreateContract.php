@@ -46,7 +46,7 @@ class CreateContract
                 ($normalized['automatic_renewal'] ?? false) && ($normalized['next_expiry_date'] ?? null) !== null,
             )],
             'notice_days' => ['nullable', 'integer', 'min:0'],
-            'conditions' => ['required', 'array', 'min:1'],
+            'conditions' => ['present', 'array'],
             'conditions.*.amount' => ['required', 'decimal:0,2', 'min:0'],
             'conditions.*.cycle' => ['required', Rule::enum(ContractCycleType::class)],
             'conditions.*.attribution_mode' => ['required', Rule::enum(ContractAttributionMode::class)],
@@ -205,7 +205,7 @@ class CreateContract
     {
         $conditions = is_array($input['conditions'] ?? null)
             ? $input['conditions']
-            : [is_array($input['condition'] ?? null) ? $input['condition'] : []];
+            : (isset($input['condition']) ? [$input['condition']] : []);
 
         return [
             'title' => is_string($input['title'] ?? null) ? trim($input['title']) : ($input['title'] ?? null),

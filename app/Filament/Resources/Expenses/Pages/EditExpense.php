@@ -135,7 +135,6 @@ class EditExpense extends EditRecord
                         ->label('Righe della Spesa')
                         ->hiddenLabel()
                         ->schema(ExpenseForm::repeaterLineFields(
-                            contractActualOnly: $expense->contract_id !== null,
                             preserveIdentity: true,
                         ))
                         ->columns(12)
@@ -176,8 +175,9 @@ class EditExpense extends EditRecord
                 ])
                 ->columnSpanFull(),
             Section::make('Informazioni Aggiuntive')
-                ->description('Sono richieste soltanto quando le modifiche alle Righe Effettivo incidono sullo stato del contenitore o sulla sovraspesa.')
+                ->description('Sono richieste per costi residui, Effettivi terminali, apertura del contenitore o sovraspesa.')
                 ->schema([
+                    Checkbox::make('residual_estimate')->label('Confermo il costo residuo del Contratto terminale')->visible($this->isTerminalContract())->live(),
                     Select::make('actual_kind')
                         ->label('Tipo di Effettivo')
                         ->options(fn (): array => $this->terminalActualOptions())
@@ -192,9 +192,9 @@ class EditExpense extends EditRecord
                         ->dehydrated(fn (Get $get): bool => $this->requiresProjectOpening($get)),
                     Textarea::make('activity_note')
                         ->label('Motivo dell’Attività Tardiva o Correttiva')
-                        ->visible(fn (Get $get): bool => $this->requiresTerminalDeclaration($get))
-                        ->required(fn (Get $get): bool => $this->requiresTerminalDeclaration($get))
-                        ->dehydrated(fn (Get $get): bool => $this->requiresTerminalDeclaration($get))
+                        ->visible(fn (Get $get): bool => $this->requiresTerminalDeclaration($get) || (bool) $get('residual_estimate'))
+                        ->required(fn (Get $get): bool => $this->requiresTerminalDeclaration($get) || (bool) $get('residual_estimate'))
+                        ->dehydrated(fn (Get $get): bool => $this->requiresTerminalDeclaration($get) || (bool) $get('residual_estimate'))
                         ->columnSpanFull(),
                     Textarea::make('overspend_note')
                         ->label('Nota di Sovraspesa')
@@ -204,7 +204,7 @@ class EditExpense extends EditRecord
                         ->columnSpanFull(),
                 ])
                 ->columns(2)
-                ->visible(fn (Get $get): bool => $this->requiresTerminalDeclaration($get)
+                ->visible(fn (Get $get): bool => $this->isTerminalContract() || $this->requiresTerminalDeclaration($get)
                     || $this->requiresProjectOpening($get)
                     || $this->requiresOverspendNote($get))
                 ->columnSpanFull(),
@@ -281,6 +281,7 @@ class EditExpense extends EditRecord
         $shared = [
             'change_reason' => $data['change_reason'] ?? null,
             'actual_kind' => $data['actual_kind'] ?? null,
+            'residual_estimate' => (bool) ($data['residual_estimate'] ?? false),
             'open_project' => $data['open_project'] ?? false,
             'activity_note' => $data['activity_note'] ?? null,
             'overspend_note' => $data['overspend_note'] ?? null,
@@ -527,6 +528,13 @@ class EditExpense extends EditRecord
         return false;
     }
 
+    private function isTerminalContract(): bool
+    {
+        $expense = $this->expenseRecord();
+
+        return $expense->contract !== null && in_array($expense->contract->stateAtDate(now($expense->company->timezone)->toDateString()), [ContractState::Cessated, ContractState::Cancelled], true);
+    }
+
     private function requiresTerminalDeclaration(Get $get): bool
     {
         if (! $this->hasMutatedActiveActual($get)) {
@@ -651,7 +659,7 @@ class EditExpense extends EditRecord
     private function lineValidationException(ValidationException $exception, string $key): ValidationException
     {
         $lineFields = ['type', 'amount', 'quantity', 'unit_amount', 'unit_of_measure', 'note', 'amount_warning_acknowledged'];
-        $sharedFields = ['change_reason', 'actual_kind', 'open_project', 'activity_note', 'overspend_note'];
+        $sharedFields = ['change_reason', 'residual_estimate', 'actual_kind', 'open_project', 'activity_note', 'overspend_note'];
         $messages = [];
         foreach ($exception->errors() as $field => $errors) {
             $target = match (true) {

@@ -74,11 +74,15 @@ final class ProposalActionReplay
                     return true;
                 }
 
-                return collect($action->payload)->contains(
-                    fn (mixed $value): bool => (is_string($value) || $value instanceof \Stringable)
-                        && ((string) $value === (string) $item->proposal_item_id
-                            || ($originKey !== null && (string) $value === $originKey)),
-                );
+                if ($action->action_type !== ProposalActionType::LinkProjectContract
+                    || $item->source_type === ProposalSourceType::Expense) {
+                    return false;
+                }
+
+                $endpoint = $item->source_type->value;
+
+                return ($action->payload[$endpoint.'_item_id'] ?? null) === (string) $item->proposal_item_id
+                    || ($originKey !== null && ($action->payload[$endpoint.'_origin_key'] ?? null) === $originKey);
             })
             ->sortBy('sequence')
             ->values();

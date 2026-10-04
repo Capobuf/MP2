@@ -274,11 +274,15 @@ final readonly class ContractEconomicChangePlan
                 continue;
             }
             $exerciseRevisions[(string) $exercise->id] = $exercise->revision;
+            $persisted = $contract->annualTotals()[$exercise->id]['allocation'] ?? '0.00';
+            $projectedTotal = Decimal::add($after->amount, $contract->manualEstimateTotal($exercise->id));
             $exerciseImpacts[(string) $exercise->id] = [
                 'year' => $exercise->year,
-                'allocation_before' => $before->amount,
-                'allocation_after' => $after->amount,
-                'allocation_delta' => Decimal::subtract($after->amount, $before->amount),
+                'allocation_before' => $persisted,
+                'allocation_after' => $projectedTotal,
+                'recurring_before' => $before->amount,
+                'recurring_after' => $after->amount,
+                'allocation_delta' => Decimal::subtract($projectedTotal, $persisted),
                 'composition_before' => $before->composition,
                 'composition_after' => $after->composition,
             ];

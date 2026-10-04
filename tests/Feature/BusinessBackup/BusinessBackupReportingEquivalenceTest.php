@@ -177,7 +177,11 @@ it('keeps all ten canonical S11 report families semantically equivalent after re
                 'company_id' => $company->id, 'source_type' => $type, 'origin_id' => $model->id,
                 'origin_key' => $model->originKey(), 'label' => $label, 'supplier_id' => $type === 'contract' ? $supplier->id : null,
                 'supplier_label' => $type === 'contract' ? $supplier->legal_name : null, 'cost_center_label' => 'Non classificato',
-                'approved_estimates' => $amounts[$index], 'approved_allocation' => $amounts[$index], 'detail' => ['schema_version' => 1],
+                'approved_estimates' => $amounts[$index], 'approved_allocation' => $amounts[$index],
+                'detail' => [
+                    'schema_version' => 1,
+                    ...($type === 'expense' ? ['expense' => ['owner' => ['type' => 'standalone']]] : []),
+                ],
             ]);
         }
     }

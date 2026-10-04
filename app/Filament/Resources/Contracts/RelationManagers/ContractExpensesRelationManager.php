@@ -57,7 +57,7 @@ class ContractExpensesRelationManager extends RelationManager
             ExpenseResource::restoreAction(),
         ])->defaultSort('id', 'desc')
             ->emptyStateHeading('Nessuna Spesa del Contratto')
-            ->emptyStateDescription('Le Stime sono generate dal motore; gli Effettivi sono registrati manualmente senza matching ai cicli.');
+            ->emptyStateDescription('Le Stime manuali si aggiungono ai canoni ricorrenti. Gli Effettivi non consumano automaticamente le Stime.');
     }
 
     private function canMutateOwner(): bool

@@ -2,7 +2,6 @@
 
 namespace App\Domain\LateCorrections;
 
-use App\Domain\Expenses\ExpenseLineType;
 use App\Models\Exercise;
 use App\Models\Expense;
 
@@ -15,11 +14,6 @@ final class HistoricalExpenseCompatibility
             || $expense->origin !== 'manual'
             || $expense->isReversed()
             || $sourceOriginId < 1) {
-            return false;
-        }
-
-        if ($expense->contract_id !== null
-            && $expense->lines()->where('type', ExpenseLineType::Estimate->value)->exists()) {
             return false;
         }
 

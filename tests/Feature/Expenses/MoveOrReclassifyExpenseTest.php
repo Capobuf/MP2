@@ -159,15 +159,15 @@ it('moves one whole Actual Expense between autonomous and Contract ownership wit
         ->and($exercise->actual())->toBe('40.00');
 });
 
-it('rejects moving manual Estimates into a Contract and rejects stale Contract previews atomically', function () {
+it('previews moving manual Estimates into a Contract and rejects stale Contract previews atomically', function () {
     [$actor, $company, $exercise, , $expense] = moveContext();
     $contract = Contract::factory()->for($company)->create(['next_expiry_date' => null, 'renewal_anchor_date' => null]);
     ContractLifecycleFact::factory()->forContract($contract)->create();
     ContractExerciseClassification::factory()->forContractAndExercise($contract, $exercise)->create();
     ExpenseLine::factory()->for($expense)->create(['amount' => '10.00']);
 
-    expect(fn () => app(UpdateExpense::class)->preview($actor, $expense, ['contract_id' => $contract->id]))
-        ->toThrow(ValidationException::class);
+    $estimatePlan = app(UpdateExpense::class)->preview($actor, $expense, ['contract_id' => $contract->id, 'supplier_replacement_acknowledged' => true]);
+    expect($estimatePlan->targetContractId)->toBe($contract->id);
 
     $expense->lines()->update(['type' => 'actual']);
     $plan = app(UpdateExpense::class)->preview($actor, $expense->refresh(), [

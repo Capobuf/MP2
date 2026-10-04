@@ -30,10 +30,10 @@ final class PlanContract
     {
         return DB::transaction(function () use ($actor, $proposal, $payload, $condition, $operationId, $expectedRevision): ProposalAction {
             $created = $this->create($actor, $proposal, $payload, $operationId, $expectedRevision);
-            if ($created->wasRecentlyCreated) {
+            if ($created->wasRecentlyCreated && $condition !== []) {
                 $this->execute($actor, $proposal->fresh(), $created->item, ProposalActionType::AddContractCondition, [
                     ...$condition,
-                    'valid_from' => $payload['contractual_start_date'],
+                    'valid_from' => $condition['valid_from'] ?? $payload['contractual_start_date'],
                 ], null, (string) Str::uuid(), $expectedRevision + 1);
             }
 

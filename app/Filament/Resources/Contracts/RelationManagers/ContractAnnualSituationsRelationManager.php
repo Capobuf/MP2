@@ -40,7 +40,7 @@ class ContractAnnualSituationsRelationManager extends RelationManager
                     ? 'Non classificato'
                     : $hierarchy->path((int) $classification->cost_center_id);
             }),
-            TextColumn::make('allocation')->label('Allocato')->state(fn (Exercise $record): string => $this->allocation($record)->amount)->money('EUR', locale: 'it'),
+            TextColumn::make('allocation')->label('Allocato')->state(fn (Exercise $record): string => Decimal::sum($this->contract()->expenses->where('exercise_id', $record->id)->map->allocation()))->money('EUR', locale: 'it'),
             TextColumn::make('actual')->label('Effettivo')->state(fn (Exercise $record): string => Decimal::sum($this->contract()->expenses
                 ->where('exercise_id', $record->id)->where('origin', 'manual')->map->actual()))->money('EUR', locale: 'it'),
             TextColumn::make('composition')->label('Composizione Esatta')->state(fn (Exercise $record): string => collect($this->allocation($record)->composition)->map(fn (array $item): string => CarbonImmutable::parse($item['attribution_date'])->format('d/m/Y').' · € '.$item['amount'])->implode(' · ') ?: 'Nessun ciclo')->wrap(),

@@ -21,6 +21,9 @@ final class BudgetPayloadGuard
         }
         foreach ($value as $key => $nested) {
             $normalized = strtolower((string) $key);
+            if ($normalized === 'residual_estimate' && is_bool($nested)) {
+                continue;
+            }
             foreach (self::FORBIDDEN as $forbidden) {
                 if (preg_match('/(^|_)'.$forbidden.'($|_)/', $normalized) === 1) {
                     throw ValidationException::withMessages([$path.'.'.$key => 'Il payload del Budget può contenere soltanto dati di piano.']);

@@ -87,7 +87,7 @@ it('compares materialized budget placement with the live hierarchy without chang
         'cost_center_label' => 'IT / Software',
         'approved_allocation' => '10.00',
         'detail_version' => 2,
-        'detail' => ['cost_center_lineage' => [
+        'detail' => ['expense' => ['owner' => ['type' => 'standalone']], 'cost_center_lineage' => [
             ['cost_center_id' => $it->id, 'cost_center_label' => 'IT'],
             ['cost_center_id' => $software->id, 'cost_center_label' => 'Software'],
         ]],
@@ -124,7 +124,7 @@ it('compares materialized budget placement with the live hierarchy without chang
         'cost_center_id' => $software->id,
         'cost_center_label' => 'Software',
         'detail_version' => 1,
-        'detail' => [],
+        'detail' => ['expense' => ['owner' => ['type' => 'standalone']]],
     ]);
     $legacyResult = app(BuildReport::class)->execute($viewer, ReportDefinition::fromArray([
         'company_id' => $company->id,
@@ -175,7 +175,7 @@ it('compares each budget with its own materialized hierarchy', function (): void
             'cost_center_label' => $path,
             'approved_allocation' => '10.00',
             'detail_version' => 2,
-            'detail' => ['cost_center_lineage' => [
+            'detail' => ['expense' => ['owner' => ['type' => 'standalone']], 'cost_center_lineage' => [
                 ['cost_center_id' => $parent->id, 'cost_center_label' => $parent->name],
                 ['cost_center_id' => $software->id, 'cost_center_label' => 'Software'],
             ]],
