@@ -45,7 +45,12 @@ final class ExportBusinessBackup
                 throw new \RuntimeException('Impossibile creare data.xlsx.');
             }
             $storedPath = Storage::disk('local')->path($relativePath);
-            if ($storedPath !== $workbookPath && ! copy($storedPath, $workbookPath)) {
+            $resolvedStoredPath = realpath($storedPath);
+            $resolvedWorkbookPath = realpath($workbookPath);
+            if ($resolvedStoredPath === false || $resolvedWorkbookPath === false) {
+                throw new \RuntimeException('Impossibile risolvere il percorso di data.xlsx.');
+            }
+            if ($resolvedStoredPath !== $resolvedWorkbookPath && ! copy($storedPath, $workbookPath)) {
                 throw new \RuntimeException('Impossibile preparare data.xlsx.');
             }
             $bundle->build($package, $workbookPath, $path, $includeLogo, $includeFiles);

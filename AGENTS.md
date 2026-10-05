@@ -194,8 +194,12 @@ Do not run the complete suite after every small change.
 For UI work, combine appropriate automated tests with direct visual/interaction
 verification when possible.
 
-Before declaring a complete feature or slice finished, run the repository-wide
-quality gate defined by the current CI workflow and fix failures caused by the work.
+The final complete test suite takes approximately 13 minutes and MUST be run manually
+by the user. Agents MUST NOT run this final suite. After completing the focused
+checks, the agent MUST provide the exact `docker exec` command that runs the entire
+test suite inside the application container with both `--stop-on-error` and
+`--stop-on-failure`. Never report the final suite as passed unless the user provides
+its successful result.
 
 A task is not complete merely because the happy path works.
 Compare the completed behavior against every requirement and acceptance criterion
@@ -285,4 +289,3 @@ Report what was changed, what was verified, and any remaining limitation or unre
 domain decision.
 
 Never claim a check was run or a behavior was verified if it was not.
-
