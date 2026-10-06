@@ -98,10 +98,10 @@
                 @if ($proposal['terminal_by'] !== null)<div><dt>Conclusa da</dt><dd>{{ $proposal['terminal_by'] }} · {{ $proposal['terminal_at'] }}</dd></div>@endif
             </dl>
             <dl class="facts metrics">
-                <div><dt>Allocato di base</dt><dd>{{ $proposal['allocation_before'] }}</dd></div>
-                <div><dt>Allocato pianificato</dt><dd>{{ $proposal['allocation_after'] }}</dd></div>
-                <div><dt>Variazione</dt><dd>{{ $proposal['allocation_delta'] }}</dd></div>
-                <div><dt>Effettivo di contesto</dt><dd>{{ $proposal['actual'] }}</dd></div>
+                <div><dt>{{ $proposal['plan_before_label'] }}</dt><dd>{{ $proposal['allocation_before'] }}</dd></div>
+                <div><dt>Budget proposto</dt><dd>{{ $proposal['allocation_after'] }}</dd></div>
+                <div><dt>Nuove decisioni della Proposta</dt><dd>{{ $proposal['allocation_delta'] }}</dd></div>
+                <div><dt>{{ $proposal['actual_label'] }}</dt><dd>{{ $proposal['actual'] }}</dd></div>
             </dl>
             <p class="muted">{{ $proposal['context'] }}</p>
         </section>
@@ -129,7 +129,7 @@
         <section data-block="impacts">
             <h2>Impatti per Esercizio</h2>
             <table>
-                <thead><tr><th>Esercizio</th><th>Applicazione</th><th class="money">Prima</th><th class="money">Dopo</th><th class="money">Variazione</th></tr></thead>
+                <thead><tr><th>Esercizio</th><th>Applicazione</th><th class="money">Allocato già presente</th><th class="money">Piano proposto</th><th class="money">Variazione</th></tr></thead>
                 <tbody>
                     @foreach ($overview['impacts'] as $impact)
                         <tr><td>{{ $impact['year'] }}</td><td>{{ $impact['application'] }}</td><td class="money">{{ $impact['before'] }}</td><td class="money">{{ $impact['after'] }}</td><td class="money">{{ $impact['delta'] }}</td></tr>
@@ -146,11 +146,11 @@
         <section data-block="sources">
             <h2>Elenco Sorgenti</h2>
             <table>
-                <thead><tr><th>Sorgente</th><th>Tipo</th><th>Natura</th><th>Readiness</th><th>Stato base → risultato</th><th class="money">Base</th><th class="money">Risultato</th><th class="money">Delta</th></tr></thead>
+                <thead><tr><th>Sorgente</th><th>Tipo</th><th>Natura</th><th>Readiness</th><th>Stato prima → proposto</th><th class="money">Allocato già presente</th><th class="money">Piano proposto</th><th class="money">Variazione</th></tr></thead>
                 <tbody>
                     @foreach ($items as $item)
                         <tr>
-                            <td><strong>{{ $item['label'] }}</strong><br><span class="muted">{{ $item['cost_center'] }} · {{ $item['supplier'] }}</span></td>
+                            <td><strong>{{ $item['label'] }}</strong><br><span class="muted">{{ $item['cost_center'] }} · {{ $item['supplier'] }}@if ($item['parent_project'] !== null) · Progetto: {{ $item['parent_project'] }}@endif</span></td>
                             <td>{{ $item['type_label'] }}</td><td>{{ $item['plan_role'] }}</td><td>{{ $item['readiness'] }}</td><td>{{ $item['state_before'] }} → {{ $item['state_after'] }}</td>
                             <td class="money">{{ $item['allocation_before'] }}</td><td class="money">{{ $item['allocation_after'] }}</td><td class="money">{{ $item['allocation_delta'] }}</td>
                         </tr>

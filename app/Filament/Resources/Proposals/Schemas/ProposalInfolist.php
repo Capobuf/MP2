@@ -85,6 +85,7 @@ class ProposalInfolist
             ))
             ->keyBy('id')
             ->all();
+        $items = self::withProjectExpenseRollups($items);
 
         return [
             'proposal' => [
@@ -111,9 +112,12 @@ class ProposalInfolist
                 'allocation_after' => self::money($mainImpact['allocation_after'] ?? '0.00'),
                 'allocation_delta' => self::signedMoney($mainImpact['allocation_delta'] ?? '0.00'),
                 'allocation_delta_tone' => self::deltaTone($mainImpact['allocation_delta'] ?? '0.00'),
+                'plan_before_label' => 'Allocato già presente nel '.$proposal->exercise->year,
+                'plan_before_help' => 'Stime e Riporto; Effettivi mostrati separatamente',
+                'actual_label' => 'Effettivo '.$proposal->exercise->year.' · Sola Lettura',
                 'context' => $proposal->purpose->value === 'revision'
-                    ? 'Il Budget approvato è il confronto immutabile. La Base della Proposta è la baseline acquisita o riallineata.'
-                    : 'La Base della Proposta viene trasformata nel Budget iniziale proposto.',
+                    ? 'Il Budget approvato resta il confronto immutabile. L’Allocato già presente comprende le Stime e gli eventuali Riporti dell’Esercizio acquisiti o riallineati nella Proposta.'
+                    : 'L’Allocato già presente comprende le Stime e gli eventuali Riporti del '.$proposal->exercise->year.' acquisiti all’apertura. Le nuove decisioni lo trasformano nel Budget iniziale proposto.',
             ],
             'verification' => self::verification($proposal, $review),
             'readiness_counts' => collect($items)
@@ -178,10 +182,18 @@ class ProposalInfolist
             'actual_raw' => $actual,
             'actual' => self::money($actual),
             'has_actuals' => (bool) data_get($item->baseline, 'actual_context.has_actuals', false),
+            'allocation_before_raw' => Decimal::money((string) ($impact['before'] ?? '0.00')),
+            'allocation_after_raw' => Decimal::money((string) ($impact['after'] ?? '0.00')),
+            'allocation_delta_raw' => Decimal::money((string) ($impact['delta'] ?? '0.00')),
             'allocation_before' => self::money($impact['before'] ?? '0.00'),
             'allocation_after' => self::money($impact['after'] ?? '0.00'),
             'allocation_delta' => self::signedMoney($impact['delta'] ?? '0.00'),
             'allocation_delta_tone' => self::deltaTone($impact['delta'] ?? '0.00'),
+            'allocation_label' => 'Allocato prima → proposto',
+            'project_id' => $item->project_id,
+            'project_item_id' => $item->source_type === ProposalSourceType::Expense ? ($result['project_item_id'] ?? null) : null,
+            'expense_project_id' => $item->source_type === ProposalSourceType::Expense ? ($result['project_id'] ?? null) : null,
+            'parent_project' => null,
             'state_before' => self::stateLabel($item->source_type, $impact['state_before'] ?? null),
             'state_after' => $item->isExcludedFromPlan() ? 'Esclusa dalla Proposta' : self::stateLabel($item->source_type, $impact['state_after'] ?? null),
             'details' => match ($item->source_type) {
@@ -191,6 +203,58 @@ class ProposalInfolist
             },
             'actions' => $item->actionHistory->map(fn (ProposalAction $action): array => self::action($action))->all(),
         ];
+    }
+
+    /**
+     * Shows the economic children of a Project in the Project itself without changing
+     * the canonical impact totals, where each new Expense remains its own source.
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     * @return array<int, array<string, mixed>>
+     */
+    private static function withProjectExpenseRollups(array $items): array
+    {
+        $projects = collect($items)->where('type_value', ProposalSourceType::Project->value);
+        $expenses = collect($items)->where('type_value', ProposalSourceType::Expense->value);
+
+        foreach ($projects as $projectId => $project) {
+            $children = $expenses->filter(fn (array $expense): bool => (filled($expense['project_item_id']) && $expense['project_item_id'] === $project['proposal_item_id'])
+                || ($project['project_id'] !== null && (int) ($expense['expense_project_id'] ?? 0) === (int) $project['project_id'])
+            );
+
+            foreach ($children as $expenseId => $expense) {
+                $items[$expenseId]['parent_project'] = $project['label'];
+            }
+
+            if ($children->isEmpty()) {
+                continue;
+            }
+
+            $before = Decimal::add($project['allocation_before_raw'], Decimal::sum($children->pluck('allocation_before_raw')));
+            $after = Decimal::add($project['allocation_after_raw'], Decimal::sum($children->pluck('allocation_after_raw')));
+            $delta = Decimal::subtract($after, $before);
+            $items[$projectId]['allocation_before_raw'] = $before;
+            $items[$projectId]['allocation_after_raw'] = $after;
+            $items[$projectId]['allocation_delta_raw'] = $delta;
+            $items[$projectId]['allocation_before'] = self::money($before);
+            $items[$projectId]['allocation_after'] = self::money($after);
+            $items[$projectId]['allocation_delta'] = self::signedMoney($delta);
+            $items[$projectId]['allocation_delta_tone'] = self::deltaTone($delta);
+            $items[$projectId]['allocation_label'] = 'Costo del progetto · '.$children->count().' '.($children->count() === 1 ? 'spesa' : 'spese');
+            $items[$projectId]['details']['expenses'] = [
+                ...$items[$projectId]['details']['expenses'],
+                ...$children->map(fn (array $expense): array => [
+                    'description' => $expense['label'],
+                    'supplier' => $expense['supplier'],
+                    'exercise' => $expense['details']['exercise'],
+                    'total' => $expense['allocation_after'],
+                    'lines' => $expense['details']['lines'],
+                    'status' => $expense['excluded'] ? 'Scartata' : 'Inclusa nel Budget proposto',
+                ])->values()->all(),
+            ];
+        }
+
+        return $items;
     }
 
     /** @param array<string, mixed> $result

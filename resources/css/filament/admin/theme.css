@@ -5636,6 +5636,12 @@ html.fi {
     overflow-wrap: anywhere;
 }
 
+.mp2-proposal-parent-project {
+    color: var(--mp2-object-accent-ink) !important;
+    font-size: 0.75rem;
+    font-weight: 620;
+}
+
 .mp2-proposal-sources-table .mp2-proposal-item-readiness {
     display: grid;
 }

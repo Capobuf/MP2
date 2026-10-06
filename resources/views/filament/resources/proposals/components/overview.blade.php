@@ -24,9 +24,9 @@
                     <span class="mp2-proposal-flow-arrow" aria-hidden="true"><x-filament::icon icon="heroicon-m-arrow-right" /></span>
                 @endif
                 <div>
-                    <span>Base della Proposta</span>
+                    <span>{{ $overview['proposal']['plan_before_label'] }}</span>
                     <strong>{{ $overview['proposal']['allocation_before'] }}</strong>
-                    <small>Baseline acquisita o riallineata</small>
+                    <small>{{ $overview['proposal']['plan_before_help'] }}</small>
                 </div>
                 <span class="mp2-proposal-flow-arrow" aria-hidden="true"><x-filament::icon icon="heroicon-m-arrow-right" /></span>
                 <div>
@@ -37,19 +37,19 @@
 
             <div class="mp2-proposal-plan-footer">
                 <div>
-                    <span>Variazione</span>
+                    <span>Nuove decisioni della Proposta</span>
                     <strong class="mp2-proposal-delta-{{ $overview['proposal']['allocation_delta_tone'] }}">
                         {{ $overview['proposal']['allocation_delta'] }}
                     </strong>
                 </div>
                 <div>
-                    <span>Effettivo · Sola Lettura</span>
+                    <span>{{ $overview['proposal']['actual_label'] }}</span>
                     <strong>{{ $overview['proposal']['actual'] }}</strong>
                 </div>
             </div>
 
             <p class="mp2-proposal-read-only-note">
-                Realtà effettiva in sola lettura: gli Effettivi non sono decisioni di piano.
+                Tutti gli importi di questo riquadro riguardano il {{ $overview['proposal']['exercise'] }}. Gli Effettivi di altri Esercizi mostrati nella Panoramica non fanno parte di questa Proposta.
             </p>
         </section>
 
@@ -139,8 +139,8 @@
                         <span class="mp2-object-table-state">{{ $impact['application'] }}</span>
                     </div>
                     <dl class="mp2-proposal-impact-values">
-                        <div><dt>Allocato Base</dt><dd>{{ $impact['before'] }}</dd></div>
-                        <div><dt>Allocato Risultante</dt><dd>{{ $impact['after'] }}</dd></div>
+                        <div><dt>Allocato prima della Proposta</dt><dd>{{ $impact['before'] }}</dd></div>
+                        <div><dt>Piano proposto</dt><dd>{{ $impact['after'] }}</dd></div>
                         <div><dt>Variazione</dt><dd class="mp2-proposal-delta-{{ $impact['delta_tone'] }}">{{ $impact['delta'] }}</dd></div>
                     </dl>
 

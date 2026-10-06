@@ -12,8 +12,8 @@
                 <span class="mp2-object-table-state">{{ $impact['application'] }}</span>
             </div>
             <dl class="mp2-proposal-impact-values">
-                <div><dt>Base</dt><dd>{{ $impact['before'] }}</dd></div>
-                <div><dt>Risultato</dt><dd>{{ $impact['after'] }}</dd></div>
+                <div><dt>Allocato prima della Proposta</dt><dd>{{ $impact['before'] }}</dd></div>
+                <div><dt>Piano proposto</dt><dd>{{ $impact['after'] }}</dd></div>
                 <div><dt>Variazione</dt><dd>{{ $impact['delta'] }}</dd></div>
             </dl>
             <p>Budget già approvati invariati: {{ $impact['unchanged_budgets'] === [] ? 'nessuno presente' : implode(', ', $impact['unchanged_budgets']) }}.</p>

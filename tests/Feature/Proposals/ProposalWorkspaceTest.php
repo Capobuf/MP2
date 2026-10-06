@@ -7,6 +7,7 @@ use App\Actions\Proposals\PlanExpense;
 use App\Actions\Proposals\ReviewProposalReadiness;
 use App\Domain\Proposals\ProposalActionType;
 use App\Filament\Resources\Proposals\Pages\ViewProposal;
+use App\Filament\Resources\Proposals\Schemas\ProposalInfolist;
 use App\Models\Contract;
 use App\Models\ContractCondition;
 use App\Models\Exercise;
@@ -19,6 +20,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Computed;
 use Livewire\Livewire;
 use Tests\Support\TestPermissions;
 
@@ -43,6 +45,7 @@ beforeEach(function (): void {
 
 it('places add controls in the workspace and shows only actions belonging to the row type', function (): void {
     $page = Livewire::test(ViewProposal::class, ['record' => $this->proposal->id])
+        ->assertSee('Allocato già presente nel 2027')->assertSee('Effettivo 2027 · Sola Lettura')
         ->assertSee('Aggiungi')->assertDontSee('Azioni di Piano')
         ->assertCanSeeTableRecords([$this->expenseItem, $this->projectItem, $this->contractItem]);
     $page->assertActionHasLabel(TestAction::make('planExpenseEstimates')->table($this->expenseItem), 'Modifica stime')
@@ -69,6 +72,13 @@ it('places add controls in the workspace and shows only actions belonging to the
     $page->filterTable('source_type', ['value' => 'all'])->assertCanSeeTableRecords([$this->expenseItem, $this->projectItem, $this->contractItem]);
 });
 
+it('keeps the expensive proposal overview across table filter requests', function (): void {
+    $attributes = (new ReflectionMethod(ViewProposal::class, 'sourceOverview'))->getAttributes(Computed::class);
+
+    expect($attributes)->toHaveCount(1)
+        ->and($attributes[0]->newInstance()->persist)->toBeTrue();
+});
+
 it('prefills the selected expense estimates and ignores a forged item id in form data', function (): void {
     $other = app(PlanExpense::class)->create($this->actor, $this->proposal, ['description' => 'Altra spesa', 'exercise_id' => $this->exercise->id, 'estimate_lines' => []], null, (string) Str::uuid(), 0)->item;
     $page = Livewire::test(ViewProposal::class, ['record' => $this->proposal->id])
@@ -91,7 +101,22 @@ it('creates the allocation for the row project without a project selector', func
         ->fillForm(['description' => 'Nuova allocazione contestuale', 'reason' => 'Piano autonomo', 'estimate_lines' => [['proposal_line_id' => (string) Str::uuid(), 'amount' => '20', 'annulled' => false]]])
         ->callMountedAction()->assertHasNoActionErrors();
     $created = $this->proposal->actions()->where('action_type', ProposalActionType::CreateProjectAllocation)->sole();
-    expect($created->item->result['project_id'])->toBe($this->projectItem->project_id);
+    $overview = ProposalInfolist::overview($this->proposal->fresh());
+    $project = $overview['items'][$this->projectItem->id];
+    $expense = $overview['items'][$created->item->id];
+
+    expect($created->item->result['project_id'])->toBe($this->projectItem->project_id)
+        ->and($project['allocation_label'])->toBe('Costo del progetto · 1 spesa')
+        ->and($project['allocation_after'])->toBe('20,00 €')
+        ->and($project['details']['expenses'])->toHaveCount(1)
+        ->and($project['details']['expenses'][0]['description'])->toBe('Nuova allocazione contestuale')
+        ->and($expense['parent_project'])->toBe('Migrazione workspace');
+
+    Livewire::test(ViewProposal::class, ['record' => $this->proposal->id])
+        ->assertCanSeeTableRecords([$this->projectItem])
+        ->assertCanNotSeeTableRecords([$created->item])
+        ->filterTable('source_type', ['value' => 'expense'])
+        ->assertCanSeeTableRecords([$created->item]);
 });
 
 it('acknowledges and realigns directly on their source while retaining mandatory confirmations and reasons', function (): void {
@@ -150,6 +175,8 @@ it('rejects direct table actions by a viewer and foreign proposal records', func
 it('excludes a new expense from its row without hard deletion and keeps its history visible', function (): void {
     $created = app(PlanExpense::class)->create($this->actor, $this->proposal, ['description' => 'Nuova da escludere', 'exercise_id' => $this->exercise->id, 'estimate_lines' => []], null, (string) Str::uuid(), 0);
     Livewire::test(ViewProposal::class, ['record' => $this->proposal->id])
+        ->assertActionHasLabel(TestAction::make('excludePlannedExpense')->table($created->item), 'Scarta nuova spesa')
+        ->assertActionHidden(TestAction::make('reversePlannedExpense')->table($created->item))
         ->mountAction(TestAction::make('excludePlannedExpense')->table($created->item))
         ->assertSchemaComponentDoesNotExist('item_id')
         ->callMountedAction()->assertHasNoActionErrors()

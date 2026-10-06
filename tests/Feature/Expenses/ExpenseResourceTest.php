@@ -2,6 +2,7 @@
 
 use App\Domain\Company\AuditEventType;
 use App\Domain\Expenses\ExerciseStatus;
+use App\Domain\Projects\ProjectState;
 use App\Filament\Forms\AttachmentUpload;
 use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Filament\Resources\Expenses\Pages\CreateExpense;
@@ -18,10 +19,12 @@ use App\Models\CostCenter;
 use App\Models\Exercise;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
+use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Support\ExerciseContext;
+use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -31,6 +34,8 @@ use Livewire\Livewire;
 use Tests\Support\TestPermissions;
 
 uses(RefreshDatabase::class);
+
+afterEach(fn () => CarbonImmutable::setTestNow());
 
 function grantExpenseResource(User $user, Company $company, bool $manage = true): void
 {
@@ -231,7 +236,7 @@ it('rolls back every Line change when one row in the complete edit form is inval
         ->set("data.lines.{$keys[1]}.type", 'actual')
         ->set("data.lines.{$keys[1]}.amount", '0.00')
         ->call('save')
-        ->assertHasErrors(['data.lines.1.note']);
+        ->assertHasErrors(["data.lines.{$keys[1]}.note"]);
 
     expect($line->fresh()->amount)->toBe('100.00')
         ->and($expense->lines()->count())->toBe(1)
@@ -239,6 +244,39 @@ it('rolls back every Line change when one row in the complete edit form is inval
             AuditEventType::ExpenseLineUpdated,
             AuditEventType::ExpenseLineCreated,
         ])->count())->toBe(0);
+});
+
+it('shows the Project state rejection on a new Estimate row', function () {
+    CarbonImmutable::setTestNow('2026-10-05 10:00:00 Europe/Rome');
+    $manager = User::factory()->create();
+    $company = Company::factory()->create(['timezone' => 'Europe/Rome']);
+    grantExpenseResource($manager, $company);
+    $exercise = Exercise::factory()->for($company)->create(['year' => 2026]);
+    $project = Project::factory()->for($company)->create([
+        'initial_state' => ProjectState::Closed,
+        'initial_effective_date' => '2026-01-01',
+    ]);
+    $expense = Expense::factory()->forExercise($exercise)->for($project)->create([
+        'direct_cost_center_id' => null,
+    ]);
+    ExpenseLine::factory()->actual()->for($expense)->create(['amount' => '6600.00']);
+    $this->actingAs($manager);
+    Filament::setTenant($company->tenantCompany);
+
+    $component = Livewire::withQueryParams(['addLine' => 1])
+        ->test(EditExpense::class, ['record' => $expense->getRouteKey()]);
+    $lineKey = array_key_last((array) $component->get('data.lines'));
+
+    $component
+        ->set("data.lines.{$lineKey}.type", 'estimate')
+        ->set("data.lines.{$lineKey}.note", 'Preventivo originariamente ricevuto nel 2025')
+        ->set("data.lines.{$lineKey}.unit_amount", '7970.00')
+        ->call('save')
+        ->assertHasErrors([
+            "data.lines.{$lineKey}.type" => 'Il Progetto deve essere Pianificato o Aperto nel contesto dell’Esercizio per ricevere Stime.',
+        ]);
+
+    expect($expense->lines()->count())->toBe(1);
 });
 
 it('requires the canonical reason when an Estimate changes after Budget approval', function () {

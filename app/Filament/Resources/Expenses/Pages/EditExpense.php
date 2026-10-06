@@ -658,13 +658,16 @@ class EditExpense extends EditRecord
 
     private function lineValidationException(ValidationException $exception, string $key): ValidationException
     {
+        $stateKey = $this->lineStateKey($key);
         $lineFields = ['type', 'amount', 'quantity', 'unit_amount', 'unit_of_measure', 'note', 'amount_warning_acknowledged'];
         $sharedFields = ['change_reason', 'residual_estimate', 'actual_kind', 'open_project', 'activity_note', 'overspend_note'];
+        $lineContextFields = ['expense', 'project_id', 'contract_id'];
         $messages = [];
         foreach ($exception->errors() as $field => $errors) {
             $target = match (true) {
-                in_array($field, $lineFields, true) => "data.lines.{$key}.{$field}",
+                in_array($field, $lineFields, true) => "data.lines.{$stateKey}.{$field}",
                 in_array($field, $sharedFields, true) => "data.{$field}",
+                in_array($field, $lineContextFields, true) => "data.lines.{$stateKey}.type",
                 default => $field,
             };
             foreach ($errors as $error) {
@@ -673,5 +676,20 @@ class EditExpense extends EditRecord
         }
 
         return ValidationException::withMessages($messages);
+    }
+
+    private function lineStateKey(string $submittedKey): string
+    {
+        $state = $this->data['lines'] ?? null;
+        if (! is_array($state) || array_key_exists($submittedKey, $state)) {
+            return $submittedKey;
+        }
+
+        $index = filter_var($submittedKey, FILTER_VALIDATE_INT);
+        if (! is_int($index) || $index < 0) {
+            return $submittedKey;
+        }
+
+        return (string) (array_keys($state)[$index] ?? $submittedKey);
     }
 }

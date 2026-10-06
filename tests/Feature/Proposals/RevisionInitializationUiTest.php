@@ -45,9 +45,9 @@ it('creates a revision from an open exercise and shows live versus budget contex
         ->assertSuccessful()
         ->assertSee('Revisione')
         ->assertSee('Budget approvato v1')
-        ->assertSee('Base della Proposta')
+        ->assertSee('Allocato già presente nel '.$exercise->year)
         ->assertSee('Budget proposto v2')
-        ->assertSee('baseline acquisita o riallineata');
+        ->assertSee('Stime e Riporto; Effettivi mostrati separatamente');
 });
 
 it('disables revision creation for a closed exercise or occupied draft', function (): void {

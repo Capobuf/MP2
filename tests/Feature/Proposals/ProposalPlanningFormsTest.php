@@ -160,7 +160,9 @@ it('creates a planned project and expense then edits the estimates without live 
     $expense = $this->proposal->items()->where('source_type', 'expense')->sole();
     expect($expense->result['estimate_lines'][0]['amount'])->toBe('900719925474099.91');
     $line['amount'] = '100,25';
-    $page->callAction(TestAction::make('planExpenseEstimates')->table($expense), data: ['estimate_lines' => [$line]])->assertHasNoActionErrors();
+    $page->filterTable('source_type', ['value' => 'expense'])
+        ->callAction(TestAction::make('planExpenseEstimates')->table($expense), data: ['estimate_lines' => [$line]])
+        ->assertHasNoActionErrors();
     expect($expense->fresh()->result['estimate_lines'][0]['amount'])->toBe('100.25')
         ->and(Project::query()->count())->toBe(0)->and(Expense::query()->count())->toBe(0)
         ->and(app(ProposalReadiness::class)->assessProposal($this->proposal->fresh())['ready'])->toBeTrue();

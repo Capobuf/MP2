@@ -3,6 +3,7 @@
         <div>
             <strong>{{ $expense['description'] }}</strong>
             <span>{{ $expense['supplier'] }} · Esercizio {{ $expense['exercise'] }}</span>
+            @if (isset($expense['status']))<span>{{ $expense['status'] }}</span>@endif
         </div>
         <strong>{{ $expense['total'] }}</strong>
     </div>

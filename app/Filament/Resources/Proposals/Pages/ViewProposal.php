@@ -31,7 +31,6 @@ use App\Domain\Proposals\ProposalActionReplay;
 use App\Domain\Proposals\ProposalActionType;
 use App\Domain\Proposals\ProposalPlanData;
 use App\Domain\Proposals\ProposalPurpose;
-use App\Domain\Proposals\ProposalReadiness;
 use App\Domain\Proposals\ProposalRealignmentChoice;
 use App\Domain\Proposals\ProposalSourceType;
 use App\Filament\Forms\AttachmentUpload;
@@ -54,6 +53,8 @@ use App\Models\Supplier;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
@@ -77,7 +78,9 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Number;
 use Illuminate\Support\Str;
@@ -94,6 +97,10 @@ class ViewProposal extends ViewRecord implements HasTable
     public string $approvalOperationId = '';
 
     public string $evidenceOperationId = '';
+
+    private ?bool $canPlanCache = null;
+
+    private ?bool $canApproveCache = null;
 
     public function mount(int|string $record): void
     {
@@ -151,17 +158,61 @@ class ViewProposal extends ViewRecord implements HasTable
             ])
             ->headerActions([$this->addSourcesAction()])
             ->recordActions($this->sourceActions())
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    BulkAction::make('bulkReloadReality')
+                        ->label('Ricarica realtà')
+                        ->icon('heroicon-m-arrow-path')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->modalHeading('Ricarica la realtà per le sorgenti selezionate')
+                        ->modalDescription('Le decisioni proposte sulle sorgenti selezionate saranno ritirate e la realtà corrente diventerà la nuova base.')
+                        ->authorize(fn (): bool => $this->canPlan())
+                        ->action(function (EloquentCollection $records): void {
+                            $this->realignSelectedSources($records, ProposalRealignmentChoice::Reload);
+                            $this->refreshProposal('Realtà Ricaricata per le Sorgenti Selezionate');
+                        })
+                        ->deselectRecordsAfterCompletion(),
+                    BulkAction::make('bulkKeepProposal')
+                        ->label('Mantieni proposta')
+                        ->icon('heroicon-m-check')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->modalHeading('Mantieni la proposta per le sorgenti selezionate')
+                        ->modalDescription('Le decisioni proposte saranno riapplicate alla realtà corrente di ogni sorgente selezionata.')
+                        ->authorize(fn (): bool => $this->canPlan())
+                        ->form([
+                            Textarea::make('reason')->label('Motivazione comune')->required(),
+                        ])
+                        ->action(function (array $data, EloquentCollection $records): void {
+                            $this->realignSelectedSources($records, ProposalRealignmentChoice::Keep, $data['reason']);
+                            $this->refreshProposal('Decisioni Riapplicate alle Sorgenti Selezionate');
+                        })
+                        ->deselectRecordsAfterCompletion(),
+                ])->label('Azioni sulle sorgenti selezionate'),
+            ])
+            ->checkIfRecordIsSelectableUsing(fn (ProposalItem $record): bool => $this->canRealign($record))
             ->filters([
                 Filter::make('source_type')->schema([
                     ToggleButtons::make('value')->label('Tipo di sorgente')->hiddenLabel()->inline()
                         ->options(fn (): array => [
-                            'all' => 'Tutte · '.$this->proposal()->items->count(),
+                            'all' => 'Panoramica · '.$this->topLevelSourceCount(),
                             'contract' => 'Contratti · '.$this->proposal()->items->where('source_type', ProposalSourceType::Contract)->count(),
                             'project' => 'Progetti · '.$this->proposal()->items->where('source_type', ProposalSourceType::Project)->count(),
                             'expense' => 'Spese · '.$this->proposal()->items->where('source_type', ProposalSourceType::Expense)->count(),
                         ])->default('all'),
-                ])->query(fn (Builder $query, array $data): Builder => in_array($data['value'] ?? null, ['contract', 'project', 'expense'], true)
-                    ? $query->where('source_type', $data['value']) : $query),
+                ])->query(function (Builder $query, array $data): Builder {
+                    if (in_array($data['value'] ?? null, ['contract', 'project', 'expense'], true)) {
+                        return $query->where('source_type', $data['value']);
+                    }
+
+                    return $query->where(fn (Builder $sources): Builder => $sources
+                        ->where('source_type', '!=', ProposalSourceType::Expense->value)
+                        ->orWhere(fn (Builder $expenses): Builder => $expenses
+                            ->where('source_type', ProposalSourceType::Expense->value)
+                            ->whereNull('result->project_item_id')
+                            ->whereNull('result->project_id')));
+                }),
                 Filter::make('needs_verification')
                     ->label('Da verificare')
                     ->query(fn (Builder $query): Builder => $query->where('readiness_state', '!=', 'aligned')),
@@ -177,7 +228,7 @@ class ViewProposal extends ViewRecord implements HasTable
     }
 
     /** @return array<string, mixed> */
-    #[Computed]
+    #[Computed(persist: true)]
     public function sourceOverview(): array
     {
         return ProposalInfolist::overview($this->proposal());
@@ -413,11 +464,11 @@ class ViewProposal extends ViewRecord implements HasTable
                     app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $record, ProposalActionType::SetExpenseCostCenter, ['cost_center_id' => filled($data['cost_center_id'] ?? null) ? (int) $data['cost_center_id'] : null], null, $data['operation_id'], (int) $data['proposal_revision']);
                     $this->refreshProposal('Centro di Costo del Piano Aggiornato');
                 }),
-                Action::make('reversePlannedExpense')->label('Storna Spesa nel Piano')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Expense && ! $record->isExcludedFromPlan() && ! data_get($record->baseline, 'actual_context.has_actuals', false) && ! ($record->result['reversed'] ?? filled($record->result['reversed_at'] ?? null)))->requiresConfirmation()->authorize(fn (): bool => $this->canPlan())->form([Textarea::make('reason')->label('Motivazione')->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision)])->action(function (array $data, ProposalItem $record): void {
+                Action::make('reversePlannedExpense')->label('Rimuovi spesa esistente dal piano')->modalHeading('Rimuovi dal piano tramite storno')->modalDescription('La Spesa esiste già: con l’approvazione sarà stornata, resterà nello storico e non contribuirà più ai calcoli. Lo storno è consentito soltanto se non contiene Effettivi.')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Expense && $record->expense_id !== null && ! $record->isExcludedFromPlan() && ! data_get($record->baseline, 'actual_context.has_actuals', false) && ! ($record->result['reversed'] ?? filled($record->result['reversed_at'] ?? null)))->requiresConfirmation()->authorize(fn (): bool => $this->canPlan())->form([Textarea::make('reason')->label('Motivazione')->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision)])->action(function (array $data, ProposalItem $record): void {
                     app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $record, ProposalActionType::ReverseExpense, ['reason' => $data['reason']], $data['reason'], $data['operation_id'], (int) $data['proposal_revision']);
                     $this->refreshProposal('Storno Pianificato');
                 }),
-                Action::make('restorePlannedExpense')->label('Ripristina Spesa nel Piano')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Expense && ! $record->isExcludedFromPlan() && ! data_get($record->baseline, 'actual_context.has_actuals', false) && ($record->result['reversed'] ?? filled($record->result['reversed_at'] ?? null)))->requiresConfirmation()->authorize(fn (): bool => $this->canPlan())->form([Textarea::make('reason')->label('Motivazione')->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision)])->action(function (array $data, ProposalItem $record): void {
+                Action::make('restorePlannedExpense')->label('Reinserisci spesa nel piano')->modalHeading('Reinserisci la spesa stornata')->modalDescription('Annulla lo storno pianificato: con l’approvazione la Spesa tornerà a contribuire ai calcoli.')->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Expense && ! $record->isExcludedFromPlan() && ! data_get($record->baseline, 'actual_context.has_actuals', false) && ($record->result['reversed'] ?? filled($record->result['reversed_at'] ?? null)))->requiresConfirmation()->authorize(fn (): bool => $this->canPlan())->form([Textarea::make('reason')->label('Motivazione')->required(), Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()), Hidden::make('proposal_revision')->default(fn (): int => $this->proposal()->revision)])->action(function (array $data, ProposalItem $record): void {
                     app(PlanExpense::class)->execute($this->actor(), $this->proposal(), $record, ProposalActionType::RestoreExpense, ['reason' => $data['reason']], $data['reason'], $data['operation_id'], (int) $data['proposal_revision']);
                     $this->refreshProposal('Ripristino Pianificato');
                 }),
@@ -518,11 +569,12 @@ class ViewProposal extends ViewRecord implements HasTable
                     app(PlanProposalRelation::class)->execute($this->actor(), $this->proposal(), [...$this->parseReference(($record->source_type === ProposalSourceType::Project ? 'item:'.$record->proposal_item_id : $data['project_reference']), 'project'), ...$this->parseReference(($record->source_type === ProposalSourceType::Contract ? 'item:'.$record->proposal_item_id : $data['contract_reference']), 'contract')], $data['operation_id'], (int) $data['proposal_revision']);
                     $this->refreshProposal('Progetto e Contratto Collegati');
                 }),
-                Action::make('excludePlannedExpense')->label('Escludi dalla Proposta')->color('danger')
+                Action::make('excludePlannedExpense')->label('Scarta nuova spesa')->color('danger')
                     ->visible(fn (ProposalItem $record): bool => $this->canPlan() && $record->source_type === ProposalSourceType::Expense && $record->expense_id === null && ! $record->isExcludedFromPlan())
                     ->authorize(fn (): bool => $this->canPlan())
                     ->requiresConfirmation()
-                    ->modalDescription('La Spesa non contribuirà al piano e non verrà creata all’approvazione. La sorgente e tutte le decisioni resteranno consultabili nello storico.')
+                    ->modalHeading('Scarta la nuova spesa')
+                    ->modalDescription('Questa Spesa è nata nella Proposta: non verrà creata all’approvazione e non contribuirà al Budget. La decisione resterà consultabile nello storico.')
                     ->schema([
                         Textarea::make('reason')->label('Motivazione'),
                         Hidden::make('operation_id')->default(fn (): string => (string) Str::uuid()),
@@ -635,12 +687,19 @@ class ViewProposal extends ViewRecord implements HasTable
 
     private function canPlan(): bool
     {
-        return $this->proposal()->status->value === 'draft' && auth()->user()?->can('update', $this->proposal()) === true;
+        return $this->canPlanCache ??= $this->proposal()->status->value === 'draft' && auth()->user()?->can('update', $this->proposal()) === true;
     }
 
     private function canCreateSupplier(): bool
     {
         return auth()->user()?->can('create', [Supplier::class, $this->proposal()->company]) === true;
+    }
+
+    private function topLevelSourceCount(): int
+    {
+        return $this->proposal()->items->reject(fn (ProposalItem $item): bool => $item->source_type === ProposalSourceType::Expense
+            && (filled($item->result['project_item_id'] ?? null) || filled($item->result['project_id'] ?? null))
+        )->count();
     }
 
     private function canRealign(ProposalItem $item): bool
@@ -653,14 +712,40 @@ class ViewProposal extends ViewRecord implements HasTable
         return $this->canPlan() && $item->readiness_state->value === 'to_review';
     }
 
+    /** @param EloquentCollection<int, ProposalItem> $items */
+    private function realignSelectedSources(EloquentCollection $items, ProposalRealignmentChoice $choice, ?string $reason = null): void
+    {
+        if ($items->isEmpty()) {
+            throw ValidationException::withMessages(['items' => 'Selezionare almeno una sorgente da riallineare.']);
+        }
+
+        $proposal = $this->proposal();
+
+        DB::transaction(function () use ($items, $choice, $reason, $proposal): void {
+            foreach ($items->sortBy('id') as $item) {
+                app(RealignProposalItem::class)->execute(
+                    $this->actor(),
+                    $proposal,
+                    $item,
+                    $choice,
+                    $reason,
+                    [],
+                    (string) Str::uuid(),
+                    (int) $proposal->revision,
+                );
+                $proposal->refresh();
+            }
+        });
+    }
+
     private function canApprove(): bool
     {
-        return $this->proposal()->status->value === 'draft' && auth()->user()?->can('approve', $this->proposal()) === true;
+        return $this->canApproveCache ??= $this->proposal()->status->value === 'draft' && auth()->user()?->can('approve', $this->proposal()) === true;
     }
 
     private function approvalReady(): bool
     {
-        return app(ProposalReadiness::class)->assessProposal($this->proposal())['ready'];
+        return $this->sourceOverview['verification']['ready'];
     }
 
     private function nextBudgetVersion(): int
@@ -730,6 +815,8 @@ class ViewProposal extends ViewRecord implements HasTable
     private function refreshProposal(string $title): void
     {
         $this->record = $this->proposal()->refresh()->load(['exercise', 'creator', 'referenceBudget', 'items', 'actions', 'actionHistory']);
+        $this->canPlanCache = null;
+        $this->canApproveCache = null;
         unset($this->sourceOverview);
         $this->flushCachedTableRecords();
         Notification::make()->title($title)->success()->send();

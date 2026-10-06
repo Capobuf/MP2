@@ -5,13 +5,16 @@
             {{ $item['cost_center'] }}
             @if ($item['supplier'] !== '—') · {{ $item['supplier'] }} @endif
         </span>
+        @if ($item['parent_project'] !== null)
+            <span class="mp2-proposal-parent-project">Nel progetto · {{ $item['parent_project'] }}</span>
+        @endif
         @if ($item['excluded'])
             <span class="mp2-budget-muted">Esclusa dalla Proposta</span>
         @endif
     </div>
     <span class="mp2-budget-source-type">{{ $item['type_label'] }}</span>
     <div class="mp2-proposal-item-allocation">
-        <small>Allocato Base → Risultante</small>
+        <small>{{ $item['allocation_label'] }}</small>
         <strong>{{ $item['allocation_before'] }} → {{ $item['allocation_after'] }}</strong>
     </div>
     <div class="mp2-proposal-item-allocation">

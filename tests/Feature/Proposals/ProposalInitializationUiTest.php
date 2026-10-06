@@ -40,7 +40,7 @@ it('initializes from the exercise and keeps proposal lists tenant scoped', funct
         ->assertSuccessful()
         ->assertSee('Confronto dell’Allocato')
         ->assertSee('Piano Risultante')
-        ->assertSee('Realtà effettiva in sola lettura')
+        ->assertSee('Effettivo '.$exercise->year.' · Sola Lettura')
         ->assertSee('7,00')
         ->assertDontSee('estimate_lines')
         ->assertDontSee('actual_context');
